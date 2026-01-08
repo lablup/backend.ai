@@ -1,6 +1,6 @@
 from aiohttp import web
 
-from ..types import (
+from ai.backend.account_manager.types import (
     CORSOptions,
     WebMiddleware,
 )

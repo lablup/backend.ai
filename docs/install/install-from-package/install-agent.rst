@@ -5,6 +5,37 @@ If there are dedicated compute nodes (often, GPU nodes) in your cluster,
 Backend.AI Agent service should be installed on the compute nodes, not on the
 management node.
 
+.. warning::
+
+   **Network Security Requirement**
+   
+   Compute nodes running Backend.AI Agents must be deployed in a network-isolated
+   environment with NO direct inbound access from untrusted networks (Internet).
+   
+   This is a critical security requirement. Please review the
+   :ref:`concept-security` guide before proceeding with the installation.
+
+Network Configuration Prerequisites
+------------------------------------
+
+Before installing the agent, ensure your network is properly configured:
+
+**Required Network Configuration:**
+
+1. **Private Network**: Agents must be in a private network without public IP addresses
+2. **Firewall Rules**: Block all direct inbound traffic from the Internet to agent nodes
+3. **Management Access**: Allow agent nodes to communicate with management zone components
+4. **Inter-Agent Communication**: Allow agents to communicate with each other for multi-node cluster sessions
+
+**Recommended Network Architecture:**
+
+* Deploy agents in a private subnet/VLAN separate from management components
+* Use firewall/security group rules to control access
+* Only expose webserver to the Internet (typically on port 443)
+* Route all interactive session access through AppProxy
+
+For detailed network architecture and configuration requirements, see :ref:`concept-security`.
+
 Refer to :ref:`prepare_python_and_venv` to setup Python and virtual environment
 for the service.
 

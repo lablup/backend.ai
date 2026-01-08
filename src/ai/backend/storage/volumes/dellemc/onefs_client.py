@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import os
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict, cast
+from typing import Any, NotRequired, Optional, TypedDict, cast
 
 import aiohttp
 
@@ -52,11 +52,10 @@ class OneFSClient:
     async def get_metadata(self) -> Mapping[str, Any]:
         cluster_metadata = await self.get_cluster_metadata()
         node_metadata = await self.get_node_metadata()
-        volume_cluster = {
+        return {
             "cluster": dump_json_str(cluster_metadata),
             "nodes": dump_json_str(node_metadata),
         }
-        return volume_cluster
 
     @asynccontextmanager
     async def _request(
@@ -83,7 +82,7 @@ class OneFSClient:
             "used_bytes": int(data["storagepools"][0]["usage"]["used_bytes"]),
         }
 
-    async def get_list_lnn(self) -> List[int]:
+    async def get_list_lnn(self) -> list[int]:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
         return data["storagepools"][0]["lnns"]
@@ -108,7 +107,7 @@ class OneFSClient:
             # "capacity": node["capacity"],
         }
 
-    async def get_cluster_metadata(self) -> List[Dict[str, Any]]:
+    async def get_cluster_metadata(self) -> list[dict[str, Any]]:
         try:
             cluster_metadata = []
             cluster_metadata.append({
@@ -129,12 +128,12 @@ class OneFSClient:
             "local_lnn": data["local_lnn"],
         }
 
-    async def get_cluster_interface(self) -> List[Mapping[str, Any]]:
+    async def get_cluster_interface(self) -> list[Mapping[str, Any]]:
         async with self._request("GET", "network/interfaces") as resp:
             data = await resp.json()
         return data["interfaces"]
 
-    async def get_node_metadata(self) -> List[Dict[str, Mapping[str, Any]]]:
+    async def get_node_metadata(self) -> list[dict[str, Mapping[str, Any]]]:
         try:
             lnns = await self.get_list_lnn()
             node_metadata = []
@@ -205,8 +204,7 @@ class OneFSClient:
             "quota/quotas",
             json=data,
         ) as resp:
-            msg = await resp.json()
-        return msg
+            return await resp.json()
 
     async def delete_quota(self, quota_id) -> None:
         async with self._request(

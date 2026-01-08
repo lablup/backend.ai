@@ -1,13 +1,10 @@
-import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
     ParamSpec,
     TypeVar,
@@ -31,10 +28,9 @@ from tenacity import (
 )
 from yarl import URL
 
+from ai.backend.account_manager.config import ServerConfig
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
-
-from ..config import ServerConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -135,9 +131,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -156,9 +151,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
-                    yield sess
+            async with self.connect() as _conn, _begin_session(_conn) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -200,9 +194,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                             raise TryAgain
                         raise
         except RetryError:
-            raise asyncio.TimeoutError(
-                f"DB serialization failed after {max_attempts} retry transactions"
-            )
+            raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
         return result
 
 

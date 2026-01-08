@@ -10,8 +10,7 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StrEnumType,

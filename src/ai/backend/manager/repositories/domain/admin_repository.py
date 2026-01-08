@@ -1,7 +1,10 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -9,24 +12,17 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
-    DomainCreator,
     DomainData,
-    DomainModifier,
     UserInfo,
 )
 from ai.backend.manager.errors.resource import (
-    DataTransformationFailed,
-    DomainCreationFailed,
-    DomainDataProcessingError,
     DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
     DomainHasUsers,
-    DomainNodeCreationFailed,
 )
-from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.group import ProjectType, groups
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     kernels,
@@ -34,6 +30,9 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -62,57 +61,38 @@ class AdminDomainRepository:
         self._db = db
 
     @domain_repository_resilience.apply()
-    async def create_domain_force(self, creator: DomainCreator) -> DomainData:
+    async def create_domain_force(self, creator: Creator[DomainRow]) -> DomainData:
         """
         Creates a new domain with model-store group without permission checks.
         For superadmin use only.
         """
-        async with self._db.begin() as conn:
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
-            existing_domain = await conn.scalar(check_query)
+        spec = cast(DomainCreatorSpec, creator.spec)
+        async with self._db.begin_session() as db_session:
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
+            existing_domain = await db_session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            data = creator.fields_to_store()
-            insert_query = sa.insert(domains).values(data).returning(domains)
-            result = await conn.execute(insert_query)
-            row = result.first()
+            creator_result = await execute_creator(db_session, creator)
+            domain_row = creator_result.row
 
             # Create model-store group for the domain
-            await self._create_model_store_group(conn, creator.name)
+            await self._create_model_store_group_session(db_session, spec.name)
 
-            if result.rowcount != 1 or row is None:
-                raise DomainCreationFailed(
-                    f"No domain created. rowcount: {result.rowcount}, data: {data}"
-                )
-
-        if row is None:
-            raise DomainDataProcessingError("Domain row is unexpectedly None after creation")
-        result = row_to_data(row)
-        if result is None:
-            raise DataTransformationFailed("Failed to transform domain row to data")
-        return result
+            return domain_row.to_data()
 
     @domain_repository_resilience.apply()
-    async def modify_domain_force(self, domain_name: str, modifier: DomainModifier) -> DomainData:
+    async def modify_domain_force(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain without permission checks.
         For superadmin use only.
         """
-        async with self._db.begin() as conn:
-            data = modifier.fields_to_update()
-            update_query = (
-                sa.update(domains)
-                .values(data)
-                .where(domains.c.name == domain_name)
-                .returning(domains)
-            )
-            result = await conn.execute(update_query)
-            row = result.first()
+        async with self._db.begin_session() as db_session:
+            result = await execute_updater(db_session, updater)
 
-            if result.rowcount == 0:
-                raise DomainNotFound(f"Domain not found: {domain_name}")
-            return row_to_data(row)
+            if result is None:
+                raise DomainNotFound(f"Domain not found: {updater.pk_value}")
+            return row_to_data(result.row)
 
     @domain_repository_resilience.apply()
     async def soft_delete_domain_force(self, domain_name: str) -> None:
@@ -188,40 +168,33 @@ class AdminDomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node_force(
-        self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
+        self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups without permission checks.
         For superadmin use only.
         """
+        spec = cast(DomainCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            data = creator.fields_to_store()
-            check_query = sa.select(DomainRow).where(DomainRow.name == creator.name)
+            check_query = sa.select(DomainRow).where(DomainRow.name == spec.name)
             existing_domain = await session.scalar(check_query)
             if existing_domain is not None:
-                raise InvalidAPIParameters(f"Domain with name '{creator.name}' already exists")
+                raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(data).returning(DomainRow)
-            )
-            domain_row = await session.scalar(insert_and_returning)
-            if domain_row is None:
-                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
+            creator_result = await execute_creator(session, creator)
+            domain_row = creator_result.row
 
             if scaling_groups is not None:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": creator.name}
+                        {"scaling_group": sgroup_name, "domain": spec.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
 
             await session.commit()
-            result = row_to_data(domain_row)
-            if result is None:
-                raise DataTransformationFailed("Failed to transform domain row to data")
-            return result
+            return domain_row.to_data()
 
     async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
         """
@@ -240,6 +213,25 @@ class AdminDomainRepository:
         })
         await conn.execute(model_store_insert_query)
 
+    async def _create_model_store_group_session(
+        self, db_session: SASession, domain_name: str
+    ) -> None:
+        """
+        Private method to create model-store group for a domain using SASession.
+        """
+        model_store_insert_query = sa.insert(groups).values({
+            "name": "model-store",
+            "description": "Model Store",
+            "is_active": True,
+            "domain_name": domain_name,
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "integration_id": None,
+            "resource_policy": "default",
+            "type": ProjectType.MODEL_STORE,
+        })
+        await db_session.execute(model_store_insert_query)
+
     async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to delete all kernels for a domain.
@@ -251,7 +243,7 @@ class AdminDomainRepository:
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions_force(
         self,
-        creator: DomainCreator,
+        creator: Creator[DomainRow],
         user_info: UserInfo,
         scaling_groups: Optional[list[str]] = None,
     ) -> DomainData:
@@ -265,8 +257,7 @@ class AdminDomainRepository:
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions_force(
         self,
-        domain_name: str,
-        modifier_fields: dict,
+        updater: Updater[DomainRow],
         user_info: UserInfo,
         sgroups_to_add: Optional[set[str]] = None,
         sgroups_to_remove: Optional[set[str]] = None,
@@ -275,6 +266,7 @@ class AdminDomainRepository:
         Modifies a domain node with scaling group changes without permission checks.
         For superadmin use only.
         """
+        domain_name = str(updater.pk_value)
         async with self._db.begin_session() as session:
             if sgroups_to_add is not None:
                 await session.execute(
@@ -293,19 +285,9 @@ class AdminDomainRepository:
                     ),
                 )
 
-            update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(modifier_fields)
-                .returning(DomainRow)
-            )
-            await session.execute(update_stmt)
-
-            domain_row = await session.scalar(
-                sa.select(DomainRow).where(DomainRow.name == domain_name)
-            )
+            result = await execute_updater(session, updater)
 
             await session.commit()
-            if domain_row is None:
+            if result is None:
                 raise DomainNotFound(f"Domain not found (id:{domain_name})")
-            return row_to_data(domain_row)
+            return row_to_data(result.row)

@@ -11,14 +11,14 @@ from pydantic import BaseModel, Field
 from .types import NotificationRuleType
 
 __all__ = (
+    "ArtifactDownloadCompletedMessage",
     "NotifiableMessage",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
-    "ArtifactDownloadCompletedMessage",
 )
 
 # Module-level registry for notification message types
-_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type["NotifiableMessage"]] = {}
+_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type[NotifiableMessage]] = {}
 
 
 class NotifiableMessage(BaseModel):
@@ -30,7 +30,7 @@ class NotifiableMessage(BaseModel):
 
     model_config = {"extra": "forbid"}  # Strict validation - reject unknown fields
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         """Automatically register subclasses by their rule type."""
         try:
             rule_type = cls.rule_type()
@@ -52,7 +52,7 @@ class NotifiableMessage(BaseModel):
         cls,
         rule_type: NotificationRuleType,
         data: Mapping[str, Any],
-    ) -> "NotifiableMessage":
+    ) -> NotifiableMessage:
         """Validate notification data against the appropriate message type.
 
         Args:

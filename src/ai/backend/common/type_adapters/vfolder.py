@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 from pydantic import BeforeValidator, PlainSerializer
 
-from ..types import VFolderID
+from ai.backend.common.types import VFolderID
 
 
 def _parse_vfolder_id(v: Any) -> VFolderID:

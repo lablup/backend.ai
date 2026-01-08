@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from functools import lru_cache
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
     CIStrEnum,
+    KernelId,
     ResourceSlot,
+    SessionId,
     SessionResult,
     SessionTypes,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult
 
 
 class KernelStatus(CIStrEnum):
@@ -37,7 +45,7 @@ class KernelStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def having_containers(cls) -> set["KernelStatus"]:
+    def having_containers(cls) -> set[KernelStatus]:
         return {
             cls.PULLING,
             cls.CREATING,
@@ -52,7 +60,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_occupied_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_occupied_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -63,7 +71,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_requested_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_requested_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -77,7 +85,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminatable_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminatable_statuses(cls) -> frozenset[KernelStatus]:
         """Return statuses that can transition to TERMINATING."""
         return frozenset(
             status
@@ -94,7 +102,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminal_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminal_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered terminal.
         """
@@ -106,21 +114,19 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def retriable_statuses(cls) -> frozenset["KernelStatus"]:
+    def retriable_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered retriable.
         """
         return frozenset(
-            (
-                status
-                for status in cls
-                if status
-                not in (
-                    cls.RUNNING,
-                    cls.TERMINATING,
-                    cls.TERMINATED,
-                    cls.CANCELLED,
-                )
+            status
+            for status in cls
+            if status
+            not in (
+                cls.RUNNING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
             )
         )
 
@@ -237,3 +243,47 @@ class KernelInfo:
     lifecycle: LifecycleStatus
     metrics: Metrics
     metadata: Metadata
+
+
+# ========== Scheduling History Types ==========
+
+
+class KernelSchedulingPhase(StrEnum):
+    PREPARING = "PREPARING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
+    RUNNING = "RUNNING"
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+
+
+@dataclass
+class KernelSchedulingHistoryData:
+    """Domain model for kernel scheduling history."""
+
+    id: UUID
+    kernel_id: KernelId
+    session_id: SessionId
+
+    phase: str  # ScheduleType value
+    from_status: Optional[KernelSchedulingPhase]
+    to_status: Optional[KernelSchedulingPhase]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class KernelSchedulingHistoryListResult:
+    """Search result with pagination for kernel scheduling history."""
+
+    items: list[KernelSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

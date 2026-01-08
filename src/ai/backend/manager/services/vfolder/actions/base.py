@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import (
@@ -15,6 +15,7 @@ from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
 )
+from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
@@ -22,10 +23,14 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderRow,
 )
-from ai.backend.manager.types import OptionalState, PartialModifier
-
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
 
 class VFolderAction(BaseAction):
@@ -51,6 +56,10 @@ class VFolderSingleEntityAction(BaseSingleEntityAction):
     @classmethod
     def entity_type(cls) -> str:
         return "vfolder"
+
+    @override
+    def field_data(self) -> FieldData | None:
+        return None
 
 
 class VFolderSingleEntityActionResult(BaseSingleEntityActionResult):
@@ -132,25 +141,10 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
 
 
 @dataclass
-class VFolderAttributeModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    mount_permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "permission")
-        return to_update
-
-
-@dataclass
 class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
-    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
+    updater: Updater[VFolderRow]
 
     @override
     def entity_id(self) -> Optional[str]:

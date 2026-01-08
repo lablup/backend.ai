@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import sqlalchemy as sa
 

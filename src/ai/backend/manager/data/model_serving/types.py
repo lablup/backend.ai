@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 import yarl
 from pydantic import HttpUrl
@@ -27,11 +28,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus
 
 __all__ = [
-    "EndpointLifecycle",
-    "EndpointData",
-    "RoutingData",
-    "EndpointTokenData",
     "EndpointAutoScalingRuleData",
+    "EndpointAutoScalingRuleListResult",
+    "EndpointData",
+    "EndpointLifecycle",
+    "EndpointTokenData",
+    "RoutingData",
 ]
 
 
@@ -68,7 +70,7 @@ class EndpointData:
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
-    routings: Optional[Sequence["RoutingData"]] = None
+    routings: Optional[Sequence[RoutingData]] = None
 
 
 @dataclass
@@ -107,6 +109,16 @@ class EndpointAutoScalingRuleData:
     created_at: datetime
     last_triggered_at: datetime
     endpoint: uuid.UUID
+
+
+@dataclass
+class EndpointAutoScalingRuleListResult:
+    """Search result with total count for endpoint auto scaling rules."""
+
+    items: list[EndpointAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass

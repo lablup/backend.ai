@@ -3,24 +3,23 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List
+from typing import Any
 
 import aiofiles.os
 
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import CephNotInstalledError, QuotaScopeNotFoundError
-from ...subproc import run
-from ...types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
-from ..abc import (
+from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_SIZE,
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -134,8 +133,8 @@ class CephFSOpModel(BaseFSOpModel):
 class CephFSVolume(BaseVolume):
     name = "cephfs"
     loop: asyncio.AbstractEventLoop
-    registry: Dict[str, int]
-    project_id_pool: List[int]
+    registry: dict[str, int]
+    project_id_pool: list[int]
 
     async def init(self) -> None:
         try:
@@ -153,7 +152,7 @@ class CephFSVolume(BaseVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
 
     async def get_fs_usage(self) -> CapacityUsage:

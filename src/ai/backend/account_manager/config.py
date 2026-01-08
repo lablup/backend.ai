@@ -68,10 +68,9 @@ class HostPortPair(BaseSchema):
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
 
 @dataclass
@@ -91,20 +90,18 @@ class UserID:
             case int():
                 if value == -1:
                     return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getuid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise ValueError(f"no such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -162,20 +159,18 @@ class GroupID:
             case int():
                 if value == -1:
                     return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getgid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
                     except KeyError:
-                        assert False, f"no such user {value} in system"
+                        raise ValueError(f"no such user {value} in system")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -435,15 +430,18 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
+    schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
+    parent: list[str] | None = None,
 ) -> dict | list:
+    if parent is None:
+        parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    elif isinstance(schema, types.GenericAlias):
+    if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseSchema):
+    if issubclass(schema, BaseSchema):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
@@ -462,5 +460,4 @@ def generate_example_json(
                     else:
                         raise
         return res
-    else:
-        raise UnsupportedTypeError(str(schema))
+    raise UnsupportedTypeError(str(schema))

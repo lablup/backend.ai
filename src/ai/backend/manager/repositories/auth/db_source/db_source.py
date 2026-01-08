@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.orm import joinedload, selectinload
 
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -124,8 +125,8 @@ class AuthDBSource:
             return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
-    async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> bool:
-        """Modify user's full name in database. Returns True if updated, False if user not found."""
+    async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
+        """Modify user's full name in database."""
         async with self._db.begin() as conn:
             query = (
                 sa.select(users)
@@ -135,12 +136,11 @@ class AuthDBSource:
             result = await conn.execute(query)
             user_row = result.first()
             if not user_row:
-                return False
+                raise UserNotFound(extra_data={"email": email, "domain": domain_name})
 
             data = {"full_name": full_name}
             update_query = users.update().values(data).where(users.c.email == email)
             await conn.execute(update_query)
-            return True
 
     @auth_db_source_resilience.apply()
     async def modify_user_password(self, email: str, password_info: PasswordInfo) -> None:
@@ -239,7 +239,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> Optional[dict]:
+    ) -> dict[str, Any]:
         """Verify credentials with password migration support."""
         return await check_credential_with_migration(
             db=self._db,
@@ -254,7 +254,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         password: str,
-    ) -> Optional[dict]:
+    ) -> dict[str, Any]:
         """Verify credentials without password migration (for signout, etc.)"""
         return await check_credential(
             db=self._db,
@@ -264,10 +264,21 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> Optional[UserRow]:
+    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         """Fetch user row by UUID from database."""
         async with self._db.begin_session() as db_session:
-            return await UserRow.query_user_by_uuid(user_uuid, db_session)
+            user_query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    joinedload(UserRow.main_keypair),
+                    selectinload(UserRow.keypairs),
+                )
+            )
+            user_row = await db_session.scalar(user_query)
+            if user_row is None:
+                raise UserNotFound(extra_data=user_uuid)
+            return user_row
 
     @auth_db_source_resilience.apply()
     async def fetch_current_time(self) -> datetime:

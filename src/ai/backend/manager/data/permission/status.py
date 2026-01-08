@@ -1,17 +1,4 @@
-import enum
+from ai.backend.common.data.permission.types import PermissionStatus, RoleStatus
 
-
-class PermissionStatus(enum.StrEnum):
-    ACTIVE = "active"
-    # 'inactive' status is used when the permission is temporarily disabled
-    INACTIVE = "inactive"
-    # 'deleted' status is used when the permission is permanently removed
-    DELETED = "deleted"
-
-
-class RoleStatus(enum.StrEnum):
-    ACTIVE = "active"
-    # 'inactive' status is used when the role is temporarily disabled
-    INACTIVE = "inactive"
-    # 'deleted' status is used when the role is permanently removed
-    DELETED = "deleted"
+# Re-export RoleStatus from common for backward compatibility
+__all__ = ("PermissionStatus", "RoleStatus")

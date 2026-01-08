@@ -24,13 +24,13 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -267,7 +267,7 @@ class AgentService:
         now = datetime.now(tzutc())
         await self._agent_repository.cleanup_agent_on_exit(
             agent_id=action.agent_id,
-            modifier=AgentStatusModifier(
+            spec=AgentStatusUpdaterSpec(
                 status=action.agent_status, status_changed=now, lost_at=OptionalState.update(now)
             ),
         )
@@ -280,7 +280,7 @@ class AgentService:
         now = datetime.now(tzutc())
         await self._agent_repository.update_agent_status(
             agent_id=action.agent_id,
-            modifier=AgentStatusModifier(
+            spec=AgentStatusUpdaterSpec(
                 status=action.agent_status,
                 status_changed=now,
             ),

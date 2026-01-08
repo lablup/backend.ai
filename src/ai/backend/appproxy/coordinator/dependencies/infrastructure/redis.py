@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from redis.asyncio import Redis
 
+from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -19,8 +20,6 @@ from ai.backend.common.health_checker import (
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.types import RedisProfileTarget
-
-from ...config import ServerConfig
 
 
 @dataclass
@@ -63,7 +62,7 @@ class RedisProvider(DependencyProvider[ServerConfig, CoordinatorValkeyClients]):
         )
 
         # Keep redis_lock for distributed locking (not yet migrated)
-        redis_lock = redis_helper.get_redis_object(
+        redis_lock = redis_helper.get_redis_object_for_lock(
             redis_profile_target.profile_target(RedisRole.STREAM),
             name="lock",  # distributed locks
             db=REDIS_STREAM_LOCK,

@@ -1,6 +1,7 @@
 import logging
 import urllib.parse
-from typing import AsyncIterator, override
+from collections.abc import AsyncIterator
+from typing import override
 
 import aiohttp
 

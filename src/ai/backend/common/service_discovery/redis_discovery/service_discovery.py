@@ -1,19 +1,19 @@
 import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Self, Sequence
+from typing import Any, Self
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import ValkeyTarget
-
-from ..service_discovery import (
+from ai.backend.common.service_discovery.service_discovery import (
     MODEL_SERVICE_GROUP,
     MODEL_SERVICE_ROUTE_TTL,
     ModelServiceMetadata,
     ServiceDiscovery,
     ServiceMetadata,
 )
+from ai.backend.common.types import ValkeyTarget
 
 _DEFAULT_PREFIX = "service_discovery"
 _DEFAULT_TTL = 60 * 3  # 3 minutes

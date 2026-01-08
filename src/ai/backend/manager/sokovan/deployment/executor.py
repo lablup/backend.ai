@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from collections.abc import Sequence
-from typing import Any, Coroutine, Optional
+from collections.abc import Coroutine, Sequence
+from typing import Any, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -26,11 +26,19 @@ from ai.backend.manager.clients.appproxy.types import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    RouteInfo,
-    ScaleOutDecision,
+    RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.deployment.creators import (
+    RouteBatchUpdaterSpec,
+    RouteCreatorSpec,
+)
+from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
     ModelDefinitionGeneratorRegistry,
@@ -81,7 +89,7 @@ class DeploymentExecutor:
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentInfo]
     ) -> DeploymentExecutionResult:
-        scaling_groups = set(deployment.metadata.resource_group for deployment in deployments)
+        scaling_groups = {deployment.metadata.resource_group for deployment in deployments}
         scaling_group_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
             scaling_groups
         )
@@ -113,7 +121,7 @@ class DeploymentExecutor:
 
         if registration_tasks:
             results = await asyncio.gather(*registration_tasks, return_exceptions=True)
-            for deployment, result in zip(deployments, results):
+            for deployment, result in zip(deployments, results, strict=True):
                 if isinstance(result, BaseException):
                     log.error(
                         "Failed to register endpoint for deployment {}: {}",
@@ -146,13 +154,44 @@ class DeploymentExecutor:
             errors=errors,
         )
 
+    async def check_ready_deployments_that_need_scaling(
+        self, deployments: Sequence[DeploymentInfo]
+    ) -> DeploymentExecutionResult:
+        endpoint_ids = {deployment.id for deployment in deployments}
+        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
+        successes: list[DeploymentInfo] = []
+        errors: list[DeploymentExecutionError] = []
+
+        for deployment in deployments:
+            routes = route_map[deployment.id]
+            if len(routes) != deployment.replica_spec.target_replica_count:
+                log.warning(
+                    "Deployment {} has mismatched active routes: expected {}, found {}",
+                    deployment.id,
+                    deployment.replica_spec.target_replica_count,
+                    len(routes),
+                )
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Mismatched active routes",
+                        error_detail=f"Expected {deployment.replica_spec.target_replica_count}, found {len(routes)}",
+                    )
+                )
+            else:
+                successes.append(deployment)
+        return DeploymentExecutionResult(
+            successes=successes,
+            errors=errors,
+        )
+
     async def scale_deployment(
         self, deployments: Sequence[DeploymentInfo]
     ) -> DeploymentExecutionResult:
         endpoint_ids = {deployment.id for deployment in deployments}
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
-        scale_outs: list[ScaleOutDecision] = []
-        scale_ins: list[RouteInfo] = []
+        scale_out_creators: list[Creator[RoutingRow]] = []
+        scale_in_route_ids: list[UUID] = []
         successes = []
         errors = []
         for deployment in deployments:
@@ -160,20 +199,23 @@ class DeploymentExecutor:
                 target_count = deployment.replica_spec.target_replica_count
                 routes = route_map[deployment.id]
                 if len(routes) < target_count:
-                    scale_outs.append(
-                        ScaleOutDecision(
-                            deployment_info=deployment,
-                            new_replica_count=target_count - len(routes),
+                    # Build creators for scale out
+                    new_replica_count = target_count - len(routes)
+                    for _ in range(new_replica_count):
+                        creator_spec = RouteCreatorSpec(
+                            endpoint_id=deployment.id,
+                            session_owner_id=deployment.metadata.session_owner,
+                            domain=deployment.metadata.domain,
+                            project_id=deployment.metadata.project,
+                            revision_id=deployment.current_revision_id,
                         )
-                    )
+                        scale_out_creators.append(Creator(spec=creator_spec))
                 elif len(routes) > target_count:
                     termination_route_candidates = sorted(
                         routes, key=lambda r: (r.status.termination_priority())
                     )
                     candidates = termination_route_candidates[: len(routes) - target_count]
-                    scale_ins.extend(
-                        candidates,
-                    )
+                    scale_in_route_ids.extend(r.route_id for r in candidates)
                 successes.append(deployment)
             except Exception as e:
                 log.warning("Failed to scale deployment {}: {}", deployment.id, e)
@@ -184,7 +226,20 @@ class DeploymentExecutor:
                         error_detail="Failed to scale deployment",
                     )
                 )
-        await self._deployment_repo.scale_routes(scale_outs, scale_ins)
+
+        # Build BatchUpdater for scale in
+        scale_in_updater: BatchUpdater[RoutingRow] | None = None
+        if scale_in_route_ids:
+            scale_in_updater = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    status=RouteStatus.TERMINATING,
+                    traffic_ratio=0.0,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
+                ),
+                conditions=[RouteConditions.by_ids(scale_in_route_ids)],
+            )
+
+        await self._deployment_repo.scale_routes(scale_out_creators, scale_in_updater)
         return DeploymentExecutionResult(
             successes=successes,
             errors=errors,

@@ -1,10 +1,9 @@
-import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Final, Optional
+from typing import Any, Final, Optional
 
 import aiohttp
 import yarl
@@ -48,7 +47,7 @@ class StorageProxyHTTPClient:
     _endpoint: yarl.URL
     _secret: str
 
-    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs):
+    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
         self._client_session = client_session
         self._endpoint = args.endpoint
         self._secret = args.secret
@@ -162,7 +161,7 @@ class StorageProxyHTTPClient:
                     yield client_resp
                     return
                 await self._handle_exceptional_response(client_resp)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
             ) from e

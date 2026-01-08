@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..loader.container import ContainerBasedKernelRegistryLoader
-from ..writer.container import ContainerBasedKernelRegistryWriter
+from ai.backend.agent.kernel_registry.loader.container import ContainerBasedKernelRegistryLoader
+from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
 
 if TYPE_CHECKING:
     from ai.backend.agent.agent import AbstractAgent

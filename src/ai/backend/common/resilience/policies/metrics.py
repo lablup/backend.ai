@@ -7,10 +7,9 @@ from dataclasses import dataclass
 from typing import ParamSpec, TypeVar
 
 from ai.backend.common.metrics.metric import DomainType, LayerMetricObserver, LayerType
+from ai.backend.common.resilience.policy import Policy
+from ai.backend.common.resilience.resilience import get_current_operation
 from ai.backend.logging import BraceStyleAdapter
-
-from ..policy import Policy
-from ..resilience import get_current_operation
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

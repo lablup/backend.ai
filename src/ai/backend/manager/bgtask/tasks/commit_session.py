@@ -227,7 +227,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 )
                 log.error(error_msg)
                 return CommitSessionResult(error_message=error_msg)
-            elif len(rescan_result.images) > 1:
+            if len(rescan_result.images) > 1:
                 log.warning(
                     "More than two images were rescanned unexpectedly. Rescanned Images: {}",
                     rescan_result.images,

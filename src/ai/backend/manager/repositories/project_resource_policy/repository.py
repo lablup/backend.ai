@@ -1,5 +1,3 @@
-from typing import Any, Mapping
-
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
@@ -11,6 +9,8 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 project_resource_policy_repository_resilience = Resilience(
     policies=[
@@ -38,12 +38,10 @@ class ProjectResourcePolicyRepository:
         self._db = db
 
     @project_resource_policy_repository_resilience.apply()
-    async def create(self, fields: Mapping[str, Any]) -> ProjectResourcePolicyData:
+    async def create(self, creator: Creator[ProjectResourcePolicyRow]) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            db_row = ProjectResourcePolicyRow(**fields)
-            db_sess.add(db_row)
-            await db_sess.flush()
-            return db_row.to_dataclass()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_dataclass()
 
     @project_resource_policy_repository_resilience.apply()
     async def get_by_name(self, name: str) -> ProjectResourcePolicyData:
@@ -56,17 +54,14 @@ class ProjectResourcePolicyRepository:
             return row.to_dataclass()
 
     @project_resource_policy_repository_resilience.apply()
-    async def update(self, name: str, fields: Mapping[str, Any]) -> ProjectResourcePolicyData:
+    async def update(self, updater: Updater[ProjectResourcePolicyRow]) -> ProjectResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise ObjectNotFound(f"Project resource policy with name {name} not found.")
-            for key, value in fields.items():
-                setattr(row, key, value)
-            await db_sess.flush()
-            return row.to_dataclass()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise ObjectNotFound(
+                    f"Project resource policy with name {updater.pk_value} not found."
+                )
+            return result.row.to_dataclass()
 
     @project_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> ProjectResourcePolicyData:

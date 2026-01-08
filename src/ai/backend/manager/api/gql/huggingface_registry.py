@@ -8,14 +8,19 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
+from ai.backend.manager.repositories.huggingface_registry.updaters import (
+    HuggingFaceRegistryUpdaterSpec,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -34,8 +39,8 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
@@ -58,7 +63,7 @@ class HuggingFaceRegistry(Node):
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
-    ) -> list["HuggingFaceRegistry"]:
+    ) -> list[HuggingFaceRegistry]:
         action_result = (
             await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
                 GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
@@ -114,10 +119,7 @@ async def huggingface_registries(
     )
 
     nodes = [HuggingFaceRegistry.from_dataclass(data) for data in action_result.data]
-    edges = [
-        HuggingFaceRegistryEdge(node=node, cursor=to_global_id(HuggingFaceRegistry, node.id))
-        for node in nodes
-    ]
+    edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return HuggingFaceRegistryConnection(
         edges=edges,
@@ -136,8 +138,8 @@ class CreateHuggingFaceRegistryInput:
     name: str
     token: Optional[str] = None
 
-    def to_creator(self) -> HuggingFaceRegistryCreator:
-        return HuggingFaceRegistryCreator(url=self.url, token=self.token)
+    def to_creator(self) -> Creator[HuggingFaceRegistryRow]:
+        return Creator(spec=HuggingFaceRegistryCreatorSpec(url=self.url, token=self.token))
 
     def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
         return ArtifactRegistryCreatorMeta(name=self.name)
@@ -150,11 +152,12 @@ class UpdateHuggingFaceRegistryInput:
     name: Optional[str] = UNSET
     token: Optional[str] = UNSET
 
-    def to_modifier(self) -> HuggingFaceRegistryModifier:
-        return HuggingFaceRegistryModifier(
+    def to_updater(self) -> Updater[HuggingFaceRegistryRow]:
+        spec = HuggingFaceRegistryUpdaterSpec(
             url=OptionalState[str].from_graphql(self.url),
             token=OptionalState[str].from_graphql(self.token),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
     def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
         return ArtifactRegistryModifierMeta(
@@ -211,7 +214,7 @@ async def update_huggingface_registry(
     action_result = (
         await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
             UpdateHuggingFaceRegistryAction(
-                id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
+                updater=input.to_updater(), meta=input.to_modifier_meta()
             )
         )
     )

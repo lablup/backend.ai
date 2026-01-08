@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.18.0rc3",
+    "version": "25.19.0",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -10228,6 +10228,569 @@
           }
         ],
         "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/": {
+      "post": {
+        "operationId": "deployments.create_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/search": {
+      "post": {
+        "operationId": "deployments.search_deployments",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search deployments with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}": {
+      "get": {
+        "operationId": "deployments.get_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "deployments.update_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "deployments.destroy_deployment",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Destroy a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions": {
+      "post": {
+        "operationId": "deployments.create_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Create a new revision for a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/search": {
+      "post": {
+        "operationId": "deployments.search_revisions",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search revisions for a deployment with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}": {
+      "get": {
+        "operationId": "deployments.get_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}/activate": {
+      "post": {
+        "operationId": "deployments.activate_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Activate a revision to make it the current active revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/revisions/{revision_id}/deactivate": {
+      "post": {
+        "operationId": "deployments.deactivate_revision",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Deactivate a revision.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/routes/search": {
+      "post": {
+        "operationId": "deployments.search_routes",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search routes for a deployment with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/deployments/{deployment_id}/routes/{route_id}/traffic-status": {
+      "patch": {
+        "operationId": "deployments.update_route_traffic_status",
+        "tags": [
+          "deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update traffic status of a route.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles": {
+      "post": {
+        "operationId": "v2.0.create_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/search": {
+      "post": {
+        "operationId": "v2.0.search_roles",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search roles with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}": {
+      "get": {
+        "operationId": "v2.0.get_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific role with details.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/delete": {
+      "post": {
+        "operationId": "v2.0.delete_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/purge": {
+      "post": {
+        "operationId": "v2.0.purge_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/assign": {
+      "post": {
+        "operationId": "v2.0.assign_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Assign a role to a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/revoke": {
+      "post": {
+        "operationId": "v2.0.revoke_role",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Revoke a role from a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/roles/{role_id}/assigned-users/search": {
+      "post": {
+        "operationId": "v2.0.search_assigned_users",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }

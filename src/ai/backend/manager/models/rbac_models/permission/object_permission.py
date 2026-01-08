@@ -7,16 +7,12 @@ import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
 from ai.backend.manager.data.permission.id import ObjectId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionCreateInput,
-    ObjectPermissionData,
-)
+from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
     IDColumn,
@@ -24,7 +20,7 @@ from ...base import (
 )
 
 if TYPE_CHECKING:
-    from ..role import RoleRow
+    from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
 class ObjectPermissionRow(Base):
@@ -51,15 +47,6 @@ class ObjectPermissionRow(Base):
 
     def object_id(self) -> ObjectId:
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
-
-    @classmethod
-    def from_input(cls, input: ObjectPermissionCreateInput) -> Self:
-        return cls(
-            role_id=input.role_id,
-            entity_type=input.entity_type,
-            entity_id=input.entity_id,
-            operation=input.operation,
-        )
 
     @classmethod
     def from_sa_row(cls, row: sa.engine.Row) -> Self:

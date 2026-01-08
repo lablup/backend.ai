@@ -11,6 +11,10 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
     GetArtifactRegistryMetasAction,
     GetArtifactRegistryMetasActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.common.search import (
+    SearchArtifactRegistriesAction,
+    SearchArtifactRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -30,6 +34,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
+    SearchHuggingFaceRegistriesAction,
+    SearchHuggingFaceRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
@@ -54,6 +62,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi i
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
+    SearchReservoirRegistriesAction,
+    SearchReservoirRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
@@ -82,6 +94,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_huggingface_registries: ActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
+    search_huggingface_registries: ActionProcessor[
+        SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
+    ]
     create_reservoir_registry: ActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
@@ -100,11 +115,17 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_reservoir_registries: ActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
+    search_reservoir_registries: ActionProcessor[
+        SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
+    ]
     get_registry_meta: ActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
     ]
     get_registry_metas: ActionProcessor[
         GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
+    ]
+    search_artifact_registries: ActionProcessor[
+        SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
     def __init__(
@@ -128,6 +149,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_huggingface_registries = ActionProcessor(
             service.list_huggingface_registry, action_monitors
         )
+        self.search_huggingface_registries = ActionProcessor(
+            service.search_huggingface_registries, action_monitors
+        )
         self.create_reservoir_registry = ActionProcessor(
             service.create_reservoir_registry, action_monitors
         )
@@ -146,8 +170,14 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_reservoir_registries = ActionProcessor(
             service.list_reservoir_registries, action_monitors
         )
+        self.search_reservoir_registries = ActionProcessor(
+            service.search_reservoir_registries, action_monitors
+        )
         self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
+        self.search_artifact_registries = ActionProcessor(
+            service.search_artifact_registries, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -158,12 +188,15 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             GetHuggingFaceRegistryAction.spec(),
             GetHuggingFaceRegistriesAction.spec(),
             ListHuggingFaceRegistryAction.spec(),
+            SearchHuggingFaceRegistriesAction.spec(),
             CreateReservoirRegistryAction.spec(),
             UpdateReservoirRegistryAction.spec(),
             DeleteReservoirRegistryAction.spec(),
             GetReservoirRegistryAction.spec(),
             GetReservoirRegistriesAction.spec(),
             ListReservoirRegistriesAction.spec(),
+            SearchReservoirRegistriesAction.spec(),
             GetArtifactRegistryMetaAction.spec(),
             GetArtifactRegistryMetasAction.spec(),
+            SearchArtifactRegistriesAction.spec(),
         ]

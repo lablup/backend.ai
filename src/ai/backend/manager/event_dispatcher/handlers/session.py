@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -38,15 +38,14 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.registry import AgentRegistry
-
-from ...models.endpoint import EndpointRow
-from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
-from ...models.utils import (
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
+from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -301,7 +300,7 @@ class SessionEventHandler:
             "type": "session_lifecycle",
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
-            "when": datetime.now(timezone.utc).isoformat(),
+            "when": datetime.now(UTC).isoformat(),
         }
 
         self._registry.webhook_ptask_group.create_task(
@@ -379,7 +378,7 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     except asyncio.CancelledError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
     finally:

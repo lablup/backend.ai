@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Mapping, Optional, Sequence, Union
+from collections.abc import Mapping, Sequence
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -53,8 +54,12 @@ from ai.backend.manager.models.vfolder import (
     query_accessible_vfolders,
     vfolders,
 )
-
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -263,14 +268,16 @@ class VfolderRepository:
                     scope_id = ScopeId(ScopeType.USER, str(params.user))
                 case VFolderOwnershipType.GROUP:
                     scope_id = ScopeId(ScopeType.PROJECT, str(params.group))
-            await self._role_manager.map_entity_to_scope(
-                session,
-                entity_id=ObjectId(
-                    entity_type=EntityType.VFOLDER,
-                    entity_id=str(params.id),
-                ),
-                scope_id=scope_id,
+            entity_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=scope_id,
+                    object_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(params.id),
+                    ),
+                )
             )
+            await self._role_manager.map_entity_to_scope(session, entity_scope_creator)
 
             # Create owner permission if requested
             if create_owner_permission and params.user:
@@ -280,14 +287,16 @@ class VfolderRepository:
                     "permission": VFolderPermission.OWNER_PERM,
                 })
                 await session.execute(permission_insert)
-                await self._role_manager.map_entity_to_scope(
-                    session,
-                    entity_id=ObjectId(
-                        entity_type=EntityType.VFOLDER,
-                        entity_id=str(params.id),
-                    ),
-                    scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                owner_scope_creator = Creator(
+                    spec=AssociationScopesEntitiesCreatorSpec(
+                        scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                        object_id=ObjectId(
+                            entity_type=EntityType.VFOLDER,
+                            entity_id=str(params.id),
+                        ),
+                    )
                 )
+                await self._role_manager.map_entity_to_scope(session, owner_scope_creator)
                 await self._role_manager.add_object_permission_to_user_role(
                     session,
                     user_id=params.user,
@@ -305,24 +314,16 @@ class VfolderRepository:
             return self._vfolder_row_to_data(created_vfolder)
 
     @vfolder_repository_resilience.apply()
-    async def update_vfolder_attribute(
-        self, vfolder_id: uuid.UUID, field_updates: dict[str, Any]
-    ) -> VFolderData:
+    async def update_vfolder_attribute(self, updater: Updater[VFolderRow]) -> VFolderData:
         """
         Update VFolder attributes.
         Returns updated VFolderData.
         """
         async with self._db.begin_session() as session:
-            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
-            if not vfolder_row:
+            result = await execute_updater(session, updater)
+            if result is None:
                 raise VFolderNotFound()
-
-            for key, value in field_updates.items():
-                if hasattr(vfolder_row, key):
-                    setattr(vfolder_row, key, value)
-
-            await session.flush()
-            return self._vfolder_row_to_data(vfolder_row)
+            return self._vfolder_row_to_data(result.row)
 
     @vfolder_repository_resilience.apply()
     async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
@@ -455,14 +456,16 @@ class VfolderRepository:
             query = sa.insert(VFolderPermissionRow, insert_values)
             await session.execute(query)
 
-            await self._role_manager.map_entity_to_scope(
-                session,
-                entity_id=ObjectId(
-                    entity_type=EntityType.VFOLDER,
-                    entity_id=str(vfolder_id),
-                ),
-                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+            user_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=ScopeId(ScopeType.USER, str(user_id)),
+                    object_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                    ),
+                )
             )
+            await self._role_manager.map_entity_to_scope(session, user_scope_creator)
             await self._role_manager.add_object_permission_to_user_role(
                 session,
                 user_id=user_id,
@@ -637,7 +640,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_group_resource_info(
-        self, group_id_or_name: Union[str, uuid.UUID], domain_name: str
+        self, group_id_or_name: str | uuid.UUID, domain_name: str
     ) -> Optional[tuple[uuid.UUID, int, int, ProjectType]]:
         """
         Get group resource information by group ID or name.

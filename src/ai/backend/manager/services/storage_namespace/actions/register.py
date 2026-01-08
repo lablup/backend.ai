@@ -3,14 +3,15 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
 
 
 @dataclass
 class RegisterNamespaceAction(StorageNamespaceAction):
-    creator: StorageNamespaceCreator
+    creator: Creator[StorageNamespaceRow]
 
     @override
     def entity_id(self) -> Optional[str]:

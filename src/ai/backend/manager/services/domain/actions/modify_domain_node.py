@@ -1,18 +1,19 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.domain.types import DomainData, DomainNodeModifier, UserInfo
+from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
 @dataclass
 class ModifyDomainNodeAction(DomainAction):
-    name: str
     user_info: UserInfo
+    updater: Updater[DomainRow]
     sgroups_to_add: Optional[set[str]] = None
     sgroups_to_remove: Optional[set[str]] = None
-    modifier: DomainNodeModifier = field(default_factory=DomainNodeModifier)
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -8,13 +8,12 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.db_source.db_source import (
     UserResourcePolicyDBSource,
 )
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    UserResourcePolicyModifier,
-)
-from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -47,7 +46,7 @@ class UserResourcePolicyRepository:
         self._db_source = UserResourcePolicyDBSource(db)
 
     @user_resource_policy_repository_resilience.apply()
-    async def create(self, creator: UserResourcePolicyCreator) -> UserResourcePolicyData:
+    async def create(self, creator: Creator[UserResourcePolicyRow]) -> UserResourcePolicyData:
         """Creates a new user resource policy."""
         return await self._db_source.create(creator)
 
@@ -57,11 +56,9 @@ class UserResourcePolicyRepository:
         return await self._db_source.get_by_name(name)
 
     @user_resource_policy_repository_resilience.apply()
-    async def update(
-        self, name: str, modifier: UserResourcePolicyModifier
-    ) -> UserResourcePolicyData:
+    async def update(self, updater: Updater[UserResourcePolicyRow]) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
-        return await self._db_source.update(name, modifier)
+        return await self._db_source.update(updater)
 
     @user_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> UserResourcePolicyData:

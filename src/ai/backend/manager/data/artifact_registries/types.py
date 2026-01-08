@@ -21,3 +21,13 @@ class ArtifactRegistryCreatorMeta:
 @dataclass
 class ArtifactRegistryModifierMeta:
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
+
+
+@dataclass
+class ArtifactRegistryListResult:
+    """Search result with total count for artifact registries."""
+
+    items: list[ArtifactRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

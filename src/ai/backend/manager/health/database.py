@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -46,7 +46,7 @@ class DatabaseHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for postgres component
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         try:
             await self._db.ping()

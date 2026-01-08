@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
@@ -35,7 +36,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ..types import StrawberryGQLContext
 from .types import (
     CreateNotificationChannelInput,
     CreateNotificationChannelPayload,
@@ -94,7 +94,7 @@ NotificationChannelEdge = Edge[NotificationChannel]
 class NotificationChannelConnection(Connection[NotificationChannel]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -106,7 +106,7 @@ NotificationRuleEdge = Edge[NotificationRule]
 class NotificationRuleConnection(Connection[NotificationRule]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -251,8 +251,7 @@ async def notification_rule_type_schema(
 
     # Convert GraphQL enum to internal enum and get schema
     internal_type = rule_type.to_internal()
-    schema = NotifiableMessage.get_message_schema(internal_type)
-    return schema
+    return NotifiableMessage.get_message_schema(internal_type)
 
 
 # Mutation fields
@@ -282,11 +281,9 @@ async def update_notification_channel(
 ) -> UpdateNotificationChannelPayload:
     processors = info.context.processors
 
+    channel_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
-        )
+        UpdateChannelAction(updater=input.to_updater(channel_id))
     )
 
     return UpdateNotificationChannelPayload(
@@ -331,11 +328,9 @@ async def update_notification_rule(
 ) -> UpdateNotificationRulePayload:
     processors = info.context.processors
 
+    rule_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
-        )
+        UpdateRuleAction(updater=input.to_updater(rule_id))
     )
 
     return UpdateNotificationRulePayload(

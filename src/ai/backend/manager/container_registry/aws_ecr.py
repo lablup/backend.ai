@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncIterator, override
+from collections.abc import AsyncIterator
+from typing import override
 
 import aiohttp
 import boto3

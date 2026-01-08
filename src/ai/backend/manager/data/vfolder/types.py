@@ -12,9 +12,8 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-from ..permission.types import OperationType
 
 
 class VFolderOwnershipType(CIStrEnum):
@@ -137,8 +136,7 @@ class VFolderOperationStatus(enum.StrEnum):
                 VFolderOperationStatus.DELETE_ONGOING,
                 VFolderOperationStatus.DELETE_ERROR,
             }
-        else:
-            return self == VFolderOperationStatus.DELETE_PENDING
+        return self == VFolderOperationStatus.DELETE_PENDING
 
     def to_field(self) -> VFolderOperationStatusField:
         return VFolderOperationStatusField(self)

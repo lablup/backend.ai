@@ -47,13 +47,13 @@ from ai.backend.manager.services.artifact_revision.actions.import_revision impor
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.list import (
-    ListArtifactRevisionsAction,
-    ListArtifactRevisionsActionResult,
-)
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.search import (
+    SearchArtifactRevisionsAction,
+    SearchArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 
@@ -70,7 +70,9 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     get_download_progress: ActionProcessor[
         GetDownloadProgressAction, GetDownloadProgressActionResult
     ]
-    list_revision: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
+    search_revision: ActionProcessor[
+        SearchArtifactRevisionsAction, SearchArtifactRevisionsActionResult
+    ]
     approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
     reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
     import_revision: ActionProcessor[
@@ -97,7 +99,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             service.get_verification_result, action_monitors
         )
         self.get_download_progress = ActionProcessor(service.get_download_progress, action_monitors)
-        self.list_revision = ActionProcessor(service.list_revision, action_monitors)
+        self.search_revision = ActionProcessor(service.search_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
         self.import_revision = ActionProcessor(service.import_revision, action_monitors)
@@ -120,7 +122,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             GetArtifactRevisionReadmeAction.spec(),
             GetArtifactRevisionVerificationResultAction.spec(),
             GetDownloadProgressAction.spec(),
-            ListArtifactRevisionsAction.spec(),
+            SearchArtifactRevisionsAction.spec(),
             ApproveArtifactRevisionAction.spec(),
             RejectArtifactRevisionAction.spec(),
             ImportArtifactRevisionAction.spec(),

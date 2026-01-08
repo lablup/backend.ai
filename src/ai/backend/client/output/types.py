@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
-from typing import TYPE_CHECKING, Any, Callable, Generic, Mapping, Optional, Sequence, TypeVar
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar
 
 import attr
 

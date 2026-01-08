@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Optional,
-    Self,
 )
 
 import sqlalchemy as sa
@@ -14,16 +13,14 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.role import (
-    RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
+    RoleDetailData,
 )
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import RoleSource
-
-from ..base import (
+from ai.backend.manager.models.base import (
     Base,
     IDColumn,
     StrEnumType,
@@ -89,29 +86,22 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
 
-    def to_data_with_permissions(self) -> RoleDataWithPermissions:
-        return RoleDataWithPermissions(
+    def to_detail_data_without_users(self) -> RoleDetailData:
+        """Convert to detail data without assigned users."""
+        return RoleDetailData(
             id=self.id,
             name=self.name,
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
             permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
-        )
-
-    @classmethod
-    def from_input(cls, data: RoleCreateInput) -> Self:
-        return cls(
-            name=data.name,
-            status=data.status,
-            description=data.description,
         )

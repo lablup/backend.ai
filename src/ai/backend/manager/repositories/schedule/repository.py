@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from functools import partial
 from typing import TYPE_CHECKING, Optional, cast
@@ -42,39 +42,36 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
 from ai.backend.manager.errors.resource import AgentNotFound, AllocationFailed, ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models import (
-    PRIVATE_SESSION_TYPES,
-    AgentRow,
-    DefaultForUnspecified,
-    DomainRow,
-    EndpointRow,
-    GroupRow,
-    KernelRow,
-    KernelStatistics,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    RoutingRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-    recalc_agent_resource_occupancy,
-)
+from ai.backend.manager.models.agent import AgentRow, recalc_agent_resource_occupancy
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
+    EndpointRow,
     EndpointStatistics,
 )
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    KernelStatistics,
     recalc_concurrency_used,
 )
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
+    DefaultForUnspecified,
+    KeyPairResourcePolicyRow,
+)
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
+    PRIVATE_SESSION_TYPES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    SessionDependencyRow,
+    SessionRow,
     _build_session_fetch_query,
 )
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -812,7 +809,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> list[AgentRow]:
         async with self._db.begin_readonly_session() as session:
-            from ai.backend.manager.models import list_schedulable_agents_by_sgroup
+            from ai.backend.manager.models.agent import list_schedulable_agents_by_sgroup
 
             result = await list_schedulable_agents_by_sgroup(session, sgroup_name)
             return list(result)
@@ -1183,7 +1180,7 @@ class ScheduleRepository:
         status_data: ErrorStatusInfo,
     ) -> None:
         async with self._db.begin_session() as db_session:
-            affected_agents = set(k.agent for k in session.kernels)
+            affected_agents = {k.agent for k in session.kernels}
             await self._rollback_predicate_mutations(db_session, sched_ctx, session)
             now = datetime.now(tzutc())
             update_query = (
@@ -1232,7 +1229,7 @@ class ScheduleRepository:
             return await self._transit_scheduled_to_preparing(session)
 
     async def _transit_scheduled_to_preparing(self, session: SASession) -> list[SessionRow]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scheduled_sessions = await SessionRow.get_sessions_by_status(
             session, SessionStatus.SCHEDULED, load_kernel_image=True
         )
@@ -1246,7 +1243,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def mark_sessions_and_kernels_creating(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
             for row in session_rows:
                 for kernel_row in row.kernels:
@@ -1330,7 +1327,7 @@ class ScheduleRepository:
             await self._autoscale_endpoints(session)
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
@@ -1347,7 +1344,7 @@ class ScheduleRepository:
 
         kernel_statistics_by_id: dict[KernelId, Mapping[str, object]] = {}
         endpoint_statistics_by_id: dict[uuid.UUID, Mapping[str, object]] = {}
-        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(list)
 
         for rule in rules:
             match rule.metric_source:
@@ -1378,12 +1375,14 @@ class ScheduleRepository:
 
         kernel_statistics_by_id = {
             kernel_id: metric
-            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats, strict=True)
             if metric is not None
         }
         endpoint_statistics_by_id = {
             endpoint_id: metric
-            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+            for endpoint_id, metric in zip(
+                metric_requested_endpoints, endpoint_live_stats, strict=True
+            )
             if metric is not None
         }
 
@@ -1489,13 +1488,12 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_endpoints_for_scaling(self) -> list:
         async with self._db.begin_readonly_session() as session:
-            endpoints = await EndpointRow.list(
+            return await EndpointRow.list(
                 session,
                 load_image=True,
                 load_routes=True,
                 status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
             )
-            return endpoints
 
     @schedule_repository_resilience.apply()
     async def get_sessions_to_destroy_for_scaling(
@@ -2611,7 +2609,7 @@ class ScheduleRepository:
 
         from ai.backend.manager.data.session.types import SessionStatus
 
-        timed_out_sessions: list["SweptSessionInfo"] = []
+        timed_out_sessions: list[SweptSessionInfo] = []
         now = datetime.now(tzutc())
 
         async with self._db.begin_readonly_session() as db_sess:

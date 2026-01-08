@@ -15,7 +15,9 @@ from ai.backend.manager.types import PaginationOptions
 
 @dataclass
 class ListArtifactsWithRevisionsAction(ArtifactAction):
-    pagination: PaginationOptions
+    """Action to list artifacts with revisions using old-style pagination (REST API)."""
+
+    pagination: Optional[PaginationOptions] = None
     ordering: Optional[ArtifactOrderingOptions] = None
     filters: Optional[ArtifactFilterOptions] = None
 

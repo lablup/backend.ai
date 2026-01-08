@@ -2,8 +2,7 @@ import json
 from contextlib import closing
 
 from ai.backend.common.types import AgentSelectionStrategy
-
-from ...utils.cli import EOF, ClientRunnerFunc, decode
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_scaling_group(run_admin: ClientRunnerFunc):

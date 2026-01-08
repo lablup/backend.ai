@@ -247,7 +247,7 @@ class VFSStorage(AbstractStorage):
                             )
 
         except Exception as e:
-            raise FileStreamUploadError(f"Upload failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Upload failed: {e!s}") from e
 
     @override
     async def stream_download(self, filepath: str) -> StreamReader:
@@ -271,11 +271,10 @@ class VFSStorage(AbstractStorage):
                 return VFSDirectoryDownloadServerStreamReader(
                     target_path, self._download_chunk_size
                 )
-            else:
-                return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
+            return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
-            raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"Download failed: {e!s}") from e
 
     @override
     async def get_file_info(self, filepath: str) -> VFSFileMetaResponse:
@@ -320,7 +319,7 @@ class VFSStorage(AbstractStorage):
             )
 
         except Exception as e:
-            raise ObjectInfoFetchError(f"Get file info failed: {str(e)}") from e
+            raise ObjectInfoFetchError(f"Get file info failed: {e!s}") from e
 
     @override
     async def delete_file(self, filepath: str) -> None:
@@ -348,7 +347,7 @@ class VFSStorage(AbstractStorage):
                 raise FileStreamUploadError(f"Cannot delete: {filepath}")
 
         except Exception as e:
-            raise FileStreamUploadError(f"Delete failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Delete failed: {e!s}") from e
 
     async def list_directory(self, directory: str) -> list[VFSFileInfo]:
         """
@@ -387,7 +386,7 @@ class VFSStorage(AbstractStorage):
             return entries
 
         except Exception as e:
-            raise FileStreamDownloadError(f"List directory failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"List directory failed: {e!s}") from e
 
     async def list_files_recursive(self, directory: str) -> VFSListFilesResponse:
         """
@@ -413,7 +412,7 @@ class VFSStorage(AbstractStorage):
             return VFSListFilesResponse(files=files)
 
         except Exception as e:
-            raise FileStreamDownloadError(f"List files recursively failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"List files recursively failed: {e!s}") from e
 
     async def _collect_files_recursive(
         self, current_path: Path, relative_base: str
@@ -470,7 +469,7 @@ class VFSStorage(AbstractStorage):
             target_path.mkdir(parents=True, exist_ok=True)
 
         except Exception as e:
-            raise FileStreamUploadError(f"Create directory failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Create directory failed: {e!s}") from e
 
     async def get_disk_usage(self) -> dict:
         """
@@ -493,7 +492,7 @@ class VFSStorage(AbstractStorage):
             }
 
         except Exception as e:
-            raise FileStreamDownloadError(f"Get disk usage failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"Get disk usage failed: {e!s}") from e
 
     async def generate_presigned_upload_url(self, key: str) -> PresignedUploadObjectResponse:
         raise NotImplementedAPI("VFS storage doesn't support presigned upload URLs")

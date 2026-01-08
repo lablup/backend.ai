@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, FrozenSet, Mapping, Optional
+from typing import Any, Optional
 
 import aiofiles.os
 
@@ -14,12 +15,18 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.errors import VolumeNotInitializedError
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ai.backend.storage.volumes.abc import (
+    CAP_FAST_FS_SIZE,
+    CAP_METRIC,
+    CAP_QUOTA,
+    CAP_VFOLDER,
+    AbstractQuotaModel,
+)
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
 
-from ...errors import VolumeNotInitializedError
-from ...types import CapacityUsage, FSPerfMetric, QuotaUsage
-from ...watcher import WatcherClient
-from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient
 
@@ -155,7 +162,7 @@ class WekaVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
@@ -192,7 +199,7 @@ class WekaVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        start_time = datetime.now().replace(second=0, microsecond=0) - timedelta(
+        start_time = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
             minutes=1,
         )
 

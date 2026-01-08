@@ -30,7 +30,7 @@ class KernelStateEngine:
 
     _repository: SchedulerRepository
 
-    def __init__(self, repository: SchedulerRepository):
+    def __init__(self, repository: SchedulerRepository) -> None:
         """
         Initialize the KernelStateEngine with a repository.
 

@@ -4,13 +4,14 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
-from ai.backend.manager.services.resource_preset.types import ResourcePresetModifier
 
 
 @dataclass
 class ModifyResourcePresetAction(ResourcePresetAction):
-    modifier: ResourcePresetModifier
+    updater: Updater[ResourcePresetRow]
     id: Optional[uuid.UUID]
     name: Optional[str]
 
@@ -31,6 +32,3 @@ class ModifyResourcePresetActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.resource_preset.id)
-
-
-# TODO: Create exceptions.

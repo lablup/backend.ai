@@ -24,7 +24,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -63,8 +63,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         log.debug("Syncing {} healthy routes to service discovery", len(routes))
 
         # Execute service discovery sync logic via executor
-        result = await self._route_executor.sync_service_discovery(routes)
-        return result
+        return await self._route_executor.sync_service_discovery(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after service discovery sync."""

@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -22,7 +23,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserData
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -30,19 +31,26 @@ from ai.backend.manager.errors.user import (
     UserConflict,
     UserCreationBadRequest,
     UserCreationFailure,
+    UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
 )
-from ai.backend.manager.models import kernels
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
-from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
+from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.user.actions.modify_user import UserModifier
-
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+    UserRoleCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -95,14 +103,15 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, user_creator: UserCreator, group_ids: Optional[list[str]]
+        self, creator: Creator[UserRow], group_ids: Optional[list[str]]
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
-        domain_name = user_creator.domain_name
-        email = user_creator.email
-        user_name = user_creator.username
+        spec = cast(UserCreatorSpec, creator.spec)
+        domain_name = spec.domain_name
+        email = spec.email
+        user_name = spec.username
 
         async with self._db.begin_session() as db_session:
             # Check if domain exists before creating user
@@ -120,10 +129,8 @@ class UserRepository:
                 )
             try:
                 # Insert user
-                row = UserRow.from_creator(user_creator)
-                db_session.add(row)
-                await db_session.flush()
-                await db_session.refresh(row)
+                result = await execute_creator(db_session, creator)
+                row = result.row
             except sa.exc.IntegrityError as e:
                 error_msg = str(e)
                 raise UserCreationBadRequest(
@@ -159,12 +166,17 @@ class UserRepository:
             )
 
             role = await self._role_manager.create_system_role(db_session, created_user)
-            await self._role_manager.map_user_to_role(db_session, created_user.uuid, role.id)
-            await self._role_manager.map_entity_to_scope(
-                db_session,
-                ObjectId(EntityType.USER, str(created_user.uuid)),
-                ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+            user_role_creator = Creator(
+                spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
             )
+            await self._role_manager.map_user_to_role(db_session, user_role_creator)
+            entity_scope_creator = Creator(
+                spec=AssociationScopesEntitiesCreatorSpec(
+                    scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+                    object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
+                )
+            )
+            await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
 
         return UserCreateResultData(created_user, kp_data)
 
@@ -172,26 +184,54 @@ class UserRepository:
     async def update_user_validated(
         self,
         email: str,
-        modifier: UserModifier,
+        updater: Updater[UserRow],
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
         Update user with ownership validation and handle role/group changes.
         """
-        to_update = modifier.fields_to_update()
+        updater_spec = cast(UserUpdaterSpec, updater.spec)
+        to_update = updater_spec.build_values()
         async with self._db.begin() as conn:
             # Get current user data for validation
             current_user = await self._get_user_by_email_with_conn(conn, email)
 
+            # Check if new username is already taken by another user
+            new_username = updater_spec.username.optional_value()
+            if new_username and new_username != current_user.username:
+                username_exists = await self._check_username_exists_for_other_user(
+                    conn, username=new_username, exclude_email=email
+                )
+                if username_exists:
+                    raise UserModificationBadRequest(
+                        f"Username '{new_username}' is already taken by another user."
+                    )
+
+            # Check if new domain_name exists
+            new_domain_name = updater_spec.domain_name.optional_value()
+            if new_domain_name and new_domain_name != current_user.domain_name:
+                domain_exists = await self._check_domain_exists(conn, new_domain_name)
+                if not domain_exists:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+            # Check if new resource_policy exists
+            new_resource_policy = updater_spec.resource_policy.optional_value()
+            if new_resource_policy and new_resource_policy != current_user.resource_policy:
+                policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
+                if not policy_exists:
+                    raise UserModificationBadRequest(
+                        f"Resource policy '{new_resource_policy}' does not exist."
+                    )
+
             # Handle main_access_key validation
-            main_access_key = modifier.main_access_key.optional_value()
+            main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
                 await self._validate_and_update_main_access_key(conn, email, main_access_key)
 
             # Update user
-            if modifier.password.optional_value():
+            if updater_spec.password.optional_value():
                 to_update["password_changed_at"] = sa.func.now()
-            status = modifier.status.optional_value()
+            status = updater_spec.status.optional_value()
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
@@ -204,12 +244,12 @@ class UserRepository:
 
             # Handle role changes
             prev_role = current_user.role
-            role = modifier.role.optional_value()
+            role = updater_spec.role.optional_value()
             if role is not None and role != prev_role:
                 await self._sync_keypair_roles(conn, updated_user.uuid, role)
 
             # Handle group updates
-            group_ids = modifier.group_ids_value
+            group_ids = updater_spec.group_ids_value
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 
@@ -217,8 +257,7 @@ class UserRepository:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
-            res = UserData.from_row(updated_user)
-        return res
+            return UserData.from_row(updated_user)
 
     @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
@@ -243,6 +282,15 @@ class UserRepository:
         result = cast(Optional[str], result)
         return result is not None
 
+    async def _check_resource_policy_exists(self, session: SASession, policy_name: str) -> bool:
+        """Check if the resource policy exists."""
+        query = sa.select(UserResourcePolicyRow.name).where(
+            UserResourcePolicyRow.name == policy_name
+        )
+        result = await session.scalar(query)
+        result = cast(Optional[str], result)
+        return result is not None
+
     async def _check_user_exists_with_email_or_username(
         self, session: SASession, *, email: str, username: str
     ) -> bool:
@@ -250,6 +298,17 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
+        result = cast(Optional[UUID], result)
+        return result is not None
+
+    async def _check_username_exists_for_other_user(
+        self, conn: SASession, *, username: str, exclude_email: str
+    ) -> bool:
+        """Check if the username is already taken by another user."""
+        query = sa.select(UserRow.uuid).where(
+            sa.and_(UserRow.username == username, UserRow.email != exclude_email)
+        )
+        result = await conn.scalar(query)
         result = cast(Optional[UUID], result)
         return result is not None
 
@@ -504,7 +563,7 @@ class UserRepository:
         kernel_ids = [str(row["id"]) for row in rows]
         raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             if raw_stat is not None:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_byte = int(nmget(last_stat, "io_read.current", 0))

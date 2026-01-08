@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
+from typing import cast
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
@@ -46,7 +50,8 @@ class DomainService:
         self._admin_repository = admin_repository
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        domain_name_candidate = action.creator.name.strip()
+        spec = cast(DomainCreatorSpec, action.creator.spec)
+        domain_name_candidate = spec.name.strip()
         if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
@@ -60,13 +65,9 @@ class DomainService:
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
         if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.modify_domain_force(
-                action.domain_name, action.modifier
-            )
+            domain_data = await self._admin_repository.modify_domain_force(action.updater)
         else:
-            domain_data = await self._repository.modify_domain_validated(
-                action.domain_name, action.modifier
-            )
+            domain_data = await self._repository.modify_domain_validated(action.updater)
         return ModifyDomainActionResult(
             domain_data=domain_data,
         )
@@ -95,19 +96,18 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        domain_name_candidate = action.creator.name.strip()
+        spec = cast(DomainCreatorSpec, action.creator.spec)
+        domain_name_candidate = spec.name.strip()
         if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
-        scaling_groups = action.scaling_groups
-
         if action.user_info.role == UserRole.SUPERADMIN:
             domain_data = await self._admin_repository.create_domain_node_with_permissions_force(
-                action.creator, action.user_info, scaling_groups
+                action.creator, action.user_info, action.scaling_groups
             )
         else:
             domain_data = await self._repository.create_domain_node_with_permissions(
-                action.creator, action.user_info, scaling_groups
+                action.creator, action.user_info, action.scaling_groups
             )
 
         return CreateDomainNodeActionResult(
@@ -117,8 +117,6 @@ class DomainService:
     async def modify_domain_node(
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
-        domain_name = action.name
-
         if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
             if union := action.sgroups_to_add | action.sgroups_to_remove:
                 raise InvalidAPIParameters(
@@ -128,16 +126,14 @@ class DomainService:
 
         if action.user_info.role == UserRole.SUPERADMIN:
             domain_data = await self._admin_repository.modify_domain_node_with_permissions_force(
-                domain_name,
-                action.modifier.fields_to_update(),
+                action.updater,
                 action.user_info,
                 action.sgroups_to_add,
                 action.sgroups_to_remove,
             )
         else:
             domain_data = await self._repository.modify_domain_node_with_permissions(
-                domain_name,
-                action.modifier.fields_to_update(),
+                action.updater,
                 action.user_info,
                 action.sgroups_to_add,
                 action.sgroups_to_remove,

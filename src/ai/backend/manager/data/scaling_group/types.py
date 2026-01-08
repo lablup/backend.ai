@@ -61,6 +61,19 @@ class ScalingGroupSchedulerOptions:
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
 
+    def to_json(self) -> dict[str, Any]:
+        """Convert scheduler options to JSON-serializable dict."""
+        return {
+            "allowed_session_types": [st.value for st in self.allowed_session_types],
+            "pending_timeout": self.pending_timeout.total_seconds(),
+            "config": dict(self.config),
+            "agent_selection_strategy": self.agent_selection_strategy.value,
+            "agent_selector_config": dict(self.agent_selector_config),
+            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
+            "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
+            "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
+        }
+
 
 @dataclass
 class ScalingGroupSchedulerConfig:

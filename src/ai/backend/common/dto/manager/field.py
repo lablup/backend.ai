@@ -1,8 +1,8 @@
 import enum
 from typing import Optional
 
-from ...api_handlers import BaseFieldModel
-from ...types import VFolderUsageMode
+from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.types import VFolderUsageMode
 
 
 class VFolderPermissionField(enum.StrEnum):

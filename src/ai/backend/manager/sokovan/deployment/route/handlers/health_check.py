@@ -24,7 +24,7 @@ class HealthCheckRouteHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -63,8 +63,7 @@ class HealthCheckRouteHandler(RouteHandler):
         log.debug("Checking health for {} routes", len(routes))
 
         # Execute route health check logic via executor
-        result = await self._route_executor.check_route_health(routes)
-        return result
+        return await self._route_executor.check_route_health(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after health check."""

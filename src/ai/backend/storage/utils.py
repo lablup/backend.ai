@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import enum
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
-from datetime import timezone as tz
+from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, AsyncIterator, Optional, Union
+from typing import Any, Optional
 
 import trafaret as t
 from aiohttp import web
@@ -27,8 +27,8 @@ class CheckParamSource(enum.Enum):
     QUERY = 1
 
 
-def fstime2datetime(t: Union[float, int]) -> datetime:
-    return datetime.utcfromtimestamp(t).replace(tzinfo=tz.utc)
+def fstime2datetime(t: float | int) -> datetime:
+    return datetime.fromtimestamp(t, tz=UTC)
 
 
 @actxmgr
@@ -87,7 +87,7 @@ async def check_params(
 
 
 async def log_manager_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -138,7 +138,7 @@ async def log_manager_api_entry(
 
 
 async def log_manager_api_entry_new(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -164,7 +164,7 @@ async def log_manager_api_entry_new(
 
 
 async def log_client_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -219,7 +219,4 @@ def normalize_filepath(filepath: str) -> str:
     normalized = str(path).replace("\\", "/")
 
     # Remove leading slash if present (we want relative paths)
-    if normalized.startswith("/"):
-        normalized = normalized[1:]
-
-    return normalized
+    return normalized.removeprefix("/")

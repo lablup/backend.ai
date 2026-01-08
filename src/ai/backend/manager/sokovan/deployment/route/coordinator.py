@@ -167,7 +167,7 @@ class RouteCoordinator:
             next_status = handler.next_status()
             if next_status is not None and result.successes:
                 await self._deployment_repository.update_route_status_bulk(
-                    set([r.route_id for r in result.successes]),
+                    {r.route_id for r in result.successes},
                     handler.target_statuses(),
                     next_status,
                 )
@@ -176,7 +176,7 @@ class RouteCoordinator:
             failure_status = handler.failure_status()
             if failure_status is not None and result.errors:
                 await self._deployment_repository.update_route_status_bulk(
-                    set([e.route_info.route_id for e in result.errors]),
+                    {e.route_info.route_id for e in result.errors},
                     handler.target_statuses(),
                     failure_status,
                 )
@@ -185,7 +185,7 @@ class RouteCoordinator:
             stale_status = handler.stale_status()
             if stale_status is not None and result.stale:
                 await self._deployment_repository.update_route_status_bulk(
-                    set([r.route_id for r in result.stale]),
+                    {r.route_id for r in result.stale},
                     handler.target_statuses(),
                     stale_status,
                 )

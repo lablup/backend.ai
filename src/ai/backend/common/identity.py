@@ -8,10 +8,11 @@ import logging
 import os
 import socket
 import uuid
+from collections.abc import Awaitable, Callable, Iterable
 from ipaddress import IPv4Network, IPv6Network, ip_address
 from ipaddress import _BaseAddress as BaseIPAddress
 from pathlib import Path, PosixPath
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Optional
 
 import aiodns
 import aiohttp
@@ -21,12 +22,12 @@ import psutil
 from .utils import curl
 
 __all__ = (
-    "detect_cloud",
     "current_provider",
+    "detect_cloud",
     "get_instance_id",
     "get_instance_ip",
-    "get_instance_type",
     "get_instance_region",
+    "get_instance_type",
     "get_root_fs_type",
     "get_wsl_version",
 )
@@ -48,10 +49,8 @@ def is_containerized() -> bool:
     """
     try:
         cginfo = Path("/proc/self/cgroup").read_text()
-        if "/docker/" in cginfo or "/lxc/" in cginfo:
-            return True
-        return False
-    except IOError:
+        return "/docker/" in cginfo or "/lxc/" in cginfo
+    except OSError:
         return False
 
 

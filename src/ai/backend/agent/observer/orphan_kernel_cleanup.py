@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional, override
 
+from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     ORPHAN_KERNEL_THRESHOLD_SEC,
@@ -12,10 +13,8 @@ from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import LifecycleEvent
-
 if TYPE_CHECKING:
-    from ..agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -75,6 +74,14 @@ class OrphanKernelCleanupObserver(AbstractObserver):
             status = statuses.get(kernel_id)
             if status is None:
                 # No Redis entry - skip (not enough info to decide)
+                continue
+
+            # Skip if last_check is None (not enough info to decide)
+            if status.last_check is None:
+                log.debug(
+                    "Kernel {} has no last_check timestamp, skipping orphan check",
+                    kernel_id,
+                )
                 continue
 
             # Strict condition: kernel.last_check < agent_last_check - THRESHOLD

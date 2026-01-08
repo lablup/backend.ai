@@ -5,9 +5,9 @@ import logging
 import mimetypes
 import ssl
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Optional, override
+from typing import Any, Final, Optional, override
 
 import aiohttp
 
@@ -166,7 +166,9 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         """
         headers_base = self._get_auth_headers()
         async with self._session.head(
-            self._url, headers=headers_base, allow_redirects=True
+            self._url,
+            headers=headers_base,
+            allow_redirects=True,
         ) as resp:
             content_length = resp.headers.get("Content-Length")
             if not content_length or not content_length.isdigit():
@@ -188,6 +190,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         self._session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
             auto_decompress=False,
+            raise_for_status=True,
         )
 
         headers_base = self._get_auth_headers()
@@ -336,7 +339,7 @@ class HuggingFaceService:
     _artifact_verifier_ctx: ArtifactVerifierContext
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
-    def __init__(self, args: HuggingFaceServiceArgs):
+    def __init__(self, args: HuggingFaceServiceArgs) -> None:
         self._storage_pool = args.storage_pool
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs
@@ -356,8 +359,7 @@ class HuggingFaceService:
                 endpoint=config.endpoint,
             )
         )
-        scanner = HuggingFaceScanner(client)
-        return scanner
+        return HuggingFaceScanner(client)
 
     async def scan_models(
         self,
@@ -467,7 +469,7 @@ class HuggingFaceService:
                 retrieved_models.append(model_data)
                 log.debug(f"Successfully retrieved basic model data: {model}")
             except Exception as e:
-                log.error(f"Failed to retrieve model {model}: {str(e)}")
+                log.error(f"Failed to retrieve model {model}: {e!s}")
                 raise
 
         # Start background metadata processing for multiple models
@@ -573,7 +575,7 @@ class HuggingFaceService:
         except HuggingFaceModelNotFoundError:
             raise
         except Exception as e:
-            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
+            raise HuggingFaceAPIError(f"Import failed for {model}: {e!s}") from e
         finally:
             scanner = self._make_scanner(registry_name)
             commit_hash = None
@@ -606,11 +608,10 @@ class HuggingFaceService:
                 async with session.get(download_url) as resp:
                     if resp.status == 200:
                         return await resp.text()
-                    else:
-                        log.warning(f"Failed to download README.md: HTTP {resp.status}")
-                        return None
+                    log.warning(f"Failed to download README.md: HTTP {resp.status}")
+                    return None
         except Exception as e:
-            log.error(f"Error downloading README.md: {str(e)}")
+            log.error(f"Error downloading README.md: {e!s}")
             return None
 
     async def import_models_batch(
@@ -677,7 +678,7 @@ class HuggingFaceService:
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{model_count}"
+                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
                         )
                         errors.append(str(e))
                     finally:
@@ -697,13 +698,12 @@ class HuggingFaceService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {str(e)}")
-                return DispatchResult.error(f"Batch import failed: {str(e)}")
+                log.error(f"Batch model import failed: {e!s}")
+                return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        return await self._background_task_manager.start(_import_models_batch)
 
 
 # Import Pipeline Steps
@@ -752,8 +752,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 endpoint=config.endpoint,
             )
         )
-        scanner = HuggingFaceScanner(client)
-        return scanner
+        return HuggingFaceScanner(client)
 
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:

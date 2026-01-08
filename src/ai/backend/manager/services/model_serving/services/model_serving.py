@@ -2,6 +2,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
+from typing import cast
 
 import aiohttp
 import tomli
@@ -35,7 +36,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
     ErrorInfo,
@@ -53,19 +53,20 @@ from ai.backend.manager.errors.service import (
     RouteNotFound,
 )
 from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
-from ai.backend.manager.models.endpoint import (
-    EndpointLifecycle,
-    EndpointTokenRow,
-)
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
+from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
 )
@@ -305,8 +306,8 @@ class ModelServingService:
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {action.creator.group_name}")
 
-        endpoint = EndpointCreator(
-            action.creator.service_name,
+        endpoint_spec = EndpointCreatorSpec(
+            name=action.creator.service_name,
             model_definition_path=service_prepare_ctx.model_definition_path,
             created_user=action.request_user_id,
             session_owner=service_prepare_ctx.owner_uuid,
@@ -332,21 +333,22 @@ class ModelServingService:
             open_to_public=action.creator.open_to_public,
             runtime_variant=action.creator.runtime_variant,
         )
+        endpoint_creator = Creator(spec=endpoint_spec)
 
         endpoint_data = await self._repository.create_endpoint_validated(
-            endpoint, self._agent_registry
+            endpoint_creator, self._agent_registry
         )
         endpoint_id = endpoint_data.id
 
         return CreateModelServiceActionResult(
             ServiceInfo(
                 endpoint_id=endpoint_id,
-                model_id=endpoint.model,
-                extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
+                model_id=endpoint_spec.model,
+                extra_mounts=[m.vfid.folder_id for m in endpoint_spec.extra_mounts],
                 name=action.creator.service_name,
                 model_definition_path=service_prepare_ctx.model_definition_path,
-                replicas=endpoint.replicas,
-                desired_session_count=endpoint.replicas,
+                replicas=endpoint_spec.replicas,
+                desired_session_count=endpoint_spec.replicas,
                 active_routes=[],
                 service_endpoint=None,
                 is_public=action.creator.open_to_public,
@@ -750,39 +752,43 @@ class ModelServingService:
 
         # Generate token via wsproxy
         body = {"user_uuid": str(endpoint_data.session_owner_id), "exp": action.expires_at}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 f"{scaling_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
                 json=body,
                 headers={
                     "accept": "application/json",
                     "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
                 },
-            ) as resp:
-                resp_json = await resp.json()
-                if resp.status != HTTPStatus.OK:
-                    raise EndpointNotFound(
-                        f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
-                    )
-                token = resp_json["token"]
+            ) as resp,
+        ):
+            resp_json = await resp.json()
+            if resp.status != HTTPStatus.OK:
+                raise EndpointNotFound(
+                    f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
+                )
+            token = resp_json["token"]
 
         # Create token in database
         token_id = uuid.uuid4()
-        token_row = EndpointTokenRow(
-            token_id,
-            token,
-            endpoint_data.id,
-            endpoint_data.domain,
-            endpoint_data.project,
-            endpoint_data.session_owner_id,
+        token_creator = Creator(
+            spec=EndpointTokenCreatorSpec(
+                id=token_id,
+                token=token,
+                endpoint=endpoint_data.id,
+                domain=endpoint_data.domain,
+                project=endpoint_data.project,
+                session_owner=endpoint_data.session_owner_id,
+            )
         )
 
         await self.check_requester_access(action.requester_ctx)
         if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            token_data = await self._admin_repository.create_endpoint_token_force(token_row)
+            token_data = await self._admin_repository.create_endpoint_token_force(token_creator)
         else:
             token_data = await self._repository.create_endpoint_token_validated(
-                token_row,
+                token_creator,
                 action.requester_ctx.user_id,
                 action.requester_ctx.user_role,
                 action.requester_ctx.domain_name,
@@ -829,7 +835,8 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
             self._storage_manager,
         )
-        if action.modifier.replica_count_modified():
+        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+        if spec.replica_count_modified():
             # Notify appproxy to update routing info
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,

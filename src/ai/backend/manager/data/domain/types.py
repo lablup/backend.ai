@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -12,7 +14,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserRole
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -49,37 +51,6 @@ class DomainData:
             entity: OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_domain()
         }
-
-
-@dataclass
-class DomainCreator(Creator):
-    name: str
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    total_resource_slots: Optional[ResourceSlot] = None
-    allowed_vfolder_hosts: Optional[dict[str, list[str]]] = None
-    allowed_docker_registries: Optional[list[str]] = None
-    integration_id: Optional[str] = None
-    dotfiles: Optional[bytes] = None
-
-    @override
-    def fields_to_store(self) -> dict[str, Any]:
-        to_store: dict[str, Any] = {"name": self.name}
-        if self.description is not None:
-            to_store["description"] = self.description
-        if self.is_active is not None:
-            to_store["is_active"] = self.is_active
-        if self.total_resource_slots is not None:
-            to_store["total_resource_slots"] = self.total_resource_slots
-        if self.allowed_vfolder_hosts is not None:
-            to_store["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts
-        if self.allowed_docker_registries is not None:
-            to_store["allowed_docker_registries"] = self.allowed_docker_registries
-        if self.integration_id is not None:
-            to_store["integration_id"] = self.integration_id
-        if self.dotfiles is not None:
-            to_store["dotfiles"] = self.dotfiles
-        return to_store
 
 
 @dataclass

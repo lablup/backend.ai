@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -243,8 +243,7 @@ class APIHandler:
         processors = processors_ctx.processors
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
-                artifact_id=path.parsed.artifact_id,
-                modifier=body.parsed.to_modifier(),
+                updater=body.parsed.to_updater(path.parsed.artifact_id),
             )
         )
 
@@ -334,7 +333,7 @@ class APIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "artifacts"

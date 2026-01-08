@@ -9,10 +9,10 @@ import pathlib
 
 import click
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..config.unified import AgentUnifiedConfig
 from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

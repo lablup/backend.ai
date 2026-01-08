@@ -2,21 +2,16 @@ import dataclasses
 import enum
 import json
 import textwrap
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     Generic,
-    Iterable,
-    Mapping,
     Optional,
-    Sequence,
     TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -304,11 +299,11 @@ class HealthCheckState(BaseModel):
     status: ModelServiceStatus | None = None
 
 
-TBaseModel = TypeVar("TBaseModel", bound=Union[BaseModel, Sequence[BaseModel]])
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel | Sequence[BaseModel])
 
 
 @dataclass
 class PydanticResponse(Generic[TBaseModel]):
     response: TBaseModel
-    headers: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
+    headers: dict[str, Any] = dataclasses.field(default_factory=dict)
     status: int = 200

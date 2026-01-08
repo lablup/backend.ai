@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -33,6 +33,8 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.audit_log.service import AuditLogService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -68,6 +70,10 @@ from ai.backend.manager.services.notification.processors import NotificationProc
 from ai.backend.manager.services.notification.service import NotificationService
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
+from ai.backend.manager.services.permission_contoller.processors import (
+    PermissionControllerProcessors,
+)
+from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -147,12 +153,14 @@ class Services:
     auth: AuthService
     notification: NotificationService
     object_storage: ObjectStorageService
+    permission_controller: PermissionControllerService
     vfs_storage: VFSStorageService
     artifact: ArtifactService
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
+    audit_log: AuditLogService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -272,6 +280,9 @@ class Services:
             repository=repositories.notification.repository,
             notification_center=args.notification_center,
         )
+        permission_controller_service = PermissionControllerService(
+            repository=repositories.permission_controller.repository,
+        )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
@@ -310,10 +321,14 @@ class Services:
             repositories.reservoir_registry.repository,
             repositories.artifact_registry.repository,
         )
-        deployment_service = DeploymentService(args.deployment_controller)
+        deployment_service = DeploymentService(
+            args.deployment_controller,
+            args.deployment_controller._deployment_repository,
+        )
         storage_namespace_service = StorageNamespaceService(
             repositories.storage_namespace.repository
         )
+        audit_log_service = AuditLogService(repositories.audit_log.repository)
 
         return cls(
             agent=agent_service,
@@ -338,12 +353,14 @@ class Services:
             auth=auth,
             notification=notification_service,
             object_storage=object_storage_service,
+            permission_controller=permission_controller_service,
             vfs_storage=vfs_storage_service,
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
             artifact_registry=artifact_registry_service,
             deployment=deployment_service,
             storage_namespace=storage_namespace_service,
+            audit_log=audit_log_service,
         )
 
 
@@ -376,12 +393,14 @@ class Processors(AbstractProcessorPackage):
     auth: AuthProcessors
     notification: NotificationProcessors
     object_storage: ObjectStorageProcessors
+    permission_controller: PermissionControllerProcessors
     vfs_storage: VFSStorageProcessors
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
-    deployment: Optional[DeploymentProcessors]
+    deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
+    audit_log: AuditLogProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -423,6 +442,9 @@ class Processors(AbstractProcessorPackage):
         )
         auth = AuthProcessors(services.auth, action_monitors)
         notification_processors = NotificationProcessors(services.notification, action_monitors)
+        permission_controller_processors = PermissionControllerProcessors(
+            services.permission_controller, action_monitors
+        )
         object_storage_processors = ObjectStorageProcessors(
             services.object_storage, action_monitors
         )
@@ -435,14 +457,12 @@ class Processors(AbstractProcessorPackage):
             services.artifact_revision, action_monitors
         )
 
-        # Initialize deployment processors if service is available
-        deployment_processors = None
-        if services.deployment is not None:
-            deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+        deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
         storage_namespace_processors = StorageNamespaceProcessors(
             services.storage_namespace, action_monitors
         )
+        audit_log_processors = AuditLogProcessors(services.audit_log, [])
 
         return cls(
             agent=agent_processors,
@@ -467,12 +487,14 @@ class Processors(AbstractProcessorPackage):
             auth=auth,
             notification=notification_processors,
             object_storage=object_storage_processors,
+            permission_controller=permission_controller_processors,
             vfs_storage=vfs_storage_processors,
             artifact=artifact_processors,
             artifact_registry=artifact_registry_processors,
             artifact_revision=artifact_revision_processors,
             deployment=deployment_processors,
             storage_namespace=storage_namespace_processors,
+            audit_log=audit_log_processors,
         )
 
     @override
@@ -500,10 +522,12 @@ class Processors(AbstractProcessorPackage):
             *self.auth.supported_actions(),
             *self.notification.supported_actions(),
             *self.object_storage.supported_actions(),
+            *self.permission_controller.supported_actions(),
             *self.vfs_storage.supported_actions(),
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),
+            *self.audit_log.supported_actions(),
         ]

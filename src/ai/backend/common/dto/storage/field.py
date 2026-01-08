@@ -2,8 +2,8 @@ from typing import Optional
 
 from pydantic import Field
 
-from ...api_handlers import BaseFieldModel
-from ...types import VolumeID
+from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.types import VolumeID
 
 
 class VolumeMetaField(BaseFieldModel):

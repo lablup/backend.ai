@@ -3,6 +3,7 @@ import uuid
 from pathlib import PurePosixPath
 from typing import (
     Optional,
+    cast,
 )
 
 import aiohttp
@@ -52,8 +53,8 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.base import (
+from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
     CreateVFolderAction,
@@ -75,7 +76,11 @@ from ..actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -198,10 +203,6 @@ class VFolderService:
             )
 
         if group_type == ProjectType.MODEL_STORE:
-            if action.mount_permission != VFolderPermission.READ_WRITE:
-                raise VFolderInvalidParameter(
-                    "Setting custom permission is not supported for model store vfolder"
-                )
             if action.usage_mode != VFolderUsageMode.MODEL:
                 raise VFolderInvalidParameter(
                     "Only Model VFolder can be created under the model store project"
@@ -312,7 +313,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        modifier = action.modifier
+        spec = cast(VFolderAttributeUpdaterSpec, action.updater.spec)
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -336,7 +337,7 @@ class VFolderService:
 
         # Check for name conflicts if name is being updated
         try:
-            new_name = modifier.name.value()
+            new_name = spec.name.value()
         except ValueError:
             pass
         else:
@@ -347,8 +348,7 @@ class VFolderService:
                     )
 
         # Update the vfolder using repository
-        to_update = modifier.fields_to_update()
-        await self._vfolder_repository.update_vfolder_attribute(action.vfolder_uuid, to_update)
+        await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 

@@ -7,6 +7,7 @@ from ai.backend.manager.repositories.artifact.repositories import ArtifactReposi
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
+from ai.backend.manager.repositories.audit_log.repositories import AuditLogRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -25,6 +26,9 @@ from ai.backend.manager.repositories.metric.repositories import MetricRepositori
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
+from ai.backend.manager.repositories.permission_controller.repositories import (
+    PermissionControllerRepositories,
+)
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -35,6 +39,9 @@ from ai.backend.manager.repositories.resource_preset.repositories import Resourc
 from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
+from ai.backend.manager.repositories.scheduling_history.repositories import (
+    SchedulingHistoryRepositories,
+)
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -62,12 +69,14 @@ class Repositories:
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
+    permission_controller: PermissionControllerRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     scaling_group: ScalingGroupRepositories
     schedule: ScheduleRepositories
     scheduler: SchedulerRepositories
+    scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
@@ -78,6 +87,7 @@ class Repositories:
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
     storage_namespace: StorageNamespaceRepositories
+    audit_log: AuditLogRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -93,12 +103,14 @@ class Repositories:
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
+        permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
+        scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
@@ -109,6 +121,7 @@ class Repositories:
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
+        audit_log_repositories = AuditLogRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -123,12 +136,14 @@ class Repositories:
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
+            permission_controller=permission_controller_repositories,
             project_resource_policy=project_resource_policy_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             scaling_group=scaling_group_repositories,
             schedule=schedule_repositories,
             scheduler=scheduler_repositories,
+            scheduling_history=scheduling_history_repositories,
             session=session_repositories,
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
@@ -139,4 +154,5 @@ class Repositories:
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
             storage_namespace=storage_namespace_repositories,
+            audit_log=audit_log_repositories,
         )

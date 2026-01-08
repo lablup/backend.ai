@@ -13,6 +13,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
+    EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
     RoutingData,
@@ -28,6 +29,13 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 model_serving_repository_resilience = Resilience(
     policies=[
@@ -74,8 +82,7 @@ class AdminModelServingRepository:
             )
             if not endpoint:
                 return None
-            data = endpoint.to_data()
-        return data
+            return endpoint.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_force(
@@ -142,8 +149,7 @@ class AdminModelServingRepository:
             route = await self._get_route_by_id(session, route_id, load_endpoint=True)
             if not route or route.endpoint != service_id:
                 return None
-            data = route.to_data()
-        return data
+            return route.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic_force(
@@ -169,7 +175,14 @@ class AdminModelServingRepository:
             )
             await session.execute(query)
 
-            endpoint = await self._get_endpoint_by_id(session, service_id, load_routes=True)
+            endpoint = await self._get_endpoint_by_id(
+                session,
+                service_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_model=True,
+                load_image=True,
+            )
             if endpoint is None:
                 raise NoResultFound
             data = endpoint.to_data()
@@ -201,22 +214,20 @@ class AdminModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token_force(
-        self, token_row: EndpointTokenRow
+        self, creator: Creator[EndpointTokenRow]
     ) -> Optional[EndpointTokenData]:
         """
         Create endpoint token without access validation.
         Returns token data if created, None if endpoint not found.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
+            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
+            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
             if not endpoint:
                 return None
 
-            session.add(token_row)
-            await session.commit()
-            await session.refresh(token_row)
-            data = token_row.to_dataclass()
-        return data
+            result = await execute_creator(session, creator)
+            return result.row.to_dataclass()
 
     async def _get_endpoint_by_id(
         self,
@@ -333,14 +344,17 @@ class AdminModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def update_auto_scaling_rule_force(
-        self, rule_id: uuid.UUID, fields_to_update: dict[str, Any]
+        self, updater: Updater[EndpointAutoScalingRuleRow]
     ) -> Optional[EndpointAutoScalingRuleData]:
         """
         Update auto scaling rule without access validation.
         Returns the updated rule if successful, None if not found.
         """
+        rule_id = uuid.UUID(str(updater.pk_value))
+
         async with self._db.begin_session() as session:
             try:
+                # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
                     return None
@@ -348,10 +362,12 @@ class AdminModelServingRepository:
                 if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     return None
 
-                for key, value in fields_to_update.items():
-                    setattr(rule, key, value)
+                # Use execute_updater to apply changes
+                result = await execute_updater(session, updater)
+                if result is None:
+                    return None
 
-                return rule.to_data()
+                return result.row.to_data()
             except ObjectNotFound:
                 return None
 
@@ -371,3 +387,26 @@ class AdminModelServingRepository:
                 return True
             except NoResultFound:
                 return False
+
+    @model_serving_repository_resilience.apply()
+    async def search_auto_scaling_rules_force(
+        self,
+        querier: BatchQuerier,
+    ) -> EndpointAutoScalingRuleListResult:
+        """
+        Search auto scaling rules without access validation.
+        Returns all matching rules regardless of ownership.
+        """
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(EndpointAutoScalingRuleRow)
+
+            result = await execute_batch_querier(session, query, querier)
+
+            items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
+
+            return EndpointAutoScalingRuleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

@@ -5,7 +5,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationChannelData
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import NotificationAction
 
@@ -14,7 +14,7 @@ from .base import NotificationAction
 class SearchChannelsAction(NotificationAction):
     """Action to search notification channels."""
 
-    querier: Querier
+    querier: BatchQuerier
 
     @override
     @classmethod

@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 import sqlalchemy as sa
@@ -12,17 +12,19 @@ from sqlalchemy.sql import Select
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
+    ArtifactListResult,
     ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
+    ArtifactRevisionListResult,
     ArtifactStatus,
     ArtifactType,
+    ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import (
@@ -32,7 +34,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
     ArtifactUpdateError,
-    InvalidArtifactModifierTypeError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
@@ -44,6 +45,8 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
@@ -253,40 +256,24 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    async def update_artifact(
-        self, artifact_id: uuid.UUID, modifier: ArtifactModifier
-    ) -> ArtifactData:
+    async def update_artifact(self, updater: Updater[ArtifactRow]) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
-            data = modifier.fields_to_update()
-            if not data:
-                raise InvalidArtifactModifierTypeError("No valid fields to update")
-
-            result = await db_sess.execute(
-                sa.update(ArtifactRow)
-                .where(
+            # Check if artifact exists and is not deleted
+            check_result = await db_sess.execute(
+                sa.select(ArtifactRow.id).where(
                     sa.and_(
-                        ArtifactRow.id == artifact_id,
-                        ArtifactRow.availability != ArtifactAvailability.DELETED,
-                    )
-                )
-                .values(**data)
-            )
-            if result.rowcount == 0:
-                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            await db_sess.commit()
-
-            result = await db_sess.execute(
-                sa.select(ArtifactRow).where(
-                    sa.and_(
-                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.id == updater.pk_value,
                         ArtifactRow.availability != ArtifactAvailability.DELETED,
                     )
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            return row.to_dataclass()
+            if check_result.scalar_one_or_none() is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+            return result.row.to_dataclass()
 
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
         async with self._db.begin_session() as db_sess:
@@ -344,7 +331,7 @@ class ArtifactDBSource:
                     if has_changes:
                         existing_artifact.extra = artifact_data.extra
                         existing_artifact.description = artifact_data.description
-                        existing_artifact.updated_at = datetime.now(timezone.utc)
+                        existing_artifact.updated_at = datetime.now(UTC)
 
                     await db_sess.flush()
                     await db_sess.refresh(
@@ -828,68 +815,7 @@ class ArtifactDBSource:
                     ArtifactRevisionRow.id == artifact_revision_id
                 )
             )
-            readme = result.scalar_one_or_none()
-            return readme
-
-    async def list_artifacts_paginated(
-        self,
-        *,
-        pagination: Optional[PaginationOptions] = None,
-        ordering: Optional[ArtifactOrderingOptions] = None,
-        filters: Optional[ArtifactFilterOptions] = None,
-    ) -> tuple[list[ArtifactData], int]:
-        """List artifacts with pagination and filtering.
-
-        Args:
-            pagination: Pagination options for the query
-            ordering: Ordering options for the query
-            filters: Filtering options for artifacts
-
-        Returns:
-            Tuple of (artifacts list, total count)
-        """
-        # Set defaults
-        if ordering is None:
-            ordering = ArtifactOrderingOptions()
-        if filters is None:
-            filters = ArtifactFilterOptions()
-
-        # Initialize the generic paginator with artifact-specific components
-        artifact_paginator = GenericQueryBuilder[
-            ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
-        ](
-            model_class=ArtifactRow,
-            filter_applier=ArtifactFilterApplier(),
-            ordering_applier=ArtifactOrderingApplier(),
-            model_converter=ArtifactModelConverter(),
-            cursor_type_name="Artifact",
-        )
-
-        # Build query using the generic paginator
-        querybuild_result = artifact_paginator.build_pagination_queries(
-            pagination=pagination or PaginationOptions(),
-            ordering=ordering,
-            filters=filters,
-            select_options=[selectinload(ArtifactRow.revision_rows)],
-        )
-
-        async with self._db.begin_session() as db_sess:
-            # Execute data query
-            result = await db_sess.execute(querybuild_result.data_query)
-            rows = result.scalars().all()
-
-            # Build count query with same filters applied
-            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
-            if filters is not None:
-                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
-            count_result = await db_sess.execute(count_stmt)
-            total_count = count_result.scalar()
-
-            # Convert to data objects using paginator
-            data_objects = artifact_paginator.convert_rows_to_data(
-                rows, querybuild_result.pagination_order
-            )
-            return data_objects, total_count
+            return result.scalar_one_or_none()
 
     async def list_artifacts_with_revisions_paginated(
         self,
@@ -958,98 +884,107 @@ class ArtifactDBSource:
 
             return data_objects, total_count
 
-    async def list_artifact_revisions_paginated(
+    async def search_artifacts(
         self,
-        *,
-        pagination: Optional[PaginationOptions] = None,
-        ordering: Optional[ArtifactRevisionOrderingOptions] = None,
-        filters: Optional[ArtifactRevisionFilterOptions] = None,
-    ) -> tuple[list[ArtifactRevisionData], int]:
-        """List artifact revisions with pagination and filtering.
+        querier: BatchQuerier,
+    ) -> ArtifactListResult:
+        """Search artifacts with querier pattern.
 
         Args:
-            pagination: Pagination options for the query
-            ordering: Ordering options for the query
-            filters: Filtering options for artifact revisions
+            querier: BatchQuerier for filtering, ordering, and pagination
 
         Returns:
-            Tuple of (artifact revisions list, total count)
+            ArtifactListResult with items, total count, and pagination info
         """
-        # Set defaults
-        if ordering is None:
-            ordering = ArtifactRevisionOrderingOptions()
-        if filters is None:
-            filters = ArtifactRevisionFilterOptions()
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRow)
 
-        # Create a generic query builder for ArtifactRevision
-        revision_paginator = GenericQueryBuilder[
-            ArtifactRevisionRow,
-            ArtifactRevisionData,
-            ArtifactRevisionFilterOptions,
-            ArtifactRevisionOrderingOptions,
-        ](
-            model_class=ArtifactRevisionRow,
-            filter_applier=ArtifactRevisionFilterApplier(),
-            ordering_applier=ArtifactRevisionOrderingApplier(),
-            model_converter=ArtifactRevisionModelConverter(),
-            cursor_type_name="ArtifactRevision",
-        )
-
-        # Build query using the generic paginator
-        querybuild_result = revision_paginator.build_pagination_queries(
-            pagination=pagination or PaginationOptions(),
-            ordering=ordering,
-            filters=filters,
-        )
-
-        async with self._db.begin_session() as db_sess:
-            # Execute data query
-            result = await db_sess.execute(querybuild_result.data_query)
-            rows = result.scalars().all()
-
-            # Build count query with same filters
-            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRevisionRow)
-            if filters.artifact_id is not None:
-                count_stmt = count_stmt.where(
-                    ArtifactRevisionRow.artifact_id == filters.artifact_id
-                )
-            if filters.status_filter is not None:
-                status_values = [status.value for status in filters.status_filter.values]
-                if filters.status_filter.type == ArtifactStatusFilterType.IN:
-                    count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
-                elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
-                    count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
-            if filters.remote_status_filter is not None:
-                remote_status_values = [
-                    status.value for status in filters.remote_status_filter.values
-                ]
-                if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
-                    count_stmt = count_stmt.where(
-                        ArtifactRevisionRow.remote_status.in_(remote_status_values)
-                    )
-                elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
-                    count_stmt = count_stmt.where(
-                        ArtifactRevisionRow.remote_status == remote_status_values[0]
-                    )
-            if filters.version_filter is not None:
-                version_filter = filters.version_filter.to_dataclass()
-                version_condition = version_filter.apply_to_column(ArtifactRevisionRow.version)
-                if version_condition is not None:
-                    count_stmt = count_stmt.where(version_condition)
-            if filters.size_filter is not None:
-                size_filter = filters.size_filter.to_dataclass()
-                size_condition = size_filter.apply_to_column(ArtifactRevisionRow.size)
-                if size_condition is not None:
-                    count_stmt = count_stmt.where(size_condition)
-
-            count_result = await db_sess.execute(count_stmt)
-            total_count = count_result.scalar()
-
-            # Convert to data objects using paginator
-            data_objects = revision_paginator.convert_rows_to_data(
-                rows, querybuild_result.pagination_order
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
             )
-            return data_objects, total_count
+
+            items = [row.ArtifactRow.to_dataclass() for row in result.rows]
+
+            return ArtifactListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifact_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactRevisionListResult:
+        """Search artifact revisions with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactRevisionListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRevisionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ArtifactRevisionRow.to_dataclass() for row in result.rows]
+
+            return ArtifactRevisionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifacts_with_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactWithRevisionsListResult:
+        """Search artifacts with their revisions using querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactWithRevisionsListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Build query with eager loading of revisions
+            query = sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            # Convert to ArtifactDataWithRevisions objects
+            items: list[ArtifactDataWithRevisions] = []
+            for row in result.rows:
+                artifact_data = row.ArtifactRow.to_dataclass()
+                revisions_data = [
+                    revision.to_dataclass() for revision in row.ArtifactRow.revision_rows
+                ]
+                items.append(
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revisions_data
+                    )
+                )
+
+            return ArtifactWithRevisionsListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @actxmgr
     async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:

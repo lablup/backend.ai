@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Mapping, Optional
+from collections.abc import Mapping
+from typing import Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -20,6 +21,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import (
@@ -29,21 +31,17 @@ from ai.backend.manager.errors.resource import (
     ResourcePresetNotFound,
     ScalingGroupNotFound,
 )
-from ai.backend.manager.models import (
-    AgentRow,
-    KernelRow,
-    SessionRow,
-    association_groups_users,
-    domains,
-    groups,
-    query_allowed_sgroups,
-)
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 
 from .types import (
     AccessKeyFilter,
@@ -71,19 +69,20 @@ class ResourcePresetDBSource:
     ) -> None:
         self._db = db
 
-    async def create_preset(self, creator: ResourcePresetCreator) -> ResourcePresetData:
+    async def create_preset(self, creator: Creator[ResourcePresetRow]) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
+        spec = cast(ResourcePresetCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            preset_row = await ResourcePresetRow.create(creator, db_session=session)
-            if preset_row is None:
+            try:
+                result = await execute_creator(session, creator)
+            except sa.exc.IntegrityError:
                 raise ResourcePresetConflict(
-                    f"Duplicate resource preset name (name:{creator.name}, scaling_group:{creator.scaling_group_name})"
+                    f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
                 )
-            data = preset_row.to_dataclass()
-        return data
+            return result.row.to_dataclass()
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
@@ -94,8 +93,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
@@ -106,8 +104,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def get_preset_by_id_or_name(
         self, preset_id: Optional[UUID], name: Optional[str]
@@ -119,8 +116,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            data = preset_row.to_dataclass()
-        return data
+            return preset_row.to_dataclass()
 
     async def _get_preset_by_id_or_name(
         self, db_sess: SASession, preset_id: Optional[UUID], name: Optional[str]
@@ -136,21 +132,18 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound()
         return preset_row
 
-    async def modify_preset(
-        self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
-    ) -> ResourcePresetData:
+    async def modify_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         async with self._db.begin_session() as session:
-            preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            to_update = modifier.fields_to_update()
-            for key, value in to_update.items():
-                setattr(preset_row, key, value)
-            await session.flush()
-            data = preset_row.to_dataclass()
-        return data
+            result = await execute_updater(session, updater)
+            if result is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.pk_value} not found."
+                )
+            return result.row.to_dataclass()
 
     async def delete_preset(
         self, preset_id: Optional[UUID], name: Optional[str]
@@ -207,7 +200,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session() as conn:
             # Fetch all database data at once
-            db_data = await self._fetch_all_check_presets_data(
+            return await self._fetch_all_check_presets_data(
                 conn,
                 access_key,
                 user_id,
@@ -217,8 +210,6 @@ class ResourcePresetDBSource:
                 known_slot_types,
                 scaling_group,
             )
-
-        return db_data
 
     async def _get_group_info(
         self,
@@ -354,6 +345,7 @@ class ResourcePresetDBSource:
                 AgentRow.scaling_group.in_(sgroup_names),
                 AgentRow.available_slots.isnot(None),
                 AgentRow.schedulable == sa.true(),
+                AgentRow.status == AgentStatus.ALIVE,
             )
         )
 

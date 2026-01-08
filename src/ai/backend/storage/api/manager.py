@@ -7,17 +7,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import AbstractAsyncContextManager
 from contextlib import contextmanager as ctxmgr
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterator,
     NotRequired,
     Optional,
     TypedDict,
@@ -65,14 +63,13 @@ from ai.backend.common.types import (
     VolumeMountableNodeType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage import __version__
+from ai.backend.storage.bgtask.tasks.clone import VFolderCloneManifest
+from ai.backend.storage.bgtask.tasks.delete import VFolderDeleteManifest
+from ai.backend.storage.bgtask.tasks.delete_files import FileDeleteManifest
 from ai.backend.storage.bgtask.types import StorageBgtaskName
-
-from .. import __version__
-from ..bgtask.tasks.clone import VFolderCloneManifest
-from ..bgtask.tasks.delete import VFolderDeleteManifest
-from ..bgtask.tasks.delete_files import FileDeleteManifest
-from ..dto.context import StorageRootCtx
-from ..errors import (
+from ai.backend.storage.dto.context import StorageRootCtx
+from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidAPIParameters,
     InvalidQuotaConfig,
@@ -83,9 +80,10 @@ from ..errors import (
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ..types import QuotaConfig, VFolderID
-from ..utils import check_params, log_manager_api_entry
-from ..watcher import ChownTask, MountTask, UmountTask
+from ai.backend.storage.types import QuotaConfig, VFolderID
+from ai.backend.storage.utils import check_params, log_manager_api_entry
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
+
 from .v1.registries.huggingface import create_app as create_huggingface_registries_app
 from .v1.registries.reservoir import create_app as create_reservoir_registries_app
 from .v1.storages.object_storage import create_app as create_object_storages_app
@@ -93,8 +91,8 @@ from .v1.storages.vfs_storage import create_app as create_vfs_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..context import RootContext, ServiceContext
-    from ..volumes.abc import AbstractVolume
+    from ai.backend.storage.context import RootContext, ServiceContext
+    from ai.backend.storage.volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -245,7 +243,7 @@ async def get_hwinfo(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -270,7 +268,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -305,7 +303,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -336,7 +334,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         options: QuotaConfig
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -374,7 +372,7 @@ async def unset_quota(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -404,7 +402,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -459,7 +457,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -493,7 +491,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         dst_vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -532,7 +530,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
         subpath: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -585,7 +583,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -618,7 +616,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -662,7 +660,7 @@ async def get_metadata(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -688,7 +686,7 @@ async def set_metadata(request: web.Request) -> web.Response:
         payload: bytes
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -713,7 +711,7 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -741,7 +739,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -776,7 +774,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -810,7 +808,7 @@ async def get_quota(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -835,7 +833,7 @@ async def set_quota(request: web.Request) -> web.Response:
         size_bytes: BinarySize
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -863,7 +861,7 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -895,7 +893,7 @@ async def mkdir(request: web.Request) -> web.Response:
             result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
             failed_cases = [isinstance(res, BaseException) for res in result_group]
 
-        for relpath, result_or_exception in zip(relpaths, result_group):
+        for relpath, result_or_exception in zip(relpaths, result_group, strict=True):
             if isinstance(result_or_exception, BaseException):
                 log.error(
                     "Failed to create the directory {!r} in vol:{}/vfid:{}:",
@@ -936,7 +934,7 @@ async def list_files(request: web.Request) -> web.Response:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -986,7 +984,7 @@ async def rename_file(request: web.Request) -> web.Response:
         is_dir: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1021,7 +1019,7 @@ async def move_file(request: web.Request) -> web.Response:
         dst_relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1055,7 +1053,7 @@ async def create_download_session(request: web.Request) -> web.Response:
         unmanaged_path: str | None
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1076,7 +1074,7 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
@@ -1098,7 +1096,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         size: int
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1122,7 +1120,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
@@ -1144,7 +1142,7 @@ async def delete_files(request: web.Request) -> web.Response:
         recursive: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(

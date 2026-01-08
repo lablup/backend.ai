@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import yarl
@@ -21,6 +21,10 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult
+
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -97,7 +101,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def active_route_statuses(cls) -> set["RouteStatus"]:
+    def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
             RouteStatus.HEALTHY,
@@ -107,7 +111,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def inactive_route_statuses(cls) -> set["RouteStatus"]:
+    def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:
@@ -124,6 +128,20 @@ class RouteStatus(enum.Enum):
             RouteStatus.HEALTHY: 4,
         }
         return priority_map.get(self, 0)
+
+
+class RouteTrafficStatus(enum.StrEnum):
+    """Traffic routing status for a route.
+
+    Controls whether traffic should be sent to this route.
+    Actual traffic delivery depends on RouteStatus being HEALTHY.
+
+    - ACTIVE: Traffic enabled (will receive traffic when RouteStatus is HEALTHY)
+    - INACTIVE: Traffic disabled (will not receive traffic regardless of RouteStatus)
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
 
 
 @dataclass
@@ -143,6 +161,7 @@ class DeploymentMetadata:
     created_user: UUID
     session_owner: UUID
     created_at: Optional[datetime]
+    revision_history_limit: int
     tag: Optional[str] = None
 
 
@@ -270,6 +289,7 @@ class DeploymentInfo:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
+    current_revision_id: UUID | None = None
 
     def target_revision(self) -> Optional[ModelRevisionSpec]:
         if self.model_revisions:
@@ -287,6 +307,7 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
+    target_revision_id: UUID | None = None
 
 
 @dataclass
@@ -305,6 +326,8 @@ class RouteInfo:
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
+    revision_id: Optional[UUID]
+    traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 
 
@@ -457,3 +480,131 @@ class ReplicaOrderField(enum.StrEnum):
 
 class AccessTokenOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
+
+
+class AutoScalingRuleOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+
+
+# ========== Scheduling History Types ==========
+
+
+@dataclass
+class DeploymentHistoryData:
+    """Domain model for deployment history."""
+
+    id: UUID
+    deployment_id: UUID
+
+    phase: str  # DeploymentLifecycleType value
+    from_status: Optional[ModelDeploymentStatus]
+    to_status: Optional[ModelDeploymentStatus]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class RouteHistoryData:
+    """Domain model for route history."""
+
+    id: UUID
+    route_id: UUID
+    deployment_id: UUID
+
+    phase: str  # RouteLifecycleType value
+    from_status: Optional[RouteStatus]
+    to_status: Optional[RouteStatus]
+
+    result: SchedulingResult
+    error_code: Optional[str]
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentHistoryListResult:
+    """Search result with pagination for deployment history."""
+
+    items: list[DeploymentHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RouteHistoryListResult:
+    """Search result with pagination for route history."""
+
+    items: list[RouteHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RevisionSearchResult:
+    """Search result with pagination for deployment revisions."""
+
+    items: list[ModelRevisionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RouteSearchResult:
+    """Search result with pagination for routes."""
+
+    items: list[RouteInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentSearchResult:
+    """Search result with pagination for deployments."""
+
+    items: list[ModelDeploymentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentInfoSearchResult:
+    """Search result with pagination for deployment info."""
+
+    items: list[DeploymentInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AutoScalingRuleSearchResult:
+    """Search result with pagination for auto-scaling rules."""
+
+    items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AccessTokenSearchResult:
+    """Search result with pagination for access tokens."""
+
+    items: list[ModelDeploymentAccessTokenData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

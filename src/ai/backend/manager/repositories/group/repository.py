@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import copy
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Sequence, cast
+from typing import Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -22,7 +25,7 @@ from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
@@ -31,8 +34,10 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
-
-from ..permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -75,47 +80,46 @@ class GroupRepository:
         return result.scalar_one_or_none()
 
     @group_repository_resilience.apply()
-    async def create(self, creator: GroupCreator) -> GroupData:
+    async def create(self, creator: Creator[GroupRow]) -> GroupData:
         """Create a new group."""
+        spec = cast(GroupCreatorSpec, creator.spec)
         async with self._db.begin_session() as db_session:
             # Validate domain exists
             domain_exists = await db_session.scalar(
-                sa.select(sa.exists().where(domains.c.name == creator.domain_name))
+                sa.select(sa.exists().where(domains.c.name == spec.domain_name))
             )
             if not domain_exists:
                 raise InvalidAPIParameters(
-                    f"Cannot create group: Domain '{creator.domain_name}' does not exist"
+                    f"Cannot create group: Domain '{spec.domain_name}' does not exist"
                 )
 
             # Validate resource policy exists
             policy_exists = await db_session.scalar(
                 sa.select(
-                    sa.exists().where(keypair_resource_policies.c.name == creator.resource_policy)
+                    sa.exists().where(keypair_resource_policies.c.name == spec.resource_policy)
                 )
             )
             if not policy_exists:
                 raise InvalidAPIParameters(
-                    f"Cannot create group: Resource policy '{creator.resource_policy}' does not exist"
+                    f"Cannot create group: Resource policy '{spec.resource_policy}' does not exist"
                 )
 
             # Check if group already exists
             check_stmt = sa.select(GroupRow).where(
                 sa.and_(
-                    GroupRow.name == creator.name,
-                    GroupRow.domain_name == creator.domain_name,
+                    GroupRow.name == spec.name,
+                    GroupRow.domain_name == spec.domain_name,
                 )
             )
             existing_group = await db_session.scalar(check_stmt)
             if existing_group is not None:
                 raise InvalidAPIParameters(
-                    f"Group with name '{creator.name}' already exists in domain '{creator.domain_name}'"
+                    f"Group with name '{spec.name}' already exists in domain '{spec.domain_name}'"
                 )
 
             # Create the group
-            row = GroupRow.from_creator(creator)
-            db_session.add(row)
-            await db_session.flush()
-            await db_session.refresh(row)
+            creator_result = await execute_creator(db_session, creator)
+            row = creator_result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)
@@ -125,22 +129,25 @@ class GroupRepository:
     @group_repository_resilience.apply()
     async def modify_validated(
         self,
-        group_id: uuid.UUID,
-        modifier: GroupModifier,
+        updater: Updater[GroupRow],
         user_role: UserRole,
         user_update_mode: Optional[str] = None,
         user_uuids: Optional[list[uuid.UUID]] = None,
     ) -> Optional[GroupData]:
         """Modify a group with validation."""
-        data = modifier.fields_to_update()
+        group_id = updater.pk_value
 
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
 
-        if not data and user_update_mode is None:
-            return None
-
         async with self._db.begin_session() as session:
+            # First verify the group exists
+            existing_group = await session.scalar(
+                sa.select(groups.c.id).where(groups.c.id == group_id)
+            )
+            if existing_group is None:
+                raise ProjectNotFound(f"Group not found: {group_id}")
+
             # Handle user addition/removal
             if user_uuids and user_update_mode:
                 if user_update_mode == "add":
@@ -156,26 +163,12 @@ class GroupRepository:
                         ),
                     )
 
-            # Update group data if provided
-            if data:
-                update_stmt = (
-                    sa.update(GroupRow)
-                    .values(data)
-                    .where(GroupRow.id == group_id)
-                    .returning(GroupRow)
-                )
-                query_stmt = (
-                    sa.select(GroupRow)
-                    .from_statement(update_stmt)
-                    .execution_options(populate_existing=True)
-                )
-                row = await session.scalar(query_stmt)
-                row = cast(Optional[GroupRow], row)
-                if row is None:
-                    raise ProjectNotFound(f"Project not found: {group_id}")
-                return row.to_data()
+            # Update group data (execute_updater returns None if no values to update)
+            result = await execute_updater(session, updater)
+            if result is not None:
+                return result.row.to_data()
 
-            # If only user updates were performed, return None
+            # No group updates or only user updates were performed
             return None
 
     @group_repository_resilience.apply()
@@ -259,7 +252,7 @@ class GroupRepository:
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
-        for row, raw_stat in zip(rows, raw_stats):
+        for row, raw_stat in zip(rows, raw_stats, strict=True):
             group_id = str(row["group_id"])
             last_stat = row["last_stat"]
             if not last_stat:
@@ -270,10 +263,10 @@ class GroupRepository:
             nfs = None
             if row["vfolder_mounts"]:
                 # For >=22.03, return used host directories instead of volume host, which is not so useful.
-                nfs = list(set([str(mount.host_path) for mount in row["vfolder_mounts"]]))
+                nfs = list({str(mount.host_path) for mount in row["vfolder_mounts"]})
             elif row["mounts"] and isinstance(row["mounts"][0], list):
                 # For the kernel records that have legacy contents of `mounts`.
-                nfs = list(set([mount[2] for mount in row["mounts"]]))
+                nfs = list({mount[2] for mount in row["mounts"]})
             if row["terminated_at"] is None:
                 used_time = used_days = None
             else:

@@ -20,7 +20,7 @@ class StorageTransferManager:
     Manages transferring files between different artifact storage backends.
     """
 
-    def __init__(self, storage_pool: StoragePool):
+    def __init__(self, storage_pool: StoragePool) -> None:
         self._storage_pool = storage_pool
 
     async def transfer_file(
@@ -66,7 +66,7 @@ class StorageTransferManager:
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer file from {source_storage_name} to {dest_storage_name}: "
-                f"{source_path} -> {dest_path}: {str(e)}"
+                f"{source_path} -> {dest_path}: {e!s}"
             ) from e
 
     async def transfer_directory(
@@ -150,7 +150,7 @@ class StorageTransferManager:
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer directory from {source_storage_name} to {dest_storage_name}: "
-                f"{source_prefix} -> {dest_prefix}: {str(e)}"
+                f"{source_prefix} -> {dest_prefix}: {e!s}"
             ) from e
 
     async def _move_vfs_directory(
@@ -246,10 +246,9 @@ class StorageTransferManager:
         """List all files in storage with given prefix."""
         if isinstance(storage, VFSStorage):
             return await self._list_vfs_files_with_prefix(storage, prefix)
-        elif isinstance(storage, ObjectStorage):
+        if isinstance(storage, ObjectStorage):
             return await self._list_object_storage_files_with_prefix(storage, prefix)
-        else:
-            raise StorageTransferError(f"Unsupported storage type: {type(storage)}")
+        raise StorageTransferError(f"Unsupported storage type: {type(storage)}")
 
     async def _list_vfs_files_with_prefix(self, storage: VFSStorage, prefix: str) -> list[str]:
         """List files in VFS storage with given prefix."""
@@ -257,15 +256,14 @@ class StorageTransferManager:
             full_path = storage.resolve_path(prefix)
             if full_path.is_file():
                 return [prefix]
-            elif full_path.is_dir():
+            if full_path.is_dir():
                 files = []
                 for item in full_path.rglob("*"):
                     if item.is_file():
                         rel_path = item.relative_to(storage.base_path)
                         files.append(str(rel_path))
                 return files
-            else:
-                return []
+            return []
         except Exception:
             return []
 
@@ -276,7 +274,7 @@ class StorageTransferManager:
         try:
             return await storage.list_objects_with_prefix(prefix)
         except Exception as e:
-            log.warning(f"Failed to list objects with prefix '{prefix}': {str(e)}")
+            log.warning(f"Failed to list objects with prefix '{prefix}': {e!s}")
             return []
 
     async def verify_transfer(
@@ -314,5 +312,5 @@ class StorageTransferManager:
             return True
 
         except Exception as e:
-            log.error(f"Failed to verify transfer: {source_path} -> {dest_path}: {str(e)}")
+            log.error(f"Failed to verify transfer: {source_path} -> {dest_path}: {e!s}")
             return False

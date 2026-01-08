@@ -24,7 +24,7 @@ class ProvisioningRouteHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -63,8 +63,7 @@ class ProvisioningRouteHandler(RouteHandler):
         log.debug("Provisioning {} routes", len(routes))
 
         # Execute route provisioning logic via executor
-        result = await self._route_executor.provision_routes(routes)
-        return result
+        return await self._route_executor.provision_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after provisioning routes."""

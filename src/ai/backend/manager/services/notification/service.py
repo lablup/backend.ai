@@ -4,13 +4,15 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.notification.types import ProcessRuleParams
+from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
+from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
 
 from .actions import (
     CreateChannelAction,
@@ -45,8 +47,7 @@ from .actions import (
 if TYPE_CHECKING:
     from ai.backend.manager.data.notification.types import NotificationRuleData
     from ai.backend.manager.notification import NotificationCenter
-
-    from ...repositories.notification import NotificationRepository
+    from ai.backend.manager.repositories.notification import NotificationRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -123,8 +124,9 @@ class NotificationService:
         action: CreateRuleAction,
     ) -> CreateRuleActionResult:
         """Creates a new notification rule."""
+        spec = cast(NotificationRuleCreatorSpec, action.creator.spec)
         # Validate message_template length
-        if len(action.creator.message_template) > 65536:
+        if len(spec.message_template) > 65536:
             raise ValueError("message_template must not exceed 65536 characters (64KB)")
 
         rule_data = await self._repository.create_rule(action.creator)
@@ -138,10 +140,7 @@ class NotificationService:
         action: UpdateChannelAction,
     ) -> UpdateChannelActionResult:
         """Updates an existing notification channel."""
-        channel_data = await self._repository.update_channel(
-            channel_id=action.channel_id,
-            modifier=action.modifier,
-        )
+        channel_data = await self._repository.update_channel(updater=action.updater)
 
         return UpdateChannelActionResult(
             channel_data=channel_data,
@@ -153,16 +152,12 @@ class NotificationService:
     ) -> UpdateRuleActionResult:
         """Updates an existing notification rule."""
         # Validate message_template length if being updated
-        fields_to_update = action.modifier.fields_to_update()
-        if "message_template" in fields_to_update:
-            message_template = fields_to_update["message_template"]
-            if message_template is not None and len(message_template) > 65536:
+        spec = cast(NotificationRuleUpdaterSpec, action.updater.spec)
+        if (message_template := spec.message_template.optional_value()) is not None:
+            if len(message_template) > 65536:
                 raise ValueError("message_template must not exceed 65536 characters (64KB)")
 
-        rule_data = await self._repository.update_rule(
-            rule_id=action.rule_id,
-            modifier=action.modifier,
-        )
+        rule_data = await self._repository.update_rule(updater=action.updater)
 
         return UpdateRuleActionResult(
             rule_data=rule_data,
@@ -229,7 +224,7 @@ class NotificationService:
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
                 channel=rule.channel,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
                 notification_data=validated_data,
             )
         )
@@ -383,7 +378,7 @@ class NotificationService:
         successes: list[ProcessedRuleSuccess] = []
         errors: list[BaseException] = []
 
-        for rule, result in zip(rules, results):
+        for rule, result in zip(rules, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
                 log.error(

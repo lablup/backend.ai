@@ -13,6 +13,8 @@ import ssl
 import sys
 import traceback
 from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
     Iterable,
     Mapping,
     MutableMapping,
@@ -20,14 +22,12 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
     Optional,
     cast,
@@ -279,6 +279,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".object_storage",
     ".vfs_storage",
     ".notification",
+    ".deployment",
+    ".rbac",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -332,8 +334,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
             return GenericBadRequest("Unsupported API version.")
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 def _debug_error_response(
@@ -390,10 +391,9 @@ async def exception_middleware(
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
-        elif len(ex.args) == 1:
+        if len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
-        else:
-            raise InvalidAPIParameters()
+        raise InvalidAPIParameters()
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -445,8 +445,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
@@ -554,7 +553,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now()))
+        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -702,7 +701,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
-    audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    audit_log_monitor = AuditLogMonitor(root_ctx.repositories.audit_log.repository)
+
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -727,7 +727,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
-            )
+            ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
@@ -1416,7 +1416,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
             redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
-            redis_lock = redis_helper.get_redis_object(
+            redis_lock = redis_helper.get_redis_object_for_lock(
                 redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
                 name="lock",  # distributed locks
                 db=REDIS_STREAM_LOCK,
@@ -1574,7 +1574,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
@@ -1593,6 +1593,7 @@ def build_prometheus_service_discovery_handler(
             resp.append({
                 "targets": [f"{service.endpoint.prometheus_address}"],
                 "labels": {
+                    **service.labels,
                     "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
@@ -1635,7 +1636,7 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

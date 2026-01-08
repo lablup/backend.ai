@@ -21,7 +21,7 @@ class ScheduleCacheSource:
 
     _valkey_stat: ValkeyStatClient
 
-    def __init__(self, valkey_stat: ValkeyStatClient):
+    def __init__(self, valkey_stat: ValkeyStatClient) -> None:
         self._valkey_stat = valkey_stat
 
     async def get_keypair_concurrency(

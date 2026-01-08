@@ -60,16 +60,12 @@ import contextlib
 import enum
 import logging
 import uuid
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    List,
-    Mapping,
     NotRequired,
     Optional,
-    Sequence,
     TypeAlias,
     TypedDict,
 )
@@ -77,9 +73,8 @@ from typing import (
 import aiohttp
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import NetAppClientError, NetAppQTreeNotFoundError
-from ...types import QuotaConfig, QuotaUsage
+from ai.backend.storage.errors import NetAppClientError, NetAppQTreeNotFoundError
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
@@ -413,8 +408,7 @@ class NetAppClient:
                 )
                 qtree_info.update(record)
                 return qtree_info
-            else:
-                raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
+            raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
     async def create_qtree(
         self,
@@ -594,7 +588,7 @@ class NetAppClient:
                 limit_bytes=limit_bytes,
             )
 
-    async def get_qos_policies(self) -> List[Mapping[str, Any]]:
+    async def get_qos_policies(self) -> list[Mapping[str, Any]]:
         async with self.send_request(
             "get",
             "/api/storage/qos/policies",
@@ -614,7 +608,7 @@ class NetAppClient:
         ) as resp:
             data = await resp.json()
             fixed = data["fixed"]
-            qos_policy = {
+            return {
                 "uuid": data["uuid"],
                 "name": data["name"],
                 "fixed": {
@@ -626,7 +620,6 @@ class NetAppClient:
                 },
                 "svm": data["svm"],
             }
-            return qos_policy
 
     async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
         async with self.send_request(

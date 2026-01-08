@@ -5,10 +5,9 @@ from typing import Generic
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
+from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import Circuit, TCircuitKey
 from ai.backend.logging import BraceStyleAdapter
-
-from ..base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

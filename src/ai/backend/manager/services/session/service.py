@@ -4,9 +4,10 @@ import functools
 import logging
 import secrets
 import uuid
+from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -74,6 +75,7 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -862,9 +864,9 @@ class SessionService:
                 raise RuntimeError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
-                code = ""  # noqa
+                code = ""
             if opts is None:
-                opts = {}  # noqa
+                opts = {}
             if mode == "complete":
                 # For legacy
                 completion_resp = await self._agent_registry.get_completions(session, code, opts)
@@ -1293,7 +1295,7 @@ class SessionService:
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, list[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
@@ -1322,19 +1324,21 @@ class SessionService:
             },
         }
 
-        async with aiohttp.ClientSession() as req:
-            async with req.post(
+        async with (
+            aiohttp.ClientSession() as req,
+            req.post(
                 f"{wsproxy_addr}/v2/conf",
                 json=body,
-            ) as resp:
-                token_json = await resp.json()
+            ) as resp,
+        ):
+            token_json = await resp.json()
 
-                return StartServiceActionResult(
-                    result=None,
-                    session_data=session.to_dataclass(),
-                    token=token_json["token"],
-                    wsproxy_addr=wsproxy_advertise_addr,
-                )
+            return StartServiceActionResult(
+                result=None,
+                session_data=session.to_dataclass(),
+                token=token_json["token"],
+                wsproxy_addr=wsproxy_advertise_addr,
+            )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name
@@ -1380,12 +1384,10 @@ class SessionService:
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
-        props = action.modifier
-        session_name = action.modifier.name.optional_value()
+        spec = cast(SessionUpdaterSpec, action.updater.spec)
+        session_name = spec.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(
-            str(session_id), props.fields_to_update(), session_name
-        )
+        session_row = await self._session_repository.modify_session(action.updater, session_name)
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))

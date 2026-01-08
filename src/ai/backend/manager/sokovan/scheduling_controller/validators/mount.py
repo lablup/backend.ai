@@ -3,7 +3,7 @@
 from typing import Any
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models import verify_vfolder_name
+from ai.backend.manager.models.vfolder import verify_vfolder_name
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,

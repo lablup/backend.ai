@@ -6,8 +6,9 @@ import os
 import shutil
 import traceback
 from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Self, Sequence
+from typing import Any, ClassVar, Self
 
 import aiofiles.os
 import attrs

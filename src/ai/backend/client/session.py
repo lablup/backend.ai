@@ -6,18 +6,13 @@ import inspect
 import queue
 import threading
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Coroutine, Iterator
 from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Coroutine,
-    Iterator,
     Literal,
     Optional,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 import aiohttp
@@ -28,15 +23,15 @@ from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
 
 __all__ = (
+    "AsyncSession",
     "BaseSession",
     "Session",
-    "AsyncSession",
     "api_session",
 )
 
 from contextlib import asynccontextmanager as actxmgr
 
-from ..common.types import SSLContextType
+from ai.backend.common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
 
@@ -44,7 +39,7 @@ api_session: ContextVar[BaseSession] = ContextVar("api_session")
 async def _negotiate_api_version(
     http_session: aiohttp.ClientSession,
     config: APIConfig,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     client_version = parse_api_version(config.version)
     try:
         timeout_config = aiohttp.ClientTimeout(
@@ -78,7 +73,7 @@ async def _negotiate_api_version(
                     category=APIVersionWarning,
                 )
             return min(server_version, client_version)
-    except (asyncio.TimeoutError, aiohttp.ClientError):
+    except (TimeoutError, aiohttp.ClientError):
         # fallback to the configured API version
         return client_version
 
@@ -130,23 +125,18 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[
-        Union[
-            Tuple[Union[AsyncIterator, Coroutine], Context],
-            Sentinel,
-        ]
-    ]
-    done_queue: queue.Queue[Union[Any, Exception]]
-    stream_queue: queue.Queue[Union[Any, Exception, Sentinel]]
+    work_queue: queue.Queue[tuple[AsyncIterator | Coroutine, Context] | Sentinel]
+    done_queue: queue.Queue[Any | Exception]
+    stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
     agen_shutdown: bool
 
     __slots__ = (
-        "work_queue",
-        "done_queue",
-        "stream_queue",
-        "stream_block",
         "agen_shutdown",
+        "done_queue",
+        "stream_block",
+        "stream_queue",
+        "work_queue",
     )
 
     def __init__(self, *args, **kwargs) -> None:
@@ -242,47 +232,48 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
-        "_config",
+        "Admin",
+        "Agent",
+        "AgentWatcher",
+        "Auth",
+        "BackgroundTask",
+        "ComputeSession",
+        "ContainerRegistry",
+        "Deployment",
+        "Domain",
+        "Dotfile",
+        "EtcdConfig",
+        "Group",
+        "Image",
+        "KeyPair",
+        "KeypairResourcePolicy",
+        "Manager",
+        "Model",
+        "Network",
+        "Notification",
+        "Permission",
+        "QuotaScope",
+        "Resource",
+        "ScalingGroup",
+        "ServerLog",
+        "Service",
+        "ServiceAutoScalingRule",
+        "SessionTemplate",
+        "Storage",
+        "System",
+        "User",
+        "UserResourcePolicy",
+        "VFolder",
         "_closed",
+        "_config",
         "_context_token",
         "_proxy_mode",
         "aiohttp_session",
         "api_version",
-        "System",
-        "Manager",
-        "Admin",
-        "Agent",
-        "ContainerRegistry",
-        "AgentWatcher",
-        "ScalingGroup",
-        "Storage",
-        "Image",
-        "ComputeSession",
-        "SessionTemplate",
-        "Domain",
-        "Group",
-        "Auth",
-        "User",
-        "KeyPair",
-        "BackgroundTask",
-        "EtcdConfig",
-        "Resource",
-        "KeypairResourcePolicy",
-        "VFolder",
-        "Dotfile",
-        "ServerLog",
-        "Permission",
-        "Service",
-        "ServiceAutoScalingRule",
-        "Model",
-        "QuotaScope",
-        "Network",
-        "UserResourcePolicy",
-        "Notification",
     )
 
     aiohttp_session: aiohttp.ClientSession
-    api_version: Tuple[int, str]
+    api_version: tuple[int, str]
 
     _closed: bool
     _config: APIConfig
@@ -305,6 +296,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.container_registry import ContainerRegistry
+        from .func.deployment import Deployment
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
@@ -339,6 +331,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.BackgroundTask = BackgroundTask
         self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
+        self.Deployment = Deployment
         self.Domain = Domain
         self.Group = Group
         self.Image = Image
@@ -370,14 +363,14 @@ class BaseSession(metaclass=abc.ABCMeta):
         return self._proxy_mode
 
     @abc.abstractmethod
-    def open(self) -> Union[None, Awaitable[None]]:
+    def open(self) -> None | Awaitable[None]:
         """
         Initializes the session and perform version negotiation.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def close(self) -> Union[None, Awaitable[None]]:
+    def close(self) -> None | Awaitable[None]:
         """
         Terminates the session and releases underlying resources.
         """

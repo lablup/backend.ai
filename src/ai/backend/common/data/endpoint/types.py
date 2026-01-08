@@ -17,13 +17,14 @@ class EndpointLifecycle(Enum):
     CREATED = "created"  # Deprecated, use READY instead
     SCALING = "scaling"
     READY = "ready"
+    DEPLOYING = "deploying"
     DESTROYING = "destroying"
     DESTROYED = "destroyed"
 
     @classmethod
     @lru_cache(maxsize=1)
     def active_states(cls) -> set["EndpointLifecycle"]:
-        return {cls.PENDING, cls.CREATED, cls.SCALING, cls.READY}
+        return {cls.PENDING, cls.CREATED, cls.SCALING, cls.READY, cls.DEPLOYING}
 
     @classmethod
     @lru_cache(maxsize=1)

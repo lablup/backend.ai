@@ -30,6 +30,7 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.utils import query_userinfo
 
 session_repository_resilience = Resilience(
@@ -235,10 +236,8 @@ class SessionRepository:
                 sa.select([sa.func.count()])
                 .select_from(ImageRow)
                 .where(
-                    (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{image_visibility}:{image_owner_id}"
-                    )
+                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                    == f"{image_visibility}:{image_owner_id}"
                 )
                 .where(ImageRow.status == ImageStatus.ALIVE)
             )
@@ -290,7 +289,7 @@ class SessionRepository:
             query = (
                 sa.select([scaling_groups.c.wsproxy_addr])
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
@@ -314,10 +313,11 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def modify_session(
         self,
-        session_id: str | SessionId,
-        modifier_fields: dict,
+        updater: Updater[SessionRow],
         session_name: Optional[str] = None,
     ) -> Optional[SessionRow]:
+        session_id = updater.pk_value
+
         async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_session.scalar(query_stmt)
@@ -340,16 +340,10 @@ class SessionRepository:
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-
-            session_row = await db_session.scalar(select_stmt)
-            for key, value in modifier_fields.items():
-                setattr(session_row, key, value)
+            # Use execute_updater to apply changes
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
                 await db_session.execute(
@@ -357,7 +351,15 @@ class SessionRepository:
                     .values(session_name=session_name)
                     .where(KernelRow.session_id == session_id)
                 )
-            return session_row
+
+            # Re-fetch with kernels loaded for the return value
+            select_stmt = (
+                sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
+                .execution_options(populate_existing=True)
+                .where(SessionRow.id == session_id)
+            )
+            return await db_session.scalar(select_stmt)
 
     @session_repository_resilience.apply()
     async def rescan_images(

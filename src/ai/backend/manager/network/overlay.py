@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
 from http import HTTPStatus
-from typing import Any, Mapping
+from typing import Any
 
 import aiodocker
 import trafaret as t
 from aiodocker.exceptions import DockerError
 
-from ..plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
+from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 plugin_config_iv = t.Dict({
     t.Key("mtu", default=1500): t.Null | t.ToInt,
@@ -46,8 +47,10 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         return await super().update_plugin_config(plugin_config)
 
     async def create_network(
-        self, *, identifier: str | None = None, options: dict[str, Any] = {}
+        self, *, identifier: str | None = None, options: dict[str, Any] | None = None
     ) -> NetworkInfo:
+        if options is None:
+            options = {}
         ident = identifier or f"{uuid.uuid4()}-nw"
         network_name = f"bai-multinode-{ident}"
         mtu: int | None = self.plugin_config["mtu"]

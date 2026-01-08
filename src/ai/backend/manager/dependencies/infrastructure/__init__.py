@@ -2,8 +2,8 @@ from .composer import InfrastructureComposer, InfrastructureInput, Infrastructur
 from .redis import ValkeyClients
 
 __all__ = [
-    "ValkeyClients",
+    "InfrastructureComposer",
     "InfrastructureInput",
     "InfrastructureResources",
-    "InfrastructureComposer",
+    "ValkeyClients",
 ]

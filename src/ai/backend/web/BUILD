@@ -35,7 +35,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "web": "ai.backend.web.cli.__main__:main",
-            "web.start-server": "ai.backend.web.server:main",
+            "web.start-server": "ai.backend.web.cli.start_server:main",
         },
     },
     generate_setup=True,

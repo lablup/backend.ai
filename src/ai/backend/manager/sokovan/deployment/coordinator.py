@@ -33,6 +33,7 @@ from .handlers import (
     CheckReplicaDeploymentHandler,
     DeploymentHandler,
     DestroyingDeploymentHandler,
+    ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
 from .types import DeploymentLifecycleType
@@ -129,6 +130,10 @@ class DeploymentCoordinator:
                 deployment_controller=self._deployment_controller,
                 route_controller=self._route_controller,
             ),
+            DeploymentLifecycleType.RECONCILE: ReconcileDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+            ),
             DeploymentLifecycleType.DESTROYING: DestroyingDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
@@ -212,6 +217,12 @@ class DeploymentCoordinator:
             DeploymentTaskSpec(
                 DeploymentLifecycleType.SCALING,
                 short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.RECONCILE,
+                short_interval=None,
                 long_interval=30.0,
                 initial_delay=10.0,
             ),

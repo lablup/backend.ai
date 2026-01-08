@@ -26,13 +26,13 @@ typename = SessionTypes.__name__.lower()
 
 
 def upgrade():
-    op.execute(text("ALTER TYPE {} ADD VALUE IF NOT EXISTS 'INFERENCE';".format(typename)))
+    op.execute(text(f"ALTER TYPE {typename} ADD VALUE IF NOT EXISTS 'INFERENCE';"))
     op.execute(
         text(
             textwrap.dedent(
-                """\
-                ALTER TABLE sessions ALTER COLUMN session_type TYPE {} USING session_type::text::sessiontypes;
-            """.format(typename)
+                f"""\
+                ALTER TABLE sessions ALTER COLUMN session_type TYPE {typename} USING session_type::text::sessiontypes;
+            """
             )
         )
     )
@@ -42,8 +42,8 @@ def downgrade():
     conn = op.get_bind()
     conn.execute(
         text(
-            "UPDATE sessions SET session_type = 'INTERACTIVE'::{x} WHERE session_type ="
-            " 'INFERENCE'::{x};".format(x=typename)
+            f"UPDATE sessions SET session_type = 'INTERACTIVE'::{typename} WHERE session_type ="
+            f" 'INFERENCE'::{typename};"
         )
     )
 
@@ -70,11 +70,11 @@ def downgrade():
     conn.execute(
         text(
             textwrap.dedent(
-                """\
+                f"""\
                 DELETE FROM pg_enum
                 WHERE enumtypid = {enumtypid}
                 AND enumlabel = 'INFERENCE';
-            """.format(enumtypid=enumtypid)
+            """
             )
         )
     )

@@ -14,11 +14,10 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.handlers.base import SchedulerHandler
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-
-from ..base import SchedulerHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -32,7 +31,7 @@ class CheckTerminatingProgressHandler(SchedulerHandler):
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         repository: SchedulerRepository,
-    ):
+    ) -> None:
         self._scheduler = scheduler
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer

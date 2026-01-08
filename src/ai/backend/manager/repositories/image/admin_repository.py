@@ -73,8 +73,7 @@ class AdminImageRepository:
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
             await row.mark_as_deleted(session)
-            data = row.to_dataclass()
-        return data
+            return row.to_dataclass()
 
     @image_repository_resilience.apply()
     async def soft_delete_image_by_id_force(self, image_id: UUID) -> ImageData:
@@ -85,8 +84,7 @@ class AdminImageRepository:
         async with self._db.begin_session() as session:
             image_row = await self._get_image_by_id(session, image_id)
             await image_row.mark_as_deleted(session)
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     @image_repository_resilience.apply()
     async def delete_image_with_aliases_force(self, image_id: UUID) -> ImageData:
@@ -114,5 +112,4 @@ class AdminImageRepository:
         async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
             await image_row.untag_image_from_registry(self._db, session)
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()

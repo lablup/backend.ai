@@ -1,7 +1,8 @@
 import enum
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Self
+from typing import Any, Optional, Self
 
 from aiohttp import web
 
@@ -77,8 +78,7 @@ class InvalidImageTag(ValueError):
     def __str__(self) -> str:
         if self._full_name is not None:
             return f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._full_name}"
-        else:
-            return f"Invalid or duplicate image name tag: {self._tag}"
+        return f"Invalid or duplicate image name tag: {self._tag}"
 
 
 class ProjectMismatchWithCanonical(ValueError):
@@ -168,6 +168,7 @@ class ErrorDomain(enum.StrEnum):
     AGENT = "agent"
     KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
+    ROLE = "role"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
     MESSAGE_QUEUE = "message-queue"
@@ -176,6 +177,8 @@ class ErrorDomain(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
+
+    EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
 
 class ErrorOperation(enum.StrEnum):
@@ -333,7 +336,9 @@ class BackendAIError(web.HTTPError, ABC):
     extra_msg: Optional[str]
     body_dict: dict[str, Any]
 
-    def __init__(self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs):
+    def __init__(
+        self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
         self.empty_body = False
@@ -352,7 +357,7 @@ class BackendAIError(web.HTTPError, ABC):
         self.body_dict = body
         self.body = dump_json(body)
 
-    def __str__(self):
+    def __str__(self) -> str:
         lines = []
         if self.extra_msg:
             lines.append(f"{self.error_title} ({self.extra_msg})")
@@ -362,7 +367,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         lines = []
         if self.extra_msg:
             lines.append(
@@ -374,7 +379,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use
@@ -685,6 +690,18 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
+    error_title = "Duplicate Scaling Group"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class VFolderNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-not-found"
     error_title = "Virtual Folder Not Found"
@@ -865,6 +882,70 @@ class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class BaseNFSMountCheckFailed(BackendAIError):
+    pass
+
+
+class ShowmountFailed(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/showmount-failed"
+    error_title = "showmount command failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ShowmountNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/showmount-not-found"
+    error_title = "showmount command not found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ExportPathNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/nfs-export-path-not-found"
+    error_title = "NFS export path not found on the server"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class NFSTimeoutError(BaseNFSMountCheckFailed, web.HTTPRequestTimeout):
+    error_type = "https://api.backend.ai/probs/nfs-timeout"
+    error_title = "NFS server is not reachable (timeout)"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class NFSUnexpectedError(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/nfs-unexpected-error"
+    error_title = "Unexpected NFS error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
     """
     Wraps and forwards errors from agent watcher requests with original status code and message.
@@ -890,3 +971,15 @@ class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
 
     def error_code(self) -> ErrorCode:
         return self._error_code
+
+
+class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/container-registry/groups-already-associated"
+    error_title = "Container registry groups already associated."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )

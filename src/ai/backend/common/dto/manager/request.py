@@ -3,9 +3,10 @@ from typing import Any, Optional
 
 from pydantic import AliasChoices, Field
 
-from ...api_handlers import BaseRequestModel
-from ...typed_validators import VFolderName
-from ...types import VFolderUsageMode
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.types import VFolderUsageMode
+
 from .field import VFolderPermissionField
 
 
