@@ -100,12 +100,12 @@ class ImageAccessForbiddenError(BackendAIError):
     """Raised when a user tries to access an image they don't own."""
 
     error_type = "https://api.backend.ai/probs/generic-forbidden"
-    error_title = "Access to this resource is forbidden."
+    error_title = "Access to this image is forbidden."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.READ,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
