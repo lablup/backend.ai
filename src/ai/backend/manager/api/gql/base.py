@@ -38,7 +38,6 @@ class UUIDMatchSpec:
     """Specification for UUID matching operations in query conditions."""
 
     value: uuid.UUID | list[uuid.UUID]
-    case_insensitive: bool
     negated: bool
     is_list_operation: bool = False
 
@@ -241,7 +240,6 @@ class UUIDFilter:
             return factory(
                 UUIDMatchSpec(
                     value=self.equals,
-                    case_insensitive=False,
                     negated=False,
                     is_list_operation=False,
                 )
@@ -250,7 +248,6 @@ class UUIDFilter:
             return factory(
                 UUIDMatchSpec(
                     value=self.not_equals,
-                    case_insensitive=False,
                     negated=True,
                     is_list_operation=False,
                 )
@@ -261,7 +258,6 @@ class UUIDFilter:
             return factory(
                 UUIDMatchSpec(
                     value=self.in_,
-                    case_insensitive=False,
                     negated=False,
                     is_list_operation=True,
                 )
@@ -270,7 +266,6 @@ class UUIDFilter:
             return factory(
                 UUIDMatchSpec(
                     value=self.not_in,
-                    case_insensitive=False,
                     negated=True,
                     is_list_operation=True,
                 )
