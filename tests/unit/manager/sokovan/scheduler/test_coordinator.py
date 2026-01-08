@@ -560,13 +560,13 @@ class TestProcessLifecycleSchedule:
         # Verify post_process was called
         mock_lifecycle_handler.post_process.assert_called_once()
 
-    async def test_process_lifecycle_schedule_merges_results(
+    async def test_process_lifecycle_schedule_per_scaling_group(
         self,
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
     ) -> None:
-        """Test process_lifecycle_schedule merges results from multiple scaling groups."""
+        """Test process_lifecycle_schedule processes each scaling group independently."""
         # Setup
         schedule_coordinator._lifecycle_handlers = {
             ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
@@ -591,12 +591,118 @@ class TestProcessLifecycleSchedule:
 
         await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
 
-        # Verify update was called with merged results (2 sessions)
+        # Verify status updates were called per scaling group (2 separate calls)
         calls = mock_repository.update_sessions_status_bulk.call_args_list
-        assert len(calls) == 1
-        # The merged result should contain both session IDs
-        updated_session_ids = calls[0][0][0]
-        assert len(updated_session_ids) == 2
+        assert len(calls) == 2
+
+        # First call for sg1
+        updated_session_ids_sg1 = calls[0][0][0]
+        assert len(updated_session_ids_sg1) == 1
+        assert updated_session_ids_sg1[0] == session1.session_id
+
+        # Second call for sg2
+        updated_session_ids_sg2 = calls[1][0][0]
+        assert len(updated_session_ids_sg2) == 1
+        assert updated_session_ids_sg2[0] == session2.session_id
+
+    async def test_process_lifecycle_schedule_post_process_per_scaling_group(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test post_process is called per scaling group, not merged."""
+        # Setup
+        schedule_coordinator._lifecycle_handlers = {
+            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
+        }
+        schedule_coordinator._repository = mock_repository
+
+        mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
+
+        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
+        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
+
+        mock_repository.get_sessions_for_handler.side_effect = [
+            [session1],
+            [session2],
+        ]
+
+        from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
+
+        # Both scaling groups return results that need post-processing
+        mock_lifecycle_handler.execute.side_effect = [
+            SessionExecutionResult(
+                successes=[session1.session_id],
+                scheduled_data=[
+                    ScheduledSessionData(
+                        session_id=session1.session_id,
+                        creation_id="test1",
+                        access_key=AccessKey("test"),
+                        reason="test",
+                    )
+                ],
+            ),
+            SessionExecutionResult(
+                successes=[session2.session_id],
+                scheduled_data=[
+                    ScheduledSessionData(
+                        session_id=session2.session_id,
+                        creation_id="test2",
+                        access_key=AccessKey("test"),
+                        reason="test",
+                    )
+                ],
+            ),
+        ]
+
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+
+        # Verify post_process was called twice (once per scaling group)
+        assert mock_lifecycle_handler.post_process.call_count == 2
+
+    async def test_process_lifecycle_schedule_parallel_error_handling(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test parallel processing continues even when one scaling group fails."""
+        # Setup
+        schedule_coordinator._lifecycle_handlers = {
+            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
+        }
+        schedule_coordinator._repository = mock_repository
+
+        mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2", "sg3"]
+
+        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
+        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
+        session3 = create_handler_session_data(SessionId(uuid4()), "sg3")
+
+        mock_repository.get_sessions_for_handler.side_effect = [
+            [session1],
+            [session2],
+            [session3],
+        ]
+
+        # sg2 raises an exception, sg1 and sg3 should still succeed
+        mock_lifecycle_handler.execute.side_effect = [
+            SessionExecutionResult(successes=[session1.session_id]),
+            RuntimeError("sg2 processing failed"),
+            SessionExecutionResult(successes=[session3.session_id]),
+        ]
+
+        # Execute - should not raise despite one scaling group failing
+        result = await schedule_coordinator.process_lifecycle_schedule(
+            ScheduleType.CHECK_PULLING_PROGRESS
+        )
+
+        assert result is True
+        # Handler was called 3 times (once per scaling group)
+        assert mock_lifecycle_handler.execute.call_count == 3
+        # Status updates were called only for successful scaling groups (sg1 and sg3)
+        assert mock_repository.update_sessions_status_bulk.call_count == 2
 
 
 class TestKernelEventHandlers:

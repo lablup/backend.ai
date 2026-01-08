@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
@@ -212,11 +213,18 @@ class ScheduleCoordinator:
     ) -> bool:
         """Process a lifecycle schedule type using the DeploymentCoordinator pattern.
 
-        This method:
+        This method processes each scaling group independently:
         1. Iterates over all schedulable scaling groups
-        2. Queries sessions based on handler's target_statuses() and target_kernel_statuses()
-        3. Executes handler logic for each scaling group
-        4. Applies status transitions based on handler's success/failure/stale statuses
+        2. For each scaling group:
+           - Creates a RecorderContext for the scaling group
+           - Queries sessions based on handler's target_statuses() and target_kernel_statuses()
+           - Executes handler logic
+           - Applies status transitions immediately
+           - Emits metrics per scaling group
+           - Runs post-processing per scaling group
+
+        This per-scaling-group approach prevents accumulating too many sessions
+        in memory and ensures status updates are applied promptly.
 
         Args:
             schedule_type: Type of scheduling operation
@@ -232,60 +240,38 @@ class ScheduleCoordinator:
         try:
             log.debug("Processing lifecycle schedule type: {}", schedule_type.value)
 
-            with RecorderContext.scope(schedule_type.value) as recorder:
-                async with AsyncExitStack() as stack:
-                    stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
 
-                    # Acquire lock if needed
-                    if handler.lock_id is not None:
-                        lock_lifetime = (
-                            self._config_provider.config.manager.session_schedule_lock_lifetime
-                        )
-                        await stack.enter_async_context(
-                            self._lock_factory(handler.lock_id, lock_lifetime)
-                        )
+                # Acquire lock if needed
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
 
-                    # Process all scaling groups
-                    all_results = SessionExecutionResult()
-                    scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                # Process each scaling group in parallel
+                scaling_groups = await self._repository.get_schedulable_scaling_groups()
 
-                    for scaling_group in scaling_groups:
-                        # Query sessions for this handler
-                        sessions = await self._repository.get_sessions_for_handler(
+                results = await asyncio.gather(
+                    *[
+                        self._process_scaling_group(handler, schedule_type, scaling_group)
+                        for scaling_group in scaling_groups
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Log any exceptions that occurred during parallel processing
+                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error(
+                            "Error processing scaling group {} for {}: {}",
                             scaling_group,
-                            handler.target_statuses(),
-                            handler.target_kernel_statuses(),
+                            schedule_type.value,
+                            result,
                         )
-
-                        if not sessions:
-                            continue
-
-                        # Execute handler logic
-                        result = await handler.execute(scaling_group, sessions)
-                        all_results.merge(result)
-
-                    # Apply status transitions
-                    await self._handle_status_transitions(handler, all_results)
-
-                    self._operation_metrics.observe_success(
-                        operation=handler.name(), count=all_results.success_count()
-                    )
-
-                    # Post-process if needed
-                    if all_results.needs_post_processing():
-                        try:
-                            await handler.post_process(all_results)
-                        except Exception as e:
-                            log.error("Error during post-processing: {}", e)
-
-                # Log recorded steps
-                all_steps = recorder.get_all_steps()
-                if all_steps:
-                    log.debug(
-                        "Recorded {} sessions with execution steps for {}",
-                        len(all_steps),
-                        schedule_type.value,
-                    )
 
             return True
 
@@ -296,6 +282,72 @@ class ScheduleCoordinator:
                 e,
             )
             raise
+
+    async def _process_scaling_group(
+        self,
+        handler: SessionLifecycleHandler,
+        schedule_type: ScheduleType,
+        scaling_group: str,
+    ) -> None:
+        """Process a single scaling group for the given handler.
+
+        This method handles all processing for one scaling group:
+        - Creates a RecorderContext scoped to this scaling group
+        - Queries and processes sessions
+        - Applies status transitions
+        - Emits metrics
+        - Runs post-processing
+
+        Args:
+            handler: The lifecycle handler to execute
+            schedule_type: Type of scheduling operation
+            scaling_group: The scaling group to process
+        """
+        # Query sessions for this handler in this scaling group
+        sessions = await self._repository.get_sessions_for_handler(
+            scaling_group,
+            handler.target_statuses(),
+            handler.target_kernel_statuses(),
+        )
+
+        if not sessions:
+            return
+
+        # Create recorder scoped to this scaling group
+        recorder_scope = f"{schedule_type.value}:{scaling_group}"
+        with RecorderContext.scope(recorder_scope) as recorder:
+            # Execute handler logic
+            result = await handler.execute(scaling_group, sessions)
+
+            # Apply status transitions immediately for this scaling group
+            await self._handle_status_transitions(handler, result)
+
+            # Emit metrics per scaling group
+            self._operation_metrics.observe_success(
+                operation=handler.name(),
+                count=result.success_count(),
+            )
+
+            # Post-process if needed (per scaling group)
+            if result.needs_post_processing():
+                try:
+                    await handler.post_process(result)
+                except Exception as e:
+                    log.error(
+                        "Error during post-processing for scaling group {}: {}",
+                        scaling_group,
+                        e,
+                    )
+
+            # Log recorded steps for this scaling group
+            all_steps = recorder.get_all_steps()
+            if all_steps:
+                log.debug(
+                    "Recorded {} sessions with execution steps for {} in scaling group {}",
+                    len(all_steps),
+                    schedule_type.value,
+                    scaling_group,
+                )
 
     async def _handle_status_transitions(
         self,
