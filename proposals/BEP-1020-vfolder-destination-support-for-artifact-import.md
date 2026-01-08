@@ -87,61 +87,135 @@ This enhancement allows users to download models to:
 
 ### API Changes
 
-Add an optional `vfolderId` parameter to the `import_artifacts` mutation:
-
-```graphql
-mutation {
-  importArtifacts(
-    input: {
-      artifactRevisionIds: ["..."]
-      vfolderId: "uuid-of-target-vfolder"  # New optional parameter
-    }
-  ) {
-    ...
-  }
-}
-```
-
-When `vfolderId` is provided:
-- The system resolves the vfolder's storage host and uses it for all import steps (DOWNLOAD, VERIFY, ARCHIVE)
-- The vfolder's host format is `{proxy_name}:{volume_name}`, which is parsed to route requests correctly
+Add an optional `vfolderId` parameter to the `import_artifacts` API.
 
 ### Architecture Changes
 
-#### 1. VFolderStorage Class
+#### 1. StorageTarget Class
 
-Introduce a new `VFolderStorage` class that inherits from `AbstractStorage`.
+Introduce a `StorageTarget` class that wraps storage references, allowing them to be either:
+- A storage name (`str`) - resolved via StoragePool
+- A storage instance (`AbstractStorage`) - used directly
 
-**Why is VFolderStorage needed?**
+```python
+class StorageTarget:
+    """
+    Wrapper for storage step mapping that can be either a storage name (str)
+    or a storage instance (AbstractStorage).
 
-The existing import pipeline is designed around the `AbstractStorage` interface with `storage_step_mappings` that map import steps to storage names. Rather than modifying the entire pipeline to handle vfolder paths directly, we create a `VFolderStorage` that:
+    When str: resolved via storage_pool.get_storage(name)
+    When AbstractStorage: used directly (e.g., VolumeStorageAdapter for VFolder imports)
+    """
 
-- Implements the same `AbstractStorage` interface (stream_upload, stream_download, get_file_info, delete_file)
-- Resolves the vfolder's base path using `volume.mangle_vfpath(vfid)`
-- Integrates seamlessly with the existing pipeline without modifying service layer logic
+    _value: str | AbstractStorage
 
-This approach follows the Open/Closed Principle—extending functionality by adding a new class rather than modifying existing code extensively.
+    def __init__(self, value: str | AbstractStorage) -> None:
+        self._value = value
 
-#### 2. Dynamic Storage Registration Pattern
+    @property
+    def name(self) -> str:
+        """Get the storage name from this mapping."""
+        if isinstance(self._value, str):
+            return self._value
+        return getattr(self._value, "name", str(id(self._value)))
 
-**Why register and unregister VFolderStorage for each request?**
+    def resolve(self, storage_pool: AbstractStoragePool) -> AbstractStorage:
+        """Resolve this mapping to an AbstractStorage instance."""
+        if isinstance(self._value, AbstractStorage):
+            return self._value
+        return storage_pool.get_storage(self._value)
+```
 
-Unlike pre-configured storages (VFSStorage, ObjectStorage) that are created at server startup from configuration files, VFolderStorage instances are:
+#### 2. VolumeStorageAdapter Class
 
-1. **Created on-demand**: Each request may target a different vfolder
-2. **Transient by nature**: The storage is only needed for the duration of the import task
-3. **Potentially numerous**: There could be thousands of vfolders, making pre-registration impractical
+Introduce a `VolumeStorageAdapter` class that implements `AbstractStorage` by wrapping `AbstractVolume`:
 
-The lifecycle is managed as follows:
+```python
+class VolumeStorageAdapter(AbstractStorage):
+    """
+    Adapter that wraps AbstractVolume to implement AbstractStorage interface.
+
+    This enables using any volume backend (VFS, XFS, NetApp, GPFS, Weka, VAST, CephFS, etc.)
+    as an artifact storage target without registering to StoragePool.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        volume: AbstractVolume,
+        vfid: VFolderID,
+    ) -> None:
+        self._name = name
+        self._volume = volume
+        self._vfid = vfid
+
+    async def stream_upload(self, filepath: str, data_stream: StreamReader) -> None:
+        # Delegates to volume.add_file()
+        ...
+
+    async def stream_download(self, filepath: str) -> StreamReader:
+        # Delegates to volume.read_file()
+        ...
+
+    async def delete_file(self, filepath: str) -> None:
+        # Delegates to volume.delete_files()
+        ...
+
+    async def get_file_info(self, filepath: str) -> VFSFileMetaResponse:
+        # Uses volume.sanitize_vfpath() + aiofiles.os.stat()
+        ...
+```
+
+**Key advantages of VolumeStorageAdapter:**
+- Uses volume's native file operations (add_file, read_file, delete_files, mkdir)
+- Supports all vfolder backends uniformly (VFS, XFS, NetApp, GPFS, Weka, VAST, CephFS, etc.)
+- No StoragePool registration overhead
+- Works with backend-specific quota management
+- Delegates all operations to the volume, enabling backend-specific optimizations
+
+#### 3. Updated Import Step Context
+
+The `ImportStepContext` is updated to use `StorageTarget` instead of string-only mappings:
+
+```python
+@dataclass
+class ImportStepContext:
+    """Context shared across import steps"""
+
+    model: ModelTarget
+    registry_name: str
+    storage_pool: AbstractStoragePool
+    storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget]
+    step_metadata: dict[str, Any]
+```
+
+Import steps now use `StorageTarget.resolve()` to get the storage instance:
+
+```python
+# In import step
+storage = context.storage_step_mappings[self.step_type].resolve(context.storage_pool)
+await storage.stream_upload(filepath, data_stream)
+```
+
+### Request Flow
 
 ```
 API Request with vfolderId
     │
     ▼
-Create VFolderStorage (name: vfolder_{request_id})
+Parse vfid from request body
     │
     ▼
-Register to StoragePool
+Get volume from VolumePool by volume_name
+    │
+    ▼
+Create VolumeStorageAdapter (name: vfolder_storage_{request_id})
+    │
+    ▼
+Create StorageTarget wrapping VolumeStorageAdapter
+    │
+    ▼
+Build storage_step_mappings with StorageTarget instances
     │
     ▼
 Start background import task ──► Return response to client
@@ -149,11 +223,13 @@ Start background import task ──► Return response to client
     ▼
 [Background task runs...]
     │
-    ▼
-Task completes (success or failure)
+    │  Each step resolves storage via:
+    │  storage = mapping.resolve(storage_pool)
+    │  → Returns VolumeStorageAdapter directly
     │
     ▼
-on_complete callback: Unregister from StoragePool
+Task completes (success or failure)
 ```
 
-Using `request_id` in the storage name ensures uniqueness and traceability. The cleanup callback guarantees no memory leaks even if the import fails.
+Using `request_id` in the adapter name ensures uniqueness and traceability.
+
