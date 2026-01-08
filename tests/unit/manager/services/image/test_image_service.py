@@ -22,7 +22,7 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
 )
 from ai.backend.manager.errors.image import (
-    ForgetImageForbiddenError,
+    ImageAccessForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
 )
@@ -203,7 +203,7 @@ class TestForgetImage:
         """Regular user cannot forget image they don't own."""
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
+            side_effect=ImageAccessForbiddenError()
         )
 
         action = ForgetImageAction(
@@ -213,7 +213,7 @@ class TestForgetImage:
             architecture=image_data.architecture,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.forget_image.wait_for_complete(action)
 
     async def test_forget_image_not_found(
@@ -293,7 +293,7 @@ class TestForgetImageById:
     ) -> None:
         """Regular user cannot forget image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
+            side_effect=ImageAccessForbiddenError()
         )
 
         action = ForgetImageByIdAction(
@@ -302,7 +302,7 @@ class TestForgetImageById:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.forget_image_by_id.wait_for_complete(action)
 
     async def test_forget_image_by_id_not_found(
@@ -496,7 +496,7 @@ class TestPurgeImageById:
     ) -> None:
         """Regular user cannot purge image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
+            side_effect=ImageAccessForbiddenError()
         )
 
         action = PurgeImageByIdAction(
@@ -505,7 +505,7 @@ class TestPurgeImageById:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.purge_image_by_id.wait_for_complete(action)
 
     async def test_purge_image_by_id_not_found(
@@ -674,7 +674,7 @@ class TestUntagImageFromRegistry:
     ) -> None:
         """Regular user cannot untag image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
+            side_effect=ImageAccessForbiddenError()
         )
 
         action = UntagImageFromRegistryAction(
@@ -683,7 +683,7 @@ class TestUntagImageFromRegistry:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.untag_image_from_registry.wait_for_complete(action)
 
     async def test_untag_image_not_found(

@@ -222,7 +222,7 @@ class ImageRepository:
     ) -> ImageData:
         """
         Validates that user owns the image.
-        Raises ForgetImageForbiddenError if image doesn't exist or user doesn't own it.
+        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
         """
         return await self._db_source.validate_and_fetch_image_ownership(
             image_id, user_id, load_aliases

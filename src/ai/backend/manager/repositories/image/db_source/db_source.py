@@ -22,7 +22,7 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
-    ForgetImageForbiddenError,
+    ImageAccessForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
     ModifyImageActionValueError,
@@ -108,11 +108,11 @@ class ImageDBSource:
     ) -> ImageRow:
         """
         Private method to get an image and validate ownership using an existing session.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
         """
         image_row = await self._get_image_by_id(session, image_id, load_aliases)
         if not image_row.is_owned_by(user_id):
-            raise ForgetImageForbiddenError()
+            raise ImageAccessForbiddenError()
         return image_row
 
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
@@ -214,7 +214,7 @@ class ImageDBSource:
     ) -> ImageData:
         """
         Validates ownership and fetches an image from database by ID in a single operation.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
         """
         async with self._db.begin_session() as session:
             image_row = await self._validate_image_ownership(
