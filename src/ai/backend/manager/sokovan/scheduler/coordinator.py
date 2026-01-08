@@ -26,7 +26,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -89,7 +89,7 @@ class ScheduleCoordinator:
     """
 
     _valkey_schedule: ValkeyScheduleClient
-    _scheduler: Scheduler
+    _components: SchedulerComponents
     _scheduling_controller: SchedulingController
     _repository: SchedulerRepository
     _lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
@@ -102,23 +102,22 @@ class ScheduleCoordinator:
     def __init__(
         self,
         valkey_schedule: ValkeyScheduleClient,
-        scheduler: Scheduler,
+        components: SchedulerComponents,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
-        config_provider: ManagerConfigProvider,
     ) -> None:
         self._valkey_schedule = valkey_schedule
-        self._scheduler = scheduler
+        self._components = components
         self._scheduling_controller = scheduling_controller
-        self._repository = scheduler._repository
+        self._repository = components.repository
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        self._config_provider = config_provider
+        self._config_provider = components.config_provider
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
-        # Initialize kernel state engine with the scheduler's repository
-        self._kernel_state_engine = KernelStateEngine(scheduler._repository)
+        # Initialize kernel state engine with the component's repository
+        self._kernel_state_engine = KernelStateEngine(components.repository)
 
         # Initialize lifecycle handlers
         self._lifecycle_handlers = self._init_lifecycle_handlers()
@@ -132,15 +131,11 @@ class ScheduleCoordinator:
         - Handler executes business logic and returns successes/failures/stales
         - Coordinator applies status transitions based on handler's declared statuses
         """
-        # Get hook registry from scheduler for handlers that need it
-        hook_registry = self._scheduler._hook_registry
-
-        # Get launcher and terminator from scheduler for handlers that need them
-        launcher = self._scheduler._launcher
-        terminator = self._scheduler._terminator
-
-        # Get provisioner for schedule sessions handler
-        provisioner = self._scheduler._provisioner
+        # Get components for handlers that need them
+        hook_registry = self._components.hook_registry
+        launcher = self._components.launcher
+        terminator = self._components.terminator
+        provisioner = self._components.provisioner
 
         return {
             # Lifecycle handlers
