@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
+    foreign,
     relationship,
 )
 
@@ -28,6 +28,18 @@ if TYPE_CHECKING:
     from .role import RoleRow
 
 
+def _get_role_row_join_condition():
+    from .role import RoleRow
+
+    return RoleRow.id == foreign(UserRoleRow.role_id)
+
+
+def _get_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(UserRoleRow.user_id)
+
+
 class UserRoleRow(Base):
     __tablename__ = "user_roles"
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
@@ -42,15 +54,15 @@ class UserRoleRow(Base):
         "granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
-    role_row: Optional[RoleRow] = relationship(
+    role_row: RoleRow | None = relationship(
         "RoleRow",
         back_populates="mapped_user_role_rows",
-        primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
+        primaryjoin=_get_role_row_join_condition,
     )
-    user_row: Optional[UserRow] = relationship(
+    user_row: UserRow | None = relationship(
         "UserRow",
         back_populates="role_assignments",
-        primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
+        primaryjoin=_get_user_row_join_condition,
     )
 
     def to_data(self) -> UserRoleAssignmentData:

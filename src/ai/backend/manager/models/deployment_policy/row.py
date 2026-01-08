@@ -9,7 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
@@ -46,6 +46,12 @@ class BlueGreenSpec(BaseModel):
 
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+
+def _get_endpoint_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
 
 
 class DeploymentPolicyRow(Base):
@@ -109,7 +115,7 @@ class DeploymentPolicyRow(Base):
     endpoint_row = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
-        primaryjoin="foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_join_condition,
         uselist=False,
     )
 

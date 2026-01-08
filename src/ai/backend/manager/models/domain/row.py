@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.orm import foreign, load_only, relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderHostPermissionMap
@@ -106,6 +106,12 @@ def row_to_data(row: DomainRow | Row) -> DomainData:
     )
 
 
+def _get_network_join_condition():
+    from ai.backend.manager.models.network import NetworkRow
+
+    return DomainRow.name == foreign(NetworkRow.domain_name)
+
+
 class DomainRow(Base):
     __table__ = domains
     sessions = relationship("SessionRow", back_populates="domain")
@@ -118,7 +124,7 @@ class DomainRow(Base):
     networks = relationship(
         "NetworkRow",
         back_populates="domain_row",
-        primaryjoin="DomainRow.name==foreign(NetworkRow.domain_name)",
+        primaryjoin=_get_network_join_condition,
     )
 
     def to_data(self) -> DomainData:
