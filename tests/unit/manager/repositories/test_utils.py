@@ -426,22 +426,16 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         "vfolder_mounts": {},
     }
     await conn.execute(
-        sa.insert(
-            kernels,
-            {
-                "tag": test_data1,
-                **kernel_data,
-            },
-        )
+        sa.insert(kernels).values({
+            "tag": test_data1,
+            **kernel_data,
+        })
     )
     await conn.execute(
-        sa.insert(
-            kernels,
-            {
-                "tag": test_data2,
-                **kernel_data,
-            },
-        )
+        sa.insert(kernels).values({
+            "tag": test_data2,
+            **kernel_data,
+        })
     )
 
     # Fetch Session's kernel and check `kernels_tag` field
@@ -491,22 +485,16 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         "vfolder_mounts": {},
     }
     await conn.execute(
-        sa.insert(
-            kernels,
-            {
-                "tag": test_data1,
-                **kernel_data,
-            },
-        )
+        sa.insert(kernels).values({
+            "tag": test_data1,
+            **kernel_data,
+        })
     )
     await conn.execute(
-        sa.insert(
-            kernels,
-            {
-                "tag": test_data2,
-                **kernel_data,
-            },
-        )
+        sa.insert(kernels).values({
+            "tag": test_data2,
+            **kernel_data,
+        })
     )
 
     # Fetch Session's kernel and check `kernels_tag` field

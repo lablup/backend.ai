@@ -297,8 +297,8 @@ async def execute_with_txn_retry(
         ):
             with attempt:
                 try:
-                    async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn, *args, **kwargs)
+                    async with begin_trx(bind=connection) as session_or_conn:  # type: ignore[arg-type]
+                        result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):
                         raise TryAgain

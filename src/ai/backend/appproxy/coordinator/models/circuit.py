@@ -6,7 +6,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
@@ -31,8 +31,6 @@ from .base import (
     Base,
     BaseMixin,
     EnumType,
-    ForeignKeyIDColumn,
-    IDColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
 )
@@ -54,41 +52,41 @@ class Circuit(Base, BaseMixin):
     port-based TCP and/or websocket proxy server.
     """
 
-    id = IDColumn()
+    id: Mapped[UUID] = mapped_column(GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
-    app = sa.Column(sa.String(length=255), nullable=True)
-    protocol = sa.Column(EnumType(ProxyProtocol), nullable=False)
+    app: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
+    protocol: Mapped[ProxyProtocol] = mapped_column(EnumType(ProxyProtocol), nullable=False)
 
-    worker = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
+    worker: Mapped[UUID] = mapped_column(GUID, sa.ForeignKey("workers.id"), nullable=False)
 
-    app_mode = sa.Column(EnumType(AppMode), nullable=False)
+    app_mode: Mapped[AppMode] = mapped_column(EnumType(AppMode), nullable=False)
 
-    frontend_mode = sa.Column(EnumType(FrontendMode), nullable=False)
-    port = sa.Column(sa.Integer(), nullable=True)
-    subdomain = sa.Column(sa.String(length=255), nullable=True)
+    frontend_mode: Mapped[FrontendMode] = mapped_column(EnumType(FrontendMode), nullable=False)
+    port: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
+    subdomain: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
 
-    envs = sa.Column(pgsql.JSONB(), nullable=True)
-    arguments = sa.Column(sa.String(length=1000), nullable=True)
+    envs: Mapped[dict[str, Any] | None] = mapped_column(pgsql.JSONB(), nullable=True)
+    arguments: Mapped[str | None] = mapped_column(sa.String(length=1000), nullable=True)
 
-    open_to_public = sa.Column(sa.Boolean(), nullable=False, default=False)
-    allowed_client_ips = sa.Column(sa.String(length=255), nullable=True)
+    open_to_public: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
+    allowed_client_ips: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
 
-    user_id = sa.Column(GUID, nullable=True)  # null if `app_mode` is set to `INFERENCE`
-    endpoint_id = sa.Column(GUID, nullable=True)
+    user_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)  # null if `app_mode` is set to `INFERENCE`
+    endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
-    runtime_variant = sa.Column(
+    runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
         StrEnumType(RuntimeVariant), nullable=True
     )  # null if `app_mode` is set to `INTERACTIVE`
 
-    session_ids = sa.Column(
+    session_ids: Mapped[list[UUID]] = mapped_column(
         pgsql.ARRAY(GUID),
         nullable=False,
         default=[],
     )
-    route_info = sa.Column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
+    route_info: Mapped[list[RouteInfo]] = mapped_column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
 
-    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
 
     worker_row = relationship("Worker", back_populates="circuits")
     endpoint_row = relationship(

@@ -11,7 +11,8 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -464,7 +465,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_resource_policy_name: str,
-    ) -> dict[str, str]:
+    ) -> Mapping[str, Any]:
         """Get resource policy dict for check_presets API"""
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
@@ -617,7 +618,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
+        # Get resource policy data - resource_policy should be the slot mapping itself
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -625,17 +626,14 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
+            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_dict,
+            resource_policy=resource_policy_slots,
             scaling_group=test_scaling_group_name,
         )
 
@@ -728,7 +726,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
+        # Get resource policy data - resource_policy should be the slot mapping itself
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -736,17 +734,14 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
+            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_dict,
+            resource_policy=resource_policy_slots,
             scaling_group=test_scaling_group_name,
         )
 
@@ -839,7 +834,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
+        # Get resource policy data - resource_policy should be the slot mapping itself
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -847,17 +842,14 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
+            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_dict,
+            resource_policy=resource_policy_slots,
             scaling_group=test_scaling_group_name,
         )
 
@@ -977,7 +969,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
+        # Get resource policy data - resource_policy should be the slot mapping itself
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -985,17 +977,14 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
+            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_dict,
+            resource_policy=resource_policy_slots,
             scaling_group=test_scaling_group_name,
         )
 
@@ -1015,7 +1004,7 @@ class TestCheckPresetsOccupiedSlots:
         test_group_name: str,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
-        test_resource_policy_dict: dict[str, str],
+        test_resource_policy_dict: Mapping[str, Any],
         alive_and_non_alive_agents: list[AgentId],
     ) -> None:
         """

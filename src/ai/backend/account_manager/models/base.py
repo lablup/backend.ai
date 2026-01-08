@@ -126,8 +126,8 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         return StrEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_StrEnum:
-        return self._enum_class
+    def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
 
 
 class PasswordColumn(TypeDecorator):

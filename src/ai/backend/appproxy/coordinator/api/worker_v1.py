@@ -55,8 +55,8 @@ class WorkerResponseModel(BaseModel):
         ),
     ]
 
-    created: datetime
-    updated: datetime
+    created: datetime | None
+    updated: datetime | None
 
 
 @auth_required("worker")

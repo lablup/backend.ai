@@ -467,12 +467,14 @@ class TestSessionTermination:
             # Check session status
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
             assert updated_session.status == SessionStatus.TERMINATING
             assert updated_session.status_info == "USER_REQUESTED"
 
             # Check kernel status
             stmt = sa.select(KernelRow).where(KernelRow.session_id == running_session.id)
             updated_kernel = await db_sess.scalar(stmt)
+            assert updated_kernel is not None
             assert updated_kernel.status == KernelStatus.TERMINATING
 
     async def test_get_terminating_sessions(
@@ -555,12 +557,14 @@ class TestSessionTermination:
             # Check session status
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
             assert updated_session.status == SessionStatus.TERMINATED
             # Result field is not updated by termination process currently
 
             # Check kernel status
             stmt = sa.select(KernelRow).where(KernelRow.session_id == running_session.id)
             updated_kernel = await db_sess.scalar(stmt)
+            assert updated_kernel is not None
             assert updated_kernel.status == KernelStatus.TERMINATED
             assert updated_kernel.terminated_at is not None
 
@@ -610,11 +614,13 @@ class TestSessionTermination:
             # Session should still be TERMINATING due to failure
             stmt = sa.select(SessionRow).where(SessionRow.id == running_session.id)
             updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
             assert updated_session.status == SessionStatus.TERMINATING
 
             # Kernel should still be TERMINATING
             stmt = sa.select(KernelRow).where(KernelRow.session_id == running_session.id)
             updated_kernel = await db_sess.scalar(stmt)
+            assert updated_kernel is not None
             assert updated_kernel.status == KernelStatus.TERMINATING
             assert updated_kernel.terminated_at is None
 
@@ -671,6 +677,7 @@ class TestSessionTermination:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             stmt = sa.select(SessionRow).where(SessionRow.id == pending_session.id)
             updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
             assert updated_session.status == SessionStatus.CANCELLED
             assert updated_session.status_info == "CANCELLED_BY_USER"
             # Result field is not updated by cancellation process currently
@@ -678,4 +685,5 @@ class TestSessionTermination:
             # Check kernel is also cancelled
             stmt = sa.select(KernelRow).where(KernelRow.session_id == pending_session.id)
             updated_kernel = await db_sess.scalar(stmt)
+            assert updated_kernel is not None
             assert updated_kernel.status == KernelStatus.CANCELLED

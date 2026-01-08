@@ -278,11 +278,11 @@ async def test_modification_queries(virtual_user_db) -> None:
     result = await conn.execute(sa_query)
     assert result.rowcount == 1
 
-    sa_query = parser.append_filter(
+    delete_query = parser.append_filter(
         sa.delete(users),
         'full_name like "tester%"',
     )
-    result = await conn.execute(sa_query)
+    result = await conn.execute(delete_query)
     assert result.rowcount == 4
 
 

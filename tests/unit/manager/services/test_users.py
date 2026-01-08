@@ -151,6 +151,9 @@ class TestCreateUser:
         """Create user with valid data should return created user."""
         mock_user_repository.create_user_validated = AsyncMock(return_value=sample_create_result)
 
+        assert sample_user_data.username is not None
+        assert sample_user_data.need_password_change is not None
+        assert sample_user_data.domain_name is not None
         action = CreateUserAction(
             creator=Creator(
                 spec=UserCreatorSpec(
@@ -182,6 +185,9 @@ class TestCreateUser:
         """Create user with group_ids should pass them to repository."""
         mock_user_repository.create_user_validated = AsyncMock(return_value=sample_create_result)
 
+        assert sample_user_data.username is not None
+        assert sample_user_data.need_password_change is not None
+        assert sample_user_data.domain_name is not None
         group_ids = ["group1", "group2"]
         action = CreateUserAction(
             creator=Creator(
@@ -293,6 +299,7 @@ class TestModifyUser:
         """Modify user with valid data should return updated user."""
         mock_user_repository.update_user_validated = AsyncMock(return_value=modified_user_data)
 
+        assert modified_user_data.username is not None
         action = ModifyUserAction(
             email=modified_user_data.email,
             updater=Updater(

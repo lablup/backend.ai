@@ -214,6 +214,9 @@ class TestAuthRepository:
             await db_sess.flush()
             await db_sess.refresh(user)
 
+            assert user.need_password_change is not None
+            assert user.domain_name is not None
+            assert user.role is not None
             user_data = UserTestData(
                 uuid=user.uuid,
                 username=user.username,

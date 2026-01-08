@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
@@ -138,7 +139,9 @@ class TestNewUserGracePeriodChecker:
     ) -> None:
         """Test new user grace period calculation"""
         # When
-        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
+        grace_period_end = await grace_period_checker.get_grace_period_end(
+            cast(Row[Any], kernel_user_joined_data)
+        )
 
         # Then
         expected_grace_period_end = kernel_user_joined_data["user_created_at"] + timedelta(
@@ -276,9 +279,9 @@ class TestNetworkTimeoutIdleChecker:
 
         # When
         should_alive = await network_timeout_checker.check_idleness(
-            kernel_row,
+            cast(Row[Any], kernel_row),
             mock_db_connection,
-            {"idle_timeout": scenario.idle_timeout},
+            cast(Row[Any], {"idle_timeout": scenario.idle_timeout}),
         )
 
         test_valkey_live.get_live_data.return_value = msgpack.packb(scenario.expected_remaining)
@@ -368,13 +371,15 @@ class TestNetworkTimeoutIdleChecker:
         # Given
         last_access = base_time
         test_valkey_live.get_live_data.return_value = str(last_access.timestamp()).encode()
-        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
+        grace_period_end = await grace_period_checker.get_grace_period_end(
+            cast(Row[Any], kernel_user_joined_data)
+        )
 
         # When
         should_alive = await network_timeout_checker_with_grace.check_idleness(
-            kernel_row,
+            cast(Row[Any], kernel_row),
             mock_db_connection,
-            {"idle_timeout": scenario.idle_timeout},
+            cast(Row[Any], {"idle_timeout": scenario.idle_timeout}),
             grace_period_end=grace_period_end,
         )
 
@@ -528,9 +533,9 @@ class TestSessionLifetimeChecker:
         """Test session lifetime without grace period"""
         # When - check_idleness runs and stores remaining time
         should_alive = await session_lifetime_checker.check_idleness(
-            session_kernel_row,
+            cast(Row[Any], session_kernel_row),
             db_connection,
-            session_lifetime_policy,
+            cast(Row[Any], session_lifetime_policy),
         )
 
         # Mock: get_checker_result will read the stored result
@@ -581,13 +586,15 @@ class TestSessionLifetimeChecker:
         kernel_user_joined_data: dict[str, datetime],
     ) -> None:
         # Get grace period end (user_created_at = base_time, grace from test_config)
-        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
+        grace_period_end = await grace_period_checker.get_grace_period_end(
+            cast(Row[Any], kernel_user_joined_data)
+        )
 
         # When - check_idleness runs with grace_period_end
         should_alive = await session_lifetime_checker.check_idleness(
-            session_kernel_row,
+            cast(Row[Any], session_kernel_row),
             db_connection,
-            session_lifetime_policy,
+            cast(Row[Any], session_lifetime_policy),
             grace_period_end=grace_period_end,
         )
 
@@ -970,9 +977,9 @@ class TestUtilizationIdleChecker:
         """Test utilization during grace period (util_info should be None)"""
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_grace_period_checker.check_idleness(
-            utilization_kernel_row,
+            cast(Row[Any], utilization_kernel_row),
             db_connection,
-            {"idle_timeout": grace_test_config.time_window_seconds},
+            cast(Row[Any], {"idle_timeout": grace_test_config.time_window_seconds}),
         )
 
         # Reset side_effect after check_idleness so return_value can be used
@@ -1075,9 +1082,9 @@ class TestUtilizationIdleChecker:
         """Test utilization with sufficient usage (should NOT terminate session)"""
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_idle_checker.check_idleness(
-            utilization_kernel_row,
+            cast(Row[Any], utilization_kernel_row),
             db_connection,
-            {"idle_timeout": test_config.time_window_seconds},
+            cast(Row[Any], {"idle_timeout": test_config.time_window_seconds}),
         )
 
         # Mock: get_checker_result
@@ -1220,9 +1227,9 @@ class TestUtilizationIdleChecker:
 
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_insufficient_checker.check_idleness(
-            utilization_kernel_row,
+            cast(Row[Any], utilization_kernel_row),
             db_connection,
-            {"idle_timeout": insufficient_test_config.time_window_seconds},
+            cast(Row[Any], {"idle_timeout": insufficient_test_config.time_window_seconds}),
         )
 
         # get_checker_result will read the stored result (already mocked above)

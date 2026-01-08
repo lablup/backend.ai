@@ -26,6 +26,10 @@ pants_ignore = [
     "/tools/pants-plugins",
     "/wheelhouse/*/",
     "/wheelhouse/*.whl",
+    # Alembic migration files - legacy SQLAlchemy 1.x style, excluded from type checking
+    "/src/ai/backend/manager/models/alembic/versions/",
+    "/src/ai/backend/account_manager/models/alembic/versions/",
+    "/src/ai/backend/appproxy/coordinator/models/alembic/versions/",
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
@@ -125,6 +129,7 @@ report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
+config = "pyproject.toml"
 
 [setuptools]
 install_from_resolve = "setuptools"
