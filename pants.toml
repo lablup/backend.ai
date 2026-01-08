@@ -90,14 +90,13 @@ bin = [
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-# Pants 2.27 uses PEX 2.33.2 by default.
 # Pin the PEX version to get benefits from a-scie/lift#116.
-version = "v2.74.1"
+version = "v2.77.0"
 known_versions = [
-    "v2.74.1|macos_arm64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
-    "v2.74.1|macos_x86_64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
-    "v2.74.1|linux_arm64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
-    "v2.74.1|linux_x86_64|24d62a8297c53277614d26c2f8293276fdb1045274411a9018f04ad241f7c3ea|4943888",
+    "v2.77.0|macos_arm64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|macos_x86_64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|linux_arm64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|linux_x86_64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
