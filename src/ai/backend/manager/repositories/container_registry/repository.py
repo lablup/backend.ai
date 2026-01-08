@@ -80,11 +80,11 @@ class ContainerRegistryRepository:
                 return reg_row.to_dataclass()
 
             session.expire(reg_row)  # Expire to get updated values after update
-            result = await execute_updater(session, updater)
-            if result is None:
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
-            reg_row = result.row
+            reg_row = update_result.row
             validator = ContainerRegistryValidator(
                 ContainerRegistryValidatorArgs(
                     type=reg_row.type,
@@ -130,7 +130,7 @@ class ContainerRegistryRepository:
                 ContainerRegistryRow.registry_name == registry_name
             )
             result = await session.execute(stmt)
-            rows: list[ContainerRegistryRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()
@@ -138,7 +138,7 @@ class ContainerRegistryRepository:
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
-            rows: list[ContainerRegistryRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()

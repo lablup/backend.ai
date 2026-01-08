@@ -264,7 +264,10 @@ class ResourcePresetDBSource:
         """
         query = sa.select(domains.c.total_resource_slots).where(domains.c.name == domain_name)
         result = await db_sess.execute(query)
-        domain_resource_slots = result.first()[0]
+        row = result.first()
+        if row is None:
+            raise DomainNotFound(f"Domain not found (name: {domain_name})")
+        domain_resource_slots = row[0]
         if domain_resource_slots is None:
             raise DomainNotFound(f"Domain not found (name: {domain_name})")
         domain_resource_policy = {
@@ -388,10 +391,11 @@ class ResourcePresetDBSource:
         agent_slots = []
 
         for agent in agent_rows:
-            actual_occupied = agent_occupied[agent.id]
+            actual_occupied = agent_occupied[AgentId(agent.id)]
             remaining = agent.available_slots - actual_occupied
             agent_slots.append(remaining)
-            per_sgroup_remaining[agent.scaling_group] += remaining
+            if agent.scaling_group:
+                per_sgroup_remaining[agent.scaling_group] += remaining
 
         return per_sgroup_remaining, agent_slots
 
@@ -506,7 +510,7 @@ class ResourcePresetDBSource:
             )
 
         # Get scaling groups
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
+        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, str(access_key))
         sgroup_names = [sg.name for sg in sgroups]
         if scaling_group is not None:
             if scaling_group not in sgroup_names:

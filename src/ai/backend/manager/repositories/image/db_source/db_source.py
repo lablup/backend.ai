@@ -141,7 +141,7 @@ class ImageDBSource:
 
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(query)
-            image_rows: list[ImageRow] = result.scalars().all()
+            image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
     async def query_image_details_by_identifier(
@@ -240,7 +240,7 @@ class ImageDBSource:
                 image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
                 image_row.aliases.append(image_alias)
                 row_id = image_row.id
-                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias)
+                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
             return row_id, alias_data
         except ValueError:
             raise AliasImageActionValueError
@@ -250,13 +250,13 @@ class ImageDBSource:
     async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
-            return ImageAliasData(id=row.id, alias=row.alias)
+            return ImageAliasData(id=row.id, alias=row.alias or "")
 
     async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
-            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias)
+            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias or "")
             await session.delete(existing_alias)
         return image_id, alias_data
 

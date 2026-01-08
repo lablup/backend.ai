@@ -120,7 +120,9 @@ def calculate_remaining_time(
 
 
 async def get_db_now(dbconn: SAConnection) -> datetime:
-    return await dbconn.scalar(sa.select(sa.func.now()))
+    result = await dbconn.scalar(sa.select(sa.func.now()))
+    assert result is not None
+    return result
 
 
 class UtilizationExtraInfo(NamedTuple):
@@ -331,15 +333,15 @@ class IdleCheckerHost:
                 check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
                 errors: list[BaseException] = []
-                for checker, result in zip(self._checkers, check_results, strict=True):
-                    if isinstance(result, BaseExceptionGroup):
-                        errors.extend(result.exceptions)
+                for checker, check_result in zip(self._checkers, check_results, strict=True):
+                    if isinstance(check_result, BaseExceptionGroup):
+                        errors.extend(check_result.exceptions)
                         continue
-                    elif isinstance(result, BaseException):
+                    elif isinstance(check_result, BaseException):
                         # mark to be destroyed afterwards
-                        errors.append(result)
+                        errors.append(check_result)
                         continue
-                    if not result:
+                    if not check_result:
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
                             checker.name,

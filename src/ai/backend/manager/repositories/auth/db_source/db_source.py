@@ -20,6 +20,7 @@ from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import (
+    UserRole,
     UserRow,
     UserStatus,
     check_credential,
@@ -124,7 +125,7 @@ class AuthDBSource:
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
 
-            return self._user_row_to_data(user_row)
+            return self._user_row_to_data(UserRow.from_row(user_row))
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
@@ -222,17 +223,17 @@ class AuthDBSource:
             username=row.username,
             email=row.email,
             password=row.password,
-            need_password_change=row.need_password_change,
+            need_password_change=row.need_password_change or False,
             full_name=row.full_name,
             description=row.description,
             is_active=row.status == UserStatus.ACTIVE,
-            status=row.status,
+            status=row.status or UserStatus.ACTIVE,
             status_info=row.status_info,
             created_at=row.created_at,
             modified_at=row.modified_at,
             password_changed_at=row.password_changed_at,
-            domain_name=row.domain_name,
-            role=row.role,
+            domain_name=row.domain_name or "",
+            role=row.role or UserRole.USER,
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             sudo_session_enabled=row.sudo_session_enabled,
