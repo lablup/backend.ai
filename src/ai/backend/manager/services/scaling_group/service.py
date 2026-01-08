@@ -27,8 +27,8 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair
     DisassociateScalingGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
-    DisassociateScalingGroupWithUserGroupAction,
-    DisassociateScalingGroupWithUserGroupActionResult,
+    DisassociateScalingGroupWithUserGroupsAction,
+    DisassociateScalingGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -123,9 +123,9 @@ class ScalingGroupService:
         await self._repository.associate_scaling_group_with_user_groups(action.bulk_creator)
         return AssociateScalingGroupWithUserGroupsActionResult()
 
-    async def disassociate_scaling_group_with_user_group(
-        self, action: DisassociateScalingGroupWithUserGroupAction
-    ) -> DisassociateScalingGroupWithUserGroupActionResult:
+    async def disassociate_scaling_group_with_user_groups(
+        self, action: DisassociateScalingGroupWithUserGroupsAction
+    ) -> DisassociateScalingGroupWithUserGroupsActionResult:
         """Disassociates a single scaling group from a user group (project)."""
-        await self._repository.disassociate_scaling_group_with_user_group(action.purger)
-        return DisassociateScalingGroupWithUserGroupActionResult()
+        await self._repository.disassociate_scaling_group_with_user_groups(action.purger)
+        return DisassociateScalingGroupWithUserGroupsActionResult()

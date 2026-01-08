@@ -153,12 +153,12 @@ class ScalingGroupRepository:
         """Associates a scaling group with multiple user groups (projects)."""
         await self._db_source.associate_scaling_group_with_user_groups(bulk_creator)
 
-    async def disassociate_scaling_group_with_user_group(
+    async def disassociate_scaling_group_with_user_groups(
         self,
         purger: BatchPurger[ScalingGroupForProjectRow],
     ) -> None:
         """Disassociates a single scaling group from a user group (project)."""
-        await self._db_source.disassociate_scaling_group_with_user_group(purger)
+        await self._db_source.disassociate_scaling_group_with_user_groups(purger)
 
     async def check_scaling_group_user_group_association_exists(
         self,

@@ -238,7 +238,7 @@ class ScalingGroupDBSource:
         async with self._db.begin_session() as session:
             await execute_bulk_creator(session, bulk_creator)
 
-    async def disassociate_scaling_group_with_user_group(
+    async def disassociate_scaling_group_with_user_groups(
         self,
         purger: BatchPurger[ScalingGroupForProjectRow],
     ) -> None:

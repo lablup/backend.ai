@@ -11,7 +11,7 @@ from .base import ScalingGroupAction
 
 
 @dataclass
-class DisassociateScalingGroupWithUserGroupAction(ScalingGroupAction):
+class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
     """Action to disassociate a single scaling group from a user group (project)."""
 
     purger: BatchPurger[ScalingGroupForProjectRow]
@@ -27,7 +27,7 @@ class DisassociateScalingGroupWithUserGroupAction(ScalingGroupAction):
 
 
 @dataclass
-class DisassociateScalingGroupWithUserGroupActionResult(BaseActionResult):
+class DisassociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
     """Result of disassociating a scaling group from a user group."""
 
     @override
