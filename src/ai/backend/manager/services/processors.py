@@ -228,7 +228,6 @@ class Services:
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
-                admin_session_repository=repositories.session.admin_repository,
                 scheduling_controller=args.scheduling_controller,
             )
         )
