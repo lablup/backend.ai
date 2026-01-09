@@ -617,7 +617,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data - resource_policy should be the slot mapping itself
+        # Get resource policy data
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -625,14 +625,17 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_slots,
+            resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
 
@@ -725,7 +728,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data - resource_policy should be the slot mapping itself
+        # Get resource policy data
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -733,14 +736,17 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_slots,
+            resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
 
@@ -833,7 +839,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data - resource_policy should be the slot mapping itself
+        # Get resource policy data
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -841,14 +847,17 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_slots,
+            resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
 
@@ -968,7 +977,7 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data - resource_policy should be the slot mapping itself
+        # Get resource policy data
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
                 sa.select(KeyPairResourcePolicyRow).where(
@@ -976,14 +985,17 @@ class TestCheckPresetsOccupiedSlots:
                 )
             )
             kp_policy = kp_policy_result.scalar_one()
-            resource_policy_slots = dict(kp_policy.total_resource_slots.to_json())
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
 
         result: CheckPresetsResult = await repository.check_presets(
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain_name,
-            resource_policy=resource_policy_slots,
+            resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
 

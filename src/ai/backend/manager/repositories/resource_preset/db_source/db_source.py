@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -190,7 +190,7 @@ class ResourcePresetDBSource:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         scaling_group: Optional[str] = None,
     ) -> CheckPresetsDBData:
@@ -431,7 +431,7 @@ class ResourcePresetDBSource:
         self,
         db_sess: SASession,
         access_key: AccessKey,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceUsageData:
         """Get keypair resource usage (limits, occupied, remaining)."""
@@ -478,7 +478,7 @@ class ResourcePresetDBSource:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         scaling_group: Optional[str] = None,
     ) -> CheckPresetsDBData:
