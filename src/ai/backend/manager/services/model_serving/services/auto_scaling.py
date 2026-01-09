@@ -5,6 +5,7 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.manager.errors.service import EndpointAccessForbiddenError
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.options import EndpointConditions
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -29,7 +30,6 @@ from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules
     SearchAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.model_serving.exceptions import (
-    EndpointAccessForbiddenError,
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
     GenericForbidden,

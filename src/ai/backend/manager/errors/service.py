@@ -174,6 +174,6 @@ class EndpointAccessForbiddenError(GenericForbidden):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ENDPOINT,
-            operation=ErrorOperation.READ,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
