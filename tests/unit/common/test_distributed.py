@@ -209,7 +209,7 @@ def etcd_timer_node_process(
         etcd_lock: AbstractDistributedLock
         match etcd_client:
             case "etcd-client-py":
-                etcd = AsyncEtcd(
+                async with AsyncEtcd(
                     addrs=etcd_ctx.addrs,
                     namespace=etcd_ctx.namespace,
                     scope_prefix_map={
@@ -217,25 +217,25 @@ def etcd_timer_node_process(
                         ConfigScopes.SGROUP: "sgroup/testing",
                         ConfigScopes.NODE: "node/i-test",
                     },
-                )
-                etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
+                ) as etcd:
+                    etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
 
-        timer = GlobalTimer(
-            etcd_lock,
-            event_producer,
-            lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
-            timer_ctx.interval,
-        )
-        try:
-            await timer.join()
-            while not stop_event.is_set():
-                await asyncio.sleep(0)
-        finally:
-            await timer.leave()
-            await event_dispatcher.close()
-            await event_producer.close()
-            await redis_mq.close()
-            await asyncio.sleep(0.2)  # Allow cleanup to complete
+                    timer = GlobalTimer(
+                        etcd_lock,
+                        event_producer,
+                        lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
+                        timer_ctx.interval,
+                    )
+                    try:
+                        await timer.join()
+                        while not stop_event.is_set():
+                            await asyncio.sleep(0)
+                    finally:
+                        await timer.leave()
+                        await event_dispatcher.close()
+                        await event_producer.close()
+                        await redis_mq.close()
+                        await asyncio.sleep(0.2)  # Allow cleanup to complete
 
     asyncio.run(_main())
 

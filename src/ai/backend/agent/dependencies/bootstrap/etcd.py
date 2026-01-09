@@ -52,17 +52,13 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
 
         # Convert config to dataclass format and initialize etcd
         etcd_config_data = setup_input.etcd.to_dataclass()
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [addr.to_legacy() for addr in etcd_config_data.addrs],
             setup_input.etcd.namespace,
             scope_prefix_map,
             credentials=etcd_credentials,
-        )
-
-        try:
+        ) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
         """

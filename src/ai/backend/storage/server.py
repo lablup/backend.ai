@@ -171,11 +171,8 @@ async def aiomonitor_ctx(
 
 @asynccontextmanager
 async def etcd_ctx(local_config: StorageProxyUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    etcd = make_etcd(local_config)
-    try:
+    async with make_etcd(local_config) as etcd:
         yield etcd
-    finally:
-        await etcd.close()
 
 
 @asynccontextmanager
