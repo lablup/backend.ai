@@ -1413,7 +1413,7 @@ class SessionService:
         user_role = action.user_role
         session_id = action.session_id
 
-        # Fetch session by ID without ownership check (service handles authorization)
+        # Fetch session by ID without ownership check
         session_row = await self._session_repository.get_session_by_id_for_status(session_id)
 
         # Regular users can only transit their own sessions
