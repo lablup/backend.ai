@@ -3,9 +3,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
+from uuid import UUID
 
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
@@ -57,4 +59,19 @@ class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
         return ScalingGroupForDomainRow(
             scaling_group=self.scaling_group,
             domain=self.domain,
+        )
+
+
+@dataclass
+class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
+    """CreatorSpec for associating a scaling group with a project (user group)."""
+
+    scaling_group: str
+    project: UUID
+
+    @override
+    def build_row(self) -> ScalingGroupForProjectRow:
+        return ScalingGroupForProjectRow(
+            scaling_group=self.scaling_group,
+            group=self.project,
         )

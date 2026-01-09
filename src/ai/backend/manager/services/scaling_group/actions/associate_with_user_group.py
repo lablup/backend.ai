@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional, override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+from ai.backend.manager.repositories.base.creator import BulkCreator
+
+from .base import ScalingGroupAction
+
+
+@dataclass
+class AssociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
+    """Action to associate a scaling group with multiple user groups (projects)."""
+
+    bulk_creator: BulkCreator[ScalingGroupForProjectRow]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "associate_with_user_groups"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+
+@dataclass
+class AssociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
+    """Result of associating a scaling group with user groups."""
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
