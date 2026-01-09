@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import enum
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
-from datetime import timezone as tz
-from typing import Any, AsyncIterator, Optional, Union
+from datetime import UTC, datetime
+from pathlib import PurePath
+from typing import Any, Optional
 
 import trafaret as t
 from aiohttp import web
@@ -11,7 +14,10 @@ from aiohttp import web
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
-from .volumes.types import LoggingInternalMeta
+from .errors import (
+    InvalidConfigurationSourceError,
+    InvalidPathError,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -21,8 +27,8 @@ class CheckParamSource(enum.Enum):
     QUERY = 1
 
 
-def fstime2datetime(t: Union[float, int]) -> datetime:
-    return datetime.utcfromtimestamp(t).replace(tzinfo=tz.utc)
+def fstime2datetime(t: float | int) -> datetime:
+    return datetime.fromtimestamp(t, tz=UTC)
 
 
 @actxmgr
@@ -50,7 +56,7 @@ async def check_params(
         elif read_from == CheckParamSource.QUERY:
             raw_params = request.query
         else:
-            raise ValueError("Invalid source for check_params() helper")
+            raise InvalidConfigurationSourceError("Invalid source for check_params() helper")
     try:
         if checker is None:
             yield None
@@ -81,7 +87,7 @@ async def check_params(
 
 
 async def log_manager_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -96,12 +102,14 @@ async def log_manager_api_entry(
                 params["dst_vfid"],
             )
         elif "relpaths" in params:
+            relpaths = params["relpaths"]
+            paths_summary = str(relpaths[0]) + "..." if relpaths else "(empty)"
             log.info(
                 "ManagerAPI::{}(v:{}, f:{}, p*:{})",
                 name.upper(),
                 params["volume"],
                 params["vfid"],
-                str(params["relpaths"][0]) + "...",
+                paths_summary,
             )
         elif "relpath" in params:
             log.info(
@@ -132,10 +140,12 @@ async def log_manager_api_entry(
 
 
 async def log_manager_api_entry_new(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
+    from .volumes.types import LoggingInternalMeta
+
     if params is None:
         log.info(
             "ManagerAPI::{}()",
@@ -153,3 +163,62 @@ async def log_manager_api_entry_new(
             name.upper(),
             str(params),
         )
+
+
+async def log_client_api_entry(
+    log: logging.Logger | BraceStyleAdapter,
+    name: str,
+    params: Any,
+) -> None:
+    from .volumes.types import LoggingInternalMeta
+
+    if params is None:
+        log.info(
+            "ClientFacingAPI::{}()",
+            name.upper(),
+        )
+    elif isinstance(params, LoggingInternalMeta):
+        log.info(
+            "ClientFacingAPI::{}({})",
+            name.upper(),
+            params.to_logging_str(),
+        )
+    else:
+        log.info(
+            "ClientFacingAPI::{}({})",
+            name.upper(),
+            str(params),
+        )
+
+
+def normalize_filepath(filepath: str) -> str:
+    """
+    Normalize a filepath by removing path traversal components and extra slashes.
+
+    Args:
+        filepath: The filepath to normalize
+
+    Returns:
+        Normalized filepath string
+
+    Raises:
+        InvalidPathError: If the filepath is empty, contains invalid characters, or attempts path traversal
+    """
+    if not filepath:
+        raise InvalidPathError("Filepath cannot be empty")
+
+    # Convert to PurePath to handle cross-platform path normalization
+    path = PurePath(filepath)
+
+    # Check for path traversal attempts
+    for part in path.parts:
+        if part in (".", ".."):
+            raise InvalidPathError(f"Path traversal not allowed: {filepath}")
+        if "\x00" in part:  # Null byte
+            raise InvalidPathError(f"Invalid character in filepath: {filepath}")
+
+    # Convert back to string with forward slashes (POSIX style)
+    normalized = str(path).replace("\\", "/")
+
+    # Remove leading slash if present (we want relative paths)
+    return normalized.removeprefix("/")

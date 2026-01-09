@@ -4,7 +4,7 @@ from typing import Optional
 class GPFSError(Exception):
     message: str
 
-    def __init__(self, message: Optional[str] = None, *args):
+    def __init__(self, message: Optional[str] = None, *args) -> None:
         super().__init__(message, *args)
 
         self.message = message or ""

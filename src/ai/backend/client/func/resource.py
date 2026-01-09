@@ -1,6 +1,8 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
-from ..request import Request
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Resource",)

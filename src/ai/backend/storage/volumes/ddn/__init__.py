@@ -1,19 +1,26 @@
 import asyncio
+import logging
+from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, FrozenSet, Mapping
+from typing import Any, Final
 
 import aiofiles
 import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
-
-from ...exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
-from ...subproc import run
-from ...types import Optional, QuotaConfig, QuotaUsage
-from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.errors import (
+    DDNCommandFailedError,
+    QuotaScopeAlreadyExists,
+    QuotaScopeNotFoundError,
+    SubprocessStdoutNotAvailableError,
+)
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
 PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"
@@ -28,6 +35,9 @@ def _kilobyte_to_byte(kilobyte: int) -> int:
     return kilobyte * 1024
 
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
 class EXAScalerQuotaModel(BaseQuotaModel):
     def __init__(self, mount_path: Path, local_config: Mapping[str, Any], etcd: AsyncEtcd) -> None:
         self.local_config = local_config
@@ -38,7 +48,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
         def _read():
             try:
-                with open(pid_file_path, "r") as f:
+                with open(pid_file_path) as f:
                     return int(f.read())
             except FileNotFoundError:
                 return None
@@ -75,7 +85,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 path,
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
 
     async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
         await self._set_quota_by_project(pid, path, QuotaConfig(0))
@@ -91,7 +101,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             stderr=asyncio.subprocess.STDOUT,
         )
         try:
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise SubprocessStdoutNotAvailableError("lfs quota process stdout is not available")
             next_line_is_quota = False
             while True:
                 try:
@@ -107,12 +118,18 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     # words[1] is soft_limit
                     if hard_limit == 0:
                         return None
-                    if raw_used_bytes.endswith("*"):
-                        raw_used_bytes = raw_used_bytes[:-1]
+                    raw_used_bytes = raw_used_bytes.removesuffix("*")
                     used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
-                    return QuotaUsage(
-                        used_bytes=used_bytes, limit_bytes=_kilobyte_to_byte(hard_limit)
-                    )
+                    limit_bytes = _kilobyte_to_byte(hard_limit)
+                    if used_bytes < 0 or limit_bytes < 0:
+                        log.warning(
+                            "Subprocess lfs quota returned negative values in used_bytes({}) or limit_bytes({}), pid: {} Line: {}",
+                            used_bytes,
+                            limit_bytes,
+                            pid,
+                            line,
+                        )
+                    return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
                 if Path(words[0]) == qspath:
                     next_line_is_quota = True
                     continue
@@ -155,7 +172,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 str(qspath),
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
 
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)
@@ -217,5 +234,5 @@ class EXAScalerFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

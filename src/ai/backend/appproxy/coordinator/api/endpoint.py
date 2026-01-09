@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -12,13 +13,12 @@ from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
     EndpointConfig,
     FrontendMode,
-    HealthCheckConfig,
     ProxyProtocol,
     PydanticResponse,
     WebMiddleware,
@@ -27,11 +27,13 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError, InvalidURLError
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.config import ModelHealthCheck
 
-from ..models import Circuit, Endpoint, Worker
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import SessionConfig, StubResponseModel
 from .utils import auth_required
 
@@ -72,7 +74,7 @@ class EndpointCreationRequestModel(BaseModel):
     ] = None
 
     health_check: Annotated[
-        HealthCheckConfig | None,
+        ModelHealthCheck | None,
         Field(
             default=None,
             description=textwrap.dedent(
@@ -109,39 +111,55 @@ async def create_or_update_endpoint(
     health_check_enabled = health_check_config is not None
 
     async def _sync(sess: SASession) -> URL:
-        # Create new endpoint record
-        endpoint = Endpoint.create(
-            endpoint_id=endpoint_id,
-            health_check_enabled=health_check_enabled,
-            health_check_config=health_check_config,
-        )
-        sess.add(endpoint)
+        # Check if endpoint already exists
+        try:
+            endpoint = await Endpoint.get(sess, endpoint_id, load_circuit=False)
+            # Update health check configuration
+            endpoint.health_check_enabled = health_check_enabled
+            endpoint.health_check_config = health_check_config
+        except ObjectNotFound:
+            # Create new endpoint record
+            endpoint = Endpoint.create(
+                endpoint_id=endpoint_id,
+                health_check_enabled=health_check_enabled,
+                health_check_config=health_check_config,
+            )
+            sess.add(endpoint)
+
+        # Check if circuit already exists for this endpoint
+        try:
+            circuit = await Circuit.get_by_endpoint(
+                sess, endpoint_id, load_worker=True, load_endpoint=True
+            )
+            circuit.endpoint_row = endpoint
+            # Return existing circuit URL
+            return await circuit.get_endpoint_url()
+        except ObjectNotFound:
+            pass  # Continue with creating new circuit
 
         # supported for subdomain based workers only
         matched_worker_id: UUID | None = None
         if _url := params.tags.endpoint.existing_url:
-            assert _url.host
+            if not _url.host:
+                raise InvalidURLError("URL is missing host component.")
             domain = "." + ".".join(_url.host.split(".")[1:])
 
             query = sa.select(Worker).where(
-                (
-                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                    & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
-                    & (Worker.wildcard_domain == domain)
-                )
+                Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
+                & (Worker.wildcard_domain == domain)
             )
             result = await sess.execute(query)
             matched_worker = result.scalar()
             if matched_worker:
                 params.subdomain = _url.host.split(".")[0]
             else:
-                assert _url.port
+                if not _url.port:
+                    raise InvalidURLError("URL is missing port component for port-based worker.")
                 query = sa.select(Worker).where(
-                    (
-                        Worker.accepted_traffics.contains([AppMode.INFERENCE])
-                        & (Worker.frontend_mode == FrontendMode.PORT)
-                        & (Worker.hostname == _url.host)
-                    )
+                    Worker.accepted_traffics.contains([AppMode.INFERENCE])
+                    & (Worker.frontend_mode == FrontendMode.PORT)
+                    & (Worker.hostname == _url.host)
                 )
                 result = await sess.execute(query)
                 worker_candidates = result.scalars().all()
@@ -219,14 +237,14 @@ async def remove_endpoint(request: web.Request) -> PydanticResponse[StubResponse
     return PydanticResponse(StubResponseModel(success=True))
 
 
-class UpdateHealthCheckConfigRequestModel(BaseModel):
-    health_check: HealthCheckConfig | None
+class UpdateModelHealthCheckRequestModel(BaseModel):
+    health_check: ModelHealthCheck | None
 
 
 @auth_required("manager")
-@pydantic_api_handler(UpdateHealthCheckConfigRequestModel)
+@pydantic_api_handler(UpdateModelHealthCheckRequestModel)
 async def inject_health_check_information(
-    request: web.Request, params: UpdateHealthCheckConfigRequestModel
+    request: web.Request, params: UpdateModelHealthCheckRequestModel
 ) -> PydanticResponse[StubResponseModel]:
     """
     Creates and returns API token required for execution of model service apps hosted by AppProxy.
@@ -241,7 +259,8 @@ async def inject_health_check_information(
         if circuit.app_mode != AppMode.INFERENCE:
             raise ObjectNotFound(object_name="inference-circuit")
 
-        assert circuit.endpoint_row
+        if not circuit.endpoint_row:
+            raise InvalidCircuitStateError("Endpoint row is not loaded for circuit")
         circuit.endpoint_row.health_check_enabled = params.health_check is not None
         circuit.endpoint_row.health_check_config = params.health_check
 
@@ -276,11 +295,11 @@ async def generate_endpoint_api_token(
 
     async with root_ctx.db.begin_readonly_session() as sess:
         circuit: Circuit = await Circuit.find_by_endpoint(
-            sess, UUID(request.match_info["endpoint_id"]), load_worker=False
+            sess, UUID(request.match_info["endpoint_id"]), load_worker=False, load_endpoint=False
         )
         payload = dict(circuit.dump_model())
         payload["config"] = {}
-        payload["app_url"] = str(await circuit.get_endpoint_url())
+        payload["app_url"] = str(await circuit.get_endpoint_url(session=sess))
 
     payload["user"] = str(params.user_uuid)
     payload["exp"] = params.exp

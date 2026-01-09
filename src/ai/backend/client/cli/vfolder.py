@@ -16,16 +16,15 @@ from ai.backend.cli.params import (
     OptionalType,
 )
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.bgtask.types import BgtaskStatus
 
-from ..compat import asyncio_run
-from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .pretty import (
-    ProgressViewer,
+    ProgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -542,7 +541,7 @@ def mv(name, src, dst):
 
 @vfolder.command(aliases=["delete-file"])
 @click.argument("name", type=str)
-@click.argument("filenames", nargs=-1)
+@click.argument("filenames", nargs=-1, required=True)
 @click.option("-r", "--recursive", is_flag=True, help="Enable recursive deletion of directories.")
 def rm(name, filenames, recursive):
     """
@@ -554,7 +553,7 @@ def rm(name, filenames, recursive):
 
     \b
     NAME: Name of a virtual folder.
-    FILENAMES: Paths of the files to delete.
+    FILENAMES: Paths of the files to delete (at least one required).
     """
     with Session() as session:
         try:
@@ -581,9 +580,9 @@ def ls(name, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             result = session.VFolder(name).list_files(path)
-            if "error_msg" in result and result["error_msg"]:
+            if result.get("error_msg"):
                 print_fail(result["error_msg"])
                 return
             files = result["items"]
@@ -620,7 +619,7 @@ def invite(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
             if invited_ids:
@@ -709,11 +708,11 @@ def share(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
             if shared_emails:
-                print("Shared with {} permission to:".format(perm))
+                print(f"Shared with {perm} permission to:")
                 for _email in shared_emails:
                     print("\t- " + _email)
             else:
@@ -774,7 +773,7 @@ def leave(name, shared_user_uuid):
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
             session.VFolder(name).leave(shared_user_uuid)
-            print('Left the shared virtual folder "{}".'.format(name))
+            print(f'Left the shared virtual folder "{name}".')
 
         except Exception as e:
             print_error(e)
@@ -837,21 +836,18 @@ def clone(name, target_name, target_host, usage_mode, permission):
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer(
+                    ProgressBarWithSpinner(
                         "Cloning the vfolder... "
                         "(This may take a while depending on its size and number of files!)",
-                    ) as viewer,
+                    ) as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-                                else:
-                                    pbar.total = data["total_progress"]
-                                    pbar.write(data["message"])
-                                    pbar.update(data["current_progress"] - pbar.n)
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(

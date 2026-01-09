@@ -56,10 +56,10 @@ When a policy is no longer needed:
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
 )
-from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
+from ai.backend.manager.repositories.user_resource_policy.creators import UserResourcePolicyCreatorSpec
 
 # Create a new policy with specific limits
-creator = UserResourcePolicyCreator(
+creator = UserResourcePolicyCreatorSpec(
     name="standard-user-policy",
     max_vfolder_count=50,
     max_quota_scope_size=10737418240,  # 10GB

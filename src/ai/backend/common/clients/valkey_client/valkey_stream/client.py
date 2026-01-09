@@ -16,21 +16,42 @@ from glide.exceptions import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.message_queue.types import BroadcastPayload
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_stream client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STREAM)
+# Resilience instance for valkey_stream layer
+valkey_stream_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_STREAM)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 _MAX_STREAM_LENGTH = 128
-_DEFAULT_CACHE_EXPIRATION = 60  # 1 minutes
+_DEFAULT_CACHE_EXPIRATION = 300  # 5 minutes
 _DEFAULT_AUTOCLAIM_COUNT = 10
 
 
@@ -66,7 +87,7 @@ class ValkeyStreamClient:
     @classmethod
     async def create(
         cls,
-        redis_target: RedisTarget,
+        valkey_target: ValkeyTarget,
         *,
         db_id: int,
         human_readable_name: str,
@@ -82,7 +103,7 @@ class ValkeyStreamClient:
         :return: An instance of ValkeyStreamClient.
         """
         client = create_valkey_client(
-            target=redis_target,
+            valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
             pubsub_channels=pubsub_channels,
@@ -90,16 +111,25 @@ class ValkeyStreamClient:
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyStreamClient connection.
         """
         if self._closed:
-            log.warning("ValkeyStreamClient is already closed.")
+            log.debug("ValkeyStreamClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()
+
+    async def ping(self) -> None:
+        """
+        Ping the Valkey server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        await self._client.ping()
 
     async def make_consumer_group(
         self,
@@ -118,7 +148,7 @@ class ValkeyStreamClient:
             stream_key, group_name, "$", StreamGroupOptions(make_stream=True)
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def read_consumer_group(
         self,
         stream_key: str,
@@ -159,7 +189,7 @@ class ValkeyStreamClient:
                 messages.append(StreamMessage.from_list(msg_id, msg_data))
         return messages
 
-    @valkey_decorator(retry_count=3, retry_delay=0.1)
+    @valkey_stream_resilience.apply()
     async def done_stream_message(
         self,
         stream_key: str,
@@ -176,7 +206,7 @@ class ValkeyStreamClient:
         """
         await self._client.client.xack(stream_key, group_name, [message_id])
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def enqueue_stream_message(
         self,
         stream_key: str,
@@ -198,7 +228,7 @@ class ValkeyStreamClient:
             ),
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def reque_stream_message(
         self,
         stream_key: str,
@@ -227,7 +257,7 @@ class ValkeyStreamClient:
         )
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def auto_claim_stream_message(
         self,
         stream_key: str,
@@ -269,7 +299,7 @@ class ValkeyStreamClient:
             messages=messages,
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def broadcast(
         self,
         channel: str,
@@ -285,7 +315,7 @@ class ValkeyStreamClient:
         message = dump_json(payload)
         await self._client.client.publish(message=message, channel=channel)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def broadcast_with_cache(
         self,
         channel: str,
@@ -311,7 +341,7 @@ class ValkeyStreamClient:
         )
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
@@ -328,7 +358,37 @@ class ValkeyStreamClient:
         payload = load_json(result)
         return cast(Mapping[str, str], payload)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
+    async def broadcast_batch(
+        self,
+        channel: str,
+        events: list[BroadcastPayload],
+        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+    ) -> None:
+        """
+        Broadcast multiple messages to a channel in a batch with optional caching.
+
+        :param channel: The channel to broadcast the messages to.
+        :param events: List of BroadcastPayload objects containing payload and optional cache_id.
+        :param timeout: The expiration time for the cached messages in seconds.
+        :raises: GlideClientError if the messages cannot be broadcasted or cached.
+        """
+        if not events:
+            return
+
+        tx = self._create_batch()
+        for event in events:
+            message = dump_json(event.payload)
+            # Only set cache if cache_id is provided
+            if event.cache_id:
+                tx.set(key=event.cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+            tx.publish(
+                message=message,
+                channel=channel,
+            )
+        await self._client.client.exec(tx, raise_on_error=True)
+
+    @valkey_stream_resilience.apply()
     async def receive_broadcast_message(
         self,
     ) -> Mapping[str, str]:
@@ -341,79 +401,11 @@ class ValkeyStreamClient:
         message = await self._client.client.get_pubsub_message()
         return load_json(message.message)
 
-    @valkey_decorator()
-    async def enqueue_container_logs(
-        self,
-        container_id: str,
-        logs: bytes,
-    ) -> None:
-        """
-        Enqueue logs for a specific container.
-        TODO: Replace with a more efficient log storage solution.
-
-        :param container_id: The ID of the container.
-        :param logs: The logs to enqueue.
-        :raises: GlideClientError if the logs cannot be enqueued.
-        """
-        key = self._container_log_key(container_id)
-        tx = self._create_batch()
-        tx.rpush(
-            key,
-            [logs],
-        )
-        tx.expire(
-            key,
-            3600,  # 1 hour expiration
-        )
-        await self._client.client.exec(tx, raise_on_error=True)
-
-    @valkey_decorator()
-    async def container_log_len(
-        self,
-        container_id: str,
-    ) -> int:
-        """
-        Get the length of logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :return: The number of logs for the container.
-        :raises: GlideClientError if the length cannot be retrieved.
-        """
-        key = self._container_log_key(container_id)
-        return await self._client.client.llen(key)
-
-    @valkey_decorator()
-    async def pop_container_logs(
-        self,
-        container_id: str,
-        count: int = 1,
-    ) -> Optional[list[bytes]]:
-        """
-        Pop logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :return: List of logs for the container.
-        :raises: GlideClientError if the logs cannot be popped.
-        """
-        key = self._container_log_key(container_id)
-        return await self._client.client.lpop_count(key, count)
-
-    @valkey_decorator()
-    async def clear_container_logs(
-        self,
-        container_id: str,
-    ) -> None:
-        """
-        Clear logs for a specific container.
-
-        :param container_id: The ID of the container.
-        :raises: GlideClientError if the logs cannot be cleared.
-        """
-        key = self._container_log_key(container_id)
-        await self._client.client.delete([key])
-
-    def _container_log_key(self, container_id: str) -> str:
-        return f"containerlog.{container_id}"
-
     def _create_batch(self, is_atomic: bool = False) -> Batch:
+        """
+        Create a batch object for batch operations.
+
+        :param is_atomic: Whether the batch should be atomic (transaction-like).
+        :return: A Batch object.
+        """
         return Batch(is_atomic=is_atomic)

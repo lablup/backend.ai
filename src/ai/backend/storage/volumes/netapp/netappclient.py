@@ -58,25 +58,23 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import enum
+import logging
 import uuid
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    List,
-    Mapping,
     NotRequired,
     Optional,
-    Sequence,
     TypeAlias,
     TypedDict,
 )
 
 import aiohttp
 
-from ...exception import ExternalError
-from ...types import QuotaConfig, QuotaUsage
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.errors import NetAppClientError, NetAppQTreeNotFoundError
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
@@ -122,8 +120,7 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
-class NetAppClientError(ExternalError):
-    pass
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class NetAppClient:
@@ -411,8 +408,7 @@ class NetAppClient:
                 )
                 qtree_info.update(record)
                 return qtree_info
-            else:
-                raise RuntimeError(f"No qtree {name} found in the volume {volume_id}")
+            raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
     async def create_qtree(
         self,
@@ -575,12 +571,24 @@ class NetAppClient:
                 raise NetAppClientError(
                     f"Quota report not found for the volume {volume_id} and the qtree {qtree_name}"
                 )
+            used_bytes = records[0]["space"]["used"]["total"]
+            limit_bytes = records[0]["space"]["hard_limit"]
+            if used_bytes < 0 or limit_bytes < 0:
+                log.warning(
+                    "Data from NetApp API negative values in used_bytes({}) or limit_bytes({}) for svm id {}, volume id {}, qtree name {}: response from NetApp API = {}",
+                    used_bytes,
+                    limit_bytes,
+                    svm_id,
+                    volume_id,
+                    qtree_name,
+                    data,
+                )
             return QuotaUsage(
-                used_bytes=records[0]["space"]["used"]["total"],
-                limit_bytes=records[0]["space"]["hard_limit"],
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
             )
 
-    async def get_qos_policies(self) -> List[Mapping[str, Any]]:
+    async def get_qos_policies(self) -> list[Mapping[str, Any]]:
         async with self.send_request(
             "get",
             "/api/storage/qos/policies",
@@ -600,7 +608,7 @@ class NetAppClient:
         ) as resp:
             data = await resp.json()
             fixed = data["fixed"]
-            qos_policy = {
+            return {
                 "uuid": data["uuid"],
                 "name": data["name"],
                 "fixed": {
@@ -612,7 +620,6 @@ class NetAppClient:
                 },
                 "svm": data["svm"],
             }
-            return qos_policy
 
     async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
         async with self.send_request(

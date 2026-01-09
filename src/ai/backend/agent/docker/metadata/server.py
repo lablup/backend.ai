@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Mapping, MutableMapping, Sequence
 from http import HTTPStatus
-from typing import Any, Iterable, List, Mapping, MutableMapping, cast
+from typing import Any, cast
 from uuid import UUID
 
 import attr
@@ -90,7 +91,7 @@ class MetadataServer(aobject):
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
-    loaded_apps: List[str]
+    loaded_apps: list[str]
 
     def __init__(
         self,
@@ -112,12 +113,12 @@ class MetadataServer(aobject):
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
-    async def __ainit__(self):
+    async def __ainit__(self) -> None:
         local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
-        metadata_plugin = ContainerMetadataPlugin({}, local_config)
+        metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
         self._init_subapp(
@@ -165,7 +166,7 @@ class MetadataServer(aobject):
         pkg_name: str,
         root_app: web.Application,
         subapp: web.Application,
-        global_middlewares: Iterable[Middleware],
+        global_middlewares: Sequence[Middleware],
         route_structure: Mapping[str, Any],
         is_extension: bool = True,
     ) -> None:
@@ -188,7 +189,7 @@ class MetadataServer(aobject):
         root_app.middlewares.extend(global_middlewares)
         self.loaded_apps.append(prefix)
 
-    async def load_metadata_plugins(self):
+    async def load_metadata_plugins(self) -> None:
         root_ctx = self.app["_root.context"]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
@@ -199,7 +200,7 @@ class MetadataServer(aobject):
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()
             self._init_subapp(plugin_name, self.app, subapp, global_middlewares, route_structure)
 
-    async def start_server(self):
+    async def start_server(self) -> None:
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
@@ -212,7 +213,7 @@ class MetadataServer(aobject):
         self.runner = metadata_server_runner
         await site.start()
 
-    async def cleanup(self):
+    async def cleanup(self) -> None:
         plugin_context = self.app["_root.context"].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()

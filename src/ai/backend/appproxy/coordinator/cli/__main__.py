@@ -1,28 +1,24 @@
-import asyncio
-import importlib
-import json
-import logging
-import subprocess
-import sys
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Optional
 
-import aiohttp_cors
 import click
-import tomli_w
-from aiohttp import web
-from setproctitle import setproctitle
 
-from ai.backend.appproxy.common.config import generate_example_json
-from ai.backend.appproxy.common.openapi import generate_openapi
-from ai.backend.appproxy.common.utils import ensure_json_serializable
-from ai.backend.cli.types import ExitCode
-from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.common.cli import LazyGroup
 
-from ..config import ServerConfig
 from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
+# LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
+_LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
+
+
+def _get_logger():
+    import logging
+
+    from ai.backend.logging import BraceStyleAdapter
+
+    return BraceStyleAdapter(logging.getLogger("ai.backend.appproxy.coordinator.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -46,24 +42,28 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.NOTSET,
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    default="NOTSET",
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     debug: bool,
-    log_level: LogLevel,
+    log_level: str,
     config_path: Optional[Path] = None,
 ) -> None:
     """
     Proxy Coordinator Administration CLI
     """
+    from setproctitle import setproctitle
+
+    from ai.backend.logging.types import LogLevel
+
     setproctitle("backend.ai: proxy-coordinator.cli")
     if debug:
-        log_level = LogLevel.DEBUG
-    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=log_level))
+        log_level = "DEBUG"
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=LogLevel(log_level)))
 
 
 @main.command()
@@ -78,6 +78,12 @@ def generate_example_configuration(output: Path) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Coordinator.
     """
+    import tomli_w
+
+    from ai.backend.appproxy.common.config import generate_example_json
+    from ai.backend.appproxy.common.utils import ensure_json_serializable
+    from ai.backend.appproxy.coordinator.config import ServerConfig
+
     if output == "-" or output is None:
         print(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
     else:
@@ -86,7 +92,13 @@ def generate_example_configuration(output: Path) -> None:
 
 
 async def _generate() -> dict[str, Any]:
-    from ..server import global_subapp_pkgs
+    import importlib
+
+    import aiohttp_cors
+    from aiohttp import web
+
+    from ai.backend.appproxy.common.openapi import generate_openapi
+    from ai.backend.appproxy.coordinator.server import global_subapp_pkgs
 
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(
@@ -114,6 +126,9 @@ def generate_openapi_spec(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
+    import asyncio
+    import json
+
     openapi = asyncio.run(_generate())
     if output == "-" or output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
@@ -161,6 +176,11 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
+    import subprocess
+    import sys
+
+    from ai.backend.cli.types import ExitCode
+
     db_config = cli_ctx.local_config.db
     if psql_help:
         psql_args = ["--help"]
@@ -200,7 +220,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         subprocess.run(cmd)
         return
     # Use the container to start the psql client command
-    log.info(f"using the db container {container_name} ...")
+    _get_logger().info(f"using the db container {container_name} ...")
     cmd = [
         "docker",
         "exec",
@@ -215,6 +235,26 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         *psql_args,
     ]
     subprocess.run(cmd)
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dependencies:cli")
+def dependencies():
+    """Command set for dependency verification and validation."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
+def health():
+    """Command set for health checking."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dbschema:cli")
+def schema():
+    """Command set for managing the database schema."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.config:cli")
+def config():
+    """Configuration management commands."""
 
 
 if __name__ == "__main__":

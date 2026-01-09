@@ -3,14 +3,15 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.file import (
+from ai.backend.manager.services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
     CreateUploadSessionActionResult,
     DeleteFilesAction,
     DeleteFilesActionResult,
+    DeleteFilesAsyncAction,
+    DeleteFilesAsyncActionResult,
     ListFilesAction,
     ListFilesActionResult,
     MkdirAction,
@@ -18,7 +19,7 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..services.file import VFolderFileService
+from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 
 
 class VFolderFileProcessors(AbstractProcessorPackage):
@@ -27,6 +28,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     rename_file: ActionProcessor[RenameFileAction, RenameFileActionResult]
     delete_files: ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
+    delete_files_async: ActionProcessor[DeleteFilesAsyncAction, DeleteFilesAsyncActionResult]
     mkdir: ActionProcessor[MkdirAction, MkdirActionResult]
 
     def __init__(self, service: VFolderFileService, action_monitors: list[ActionMonitor]) -> None:
@@ -35,6 +37,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
+        self.delete_files_async = ActionProcessor(service.delete_files_async, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
 
     @override
@@ -45,5 +48,6 @@ class VFolderFileProcessors(AbstractProcessorPackage):
             ListFilesAction.spec(),
             RenameFileAction.spec(),
             DeleteFilesAction.spec(),
+            DeleteFilesAsyncAction.spec(),
             MkdirAction.spec(),
         ]

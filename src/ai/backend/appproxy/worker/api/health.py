@@ -1,18 +1,29 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddleware
-
-from .. import __version__
-from ..types import RootContext
+from ai.backend.appproxy.worker import __version__
+from ai.backend.appproxy.worker.errors import MissingPortProxyConfigError
+from ai.backend.appproxy.worker.types import RootContext
 
 
 async def hello(request: web.Request) -> web.Response:
+    """Health check endpoint with dependency connectivity status"""
+    from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+
     request["do_not_print_access_log"] = True
 
-    return web.Response()
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="appproxy-worker",
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump_json())
 
 
 async def status(request: web.Request) -> web.Response:
@@ -26,7 +37,8 @@ async def status(request: web.Request) -> web.Response:
     if worker_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
         available_slots = 0
     else:
-        assert worker_config.port_proxy is not None
+        if worker_config.port_proxy is None:
+            raise MissingPortProxyConfigError("Port proxy configuration is required for PORT mode")
         available_slots = (
             worker_config.port_proxy.bind_port_range[1]
             - worker_config.port_proxy.bind_port_range[0]

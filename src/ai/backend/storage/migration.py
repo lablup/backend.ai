@@ -4,11 +4,12 @@ import enum
 import logging
 import os
 import re
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Optional, TypedDict
+from typing import Optional, TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -19,18 +20,23 @@ import tqdm
 import yarl
 
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
-from ai.backend.logging import BraceStyleAdapter, LocalLogger
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.types import AGENTID_STORAGE
+from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 
+from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
-from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context_types import ArtifactVerifierContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 
@@ -98,12 +104,12 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 
 async def upgrade_2_to_3(
     ctx: RootContext,
+    dsn: str,
     volume: AbstractVolume,
     outfile: str,
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
 ) -> None:
-    assert ctx.dsn is not None
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
     log.info("upgrading {} ...", volume.mount_path)
@@ -127,7 +133,7 @@ async def upgrade_2_to_3(
             folder_ids: list[UUID] = []
             old_quota_map: dict[UUID, Optional[int]] = {}
             quota_scope_map: dict[UUID, str] = {}
-            async with connect_database(ctx.dsn) as conn:
+            async with connect_database(dsn) as conn:
                 for target in target_chunk:
                     folder_id = path_to_uuid(target)
                     folder_ids.append(folder_id)
@@ -151,11 +157,7 @@ async def upgrade_2_to_3(
                     quota_scope_id = quota_scope_map[folder_id]
                 except KeyError:
                     continue
-                progbar.set_description(
-                    "inspecting contents of vfolder {}".format(
-                        folder_id,
-                    )
-                )
+                progbar.set_description(f"inspecting contents of vfolder {folder_id}")
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:
@@ -227,10 +229,11 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ):
     etcd = make_etcd(local_config)
-    redis_config = redis_config_iv.check(
+    raw_redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+    redis_config = RedisConfig.model_validate(raw_redis_config)
+    redis_profile_target = redis_config.to_redis_profile_target()
     node_id = local_config.storage_proxy.node_id
     redis_mq = await RedisQueue.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
@@ -253,29 +256,46 @@ async def check_and_upgrade(
         redis_mq,
         log_events=local_config.debug.log_events,
     )
+    # Create a dummy health probe for migration context (not started)
+    health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    # Create a dummy ManagerHTTPClientPool for migration context
+    manager_client_pool = ManagerHTTPClientPool(
+        registry_configs={},
+        client_config=local_config.reservoir_client,
+    )
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
         node_id=local_config.storage_proxy.node_id,
         local_config=local_config,
         etcd=etcd,
-        dsn=dsn,
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
+        volume_pool=None,  # type: ignore[arg-type]
+        storage_pool=None,  # type: ignore[arg-type]
+        background_task_manager=None,  # type: ignore[arg-type]
+        artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
+        metric_registry=CommonMetricRegistry(),
+        cors_options={},
+        manager_client_pool=manager_client_pool,
+        valkey_artifact_client=None,  # type: ignore[arg-type]
+        backends={**DEFAULT_BACKENDS},
+        volumes={},
+        health_probe=health_probe,
     )
 
-    async with ctx:
-        volumes_to_upgrade = await check_latest(ctx)
-        for upgrade_info in volumes_to_upgrade:
-            handler = upgrade_handlers[upgrade_info.target_version]
-            await handler(
-                ctx,
-                upgrade_info.volume,
-                outfile,
-                report_path=report_path,
-                force_scan_folder_size=force_scan_folder_size,
-            )
+    volumes_to_upgrade = await check_latest(ctx)
+    for upgrade_info in volumes_to_upgrade:
+        handler = upgrade_handlers[upgrade_info.target_version]
+        await handler(
+            ctx,
+            dsn,
+            upgrade_info.volume,
+            outfile,
+            report_path=report_path,
+            force_scan_folder_size=force_scan_folder_size,
+        )
 
 
 @click.command()
@@ -324,7 +344,13 @@ async def check_and_upgrade(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
+    help="Set the logging verbosity level",
 )
 def main(
     outfile: str,
@@ -332,13 +358,15 @@ def main(
     dsn: str,
     report_path: Optional[Path],
     force_scan_folder_size: bool,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
     Print migration script to OUTFILE.
     Pass - as OUTFILE to print results to STDOUT.
     """
-    local_config = load_local_config(config_path, debug=debug)
+    log_level = LogLevel.DEBUG if debug else log_level
+    local_config = load_local_config(config_path, log_level=log_level)
     with LocalLogger(local_config.logging):
         asyncio.run(
             check_and_upgrade(

@@ -14,7 +14,7 @@ def toml_get(filepath: str, key: str) -> str:
     if filepath == "-":
         file = sys.stdin
     else:
-        file = open(filepath, "r")
+        file = open(filepath)
     doc = tomlkit.load(file)
     keytree = key.split(".")
     keytree_traversed = keytree[:]
@@ -57,7 +57,7 @@ def toml_set(filepath: str, key: str, value: str) -> None:
         if filepath == "-":
             file = sys.stdin
         else:
-            file = open(filepath, "r")
+            file = open(filepath)
         doc = tomlkit.load(file)
         keytree = key.split(".")
         keytree_traversed = keytree[:-1]

@@ -1,0 +1,1912 @@
+from __future__ import annotations
+
+import enum
+import logging
+import os.path
+import uuid
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import PurePosixPath
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    NamedTuple,
+    Optional,
+    TypeAlias,
+    cast,
+    overload,
+    override,
+)
+
+import aiotools
+import sqlalchemy as sa
+import trafaret as t
+from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
+
+from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.types import (
+    MountPermission,
+    QuotaScopeID,
+    SessionId,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
+)
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderInvitationState,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
+from ai.backend.manager.defs import (
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+    VFOLDER_DSTPATHS_MAP,
+)
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.storage import (
+    InsufficientStoragePermission,
+    VFolderGone,
+    VFolderNotFound,
+    VFolderOperationFailed,
+    VFolderPermissionError,
+)
+from ai.backend.manager.models.base import (
+    GUID,
+    Base,
+    EnumValueType,
+    QuotaScopeIDType,
+    StrEnumType,
+    metadata,
+)
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    DomainScope,
+    ProjectScope,
+    ScopeType,
+    StorageHost,
+    get_predefined_roles_in_scope,
+)
+from ai.backend.manager.models.rbac import (
+    UserScope as UserRBACScope,
+)
+from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
+from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
+from ai.backend.manager.models.rbac.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
+from ai.backend.manager.models.storage import (
+    PermissionContextBuilder as StorageHostPermissionContextBuilder,
+)
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import (
+    ExtendedAsyncSAEngine,
+    execute_with_retry,
+    execute_with_txn_retry,
+    sql_json_merge,
+)
+from ai.backend.manager.types import UserScope
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.endpoint import EndpointRow
+    from ai.backend.manager.models.storage import StorageSessionManager
+
+__all__: Sequence[str] = (
+    "DEAD_VFOLDER_STATUSES",
+    "DEAD_VFOLDER_STATUSES",
+    "HARD_DELETED_VFOLDER_STATUSES",
+    "SOFT_DELETED_VFOLDER_STATUSES",
+    "VFolderCloneInfo",
+    "VFolderDeletionInfo",
+    "VFolderInvitationState",
+    "VFolderOperationStatus",
+    "VFolderOwnershipType",
+    "VFolderPermission",
+    "VFolderPermissionSetAlias",
+    "VFolderPermissionValidator",
+    "VFolderRow",
+    "VFolderStatusSet",
+    "ensure_host_permission_allowed",
+    "filter_host_allowed_permission",
+    "get_allowed_vfolder_hosts_by_group",
+    "get_allowed_vfolder_hosts_by_user",
+    "initiate_vfolder_deletion",
+    "prepare_vfolder_mounts",
+    "query_accessible_vfolders",
+    "update_vfolder_status",
+    "verify_vfolder_name",
+    "vfolder_invitations",
+    "vfolder_permissions",
+    "vfolder_status_map",
+    "vfolders",
+)
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _get_user_row_join_condition():
+    return UserRow.uuid == foreign(VFolderRow.user)
+
+
+def _get_group_row_join_condition():
+    return GroupRow.id == foreign(VFolderRow.group)
+
+
+class VFolderPermissionValidator(t.Trafaret):
+    def check_and_return(self, value: Any) -> VFolderPermission:
+        if value not in ["ro", "rw", "wd"]:
+            self._failure('one of "ro", "rw", or "wd" required', value=value)
+        return VFolderPermission(value)
+
+
+class VFolderStatusSet(enum.StrEnum):
+    """
+    Acts as an alias to represent set of VFolder statuses. Use this value as a key of
+    `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
+    """
+
+    ALL = "all"
+    """Represents VFolder in all state"""
+
+    READABLE = "readable"
+    """Represents VFolder in a normal (readable, mountable and clonable) state"""
+
+    MOUNTABLE = "mountable"
+    """Represents VFolder in a mountable state"""
+
+    UPDATABLE = "updatable"
+    """Represents VFolder in idle (not performing active clone or removal) state"""
+
+    DELETABLE = "deletable"
+    """Simillar with UPDATABLE but does not allow VFolder in MOUNTED state"""
+
+    PURGABLE = "purgable"
+    """Represents VFolder located in trash bin. The meaning of `purge` here is
+    completely different between our VFolder `/purge` API so be sure not to confuse.
+    That API will be renamed any soon in a more self-representitive way."""
+
+    RECOVERABLE = "recoverable"
+    """alias of VFolderStatusSet.PURGABLE"""
+
+    INACCESSIBLE = "inaccessible"
+    """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+
+vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.ALL: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.MOUNTABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.INACCESSIBLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+}
+
+
+class VFolderPermissionSetAlias(enum.Enum):
+    READABLE = {
+        VFolderPermission.READ_ONLY,
+        VFolderPermission.READ_WRITE,
+        VFolderPermission.RW_DELETE,
+    }
+    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
+    DELETABLE = {VFolderPermission.RW_DELETE}
+
+
+SOFT_DELETED_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_PENDING,
+    VFolderOperationStatus.DELETE_ONGOING,
+)
+
+HARD_DELETED_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_COMPLETE,
+    VFolderOperationStatus.DELETE_ERROR,
+)
+
+DEAD_VFOLDER_STATUSES = (
+    *SOFT_DELETED_VFOLDER_STATUSES,
+    *HARD_DELETED_VFOLDER_STATUSES,
+)
+
+
+class VFolderDeletionInfo(NamedTuple):
+    vfolder_id: VFolderID
+    host: str
+    unmanaged_path: Optional[str]
+
+
+class VFolderCloneInfo(NamedTuple):
+    source_vfolder_id: VFolderID
+    source_host: str
+    unmanaged_path: Optional[str]
+    domain_name: str
+
+    # Target Vfolder infos
+    target_quota_scope_id: str
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool
+
+
+class VFolderRow(Base):
+    __tablename__ = "vfolders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    # host will be '' if vFolder is unmanaged
+    host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
+    domain_name: Mapped[str] = mapped_column(
+        "domain_name", sa.String(length=64), nullable=False, index=True
+    )
+    quota_scope_id: Mapped[QuotaScopeID] = mapped_column(
+        "quota_scope_id", QuotaScopeIDType, nullable=False
+    )
+    name: Mapped[str] = mapped_column(
+        "name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True
+    )
+    usage_mode: Mapped[VFolderUsageMode] = mapped_column(
+        "usage_mode",
+        EnumValueType(VFolderUsageMode),
+        default=VFolderUsageMode.GENERAL,
+        nullable=False,
+        index=True,
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )  # legacy
+    max_files: Mapped[int | None] = mapped_column("max_files", sa.Integer(), default=1000)
+    max_size: Mapped[int | None] = mapped_column(
+        "max_size", sa.Integer(), default=None
+    )  # in MBytes
+    num_files: Mapped[int | None] = mapped_column("num_files", sa.Integer(), default=0)
+    cur_size: Mapped[int | None] = mapped_column("cur_size", sa.Integer(), default=0)  # in KBytes
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    last_used: Mapped[datetime | None] = mapped_column(
+        "last_used", sa.DateTime(timezone=True), nullable=True
+    )
+    # creator is always set to the user who created vfolder (regardless user/project types)
+    creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
+    # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
+    unmanaged_path: Mapped[str | None] = mapped_column(
+        "unmanaged_path", sa.String(length=512), nullable=True
+    )
+    ownership_type: Mapped[VFolderOwnershipType] = mapped_column(
+        "ownership_type",
+        EnumValueType(VFolderOwnershipType),
+        default=VFolderOwnershipType.USER,
+        nullable=False,
+        index=True,
+    )
+    user: Mapped[uuid.UUID | None] = mapped_column(
+        "user", GUID, nullable=True
+    )  # owner if user vfolder
+    group: Mapped[uuid.UUID | None] = mapped_column(
+        "group", GUID, nullable=True
+    )  # owner if project vfolder
+    cloneable: Mapped[bool] = mapped_column("cloneable", sa.Boolean, default=False, nullable=False)
+    status: Mapped[VFolderOperationStatus] = mapped_column(
+        "status",
+        StrEnumType(VFolderOperationStatus),
+        default=VFolderOperationStatus.READY,
+        server_default=VFolderOperationStatus.READY,
+        nullable=False,
+        index=True,
+    )
+    # status_history records the most recent status changes for each status
+    # e.g)
+    # {
+    #   "ready": "2022-10-22T10:22:30",
+    #   "delete-pending": "2022-10-22T11:40:30",
+    #   "delete-ongoing": "2022-10-25T10:22:30"
+    # }
+    status_history: Mapped[dict | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    status_changed: Mapped[datetime | None] = mapped_column(
+        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
+    )
+
+    # Relationships
+    endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
+    user_row: Mapped[UserRow | None] = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin=_get_user_row_join_condition,
+    )
+    group_row: Mapped[GroupRow | None] = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin=_get_group_row_join_condition,
+    )
+    permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
+        "VFolderPermissionRow", back_populates="vfolder_row"
+    )
+    invitation_rows: Mapped[list[VFolderInvitationRow]] = relationship(
+        "VFolderInvitationRow", back_populates="vfolder_row"
+    )
+
+    @classmethod
+    async def get(
+        cls,
+        session: SASession,
+        id: uuid.UUID,
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
+        query = sa.select(VFolderRow).where(VFolderRow.id == id)
+        if load_user:
+            query = query.options(selectinload(VFolderRow.user_row))
+        if load_group:
+            query = query.options(selectinload(VFolderRow.group_row))
+
+        result = await session.scalar(query)
+        if not result:
+            raise ObjectNotFound(object_name="VFolder")
+        return result
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.__dir__()
+
+    def __getitem__(self, item: str) -> Any:
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
+
+    @property
+    def vfid(self) -> VFolderID:
+        return VFolderID(self.quota_scope_id, self.id)
+
+    def to_data(self) -> VFolderData:
+        return VFolderData(
+            id=self.id,
+            name=self.name,
+            domain_name=self.domain_name,
+            quota_scope_id=self.quota_scope_id,
+            usage_mode=self.usage_mode,
+            permission=self.permission,
+            host=self.host,
+            max_files=self.max_files or 0,
+            max_size=self.max_size,
+            num_files=self.num_files or 0,
+            cur_size=self.cur_size or 0,
+            created_at=self.created_at or datetime.now(UTC),
+            last_used=self.last_used,
+            creator=self.creator,
+            unmanaged_path=self.unmanaged_path,
+            ownership_type=self.ownership_type,
+            user=self.user,
+            group=self.group,
+            cloneable=self.cloneable,
+            status=self.status,
+        )
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderRow class directly for new code.
+vfolders = VFolderRow.__table__
+
+
+vfolder_attachment = sa.Table(
+    "vfolder_attachment",
+    metadata,
+    sa.Column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column(
+        "kernel",
+        GUID,
+        sa.ForeignKey("kernels.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.PrimaryKeyConstraint("vfolder", "kernel"),
+)
+
+
+class VFolderInvitationRow(Base):
+    __tablename__ = "vfolder_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    inviter: Mapped[str | None] = mapped_column("inviter", sa.String(length=256))  # email
+    invitee: Mapped[str] = mapped_column("invitee", sa.String(length=256), nullable=False)  # email
+    state: Mapped[VFolderInvitationState | None] = mapped_column(
+        "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
+        "modified_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+        onupdate=sa.func.current_timestamp(),
+    )
+    vfolder: Mapped[uuid.UUID] = mapped_column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="invitation_rows")
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderInvitationRow class directly for new code.
+vfolder_invitations = VFolderInvitationRow.__table__
+
+
+class VFolderPermissionRow(Base):
+    __tablename__ = "vfolder_permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    vfolder: Mapped[uuid.UUID] = mapped_column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user: Mapped[uuid.UUID] = mapped_column(
+        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    )
+
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="permission_rows")
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderPermissionRow class directly for new code.
+vfolder_permissions = VFolderPermissionRow.__table__
+
+
+def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
+    return (unmanaged_path is not None) and unmanaged_path != ""
+
+
+def verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True
+
+
+async def query_accessible_vfolders(
+    conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    # when enabled, skip vfolder ownership check if user role is admin or superadmin
+    allow_privileged_access=False,
+    user_role=None,
+    domain_name=None,
+    allowed_vfolder_types=None,
+    extra_vf_conds=None,
+    extra_invited_vf_conds=None,
+    extra_vf_user_conds=None,
+    extra_vf_group_conds=None,
+    allowed_status_set: VFolderStatusSet | None = None,
+) -> Sequence[Mapping[str, Any]]:
+    from ai.backend.manager.models.group import association_groups_users as agus
+    from ai.backend.manager.models.group import groups
+    from ai.backend.manager.models.user import users
+
+    if allowed_vfolder_types is None:
+        allowed_vfolder_types = ["user"]  # legacy default
+
+    vfolders_selectors = [
+        vfolders.c.name,
+        vfolders.c.id,
+        vfolders.c.host,
+        vfolders.c.quota_scope_id,
+        vfolders.c.domain_name,
+        vfolders.c.usage_mode,
+        vfolders.c.created_at,
+        vfolders.c.last_used,
+        vfolders.c.max_files,
+        vfolders.c.max_size,
+        vfolders.c.ownership_type,
+        vfolders.c.user,
+        vfolders.c.group,
+        vfolders.c.creator,
+        vfolders.c.unmanaged_path,
+        vfolders.c.cloneable,
+        vfolders.c.status,
+        vfolders.c.cur_size,
+        # vfolders.c.permission,
+        # users.c.email,
+    ]
+
+    async def _append_entries(_query, _is_owner=True):
+        if extra_vf_conds is not None:
+            _query = _query.where(extra_vf_conds)
+        if extra_vf_user_conds is not None:
+            _query = _query.where(extra_vf_user_conds)
+        result = await conn.execute(_query)
+        for row in result:
+            row_keys = row._mapping.keys()
+            _perm = (
+                row.vfolder_permissions_permission
+                if "vfolder_permissions_permission" in row_keys
+                else row.vfolders_permission
+            )
+            entries.append({
+                "name": row.vfolders_name,
+                "id": row.vfolders_id,
+                "host": row.vfolders_host,
+                "quota_scope_id": row.vfolders_quota_scope_id,
+                "domain_name": row.vfolders_domain_name,
+                "usage_mode": row.vfolders_usage_mode,
+                "created_at": row.vfolders_created_at,
+                "last_used": row.vfolders_last_used,
+                "max_size": row.vfolders_max_size,
+                "max_files": row.vfolders_max_files,
+                "ownership_type": row.vfolders_ownership_type,
+                "user": str(row.vfolders_user) if row.vfolders_user else None,
+                "group": str(row.vfolders_group) if row.vfolders_group else None,
+                "creator": row.vfolders_creator,
+                "user_email": row.users_email if "users_email" in row_keys else None,
+                "group_name": row.groups_name if "groups_name" in row_keys else None,
+                "is_owner": _is_owner,
+                "permission": _perm,
+                "unmanaged_path": row.vfolders_unmanaged_path,
+                "cloneable": row.vfolders_cloneable,
+                "status": row.vfolders_status,
+                "cur_size": row.vfolders_cur_size,
+            })
+
+    entries: list[dict] = []
+    # User vfolders.
+    if "user" in allowed_vfolder_types:
+        # Scan vfolders on requester's behalf.
+        j = vfolders.join(users, vfolders.c.user == users.c.uuid)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, users.c.email)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
+        if not allow_privileged_access or user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            query = query.where(vfolders.c.user == user_uuid)
+        await _append_entries(query)
+
+        # Scan vfolders shared with requester.
+        j = vfolders.join(
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+            isouter=True,
+        ).join(
+            users,
+            vfolders.c.user == users.c.uuid,
+            isouter=True,
+        )
+        query = (
+            sa.select(*vfolders_selectors, vfolder_permissions.c.permission, users.c.email)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+            .where(
+                (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+            )
+        )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
+        if extra_invited_vf_conds is not None:
+            query = query.where(extra_invited_vf_conds)
+        await _append_entries(query, _is_owner=False)
+
+    if "group" in allowed_vfolder_types:
+        # Scan group vfolders.
+        if user_role == UserRole.ADMIN or user_role == "admin":
+            query = (
+                sa.select(groups.c.id)
+                .select_from(groups)
+                .where(groups.c.domain_name == domain_name)
+            )
+            result = await conn.execute(query)
+            grps = result.fetchall()
+            group_ids = [g.id for g in grps]
+        else:
+            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
+            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
+            result = await conn.execute(query)
+            grps = result.fetchall()
+            group_ids = [g.group_id for g in grps]
+        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
+        if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
+            query = query.where(vfolders.c.group.in_(group_ids))
+        if extra_vf_group_conds is not None:
+            query = query.where(extra_vf_group_conds)
+        is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
+            user_role == UserRole.SUPERADMIN or user_role == "superadmin"
+        )
+        await _append_entries(query, is_owner)
+
+        # Override permissions, if exists, for group vfolders.
+        j = sa.join(
+            vfolders,
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+        )
+        query = (
+            sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
+            .select_from(j)
+            .where((vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid))
+        )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
+        if extra_vf_conds is not None:
+            query = query.where(extra_vf_conds)
+        if extra_vf_user_conds is not None:
+            query = query.where(extra_vf_user_conds)
+        result = await conn.execute(query)
+        overriding_permissions: dict = {row.vfolder: row.permission for row in result}
+        for entry in entries:
+            if (
+                entry["id"] in overriding_permissions
+                and entry["ownership_type"] == VFolderOwnershipType.GROUP
+            ):
+                entry["permission"] = overriding_permissions[entry["id"]]
+
+    return entries
+
+
+async def get_allowed_vfolder_hosts_by_group(
+    conn: SAConnection,
+    resource_policy,
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    """
+    Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
+
+    If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
+    If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
+    """
+    from ai.backend.manager.models.domain import domains
+    from ai.backend.manager.models.group import groups
+
+    # Domain's allowed_vfolder_hosts.
+    allowed_hosts = VFolderHostPermissionMap()
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
+        (domains.c.name == domain_name) & (domains.c.is_active),
+    )
+    if values := await conn.scalar(query):
+        allowed_hosts = allowed_hosts | values
+    # Group's allowed_vfolder_hosts.
+    if group_id is not None:
+        query = sa.select(groups.c.allowed_vfolder_hosts).where(
+            (groups.c.domain_name == domain_name)
+            & (groups.c.id == group_id)
+            & (groups.c.is_active),
+        )
+        if values := await conn.scalar(query):
+            allowed_hosts = allowed_hosts | values
+    # Keypair Resource Policy's allowed_vfolder_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+
+
+async def get_allowed_vfolder_hosts_by_user(
+    conn: SAConnection,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    user_uuid: uuid.UUID,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    """
+    Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
+
+    All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
+    """
+    from ai.backend.manager.models.domain import domains
+    from ai.backend.manager.models.group import association_groups_users, groups
+
+    # Domain's allowed_vfolder_hosts.
+    allowed_hosts = VFolderHostPermissionMap()
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
+        (domains.c.name == domain_name) & (domains.c.is_active),
+    )
+    if values := await conn.scalar(query):
+        allowed_hosts = allowed_hosts | values
+    # User's Groups' allowed_vfolder_hosts.
+    if group_id is not None:
+        j = groups.join(
+            association_groups_users,
+            (
+                (groups.c.id == association_groups_users.c.group_id)
+                & (groups.c.id == group_id)
+                & (association_groups_users.c.user_id == user_uuid)
+            ),
+        )
+    else:
+        j = groups.join(
+            association_groups_users,
+            (
+                (groups.c.id == association_groups_users.c.group_id)
+                & (association_groups_users.c.user_id == user_uuid)
+            ),
+        )
+    query = (
+        sa.select(groups.c.allowed_vfolder_hosts)
+        .select_from(j)
+        .where(
+            (groups.c.domain_name == domain_name) & (groups.c.is_active),
+        )
+    )
+    if rows := (await conn.execute(query)).fetchall():
+        for row in rows:
+            allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
+    # Keypair Resource Policy's allowed_vfolder_hosts
+    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+
+
+@overload
+def check_overlapping_mounts(mounts: Iterable[str]) -> None:
+    pass
+
+
+@overload
+def check_overlapping_mounts(mounts: Iterable[PurePosixPath]) -> None:
+    pass
+
+
+def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) -> None:
+    for p1 in mounts:
+        for p2 in mounts:
+            _p1 = PurePosixPath(p1)
+            _p2 = PurePosixPath(p2)
+            if _p1 == _p2:
+                continue
+            if _p1.is_relative_to(_p2):
+                raise InvalidAPIParameters(
+                    f"VFolder path '{_p1}' overlaps with '{_p2}'",
+                )
+
+
+async def prepare_vfolder_mounts(
+    conn: SAConnection,
+    storage_manager: StorageSessionManager,
+    allowed_vfolder_types: Sequence[str],
+    user_scope: UserScope,
+    resource_policy: Mapping[str, Any],
+    requested_mount_references: Sequence[str | uuid.UUID],
+    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
+    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
+) -> Sequence[VFolderMount]:
+    """
+    Determine the actual mount information from the requested vfolder lists,
+    vfolder configurations, and the given user scope.
+    """
+    # TODO: Refactor the whole function:
+    # - Replace 'requested_mount_references', 'requested_mount_reference_map' and 'requested_mount_reference_options' with one mapping parameter.
+    # - DO NOT validate value of subdirectories here.
+    requested_mounts: list[str] = [
+        name for name in requested_mount_references if isinstance(name, str)
+    ]
+    requested_mount_name_map: dict[str, str] = {
+        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+    requested_mount_map: dict[uuid.UUID, str] = {
+        vfolder_uuid: path
+        for vfolder_uuid, path in requested_mount_reference_map.items()
+        if isinstance(vfolder_uuid, uuid.UUID)
+    }
+    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
+        name: options
+        for name, options in requested_mount_reference_options.items()
+        if isinstance(name, str)
+    }
+
+    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_ids: set[uuid.UUID] = set()
+    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
+    matched_vfolder_mounts: list[VFolderMount] = []
+    _already_resolved: set[str] = set()
+
+    # Split the vfolder name and subpaths
+    for key in requested_mount_references:
+        if isinstance(key, uuid.UUID):
+            requested_vfolder_ids.add(key)
+            continue
+        name, _, subpath = key.partition("/")
+        if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
+            raise InvalidAPIParameters(
+                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
+            )
+        requested_vfolder_names[key] = name
+        requested_vfolder_subpaths[key] = os.path.normpath(subpath)
+        _already_resolved.add(name)
+    for vfolder_uuid, value in requested_mount_map.items():
+        requested_vfolder_subpaths[vfolder_uuid] = "."
+        requested_vfolder_dstpaths[vfolder_uuid] = value
+    for key, value in requested_mount_name_map.items():
+        requested_vfolder_dstpaths[key] = value
+
+    # Check if there are overlapping mount sources
+    for p1 in requested_mounts:
+        for p2 in requested_mounts:
+            if p1 == p2:
+                continue
+            if PurePosixPath(p1).is_relative_to(PurePosixPath(p2)):
+                raise InvalidAPIParameters(
+                    f"VFolder source path '{p1}' overlaps with '{p2}'",
+                )
+
+    # Query the accessible vfolders that satisfy either:
+    # - the name matches with the requested vfolder name, or
+    # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
+    extra_vf_conds = vfolders.c.name.startswith(".")
+    if requested_vfolder_names:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
+        )
+    if requested_mount_map:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds,
+            VFolderRow.id.in_(requested_mount_map.keys()),
+        )
+    if requested_vfolder_ids:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds,
+            VFolderRow.id.in_(requested_vfolder_ids),
+        )
+    extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
+    accessible_vfolders = await query_accessible_vfolders(
+        conn,
+        user_scope.user_uuid,
+        user_role=user_scope.user_role,
+        domain_name=user_scope.domain_name,
+        allowed_vfolder_types=allowed_vfolder_types,
+        extra_vf_conds=extra_vf_conds,
+    )
+
+    # Fast-path for empty requested mounts
+    if not accessible_vfolders:
+        if requested_vfolder_names:
+            raise VFolderNotFound("There is no accessible vfolders at all.")
+        return []
+
+    requested_names = set(requested_vfolder_names.values())
+    for row in accessible_vfolders:
+        vfid = row["id"]
+        name = row["name"]
+        if vfid in requested_vfolder_ids:
+            requested_vfolder_names[vfid] = name
+            requested_vfolder_subpaths[vfid] = "."
+        if name in _already_resolved:
+            continue
+        if name not in requested_names:
+            requested_vfolder_names[vfid] = name
+        requested_mounts.append(name)
+        if path := requested_mount_reference_map.get(vfid):
+            requested_mount_name_map[name] = path
+        if options := requested_mount_reference_options.get(vfid):
+            requested_mount_options[name] = options
+            requested_mount_options[vfid] = options
+
+    # Check if there are overlapping mount sources
+    check_overlapping_mounts(requested_mounts)
+
+    # add automount folder list into requested_vfolder_names
+    # and requested_vfolder_subpath
+    for _vfolder in accessible_vfolders:
+        if _vfolder["name"].startswith("."):
+            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
+            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
+
+    # for vfolder in accessible_vfolders:
+    accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
+    for requested_key, vfolder_name in requested_vfolder_names.items():
+        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
+            raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        try:
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder["host"],
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_scope.user_uuid,
+                resource_policy=resource_policy,
+                domain_name=user_scope.domain_name,
+                group_id=user_scope.group_id,
+                permission=VFolderHostPermission.MOUNT_IN_SESSION,
+            )
+        except InsufficientStoragePermission as e:
+            if vfolder["name"].startswith("."):
+                log.warning(
+                    "Skipping auto-mount VFolder '{}' due to insufficient permission",
+                    vfolder["name"],
+                )
+                continue
+            raise InsufficientStoragePermission(
+                f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
+                e.extra_data,
+            ) from e
+        if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(".")
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
+            if kernel_path_raw is None:
+                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+            else:
+                kernel_path = PurePosixPath(kernel_path_raw)
+            matched_vfolder_mounts.append(
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=PurePosixPath(unmanaged_path),
+                    kernel_path=kernel_path,
+                    mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
+                )
+            )
+            continue
+        if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
+            # User's accessible group vfolders should not be mounted
+            # if they do not belong to the execution kernel.
+            continue
+        try:
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            mount_path_result = await manager_client.get_mount_path(
+                volume_name,
+                str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
+                str(PurePosixPath(requested_vfolder_subpaths[requested_key])),
+            )
+            mount_base_path = PurePosixPath(mount_path_result["path"])
+        except VFolderOperationFailed as e:
+            raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
+        if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
+            requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
+        if vfolder["name"] == ".local" and vfolder["group"] is not None:
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
+            # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.mkdir(
+                volume=volume_name,
+                vfid=str(vfid),
+                relpath=[vfsubpath.as_posix()],
+                exist_ok=True,
+            )
+            # Mount the per-user subdirectory as the ".local" vfolder.
+            matched_vfolder_mounts.append(
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
+                    host_path=mount_base_path / user_scope.user_uuid.hex,
+                    kernel_path=PurePosixPath("/home/work/.local"),
+                    mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
+                )
+            )
+        else:
+            # Normal vfolders
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(requested_vfolder_subpaths[requested_key])
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
+            if kernel_path_raw is None:
+                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+            else:
+                kernel_path = PurePosixPath(kernel_path_raw)
+                if not kernel_path.is_absolute():
+                    kernel_path = PurePosixPath("/home/work", kernel_path_raw)
+            match requested_perm := requested_mount_options.get(requested_key, {}).get(
+                "permission"
+            ):
+                case MountPermission.READ_ONLY:
+                    mount_perm = MountPermission.READ_ONLY
+                case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
+                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                        raise VFolderPermissionError(
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"but attempted with '{requested_perm.value}' mode."
+                        )
+                    mount_perm = requested_perm
+                case _:  # None if unset
+                    mount_perm = vfolder["permission"]
+            matched_vfolder_mounts.append(
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=mount_base_path / vfsubpath,
+                    kernel_path=kernel_path,
+                    mount_perm=mount_perm,
+                    usage_mode=vfolder["usage_mode"],
+                )
+            )
+
+    # Check if there are overlapping mount targets
+    check_overlapping_mounts([trgt.kernel_path for trgt in matched_vfolder_mounts])
+
+    return matched_vfolder_mounts
+
+
+async def update_vfolder_status(
+    engine: ExtendedAsyncSAEngine,
+    vfolder_ids: Sequence[uuid.UUID],
+    update_status: VFolderOperationStatus,
+    do_log: bool = True,
+    force: bool = False,
+) -> None:
+    vfolder_info_len = len(vfolder_ids)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return
+    if vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    now = datetime.now(UTC)
+
+    if update_status.is_deletable(force):
+        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+        async with engine.begin_readonly_session() as db_session:
+            for vf_row in await db_session.scalars(select_stmt):
+                vf_row = cast(VFolderRow, vf_row)
+                mount_sessions = await get_sessions_by_mounted_folder(
+                    db_session, VFolderID.from_row(vf_row)
+                )
+                if mount_sessions:
+                    session_ids = [str(s) for s in mount_sessions]
+                    raise InvalidAPIParameters(
+                        f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
+                    )
+
+    if update_status == VFolderOperationStatus.DELETE_ERROR:
+        folder_ids: list[uuid.UUID] = []
+        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+        async with engine.begin_readonly_session() as db_session:
+            for vf_row in await db_session.scalars(select_stmt):
+                vf_row = cast(VFolderRow, vf_row)
+                if vf_row.status == VFolderOperationStatus.DELETE_PENDING:
+                    folder_ids.append(vf_row.id)
+        cond = VFolderRow.id.in_(folder_ids)
+
+    async def _update() -> None:
+        async with engine.begin_session() as db_session:
+            values = {
+                "status": update_status,
+                "status_changed": now,
+                "status_history": sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        update_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if update_status == VFolderOperationStatus.DELETE_ONGOING:
+                values["name"] = VFolderRow.name + f"_deleted_{now.strftime('%Y-%m-%dT%H%M%S%z')}"
+            query = sa.update(vfolders).values(**values).where(cond)
+            await db_session.execute(query)
+
+    await execute_with_retry(_update)
+    if do_log:
+        log.debug(
+            "Successfully updated status of VFolder(s) {} to {}",
+            [str(x) for x in vfolder_ids],
+            update_status.name,
+        )
+
+
+async def ensure_host_permission_allowed(
+    db_conn,
+    folder_host: str,
+    *,
+    permission: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> None:
+    from ai.backend.manager.models.storage import StorageSessionManager
+
+    if StorageSessionManager.is_noop_host(folder_host):
+        return
+    allowed_hosts = await filter_host_allowed_permission(
+        db_conn,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        group_id=group_id,
+    )
+    if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+        raise InsufficientStoragePermission(
+            f"`{permission}` Not allowed in vfolder host(`{folder_host}`)"
+        )
+
+
+async def filter_host_allowed_permission(
+    db_conn,
+    *,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    allowed_hosts = VFolderHostPermissionMap()
+    if "user" in allowed_vfolder_types:
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            db_conn, resource_policy, domain_name, user_uuid, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+    if "group" in allowed_vfolder_types and group_id is not None:
+        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+    return allowed_hosts
+
+
+async def _delete_vfolder_permission_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderInvitationRow).where(VFolderInvitationRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def _delete_vfolder_invitation_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderPermissionRow).where(VFolderPermissionRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def delete_vfolder_relation_rows(
+    db_conn: SAConnection,
+    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    async def _delete(db_session: SASession) -> None:
+        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
+        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
+
+    await execute_with_txn_retry(_delete, begin_session, db_conn)
+
+
+async def initiate_vfolder_deletion(
+    db_engine: ExtendedAsyncSAEngine,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    storage_manager: StorageSessionManager,
+    storage_ptask_group: Optional[aiotools.PersistentTaskGroup] = None,
+    *,
+    force: bool = False,
+) -> int:
+    """Purges VFolder content from storage host."""
+    vfolder_info_len = len(requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
+    if vfolder_info_len == 0:
+        return 0
+
+    async with db_engine.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
+    await update_vfolder_status(
+        db_engine,
+        vfolder_ids,
+        VFolderOperationStatus.DELETE_ONGOING,
+        do_log=False,
+        force=force,
+    )
+
+    already_deleted: list[VFolderDeletionInfo] = []
+
+    for vfolder_info in requested_vfolders:
+        folder_id, host_name, unmanaged_path = vfolder_info
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(
+            host_name, is_unmanaged(unmanaged_path)
+        )
+        try:
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.delete_folder(volume_name, str(folder_id))
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if e.status == 410:
+                already_deleted.append(vfolder_info)
+        except VFolderGone:
+            already_deleted.append(vfolder_info)
+    if already_deleted:
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
+
+        await update_vfolder_status(
+            db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+        )
+        log.info("vfolders already deleted {}", [str(x) for x in vfolder_ids])
+
+    log.info("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+
+    return vfolder_info_len
+
+
+async def ensure_quota_scope_accessible_by_user(
+    conn: SASession,
+    quota_scope: QuotaScopeID,
+    user: Mapping[str, Any],
+) -> None:
+    from ai.backend.manager.models.group import association_groups_users as agus
+
+    # Lookup user table to match if quota is scoped to the user
+    query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
+    quota_scope_user: Optional[UserRow] = await conn.scalar(query)
+    if quota_scope_user:
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN:
+                if quota_scope_user.domain_name == user["domain_name"]:
+                    return
+            case _:
+                if quota_scope_user.uuid == user["uuid"]:
+                    return
+        raise InvalidAPIParameters
+
+    # Lookup group table to match if quota is scoped to the group
+    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
+    quota_scope_group: Optional[GroupRow] = await conn.scalar(query)
+    if quota_scope_group:
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN:
+                if quota_scope_group.domain_name == user["domain_name"]:
+                    return
+            case _:
+                query = (
+                    sa.select(agus.c.group_id)
+                    .select_from(agus)
+                    .where(
+                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
+                    )
+                )
+                matched_group_id = await conn.scalar(query)
+                if matched_group_id:
+                    return
+
+    raise InvalidAPIParameters
+
+
+async def get_sessions_by_mounted_folder(
+    db_session: SASession, vfolder_id: VFolderID
+) -> tuple[SessionId, ...]:
+    """
+    Return a tuple of sessions.id that the give folder is mounted on.
+    """
+
+    select_stmt = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.status.not_in(DEAD_SESSION_STATUSES))
+            & SessionRow.vfolder_mounts.contains([{"vfid": str(vfolder_id)}])
+        )
+        .options(load_only(SessionRow.id))
+    )
+
+    session_rows = (await db_session.scalars(select_stmt)).all()
+    return tuple([session.id for session in session_rows])
+
+
+# Note: GraphQL classes (VirtualFolder, VirtualFolderList, VirtualFolderPermission,
+# VirtualFolderPermissionList, QuotaDetails, QuotaScope, QuotaScopeInput, SetQuotaScope,
+# UnsetQuotaScope) have been moved to api/gql_legacy/vfolder.py
+
+# RBAC
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+# TypeAlias is deprecated since 3.12 but mypy does not follow up yet
+
+OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    perm for perm in VFolderRBACPermission
+])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
+MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE,
+])
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.READ_CONTENT,
+    VFolderRBACPermission.WRITE_CONTENT,
+    VFolderRBACPermission.DELETE_CONTENT,
+    VFolderRBACPermission.MOUNT_RO,
+    VFolderRBACPermission.MOUNT_RW,
+    VFolderRBACPermission.MOUNT_WD,
+])
+MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
+
+# TODO: Change type of `vfolder_permissions.permission` to VFolderRBACPermission
+LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
+    VFolderPermission, frozenset[VFolderRBACPermission]
+] = {
+    VFolderPermission.READ_ONLY: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
+    ]),
+    VFolderPermission.READ_WRITE: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.UPDATE_ATTRIBUTE,
+        VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.WRITE_CONTENT,
+        VFolderRBACPermission.DELETE_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
+        VFolderRBACPermission.MOUNT_RW,
+    ]),
+    VFolderPermission.RW_DELETE: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.UPDATE_ATTRIBUTE,
+        VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.WRITE_CONTENT,
+        VFolderRBACPermission.DELETE_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
+        VFolderRBACPermission.MOUNT_RW,
+        VFolderRBACPermission.MOUNT_WD,
+    ]),
+    VFolderPermission.OWNER_PERM: frozenset(OWNER_PERMISSIONS),
+}
+
+_VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
+    VFolderRBACPermission, StorageHostPermission
+] = {
+    VFolderRBACPermission.CLONE: StorageHostPermission.CLONE,
+    VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS: StorageHostPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    VFolderRBACPermission.READ_ATTRIBUTE: StorageHostPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE: StorageHostPermission.UPDATE_ATTRIBUTE,
+    VFolderRBACPermission.DELETE_VFOLDER: StorageHostPermission.DELETE_VFOLDER,
+    VFolderRBACPermission.READ_CONTENT: StorageHostPermission.READ_CONTENT,
+    VFolderRBACPermission.WRITE_CONTENT: StorageHostPermission.WRITE_CONTENT,
+    VFolderRBACPermission.DELETE_CONTENT: StorageHostPermission.DELETE_CONTENT,
+    VFolderRBACPermission.MOUNT_RO: StorageHostPermission.MOUNT_RO,
+    VFolderRBACPermission.MOUNT_RW: StorageHostPermission.MOUNT_RW,
+    VFolderRBACPermission.MOUNT_WD: StorageHostPermission.MOUNT_WD,
+}
+
+_STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
+    StorageHostPermission, VFolderRBACPermission
+] = {
+    StorageHostPermission.CLONE: VFolderRBACPermission.CLONE,
+    StorageHostPermission.ASSIGN_PERMISSION_TO_OTHERS: VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS,
+    StorageHostPermission.READ_ATTRIBUTE: VFolderRBACPermission.READ_ATTRIBUTE,
+    StorageHostPermission.UPDATE_ATTRIBUTE: VFolderRBACPermission.UPDATE_ATTRIBUTE,
+    StorageHostPermission.DELETE_VFOLDER: VFolderRBACPermission.DELETE_VFOLDER,
+    StorageHostPermission.READ_CONTENT: VFolderRBACPermission.READ_CONTENT,
+    StorageHostPermission.WRITE_CONTENT: VFolderRBACPermission.WRITE_CONTENT,
+    StorageHostPermission.DELETE_CONTENT: VFolderRBACPermission.DELETE_CONTENT,
+    StorageHostPermission.MOUNT_RO: VFolderRBACPermission.MOUNT_RO,
+    StorageHostPermission.MOUNT_RW: VFolderRBACPermission.MOUNT_RW,
+    StorageHostPermission.MOUNT_WD: VFolderRBACPermission.MOUNT_WD,
+}
+
+
+# RBAC
+@dataclass
+class VFolderPermissionContext(
+    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]
+):
+    host_permission_ctx: StorageHostPermissionContext | None = None
+
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.user_id_to_permission_map:
+            cond = _OR_coalesce(cond, VFolderRow.user.in_(self.user_id_to_permission_map.keys()))
+        if self.project_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.group.in_(self.project_id_to_permission_map.keys())
+            )
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, VFolderRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+
+        if self.host_permission_ctx is not None:
+            if cond is not None:
+                host_names = self.host_permission_ctx.host_to_permissions_map.keys()
+                cond = cond & VFolderRow.host.in_(host_names)
+        return cond
+
+    def apply_host_permission_ctx(self, host_permission_ctx: StorageHostPermissionContext) -> None:
+        self.host_permission_ctx = host_permission_ctx
+
+    async def build_query(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(VFolderRow).where(cond)
+
+    async def calculate_final_permission(
+        self, rbac_obj: VFolderRow
+    ) -> frozenset[VFolderRBACPermission]:
+        vfolder_row = rbac_obj
+        vfolder_id = cast(uuid.UUID, vfolder_row.id)
+        permissions: set[VFolderRBACPermission] = set()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(vfolder_id)
+        ) is not None:
+            permissions = set(overriding_perm)
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
+            if vfolder_row.user is not None:
+                permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
+            if vfolder_row.group is not None:
+                permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
+            permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
+
+        if self.host_permission_ctx is not None:
+            host_permission_map = self.host_permission_ctx.host_to_permissions_map
+            host_perms = host_permission_map.get(vfolder_row.host)
+            if host_perms is not None:
+                permissions &= {
+                    _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP[perm]
+                    for perm in host_perms
+                    if perm in _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP
+                }
+
+        match vfolder_row.permission:
+            case (
+                VFolderPermission.OWNER_PERM
+                | VFolderPermission.RW_DELETE
+                | VFolderPermission.READ_WRITE
+            ):
+                pass
+            case VFolderPermission.READ_ONLY:
+                permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
+        return frozenset(permissions)
+
+
+class VFolderPermissionContextBuilder(
+    AbstractPermissionContextBuilder[VFolderRBACPermission, VFolderPermissionContext]
+):
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[VFolderRBACPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        return await self._calculate_permission_by_predefined_roles(roles)
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
+    ) -> VFolderPermissionContext:
+        from ai.backend.manager.models.domain import DomainRow
+
+        perm_ctx = VFolderPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
+            ctx, ctx.user_id, scope.domain_name
+        )
+        permission_ctx.merge(_user_perm_ctx)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
+        permission_ctx.merge(_project_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserRBACScope
+    ) -> VFolderPermissionContext:
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
+
+    async def _build_at_domain_scope_non_recursively(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> VFolderPermissionContext:
+        domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
+        return VFolderPermissionContext(
+            domain_name_to_permission_map={domain_name: domain_permissions}
+        )
+
+    async def _build_at_project_scopes_in_domain(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> VFolderPermissionContext:
+        result = VFolderPermissionContext()
+
+        j = sa.join(
+            GroupRow,
+            AssocGroupUserRow,
+            GroupRow.id == AssocGroupUserRow.group_id,
+        )
+        _project_stmt = (
+            sa.select(GroupRow)
+            .select_from(j)
+            .where(
+                sa.and_(
+                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
+                )
+            )
+            .options(load_only(GroupRow.id))
+        )
+        for row in await self.db_session.scalars(_project_stmt):
+            _row = cast(GroupRow, row)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
+            result.merge(_project_perm_ctx)
+        return result
+
+    async def _build_at_user_scope_in_domain(
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+        domain_name: str,
+    ) -> VFolderPermissionContext:
+        # For Superadmin and monitor who can create vfolders in multiple different domains.
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
+
+        _vfolder_stmt = (
+            sa.select(VFolderRow)
+            .where((VFolderRow.user == user_id) & (VFolderRow.domain_name == domain_name))
+            .options(load_only(VFolderRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = VFolderPermissionContext(object_id_to_additional_permission_map=own_folder_map)
+
+        _stmt = (
+            sa.select(VFolderPermissionRow)
+            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+            .where(
+                (VFolderPermissionRow.user == ctx.user_id)
+                & (
+                    VFolderRow.ownership_type == VFolderOwnershipType.USER
+                )  # filter out user vfolders
+                & (VFolderRow.domain_name == domain_name)
+            )
+        )
+        object_id_to_permission_map = {
+            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+            for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
+        }
+        if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            ctx_to_merge = VFolderPermissionContext(
+                object_id_to_additional_permission_map=object_id_to_permission_map
+            )
+        else:
+            ctx_to_merge = VFolderPermissionContext(
+                object_id_to_overriding_permission_map=object_id_to_permission_map
+            )
+        result.merge(ctx_to_merge)
+        return result
+
+    async def _build_at_project_scope_non_recursively(
+        self,
+        ctx: ClientContext,
+        project_id: uuid.UUID,
+    ) -> VFolderPermissionContext:
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
+        result = VFolderPermissionContext(project_id_to_permission_map={project_id: permissions})
+
+        _stmt = (
+            sa.select(VFolderPermissionRow)
+            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+            .where(
+                (VFolderPermissionRow.user == ctx.user_id)
+                & (
+                    VFolderRow.ownership_type == VFolderOwnershipType.GROUP
+                )  # filter out user vfolders
+            )
+        )
+        object_id_to_permission_map = {
+            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+            for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
+        }
+        if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            result.object_id_to_additional_permission_map = object_id_to_permission_map
+        else:
+            result.object_id_to_overriding_permission_map = object_id_to_permission_map
+        return result
+
+    async def _build_at_user_scope_non_recursively(
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+    ) -> VFolderPermissionContext:
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+        result = VFolderPermissionContext(user_id_to_permission_map={user_id: permissions})
+
+        _stmt = (
+            sa.select(VFolderPermissionRow)
+            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
+            .where(
+                (VFolderPermissionRow.user == ctx.user_id)
+                & (
+                    VFolderRow.ownership_type == VFolderOwnershipType.USER
+                )  # filter out user vfolders
+            )
+        )
+        object_id_to_permission_map = {
+            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
+            for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
+        }
+        if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            result.object_id_to_additional_permission_map = object_id_to_permission_map
+        else:
+            result.object_id_to_overriding_permission_map = object_id_to_permission_map
+        return result
+
+    @override
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[VFolderRBACPermission]:
+        return OWNER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[VFolderRBACPermission]:
+        return ADMIN_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[VFolderRBACPermission]:
+        return MONITOR_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[VFolderRBACPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[VFolderRBACPermission]:
+        return MEMBER_PERMISSIONS
+
+
+class VFolderWithPermissionSet(NamedTuple):
+    vfolder_row: VFolderRow
+    permissions: frozenset[VFolderRBACPermission]
+
+
+async def get_vfolders(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: ScopeType,
+    requested_permission: VFolderRBACPermission,
+    extra_scope: StorageHost | None = None,
+    *,
+    vfolder_id: uuid.UUID | None = None,
+    vfolder_name: str | None = None,
+    usage_mode: VFolderUsageMode | None = None,
+    allowed_status: Iterable[VFolderOperationStatus] | None = None,
+    blocked_status: Iterable[VFolderOperationStatus] | None = None,
+) -> list[VFolderWithPermissionSet]:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+            ctx, target_scope, host_permission
+        )
+        builder = VFolderPermissionContextBuilder(db_session)
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+        permission_ctx.apply_host_permission_ctx(host_permission_ctx)
+
+        query_stmt = await permission_ctx.build_query()
+        if query_stmt is None:
+            return []
+        if vfolder_id is not None:
+            query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
+        if vfolder_name is not None:
+            query_stmt = query_stmt.where(VFolderRow.name == vfolder_name)
+        if usage_mode is not None:
+            query_stmt = query_stmt.where(VFolderRow.usage_mode == usage_mode)
+        if allowed_status is not None:
+            query_stmt = query_stmt.where(VFolderRow.status.in_(allowed_status))
+        if blocked_status is not None:
+            query_stmt = query_stmt.where(VFolderRow.status.not_in(blocked_status))
+
+        result: list[VFolderWithPermissionSet] = []
+        for row in await db_session.scalars(query_stmt):
+            row = cast(VFolderRow, row)
+            permissions = await permission_ctx.calculate_final_permission(row)
+            result.append(VFolderWithPermissionSet(row, permissions))
+        return result
+
+
+async def validate_permission(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: ScopeType,
+    *,
+    permission: VFolderRBACPermission,
+    vfolder_id: uuid.UUID,
+) -> None:
+    vfolders = await get_vfolders(
+        db_conn,
+        ctx,
+        target_scope,
+        permission,
+        vfolder_id=vfolder_id,
+    )
+    if not vfolders:
+        raise NotEnoughPermission(f"'{permission.name}' not allowed in {target_scope!s}")
+
+
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: ScopeType,
+    requested_permission: VFolderRBACPermission,
+) -> VFolderPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = VFolderPermissionContextBuilder(db_session)
+        return await builder.build(ctx, target_scope, requested_permission)
+        # TODO: Plan how to check storage host permission with recursive scopes
+        # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+        #     ctx, target_scope, host_permission
+        # )
+        # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
+
+
+def is_mount_duplicate(
+    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
+) -> bool:
+    for mount in mounts:
+        if mount.vfid != folder_id:
+            continue
+        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
+            return True
+    return False

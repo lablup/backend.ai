@@ -2,13 +2,15 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.group.actions.base import GroupAction
-from ai.backend.manager.services.group.types import GroupCreator, GroupData
 
 
 @dataclass
 class CreateGroupAction(GroupAction):
-    input: GroupCreator
+    creator: Creator[GroupRow]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -23,7 +25,6 @@ class CreateGroupAction(GroupAction):
 @dataclass
 class CreateGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
-    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

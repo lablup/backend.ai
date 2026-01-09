@@ -8,13 +8,12 @@ import functools
 import json
 import logging
 import re
+from collections.abc import Iterable
 from decimal import Decimal
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Tuple,
 )
 
 import aiohttp_cors
@@ -23,7 +22,9 @@ import yarl
 from aiohttp import web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
@@ -45,7 +46,6 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 
-from ..errors.api import InvalidAPIParameters
 from .auth import auth_required, superadmin_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -120,16 +120,24 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
     )
 
+    # Convert ResourceSlot objects to JSON for API response
+    scaling_groups_json = {}
+    for sgname, sg_data in result.scaling_groups.items():
+        scaling_groups_json[sgname] = {
+            ResourceSlotState.OCCUPIED: sg_data[ResourceSlotState.OCCUPIED].to_json(),
+            ResourceSlotState.AVAILABLE: sg_data[ResourceSlotState.AVAILABLE].to_json(),
+        }
+
     resp = {
         "presets": result.presets,
-        "keypair_limits": result.keypair_limits,
-        "keypair_using": result.keypair_using,
-        "keypair_remaining": result.keypair_remaining,
-        "group_limits": result.group_limits,
-        "group_using": result.group_using,
-        "group_remaining": result.group_remaining,
-        "scaling_group_remaining": result.scaling_group_remaining,
-        "scaling_groups": result.scaling_groups,
+        "keypair_limits": result.keypair_limits.to_json(),
+        "keypair_using": result.keypair_using.to_json(),
+        "keypair_remaining": result.keypair_remaining.to_json(),
+        "group_limits": result.group_limits.to_json(),
+        "group_using": result.group_using.to_json(),
+        "group_remaining": result.group_remaining.to_json(),
+        "scaling_group_remaining": result.scaling_group_remaining.to_json(),
+        "scaling_groups": scaling_groups_json,
     }
 
     return web.json_response(resp, status=HTTPStatus.OK)
@@ -292,12 +300,7 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
         GetWatcherStatusAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -315,12 +318,7 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
         WatcherAgentStartAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -338,12 +336,7 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
         WatcherAgentStopAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -363,12 +356,7 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
         )
     )
 
-    if result.resp.status == HTTPStatus.OK:
-        data = await result.resp.json()
-        return web.json_response(data, status=result.resp.status)
-    else:
-        data = await result.resp.text()
-        return web.Response(text=data, status=result.resp.status)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -389,7 +377,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
     app["prefix"] = "resource"

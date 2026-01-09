@@ -1,17 +1,23 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
 from stat import S_IFDIR, S_IFLNK
 from subprocess import CalledProcessError
-from typing import AsyncIterator
 
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.storage.errors import (
+    PureStorageCommandFailedError,
+    SubprocessStdoutNotAvailableError,
+)
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import DirEntry, DirEntryType, Stat, TreeUsage
+from ai.backend.storage.utils import fstime2datetime
 
-from ...subproc import run
-from ...types import DirEntry, DirEntryType, Stat, TreeUsage
-from ...utils import fstime2datetime
 from .rapidfiles import RapidFileToolsFSOpModel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -29,7 +35,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
         if dst_path.is_dir():
             extra_opts.append(b"-T")
         try:
-            await run([  # noqa: F821
+            await run([
                 b"pcopy",
                 *extra_opts,
                 b"-p",
@@ -38,7 +44,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 os.fsencode(dst_path),
             ])
         except CalledProcessError as e:
-            raise RuntimeError(f'"pcopy" command failed: {e.stderr}')
+            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}')
 
     def scan_tree(
         self,
@@ -56,7 +62,8 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise SubprocessStdoutNotAvailableError("pls process stdout is not available")
             try:
                 while True:
                     line = await proc.stdout.readline()
@@ -106,7 +113,8 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStdoutNotAvailableError("pdu process stdout is not available")
         try:
             # TODO: check slowdowns when there are millions of files
             while True:

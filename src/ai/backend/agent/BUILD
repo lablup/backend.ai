@@ -1,35 +1,24 @@
 python_sources(
     name="src",
-    sources=[
-        "*.py",
-        # FIXME: remove watcher.py from agent artifact after we settle down
-        # binary-based agent watcher deployments
-        # "!watcher.py",
-    ],
+    sources=["**/*.py", "!watcher/**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/agent/docker:src",  # not auto-inferred
-        "src/ai/backend/agent/dummy:src",  # not auto-inferred
-        "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
-        "src/ai/backend/agent/config:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
-        "!./__init__.py:src-watcher",
     ],
 )
+
 python_sources(
     name="src-watcher",
-    sources=[
-        "__init__.py",
-        "watcher.py",
-    ],
+    sources=["watcher/**/*.py"],
     dependencies=[
+        "src/ai/backend/cli:src",  # not auto-inferred
+        "src/ai/backend/runner:src",
+        "src/ai/backend/helpers:src",
+        "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
-        # Exclude transitive dependencies of the agent itself!
-        "!./__init__.py:src",
     ],
 )
 
@@ -53,6 +42,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        ":src-watcher",
         "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],
@@ -64,7 +54,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "ag": "ai.backend.agent.cli.__main__:main",
-            "ag.start-server": "ai.backend.agent.server:main",
+            "ag.start-server": "ai.backend.agent.cli.start_server:main",
         },
         "backendai_network_agent_v1": {
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
@@ -92,7 +82,6 @@ pex_binary(
         ":buildscript",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
-        "!!./__init__.py:src-watcher",
     ],
 )
 
@@ -104,27 +93,28 @@ pex_binary(
         ":buildscript",
         "!!stubs/trafaret:stubs",
         *_common_pex_dependencies,
-        "!!./__init__.py:src-watcher",
     ],
 )
 
 pex_binary(
     name="backendai-agent-watcher",
-    **common_scie_config("lazy", entry_point="watcher.py"),
+    **common_scie_config("lazy", entry_point="watcher/__main__.py"),
     dependencies=[
         ":src-watcher",
+        ":buildscript",
+        ":resources",
         "!!stubs/trafaret:stubs",
-        "!!./__init__.py:src",
     ],
 )
 
 pex_binary(
     name="backendai-agent-watcher-fat",
-    **common_scie_config("eager", entry_point="watcher.py"),
+    **common_scie_config("eager", entry_point="watcher/__main__.py"),
     dependencies=[
         ":src-watcher",
+        ":buildscript",
+        ":resources",
         "!!stubs/trafaret:stubs",
-        "!!./__init__.py:src",
     ],
 )
 
@@ -153,5 +143,8 @@ resources(
     ],
     sources=[
         "py.typed",
+        "docker/*.tar.gz",
+        "docker/*.txt",
+        "docker/*.bin",
     ],
 )

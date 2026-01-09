@@ -4,13 +4,14 @@ from asyncio import subprocess
 
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
 from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.logging import BraceStyleAdapter
 
-from .abc import H2Frontend
+from .base import H2Frontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -58,7 +59,8 @@ class PortFrontend(H2Frontend[int]):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            assert proc.stdout and proc.stderr
+            if not proc.stdout or not proc.stderr:
+                raise SubprocessPipeError("Subprocess stdout or stderr is not available")
             self.processes.append(proc)
             self.log_monitor_tasks.append(
                 asyncio.create_task(self._log_monitor_task(proc.stdout, f"stdout #{listen_port}"))
@@ -90,7 +92,7 @@ class PortFrontend(H2Frontend[int]):
         return await self.update_backend(backend, routes)
 
     async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.kernel_host, r.kernel_port) for r in routes]
+        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
         await backend.update_config(backend_configs)
         return backend
 
@@ -98,5 +100,8 @@ class PortFrontend(H2Frontend[int]):
         await backend.update_config([])
 
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port

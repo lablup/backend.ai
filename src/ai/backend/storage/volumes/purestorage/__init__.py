@@ -4,20 +4,24 @@ import asyncio
 import contextlib
 import logging
 import re
-from typing import FrozenSet
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
-
-from ...types import CapacityUsage, FSPerfMetric
-from ..abc import (
+from ai.backend.storage.errors import (
+    MetricNotFoundError,
+    PureStorageCommandFailedError,
+    VolumeNotInitializedError,
+)
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SCAN,
     CAP_METRIC,
     CAP_VFOLDER,
     AbstractFSOpModel,
 )
-from ..vfs import BaseVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
+
 from .purity import PurityClient
 from .rapidfiles import RapidFileToolsFSOpModel
 from .rapidfiles_v2 import RapidFileToolsv2FSOpModel
@@ -43,11 +47,10 @@ class FlashBladeVolume(BaseVolume):
                 self.mount_path,
                 self.local_config["storage-proxy"]["scandir-limit"],
             )
-        else:
-            return RapidFileToolsFSOpModel(
-                self.mount_path,
-                self.local_config["storage-proxy"]["scandir-limit"],
-            )
+        return RapidFileToolsFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def get_toolkit_version(self) -> int:
         if self._toolkit_version is not None:
@@ -79,15 +82,16 @@ class FlashBladeVolume(BaseVolume):
                     self._toolkit_version = -1
         finally:
             await proc.wait()
-            assert self._toolkit_version
+            if not self._toolkit_version:
+                raise VolumeNotInitializedError("Failed to detect FlashBlade Toolkit version")
             return self._toolkit_version
 
     async def init(self) -> None:
         toolkit_version = await self.get_toolkit_version()
         if toolkit_version == -1:
-            raise RuntimeError(
+            raise PureStorageCommandFailedError(
                 "PureStorage RapidFile Toolkit is not installed. "
-                "You cannot use the PureStorage backend for the stroage proxy.",
+                "You cannot use the PureStorage backend for the storage proxy."
             )
         self.purity_client = PurityClient(
             self.config["purity_endpoint"],
@@ -99,7 +103,7 @@ class FlashBladeVolume(BaseVolume):
     async def shutdown(self) -> None:
         await self.purity_client.aclose()
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset(
             [
                 CAP_FAST_FS_SIZE,
@@ -129,20 +133,22 @@ class FlashBladeVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        async with self.purity_client as client:
-            async with contextlib.aclosing(
+        async with (
+            self.purity_client as client,
+            contextlib.aclosing(
                 client.get_nfs_metric(self.config["purity_fs_name"]),
-            ) as items:
-                async for item in items:
-                    return FSPerfMetric(
-                        iops_read=item["reads_per_sec"],
-                        iops_write=item["writes_per_sec"],
-                        io_bytes_read=item["read_bytes_per_sec"],
-                        io_bytes_write=item["write_bytes_per_sec"],
-                        io_usec_read=item["usec_per_read_op"],
-                        io_usec_write=item["usec_per_write_op"],
-                    )
-                else:
-                    raise RuntimeError(
-                        "no metric found for the configured flashblade filesystem",
-                    )
+            ) as items,
+        ):
+            async for item in items:
+                return FSPerfMetric(
+                    iops_read=item["reads_per_sec"],
+                    iops_write=item["writes_per_sec"],
+                    io_bytes_read=item["read_bytes_per_sec"],
+                    io_bytes_write=item["write_bytes_per_sec"],
+                    io_usec_read=item["usec_per_read_op"],
+                    io_usec_write=item["usec_per_write_op"],
+                )
+            else:
+                raise MetricNotFoundError(
+                    "no metric found for the configured flashblade filesystem",
+                )

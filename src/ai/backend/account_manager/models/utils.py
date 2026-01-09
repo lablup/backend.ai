@@ -1,19 +1,15 @@
-import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
     ParamSpec,
     TypeVar,
     cast,
 )
-from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
 from sqlalchemy.engine import create_engine as _create_engine
@@ -21,7 +17,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -30,11 +26,11 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from yarl import URL
 
+from ai.backend.account_manager.config import ServerConfig
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.logging import BraceStyleAdapter
-
-from ..config import ServerConfig
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -57,8 +53,8 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -135,9 +131,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -156,9 +151,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
-                    yield sess
+            async with self.connect() as _conn, _begin_session(_conn) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -200,9 +194,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                             raise TryAgain
                         raise
         except RetryError:
-            raise asyncio.TimeoutError(
-                f"DB serialization failed after {max_attempts} retry transactions"
-            )
+            raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
         return result
 
 
@@ -225,23 +217,27 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    username = local_config.db.user
-    password = local_config.db.password
-    address = local_config.db.addr
-    dbname = local_config.db.name
-    url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
+    db_url = (
+        URL(f"postgresql+asyncpg://{local_config.db.addr.host}/{local_config.db.name}")
+        .with_port(local_config.db.addr.port)
+        .with_user(local_config.db.user)
+    )
+    if local_config.db.password is not None:
+        db_url = db_url.with_password(local_config.db.password)
 
-    version_check_db = create_async_engine(url)
+    version_check_db = create_async_engine(str(db_url))
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
+        if version_str is None:
+            raise RuntimeError("Failed to get PostgreSQL version")
         major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
 
     db = create_async_engine(
-        url,
+        str(db_url),
         connect_args=pgsql_connect_opts,
         pool_size=local_config.db.pool_size,
         pool_recycle=local_config.db.pool_recycle,

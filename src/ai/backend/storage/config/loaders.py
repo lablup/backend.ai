@@ -3,17 +3,19 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from pprint import pformat
 
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair as CommonHostPortPair
+from ai.backend.logging import LogLevel
 
 from .unified import StorageProxyUnifiedConfig
 
 
-def load_local_config(config_path: Path | None, debug: bool = False) -> StorageProxyUnifiedConfig:
+def load_local_config(
+    config_path: Path | None,
+    log_level: LogLevel = LogLevel.NOTSET,
+) -> StorageProxyUnifiedConfig:
     """Load and validate the storage-proxy local configuration."""
     # Determine where to read configuration
     raw_cfg, cfg_src_path = read_from_file(config_path, "storage-proxy")
@@ -25,18 +27,18 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> StorageP
     override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
 
-    if debug:
-        override_key(raw_cfg, ("debug", "enabled"), True)
+    override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        override_key(raw_cfg, ("logging", "level"), log_level)
+        override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     try:
-        local_config = StorageProxyUnifiedConfig.model_validate(raw_cfg)
-        return local_config
+        return StorageProxyUnifiedConfig.model_validate(raw_cfg)
     except Exception as e:
         print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
+            f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
             file=sys.stderr,
         )
-        print(pformat(raw_cfg), file=sys.stderr)
         raise BaseConfigError(raw_cfg) from e
 
 
@@ -54,14 +56,10 @@ def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
         ConfigScopes.NODE: f"nodes/storage/{local_config.storage_proxy.node_id}",
     }
 
-    # Convert to common HostPortPair
-    addr = local_config.etcd.addr
-    common_addr = CommonHostPortPair(host=addr.host, port=addr.port)
-
-    etcd = AsyncEtcd(
-        common_addr,
+    etcd_config_data = local_config.etcd.to_dataclass()
+    return AsyncEtcd(
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
     )
-    return etcd

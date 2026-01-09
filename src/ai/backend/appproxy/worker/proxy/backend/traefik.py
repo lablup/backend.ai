@@ -1,10 +1,10 @@
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.types import Circuit, RootContext
 
-from ...types import Circuit, RootContext
-from .abc import AbstractBackend
+from .base import BaseBackend
 
 
-class TraefikBackend(AbstractBackend):
+class TraefikBackend(BaseBackend):
     worker_circuit: Circuit
 
     def __init__(self, context: RootContext, circuit: Circuit, routes: list[RouteInfo]) -> None:

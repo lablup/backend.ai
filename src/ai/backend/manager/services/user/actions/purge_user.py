@@ -25,7 +25,5 @@ class PurgeUserAction(UserAction):
 
 @dataclass
 class PurgeUserActionResult(BaseActionResult):
-    success: bool
-
     def entity_id(self) -> Optional[str]:
         return None

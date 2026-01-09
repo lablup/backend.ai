@@ -1,9 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "./configs:src",
-        "./fixtures:src",
     ],
 )
 
@@ -80,11 +79,13 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        "./configs:templates",
-        "./fixtures:resources",
     ],
     sources=[
         "**/py.typed",
         "app.tcss",
+        "configs/**/*.toml",
+        "configs/**/*.yaml",
+        "configs/**/*.json",
+        "fixtures/**/*.json",
     ],
 )

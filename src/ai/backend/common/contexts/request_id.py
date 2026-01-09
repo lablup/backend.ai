@@ -1,7 +1,8 @@
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator, Optional
+from typing import Optional
 
 _request_id_var: ContextVar[str] = ContextVar("request_id")
 

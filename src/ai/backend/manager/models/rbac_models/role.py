@@ -4,121 +4,126 @@ import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
-    Self,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    mapped_column,
     relationship,
 )
 
 from ai.backend.manager.data.permission.role import (
-    RoleCreateInput,
     RoleData,
-    RoleDataWithPermissions,
+    RoleDetailData,
 )
 from ai.backend.manager.data.permission.status import (
-    PermissionStatus,
     RoleStatus,
 )
-
-from ..base import (
+from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
 if TYPE_CHECKING:
-    from .object_permission import ObjectPermissionRow
-    from .scope_permission import ScopePermissionRow
+    from .permission.object_permission import ObjectPermissionRow
+    from .permission.permission_group import PermissionGroupRow
     from .user_role import UserRoleRow
+
+
+def _get_mapped_user_role_rows_join_condition():
+    from .user_role import UserRoleRow
+
+    return RoleRow.id == foreign(UserRoleRow.role_id)
+
+
+def _get_object_permission_rows_join_condition():
+    from .permission.object_permission import ObjectPermissionRow
+
+    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
+
+
+def _get_permission_group_rows_join_condition():
+    from .permission.permission_group import PermissionGroupRow
+
+    return RoleRow.id == foreign(PermissionGroupRow.role_id)
 
 
 class RoleRow(Base):
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
-    id: uuid.UUID = IDColumn()
-    name: str = sa.Column("name", sa.String(64), nullable=False)
-    description: Optional[str] = sa.Column("description", sa.Text, nullable=True)
-    status: RoleStatus = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    source: Mapped[RoleSource] = mapped_column(
+        "source",
+        StrEnumType(RoleSource, length=16),
+        nullable=False,
+        default=RoleSource.SYSTEM,
+        server_default=str(RoleSource.SYSTEM),
+    )
+    status: Mapped[RoleStatus] = mapped_column(
         "status",
         StrEnumType(RoleStatus),
         nullable=False,
         default=RoleStatus.ACTIVE,
         server_default=RoleStatus.ACTIVE,
     )
-    created_at: datetime = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: Optional[datetime] = sa.Column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         "updated_at", sa.DateTime(timezone=True), nullable=True
     )
-    deleted_at: Optional[datetime] = sa.Column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
 
-    mapped_user_role_rows: list[UserRoleRow] = relationship(
+    mapped_user_role_rows: Mapped[list[UserRoleRow]] = relationship(
         "UserRoleRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
+        primaryjoin=_get_mapped_user_role_rows_join_condition,
     )
-    scope_permission_rows: list[ScopePermissionRow] = relationship(
-        "ScopePermissionRow",
-        back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(ScopePermissionRow.role_id)",
-    )
-    object_permission_rows: list[ObjectPermissionRow] = relationship(
+    object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
         "ObjectPermissionRow",
         back_populates="role_row",
-        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+        primaryjoin=_get_object_permission_rows_join_condition,
+    )
+    permission_group_rows: Mapped[list[PermissionGroupRow]] = relationship(
+        "PermissionGroupRow",
+        back_populates="role_row",
+        primaryjoin=_get_permission_group_rows_join_condition,
     )
 
     def to_data(self) -> RoleData:
         return RoleData(
             id=self.id,
             name=self.name,
+            source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
 
-    def to_data_with_permissions(
-        self, active_permission_only: bool = True
-    ) -> RoleDataWithPermissions:
-        if active_permission_only:
-            scope_permissions = [
-                sp.to_data_with_entity()
-                for sp in self.scope_permission_rows
-                if sp.status == PermissionStatus.ACTIVE
-            ]
-            object_permissions = [
-                op.to_data()
-                for op in self.object_permission_rows
-                if op.status == PermissionStatus.ACTIVE
-            ]
-        else:
-            scope_permissions = [sp.to_data_with_entity() for sp in self.scope_permission_rows]
-            object_permissions = [op.to_data() for op in self.object_permission_rows]
-        return RoleDataWithPermissions(
+    def to_detail_data_without_users(self) -> RoleDetailData:
+        """Convert to detail data without assigned users."""
+        return RoleDetailData(
             id=self.id,
             name=self.name,
+            source=self.source,
             status=self.status,
-            scope_permissions=scope_permissions,
-            object_permissions=object_permissions,
             created_at=self.created_at,
-            updated_at=self.updated_at,
+            updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
-        )
-
-    @classmethod
-    def from_input(cls, data: RoleCreateInput) -> Self:
-        return cls(
-            name=data.name,
-            status=data.status,
-            description=data.description,
+            permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
+            object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

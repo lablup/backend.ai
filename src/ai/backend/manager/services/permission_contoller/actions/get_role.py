@@ -4,7 +4,6 @@ from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
-from ai.backend.manager.services.permission_contoller.types import RoleData
 
 
 @dataclass
@@ -24,8 +23,6 @@ class GetRoleAction(RoleAction):
 
 @dataclass
 class GetRoleActionResult(BaseActionResult):
-    role: RoleData
-
     @override
     def entity_id(self) -> Optional[str]:
         return None

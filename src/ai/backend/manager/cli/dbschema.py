@@ -7,20 +7,9 @@ import sys
 from typing import TYPE_CHECKING, TypedDict
 
 import click
-from alembic import command
-from alembic.config import Config
-from alembic.runtime.environment import EnvironmentContext
-from alembic.runtime.migration import MigrationContext, MigrationStep
-from alembic.script import Script, ScriptDirectory
-from sqlalchemy.engine import Connection, Engine
 
-from ai.backend.common.json import load_json, pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager import __version__
-
-from ..models.alembic import invoked_programmatically
-from ..models.base import metadata
-from ..models.utils import create_async_engine
+from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -58,6 +47,13 @@ def cli(args) -> None:
 @click.pass_obj
 def show(cli_ctx: CLIContext, alembic_config) -> None:
     """Show the current schema information."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection
+
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -76,7 +72,8 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    assert sa_url is not None
+    if sa_url is None:
+        raise ConfigurationLoadFailed("sqlalchemy.url is not configured in alembic config")
     sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
     asyncio.run(_show(sa_url))
 
@@ -100,6 +97,11 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
 @click.pass_obj
 def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     """Dump current alembic history in a serialiazable format."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    from ai.backend.common.json import pretty_json_str
+    from ai.backend.manager import __version__
 
     alembic_cfg = Config(alembic_config)
     script = ScriptDirectory.from_config(alembic_cfg)
@@ -149,11 +151,18 @@ def apply_missing_revisions(
     Compare current alembic revision paths with the given serialized
     alembic revision history and try to execute every missing revisions.
     """
+    from alembic.config import Config
+    from alembic.runtime.environment import EnvironmentContext
+    from alembic.runtime.migration import MigrationStep
+    from alembic.script import Script, ScriptDirectory
+
+    from ai.backend.common.json import load_json
+
     with importlib.resources.as_file(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
         try:
-            with open(f / f"{previous_version}.json", "r") as fr:
+            with open(f / f"{previous_version}.json") as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
@@ -210,6 +219,17 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection, Engine
+
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+    from ai.backend.manager.models.utils import create_async_engine
+
+    ensure_all_tables_registered()
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -220,7 +240,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
-        head_rev = script.get_heads()[0]
+        heads = script.get_heads()
+        if not heads:
+            log.warning("No alembic migration heads found, skipping version stamping")
+            return
+        head_rev = heads[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 
@@ -255,6 +279,7 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    assert sa_url is not None
+    if sa_url is None:
+        raise ConfigurationLoadFailed("sqlalchemy.url is not configured in alembic config")
     sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
     asyncio.run(_oneshot(sa_url))

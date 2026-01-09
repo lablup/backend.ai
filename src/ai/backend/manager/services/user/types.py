@@ -13,8 +13,7 @@ class NoUserUpdateError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/no-update-error"
     error_title = "No update user fields provided."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.UPDATE,

@@ -1,18 +1,15 @@
 import sys
 import uuid
-from typing import Sequence
+from collections.abc import Sequence
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-
-from ...func.group import _default_detail_fields, _default_list_fields
-from ...session import Session
-from ..extensions import pass_ctx_obj
-from ..pretty import print_info
-from ..types import CLIContext
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_info
+from ai.backend.client.cli.types import CLIContext
 
 # from ai.backend.client.output.fields import group_fields
 from . import admin
@@ -42,6 +39,9 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
     \b
     id_or_name: Group ID (UUID) or name.
     """
+    from ai.backend.client.func.group import _default_detail_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             gid = uuid.UUID(id_or_name)
@@ -74,6 +74,9 @@ def list(ctx: CLIContext, domain_name) -> None:
     List groups in the given domain.
     (admin privilege required)
     """
+    from ai.backend.client.func.group import _default_list_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.Group.list(domain_name=domain_name)
@@ -118,6 +121,8 @@ def add(
     DOMAIN_NAME: Name of the domain where new group belongs to.
     NAME: Name of new group.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Group.create(
@@ -203,6 +208,8 @@ def update(
 
     GROUP_ID: Group ID to update.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Group.update(
@@ -244,6 +251,8 @@ def delete(ctx: CLIContext, gid: str) -> None:
 
     GROUP_ID: Group ID to inactivate.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Group.delete(gid)
@@ -278,6 +287,8 @@ def purge(ctx: CLIContext, gid: str) -> None:
 
     GROUP_ID: Group ID to inactivate.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             if not ask_yn():
@@ -318,6 +329,8 @@ def add_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
     GROUP_ID: Group ID where users will be belong to.
     USER_UUIDS: List of users' uuids to be added to the group.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Group.add_users(gid, user_uuids)
@@ -355,6 +368,8 @@ def remove_users(ctx: CLIContext, gid: str, user_uuids: Sequence[str]) -> None:
     GROUP_ID: Group ID where users currently belong to.
     USER_UUIDS: List of users' uuids to be removed from the group.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Group.remove_users(gid, user_uuids)

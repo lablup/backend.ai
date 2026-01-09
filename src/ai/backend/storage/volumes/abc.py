@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import (
     Any,
-    AsyncIterator,
     ClassVar,
     Final,
-    FrozenSet,
-    Mapping,
     Optional,
-    Sequence,
     final,
 )
 
@@ -20,9 +17,8 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..exception import InvalidSubpathError, VFolderNotFoundError
-from ..types import (
+from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
+from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
     FSPerfMetric,
@@ -30,8 +26,9 @@ from ..types import (
     QuotaUsage,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
-from ..watcher import WatcherClient
+from ai.backend.storage.watcher import WatcherClient
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
@@ -43,6 +40,8 @@ CAP_FAST_FS_SIZE: Final = "fast-fs-size"
 CAP_FAST_SCAN: Final = "fast-scan"
 # ability to scan vFolder size fast (e.g. by API)
 CAP_FAST_SIZE: Final = "fast-size"
+
+_CURRENT_DIR: Final = PurePosixPath(".")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -224,6 +223,10 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def info(self) -> VolumeInfo:
+        raise NotImplementedError
+
+    @abstractmethod
     async def create_quota_model(self) -> AbstractQuotaModel:
         raise NotImplementedError
 
@@ -243,11 +246,11 @@ class AbstractVolume(metaclass=ABCMeta):
     def sanitize_vfpath(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> Path:
         vfpath = self.mangle_vfpath(vfid).resolve()
         if not (vfpath.exists() and vfpath.is_dir()):
-            raise VFolderNotFoundError(vfid)
+            raise VFolderNotFoundError(f"VFolder not found or not a directory: {vfid}")
         target_path = (vfpath / relpath).resolve()
         if not target_path.is_relative_to(vfpath):
             raise InvalidSubpathError(vfid, relpath)
@@ -261,7 +264,7 @@ class AbstractVolume(metaclass=ABCMeta):
     # ------ volume operations -------
 
     @abstractmethod
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         raise NotImplementedError
 
     @abstractmethod
@@ -317,7 +320,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         pass
 

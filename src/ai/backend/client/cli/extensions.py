@@ -1,6 +1,7 @@
 import warnings
+from collections.abc import Callable, Mapping
 from functools import update_wrapper
-from typing import Callable, Concatenate, Mapping, ParamSpec, TypeVar
+from typing import Concatenate, ParamSpec, TypeVar
 
 from click import get_current_context
 

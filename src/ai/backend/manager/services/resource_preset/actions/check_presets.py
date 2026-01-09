@@ -1,15 +1,22 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import (
+    AccessKey,
+    ResourceSlot,
+)
+from ai.backend.common.types import (
+    LegacyResourceSlotState as ResourceSlotState,
+)
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
 
 @dataclass
 class CheckResourcePresetsAction(ResourcePresetAction):
-    access_key: str
+    access_key: AccessKey
     resource_policy: Mapping[str, Any]
     domain_name: str
     user_id: uuid.UUID
@@ -28,15 +35,15 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
 @dataclass
 class CheckResourcePresetsActionResult(BaseActionResult):
-    presets: list[Any]
-    keypair_limits: Mapping[str, str]
-    keypair_using: Mapping[str, str]
-    keypair_remaining: Mapping[str, str]
-    group_limits: Mapping[str, str]
-    group_using: Mapping[str, str]
-    group_remaining: Mapping[str, str]
-    scaling_group_remaining: Mapping[str, str]
-    scaling_groups: dict[str | Any, dict[str, ResourceSlot]]
+    presets: list[Mapping[str, Any]]
+    keypair_limits: ResourceSlot
+    keypair_using: ResourceSlot
+    keypair_remaining: ResourceSlot
+    group_limits: ResourceSlot
+    group_using: ResourceSlot
+    group_remaining: ResourceSlot
+    scaling_group_remaining: ResourceSlot
+    scaling_groups: Mapping[str, Mapping[ResourceSlotState, ResourceSlot]]
 
     # TODO: Should return preset row ids after changing to batching.
     @override

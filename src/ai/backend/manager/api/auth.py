@@ -5,10 +5,12 @@ import hashlib
 import hmac
 import logging
 import secrets
+from collections.abc import Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Final
+from urllib.parse import urlparse
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -26,10 +28,24 @@ from ai.backend.common.dto.manager.auth.field import (
     AuthTokenType,
 )
 from ai.backend.common.exception import InvalidIpAddressValue
+from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    InvalidAuthParameters,
+    InvalidClientIPConfig,
+)
+from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    keypair_resource_policies,
+    user_resource_policies,
+)
+from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
@@ -43,10 +59,6 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.auth import AuthorizationFailed, InvalidAuthParameters
-from ..errors.common import RejectedByHook
-from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
-from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 
@@ -311,8 +323,7 @@ def _extract_auth_params(request):
 
     try:
         access_key, signature = params["credential"].split(":", 1)
-        ret = params["signMethod"], access_key, signature
-        return ret
+        return params["signMethod"], access_key, signature
     except (KeyError, ValueError):
         raise InvalidAuthParameters("Missing or malformed authorization parameters")
 
@@ -345,27 +356,34 @@ def check_date(request: web.Request) -> bool:
 async def sign_request(sign_method: str, request: web.Request, secret_key: str) -> str:
     try:
         mac_type, hash_type = map(lambda s: s.lower(), sign_method.split("-"))
-        assert mac_type == "hmac", "Unsupported request signing method (MAC type)"
-        assert hash_type in hashlib.algorithms_guaranteed, (
-            "Unsupported request signing method (hash type)"
-        )
+        if mac_type != "hmac":
+            raise InvalidAuthParameters("Unsupported request signing method (MAC type)")
+        if hash_type not in hashlib.algorithms_guaranteed:
+            raise InvalidAuthParameters("Unsupported request signing method (hash type)")
 
         new_api_version = request.headers.get("X-BackendAI-Version")
         legacy_api_version = request.headers.get("X-Sorna-Version")
         api_version = new_api_version or legacy_api_version
-        assert api_version is not None, "API version missing in request headers"
+        if api_version is None:
+            raise InvalidAuthParameters("API version missing in request headers")
         body = b""
         if api_version < "v4.20181215":
             if request.can_read_body and request.content_type != "multipart/form-data":
                 # read the whole body if neither streaming nor bodyless
                 body = await request.read()
         body_hash = hashlib.new(hash_type, body).hexdigest()
+        path = request.raw_path
+        host = request.host
+        if upstream_url := request.headers.get("X-Forwarded-URL", None):
+            parsed_url = urlparse(upstream_url)
+            path = parsed_url.path
+            host = parsed_url.netloc
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
-            str(request.raw_path),
+            str(path),
             request["raw_date"],
-            request.host,
+            host,
             request.content_type,
             api_version,
             body_hash,
@@ -374,12 +392,10 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         sign_key = hmac.new(
             secret_key.encode(), request["date"].strftime("%Y%m%d").encode(), hash_type
         ).digest()
-        sign_key = hmac.new(sign_key, request.host.encode(), hash_type).digest()
+        sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
     except ValueError:
         raise AuthorizationFailed("Invalid signature")
-    except AssertionError as e:
-        raise InvalidAuthParameters(e.args[0])
 
 
 def validate_ip(request: web.Request, user: Mapping[str, Any]):
@@ -387,7 +403,8 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list
         return
-    assert isinstance(allowed_client_ip, list)
+    if not isinstance(allowed_client_ip, list):
+        raise InvalidClientIPConfig("allowed_client_ip must be a list")
     raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
@@ -400,145 +417,283 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
 
-@web.middleware
-async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
-    """
-    Fetches user information and sets up keypair, user, and is_authorized
-    attributes.
-    """
-    allow_list = request.app["auth_middleware_allowlist"]
-
-    if any(request.path.startswith(path) for path in allow_list):
-        request["is_authorized"] = False
-        request["is_admin"] = False
-        request["is_superadmin"] = False
-        request["keypair"] = None
-        request["user"] = None
-        return await handler(request)
-
-    # This is a global middleware: request.app is the root app.
-    root_ctx: RootContext = request.app["_root.context"]
+def _set_unauthenticated_state(request: web.Request) -> None:
+    """Initialize request with unauthenticated state."""
     request["is_authorized"] = False
     request["is_admin"] = False
     request["is_superadmin"] = False
     request["keypair"] = None
     request["user"] = None
-    if not get_handler_attr(request, "auth_required", False):
-        return await handler(request)
+
+
+async def _query_cred_by_access_key(
+    root_ctx: RootContext,
+    access_key: str,
+) -> tuple[Any, Any]:
+    """
+    Query keypair and user information by access_key.
+
+    Returns:
+        Tuple of (user_row, keypair_row) or (None, None) if not found
+    """
+    async with root_ctx.db.begin_readonly() as conn:
+        # Query keypair with resource policy
+        j = keypairs.join(
+            keypair_resource_policies,
+            keypairs.c.resource_policy == keypair_resource_policies.c.name,
+        )
+        query = (
+            sa.select(keypairs, keypair_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+            .where(
+                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+            )
+        )
+        result = await conn.execute(query)
+        keypair_row = result.first()
+
+        if keypair_row is None:
+            return None, None
+
+        # Query user with resource policy by joining keypairs table
+        j = users.join(
+            user_resource_policies,
+            users.c.resource_policy == user_resource_policies.c.name,
+        ).join(
+            keypairs,
+            users.c.uuid == keypairs.c.user,
+        )
+        query = (
+            sa.select(users, user_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+            .where(keypairs.c.access_key == access_key)
+        )
+        result = await conn.execute(query)
+        user_row = result.first()
+
+        return user_row, keypair_row
+
+
+def _populate_auth_result(
+    request: web.Request,
+    user_row: Any,
+    keypair_row: Any,
+) -> None:
+    """
+    Populate authentication result into request state.
+
+    This function is called by all authentication flows (JWT, HMAC, Hook)
+    to set up the common request state structure.
+    """
+    if not user_row or not keypair_row:
+        return
+
+    keypair_mapping = keypair_row._mapping
+    user_mapping = user_row._mapping
+
+    auth_result = {
+        "is_authorized": True,
+        "keypair": {
+            col.name: keypair_mapping[f"keypairs_{col.name}"]
+            for col in keypairs.c
+            if col.name != "secret_key"
+        },
+        "user": {
+            col.name: user_mapping[f"users_{col.name}"]
+            for col in users.c
+            if col.name not in ("password", "description", "created_at")
+        },
+        "is_admin": keypair_mapping["keypairs_is_admin"],
+    }
+
+    validate_ip(request, auth_result["user"])
+
+    auth_result["keypair"]["resource_policy"] = {
+        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
+        for col in keypair_resource_policies.c
+    }
+    auth_result["user"]["resource_policy"] = {
+        col.name: user_mapping[f"user_resource_policies_{col.name}"]
+        for col in user_resource_policies.c
+    }
+    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
+    auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
+
+    # Populate the result to the per-request state dict
+    request.update(auth_result)
+
+
+async def _authenticate_via_jwt(
+    request: web.Request,
+    root_ctx: RootContext,
+    jwt_token: str,
+) -> None:
+    """
+    JWT token-based authentication flow.
+
+    Used by GraphQL Federation (Hive Router) with stateless validation.
+    JWT tokens are signed using per-user secret keys (from keypair table),
+    maintaining the same security model as HMAC authentication.
+
+    Args:
+        request: aiohttp request
+        root_ctx: Manager root context
+        jwt_token: JWT token from X-BackendAI-Token header
+
+    Raises:
+        AuthorizationFailed: If JWT validation fails or access_key not found
+    """
+    import jwt as pyjwt
+
+    try:
+        # 1. Decode token without verification to extract access_key
+        unverified_payload = pyjwt.decode(
+            jwt_token,
+            options={"verify_signature": False},
+        )
+        access_key = unverified_payload.get("access_key")
+        if not access_key:
+            raise AuthorizationFailed("Access key not found in JWT token")
+
+        # 2. Query keypair and user from database to get secret_key
+        user_row, keypair_row = await execute_with_retry(
+            functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+        )
+
+        if keypair_row is None:
+            raise AuthorizationFailed("Access key not found in database")
+
+        # 3. Validate JWT token using user's secret key
+        secret_key = keypair_row.keypairs_secret_key
+        root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
+
+        # 4. Populate authentication result
+        _populate_auth_result(request, user_row, keypair_row)
+        log.trace("JWT authentication succeeded for access_key={}", access_key)
+
+        # 5. Update statistics
+        await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+
+    except JWTError as e:
+        log.warning("JWT authentication failed: {}", e)
+        raise AuthorizationFailed(f"JWT validation failed: {e}") from e
+
+
+async def _authenticate_via_hmac(
+    request: web.Request,
+    root_ctx: RootContext,
+) -> None:
+    """
+    HMAC signature-based authentication flow.
+
+    Used by traditional REST API with Client SDK.
+
+    Args:
+        request: aiohttp request
+        root_ctx: Manager root context
+
+    Raises:
+        InvalidAuthParameters: If date/time sync error or malformed header
+        AuthorizationFailed: If signature mismatch or access_key not found
+    """
+    # 1. Check date/time sync
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
 
-    # PRE_AUTH_MIDDLEWARE allows authentication via 3rd-party request headers/cookies.
-    # Any responsible hook must return a valid keypair.
+    # 2. Extract HMAC parameters from Authorization header
+    params = _extract_auth_params(request)
+    if not params:
+        # Unsigned requests (public APIs)
+        return
+
+    sign_method, access_key, signature = params
+
+    # 3. Query keypair and user from database
+    user_row, keypair_row = await execute_with_retry(
+        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+    )
+
+    if keypair_row is None:
+        raise AuthorizationFailed("Access key not found in HMAC")
+
+    # 4. Verify HMAC signature
+    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
+
+    if not secrets.compare_digest(my_signature, signature):
+        raise AuthorizationFailed("HMAC signature mismatch")
+
+    # 5. Populate authentication result
+    _populate_auth_result(request, user_row, keypair_row)
+
+    # 6. Update statistics
+    await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+
+
+async def _authenticate_via_hook(
+    request: web.Request,
+    root_ctx: RootContext,
+) -> None:
+    """
+    Plugin hook-based authentication flow.
+
+    Used for 3rd-party authentication (OAuth, SAML, etc).
+
+    Args:
+        request: aiohttp request
+        root_ctx: Manager root context
+
+    Raises:
+        RejectedByHook: If hook rejects the request
+        AuthorizationFailed: If access_key not found
+    """
+    # 1. Dispatch PRE_AUTH_MIDDLEWARE hook
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "PRE_AUTH_MIDDLEWARE",
         (request,),
         return_when=FIRST_COMPLETED,
     )
-    user_row = None
-    keypair_row = None
-
-    async def _query_cred(access_key):
-        async with root_ctx.db.begin_readonly() as conn:
-            j = keypairs.join(
-                keypair_resource_policies,
-                keypairs.c.resource_policy == keypair_resource_policies.c.name,
-            )
-            query = (
-                sa.select([keypairs, keypair_resource_policies], use_labels=True)
-                .select_from(j)
-                .where(
-                    (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
-                )
-            )
-            result = await conn.execute(query)
-            keypair_row = result.first()
-            if keypair_row is None:
-                return None, None
-
-            j = users.join(
-                user_resource_policies,
-                users.c.resource_policy == user_resource_policies.c.name,
-            )
-            query = (
-                sa.select([users, user_resource_policies], use_labels=True)
-                .select_from(j)
-                .where((users.c.main_access_key == access_key))
-            )
-            result = await conn.execute(query)
-            user_row = result.first()
-            return user_row, keypair_row
 
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
-    elif hook_result.result:
-        # Passed one of the hook.
-        # The "None" access_key means that the hook has allowed anonymous access.
-        access_key = hook_result.result
-        if access_key is not None:
-            user_row, keypair_row = await execute_with_retry(
-                functools.partial(_query_cred, access_key)
-            )
-            if keypair_row is None:
-                raise AuthorizationFailed("Access key not found")
 
-            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
-        else:
-            # unsigned requests may be still accepted for public APIs
-            pass
-    else:
-        # There were no hooks configured.
-        # Perform our own authentication.
-        params = _extract_auth_params(request)
-        if params:
-            sign_method, access_key, signature = params
-            user_row, keypair_row = await execute_with_retry(
-                functools.partial(_query_cred, access_key)
-            )
-            if keypair_row is None:
-                raise AuthorizationFailed("Access key not found")
-            my_signature = await sign_request(
-                sign_method, request, keypair_row["keypairs_secret_key"]
-            )
-            if not secrets.compare_digest(my_signature, signature):
-                raise AuthorizationFailed("Signature mismatch")
-            await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
-        else:
-            # unsigned requests may be still accepted for public APIs
-            pass
+    if not hook_result.result:
+        # No hooks configured, unsigned request
+        return
 
-    if user_row and keypair_row:
-        auth_result = {
-            "is_authorized": True,
-            "keypair": {
-                col.name: keypair_row[f"keypairs_{col.name}"]
-                for col in keypairs.c
-                if col.name != "secret_key"
-            },
-            "user": {
-                col.name: user_row[f"users_{col.name}"]
-                for col in users.c
-                if col.name not in ("password", "description", "created_at")
-            },
-            "is_admin": keypair_row["keypairs_is_admin"],
-        }
+    # 2. Hook returns access_key (None means anonymous access)
+    access_key = hook_result.result
+    if access_key is None:
+        # Anonymous access allowed
+        return
 
-        validate_ip(request, auth_result["user"])
-        auth_result["keypair"]["resource_policy"] = {
-            col.name: keypair_row[f"keypair_resource_policies_{col.name}"]
-            for col in keypair_resource_policies.c
-        }
-        auth_result["user"]["resource_policy"] = {
-            col.name: user_row[f"user_resource_policies_{col.name}"]
-            for col in user_resource_policies.c
-        }
-        auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
-        auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
-        # Populate the result to the per-request state dict.
-        request.update(auth_result)
+    # 3. Query keypair and user from database
+    user_row, keypair_row = await execute_with_retry(
+        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+    )
 
-    with ExitStack() as stack:
-        user_id = request.get("user", {}).get("uuid")
+    if keypair_row is None:
+        raise AuthorizationFailed("Access key not found in hook")
+
+    # 4. Populate authentication result
+    _populate_auth_result(request, user_row, keypair_row)
+
+    # 5. Update statistics
+    await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+
+
+def _setup_user_context(request: web.Request) -> ExitStack:
+    """
+    Setup user context for logging and request tracking.
+
+    Returns:
+        ExitStack with user context managers
+    """
+    stack = ExitStack()
+
+    if user := request.get("user"):
+        user_id = user.get("uuid")
         if user_id is not None:
             stack.enter_context(
                 with_user(
@@ -557,8 +712,51 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                     "user_id": str(user_id),
                 })
             )
-        # No matter if authenticated or not, pass-through to the handler.
-        # (if it's required, `auth_required` decorator will handle the situation.)
+
+    return stack
+
+
+@web.middleware
+async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+    """
+    Unified authentication middleware - routes to appropriate authentication flow.
+
+    This middleware detects the authentication method and dispatches to:
+    - JWT authentication (X-BackendAI-Token header)
+    - HMAC authentication (Authorization header)
+    - Hook authentication (3rd-party plugins)
+    """
+    allow_list = request.app["auth_middleware_allowlist"]
+
+    # Skip authentication for allowed paths
+    if any(request.path.startswith(path) for path in allow_list):
+        _set_unauthenticated_state(request)
+        return await handler(request)
+
+    # Initialize request state
+    root_ctx: RootContext = request.app["_root.context"]
+    _set_unauthenticated_state(request)
+
+    # Skip if handler doesn't require authentication
+    if not get_handler_attr(request, "auth_required", False):
+        return await handler(request)
+
+    # Detect authentication method and route to appropriate flow
+    jwt_token = request.headers.get("X-BackendAI-Token")
+    auth_header = request.headers.get("Authorization")
+    if jwt_token:
+        # JWT authentication flow (GraphQL Federation)
+        await _authenticate_via_jwt(request, root_ctx, jwt_token)
+    elif auth_header:
+        # HMAC authentication flow (REST API)
+        await _authenticate_via_hmac(request, root_ctx)
+    else:
+        # Hook authentication flow (3rd-party plugins)
+        await _authenticate_via_hook(request, root_ctx)
+
+    # Setup user context for logging
+    with _setup_user_context(request):
+        # Pass-through to handler (auth_required decorator validates authorization)
         return await handler(request)
 
 
@@ -567,6 +765,18 @@ def auth_required(handler):
     async def wrapped(request, *args, **kwargs):
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
+    return wrapped
+
+
+def auth_required_for_method(method):
+    @functools.wraps(method)
+    async def wrapped(self, request, *args, **kwargs):
+        if request.get("is_authorized", False):
+            return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
@@ -660,14 +870,14 @@ async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
         email=params["username"],
         password=params["password"],
         stoken=stoken,
-        auth_config=root_ctx.config_provider.config.auth,
     )
     result = await root_ctx.processors.auth.authorize.wait_for_complete(action)
 
     if result.stream_response is not None:
         return result.stream_response
 
-    assert result.authorization_result is not None
+    if result.authorization_result is None:
+        raise AuthorizationFailed("Authorization result is missing")
     auth_result = result.authorization_result
     data = AuthSuccessResponse(
         response_type=AuthResponseType.SUCCESS,
@@ -697,9 +907,9 @@ async def signup(request: web.Request, params: Any) -> web.Response:
         domain_name=params["domain"],
         email=params["email"],
         password=params["password"],
-        username=params["username"] if "username" in params else None,
-        full_name=params["full_name"] if "full_name" in params else None,
-        description=params["description"] if "description" in params else None,
+        username=params.get("username"),
+        full_name=params.get("full_name"),
+        description=params.get("description"),
     )
     result = await root_ctx.processors.auth.signup.wait_for_complete(action)
 
@@ -750,7 +960,7 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
     log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
-    result = await root_ctx.processors.auth.update_full_name.wait_for_complete(
+    await root_ctx.processors.auth.update_full_name.wait_for_complete(
         UpdateFullNameAction(
             user_id=request["user"]["uuid"],
             full_name=params["full_name"],
@@ -758,11 +968,6 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
             email=email,
         )
     )
-
-    if not result.success:
-        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{}): Unknown user", domain_name, email)
-        return web.json_response({"error_msg": "Unknown user"}, status=HTTPStatus.BAD_REQUEST)
-
     return web.json_response({}, status=HTTPStatus.OK)
 
 
@@ -825,7 +1030,6 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         email=params["username"],
         current_password=params["current_password"],
         new_password=params["new_password"],
-        auth_config=root_ctx.config_provider.config.auth,
     )
     result = await root_ctx.processors.auth.update_password_no_auth.wait_for_complete(action)
     return web.json_response(
@@ -899,7 +1103,7 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
     app["api_versions"] = (1, 2, 3, 4)

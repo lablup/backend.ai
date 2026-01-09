@@ -9,18 +9,20 @@ import aiohttp_cors
 import attrs
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
-
-from ..models.health import (
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager import __version__
+from ai.backend.manager.models.health import (
     SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
+
 from .types import CORSOptions
 
 if TYPE_CHECKING:
-    from ..api.context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -35,7 +37,7 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                log.exception(f"Failed to report manager health status (e:{str(e)})")
+                log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:
         pass
 
@@ -117,6 +119,21 @@ class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
         return PromMetricPrimitive.gauge
 
 
+async def hello(request: web.Request) -> web.Response:
+    """Health check endpoint with dependency connectivity status"""
+    request["do_not_print_access_log"] = True
+
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="manager",
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump(mode="json"))
+
+
 async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     status = await get_manager_db_cxn_status(root_ctx)
@@ -182,6 +199,12 @@ def create_app(default_cors_options: CORSOptions):
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+
+    # Basic health check endpoint
+    root_resource = cors.add(app.router.add_resource(r""))
+    cors.add(root_resource.add_route("GET", hello))
+
     prom_resource = cors.add(app.router.add_resource("/prom"))
     cors.add(prom_resource.add_route("GET", get_manager_status_for_prom))
+
     return app, []

@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import urllib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
 from types import TracebackType
-from typing import Any, Optional, Self, Sequence, TypeAlias, override
+from typing import Any, Optional, Self, override
 
 import aiotools
 import yarl
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd, GetPrefixValue
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.types import SlotName, SlotTypes, current_resource_slots
 from ai.backend.manager.api import ManagerStatus
@@ -17,8 +19,7 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 current_vfolder_types: ContextVar[list[str]] = ContextVar("current_vfolder_types")
 
-
-NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
+type NestedStrKeyedDict = dict[str, Any | NestedStrKeyedDict]
 
 
 class LegacyEtcdLoader(AbstractConfigLoader):
@@ -33,8 +34,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        raw_cfg = await self._etcd.get_prefix(self._config_prefix)
-        return raw_cfg
+        return await self._etcd.get_prefix(self._config_prefix)
 
     async def open(self) -> None:
         await self._etcd.__aenter__()
@@ -114,9 +114,9 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         self.get_manager_status.cache_clear()
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-    async def _get_resource_slots(self):
+    async def _get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
         raw_data = await self._etcd.get_prefix_dict("config/resource_slots")
-        return {SlotName(k): SlotTypes(v) for k, v in raw_data.items()}
+        return {SlotName(k): SlotTypes(str(v)) for k, v in raw_data.items()}
 
     async def get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
         """
@@ -131,7 +131,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         return ret
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-    async def _get_vfolder_types(self):
+    async def _get_vfolder_types(self) -> GetPrefixValue:
         return await self._etcd.get_prefix("volumes/_types")
 
     async def get_vfolder_types(self) -> Sequence[str]:
@@ -148,7 +148,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         return ret
 
     @aiotools.lru_cache(maxsize=1, expire_after=5.0)
-    async def get_manager_nodes_info(self):
+    async def get_manager_nodes_info(self) -> GetPrefixValue:
         return await self._etcd.get_prefix_dict("nodes/manager")
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)

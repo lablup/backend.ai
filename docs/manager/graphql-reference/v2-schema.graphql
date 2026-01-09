@@ -1,0 +1,3250 @@
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type AccessToken implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.16.0: The access token."""
+  token: String!
+
+  """Added in 25.16.0: The creation timestamp of the access token."""
+  createdAt: DateTime!
+
+  """Added in 25.16.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
+}
+
+"""Added in 25.16.0"""
+type AccessTokenConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AccessTokenEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AccessTokenEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AccessToken!
+}
+
+"""Added in 25.16.0"""
+input AccessTokenFilter {
+  token: StringFilter = null
+  validUntil: DateTimeFilter = null
+  createdAt: DateTimeFilter = null
+}
+
+"""Added in 25.16.0"""
+input AccessTokenOrderBy {
+  field: AccessTokenOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum AccessTokenOrderField {
+  CREATED_AT
+}
+
+"""
+Added in 25.19.0. Input for activating a revision to be the current revision.
+"""
+input ActivateRevisionInput {
+  deploymentId: ID!
+  revisionId: ID!
+}
+
+"""Added in 25.19.0. Result of activating a revision."""
+type ActivateRevisionPayload {
+  deployment: ModelDeployment!
+  previousRevisionId: ID
+  activatedRevisionId: ID!
+}
+
+"""
+Added in 25.19.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
+"""
+enum ActivenessStatus {
+  ACTIVE
+  INACTIVE
+}
+
+"""Added in 25.19.0"""
+input AddRevisionInput {
+  name: String = null
+  deploymentId: ID!
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
+}
+
+"""Added in 25.19.0"""
+type AddRevisionPayload {
+  revision: ModelRevision!
+}
+
+"""Added in 25.15.0"""
+type AgentResource {
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats {
+  """Added in 25.15.0"""
+  totalResource: AgentResource!
+}
+
+"""Added in 25.16.0. App configuration data"""
+type AppConfig {
+  extraConfig: JSON!
+}
+
+"""
+Added in 25.14.0.
+
+Input for approving an artifact revision.
+
+Admin-only operation to approve artifact revisions for general use.
+"""
+input ApproveArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision approval operations.
+
+Contains the approved artifact revision. Admin-only operation.
+"""
+type ApproveArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""
+Added in 25.14.0.
+
+An artifact represents AI models, packages, images, or other resources that can be
+stored, managed, and used within Backend.AI.
+
+Artifacts are discovered through scanning external registries and,
+can have multiple revisions.
+
+Each artifact contains metadata and references to its source registry.
+
+Key concepts:
+- Type: MODEL, PACKAGE, or IMAGE
+- Availability: ALIVE (available), DELETED (soft-deleted)
+- Source: Original external registry where it was discovered
+"""
+type Artifact implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  type: ArtifactType!
+  description: String
+  registry: SourceInfo!
+  source: SourceInfo!
+  readonly: Boolean!
+  extra: JSON
+  scannedAt: DateTime!
+  updatedAt: DateTime!
+  availability: ArtifactAvailability!
+  revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+}
+
+enum ArtifactAvailability {
+  ALIVE
+  DELETED
+}
+
+"""
+Added in 25.14.0.
+
+Paginated connection for artifacts with total count information.
+
+Used for relay-style pagination with cursor-based navigation.
+"""
+type ArtifactConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Artifact!
+}
+
+"""
+Added in 25.14.0.
+
+Filter options for artifacts based on various criteria such as type, name, registry,
+source, and availability status.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
+input ArtifactFilter {
+  type: [ArtifactType!] = null
+  name: StringFilter = null
+  registry: StringFilter = null
+  source: StringFilter = null
+  availability: [ArtifactAvailability!] = null
+  AND: [ArtifactFilter!] = null
+  OR: [ArtifactFilter!] = null
+  NOT: [ArtifactFilter!] = null
+}
+
+"""
+Added in 25.14.0.
+
+Payload for artifact import progress subscription events.
+
+Provides real-time updates during the artifact import process,
+including progress percentage and current status.
+"""
+type ArtifactImportProgressUpdatedPayload {
+  artifactId: ID!
+  progress: Float!
+  status: ArtifactStatus!
+}
+
+"""
+Added in 25.14.0.
+
+Specifies the field and direction for ordering artifacts in queries.
+"""
+input ArtifactOrderBy {
+  field: ArtifactOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactOrderField {
+  NAME
+  TYPE
+  SIZE
+  SCANNED_AT
+  UPDATED_AT
+}
+
+"""Added in 25.14.0"""
+type ArtifactRegistry {
+  """
+  Added in 25.17.0. Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. This ID is unique across all registry types and represents the metadata record itself. Example: When you need to reference a registry entry in the metadata table, use this ID.
+  """
+  id: ID!
+
+  """
+  Added in 25.17.0. Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). This ID corresponds to the primary key in the registry-type-specific table. Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. Use this ID when you need to access type-specific registry details.
+  """
+  registryId: ID!
+
+  """Name of the default artifact registry."""
+  name: String!
+
+  """Type of the default artifact registry."""
+  type: ArtifactRegistryType!
+}
+
+"""
+Added in 25.15.0.
+
+Represents common metadata for an artifact registry.
+All artifact registry nodes expose that information regardless of type.
+"""
+type ArtifactRegistryMeta implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  registryId: ID!
+  type: ArtifactRegistryType!
+  url: String!
+}
+
+"""Added in 25.15.0"""
+type ArtifactRegistryMetaConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRegistryMetaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRegistryMetaEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRegistryMeta!
+}
+
+enum ArtifactRegistryType {
+  HUGGINGFACE
+  RESERVOIR
+}
+
+enum ArtifactRemoteStatus {
+  SCANNED
+  AVAILABLE
+  FAILED
+}
+
+"""
+Added in 25.14.0.
+
+A specific version/revision of an artifact containing the actual file data.
+
+Artifact revisions progress through different statuses:
+- SCANNED: Discovered in external registry, metadata only
+- PULLING: Currently downloading from external source
+- PULLED: Downloaded to temporary storage
+- AVAILABLE: Ready for use by users
+
+Contains version information, file size, README content, and timestamps.
+Most HuggingFace models only have a 'main' revision.
+"""
+type ArtifactRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  status: ArtifactStatus!
+
+  """Added in 25.15.0"""
+  remoteStatus: ArtifactRemoteStatus
+  version: String!
+  readme: String
+  size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
+
+  """
+  Digest at the time of import. None for models that have not been imported. Added in 25.17.0
+  """
+  digest: String
+
+  """
+  Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0
+  """
+  verificationResult: ArtifactVerificationResult
+  artifact: Artifact!
+}
+
+"""
+Added in 25.14.0.
+
+Paginated connection for artifact revisions with total count information.
+
+Used for relay-style pagination with cursor-based navigation.
+"""
+type ArtifactRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRevision!
+}
+
+"""
+Added in 25.14.0.
+
+Filter options for artifact revisions based on status, version, artifact ID, and file size.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
+input ArtifactRevisionFilter {
+  status: ArtifactRevisionStatusFilter = null
+
+  """Added in 25.16.0"""
+  remoteStatus: ArtifactRevisionRemoteStatusFilter = null
+  version: StringFilter = null
+  artifactId: ID = null
+  size: IntFilter = null
+  AND: [ArtifactRevisionFilter!] = null
+  OR: [ArtifactRevisionFilter!] = null
+  NOT: [ArtifactRevisionFilter!] = null
+}
+
+"""
+Added in 25.14.0.
+
+Represents a background task for importing an artifact revision.
+
+Contains the task ID for monitoring progress and the associated artifact revision
+being imported from external registries.
+"""
+type ArtifactRevisionImportTask {
+  taskId: ID
+  artifactRevision: ArtifactRevision!
+}
+
+"""
+Added in 25.14.0.
+
+Specifies the field and direction for ordering artifact revisions in queries.
+"""
+input ArtifactRevisionOrderBy {
+  field: ArtifactRevisionOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactRevisionOrderField {
+  VERSION
+  SIZE
+  CREATED_AT
+  UPDATED_AT
+  STATUS
+}
+
+"""Added in 25.16.0"""
+input ArtifactRevisionRemoteStatusFilter {
+  in: [ArtifactRemoteStatus!] = null
+  equals: ArtifactRemoteStatus = null
+}
+
+"""
+Added in 25.14.0.
+
+Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+"""
+input ArtifactRevisionStatusFilter {
+  in: [ArtifactStatus!] = null
+  equals: ArtifactStatus = null
+}
+
+enum ArtifactStatus {
+  SCANNED
+  PULLING
+  PULLED
+  VERIFYING
+  NEEDS_APPROVAL
+  AVAILABLE
+  FAILED
+  REJECTED
+}
+
+"""
+Added in 25.14.0.
+
+Input for subscribing to artifact status change notifications.
+
+Used with artifact_status_changed subscription to receive real-time updates
+when artifact revision statuses change.
+"""
+input ArtifactStatusChangedInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""
+Added in 25.14.0.
+
+Payload for artifact status change subscription events.
+
+Provides real-time notifications when artifact revision statuses change
+during import, cleanup, or other operations.
+"""
+type ArtifactStatusChangedPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+enum ArtifactType {
+  MODEL
+  PACKAGE
+  IMAGE
+}
+
+"""
+Added in 25.17.0.
+
+Complete verification result containing results from all configured verifiers.
+
+Artifacts undergo malware scanning through multiple verifiers after being imported.
+This type aggregates results from all verifiers that were run on the artifact.
+"""
+type ArtifactVerificationResult {
+  """Results from each verifier that scanned the artifact"""
+  verifiers: [ArtifactVerifierResultEntry!]!
+}
+
+"""
+Added in 25.17.0.
+
+Result from a single malware verifier containing scan results and metadata.
+
+Each verifier scans the artifact for potential security issues and reports
+findings including infected file count, scan time, and any errors encountered.
+"""
+type ArtifactVerifierResult {
+  """Whether the verification completed successfully"""
+  success: Boolean!
+
+  """Number of infected or suspicious files detected"""
+  infectedCount: Int!
+
+  """Timestamp when verification started"""
+  scannedAt: DateTime!
+
+  """Time taken to complete verification in seconds"""
+  scanTime: Float!
+
+  """Total number of files scanned"""
+  scannedCount: Int!
+
+  """Additional metadata from the verifier"""
+  metadata: JSON!
+
+  """Fatal error message if the verifier failed to complete"""
+  error: String
+}
+
+"""
+Added in 25.17.0.
+
+Entry for a single verifier's result in the verification results.
+
+Associates a verifier name with its scan results.
+"""
+type ArtifactVerifierResultEntry {
+  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  name: String!
+
+  """Scan result from this verifier"""
+  result: ArtifactVerifierResult!
+}
+
+"""Added in 25.1.0"""
+enum AutoScalingMetricSource {
+  KERNEL
+  INFERENCE_FRAMEWORK
+}
+
+type AutoScalingRule implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.19.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+
+  """Added in 25.19.0: The minimum threshold for scaling (e.g. 0.5)"""
+  minThreshold: Decimal
+
+  """Added in 25.19.0: The maximum threshold for scaling (e.g. 21.0)"""
+  maxThreshold: Decimal
+
+  """Added in 25.19.0: The step size for scaling (e.g. 1)."""
+  stepSize: Int!
+
+  """Added in 25.19.0: The time window (seconds) for scaling (e.g. 60)."""
+  timeWindow: Int!
+
+  """Added in 25.19.0: The minimum number of replicas (e.g. 1)."""
+  minReplicas: Int
+
+  """Added in 25.19.0: The maximum number of replicas (e.g. 10)."""
+  maxReplicas: Int
+  createdAt: DateTime!
+  lastTriggeredAt: DateTime!
+}
+
+"""Added in 25.19.0"""
+type AutoScalingRuleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AutoScalingRuleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AutoScalingRuleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AutoScalingRule!
+}
+
+"""Added in 25.19.0"""
+input AutoScalingRuleFilter {
+  createdAt: DateTimeFilter = null
+  lastTriggeredAt: DateTimeFilter = null
+}
+
+"""Added in 25.19.0"""
+input AutoScalingRuleOrderBy {
+  field: AutoScalingRuleOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum AutoScalingRuleOrderField {
+  CREATED_AT
+}
+
+"""Background task event payload"""
+type BackgroundTaskEventPayload {
+  taskId: ID!
+  eventType: BgtaskEventType!
+  message: String!
+  currentProgress: Float
+  totalProgress: Float
+}
+
+"""Type of background task event"""
+enum BgtaskEventType {
+  UPDATED
+  DONE
+  CANCELLED
+  FAILED
+}
+
+"""Added in 25.19.0. Configuration for blue-green deployment strategy."""
+input BlueGreenConfigInput {
+  autoPromote: Boolean! = false
+  promoteDelaySeconds: Int! = 0
+}
+
+scalar ByteSize
+
+"""
+Added in 25.14.0.
+
+Input for canceling an in-progress artifact import operation.
+
+Stops the download process and reverts the artifact revision status back to SCANNED.
+"""
+input CancelArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for canceling artifact import operations.
+
+Contains the artifact revision whose import was canceled,
+reverting its status back to SCANNED.
+"""
+type CancelImportArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""
+Added in 25.14.0.
+
+Input for cleaning up stored artifact revision data.
+
+Removes downloaded files from storage and transitions the artifact revision
+back to SCANNED status, freeing up storage space.
+"""
+input CleanupArtifactRevisionsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision cleanup operations.
+
+Contains the cleaned artifact revisions that have had their stored data removed,
+transitioning them back to SCANNED status to free storage space.
+"""
+type CleanupArtifactRevisionsPayload {
+  artifactRevisions: ArtifactRevisionConnection!
+}
+
+type ClusterConfig {
+  """The clustering mode (e.g., SINGLE_NODE)."""
+  mode: ClusterMode!
+
+  """Number of replicas in the cluster."""
+  size: Int!
+}
+
+"""Added in 25.19.0"""
+input ClusterConfigInput {
+  mode: ClusterMode!
+  size: Int!
+}
+
+"""Added in 25.19.0"""
+enum ClusterMode {
+  SINGLE_NODE
+  MULTI_NODE
+}
+
+extend type ComputeSessionNode @key(fields: "id") {
+  id: ID! @external
+}
+
+input CreateAccessTokenInput {
+  """
+  Added in 25.16.0: The ID of the model deployment for which the access token is created.
+  """
+  modelDeploymentId: ID!
+
+  """Added in 25.16.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
+}
+
+type CreateAccessTokenPayload {
+  accessToken: AccessToken!
+}
+
+input CreateAutoScalingRuleInput {
+  modelDeploymentId: ID!
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int!
+  timeWindow: Int!
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type CreateAutoScalingRulePayload {
+  autoScalingRule: AutoScalingRule!
+}
+
+"""Added in 25.19.0"""
+input CreateDeploymentInput {
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
+  defaultDeploymentStrategy: DeploymentStrategyInput!
+  desiredReplicaCount: Int!
+  initialRevision: CreateRevisionInput!
+}
+
+"""Added in 25.19.0"""
+type CreateDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
+"""Added in 25.14.0"""
+input CreateHuggingFaceRegistryInput {
+  url: String!
+  name: String!
+  token: String = null
+}
+
+"""Added in 25.14.0"""
+type CreateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""Input for creating a notification channel"""
+input CreateNotificationChannelInput {
+  name: String!
+  description: String = null
+  channelType: NotificationChannelType! = WEBHOOK
+  config: WebhookConfigInput!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification channel mutation"""
+type CreateNotificationChannelPayload {
+  channel: NotificationChannel!
+}
+
+"""Input for creating a notification rule"""
+input CreateNotificationRuleInput {
+  name: String!
+  description: String = null
+  ruleType: NotificationRuleType!
+  channelId: ID!
+  messageTemplate: String!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification rule mutation"""
+type CreateNotificationRulePayload {
+  rule: NotificationRule!
+}
+
+"""Added in 25.14.0"""
+input CreateObjectStorageInput {
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+}
+
+"""Added in 25.14.0"""
+type CreateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
+"""Added in 25.14.0"""
+input CreateReservoirRegistryInput {
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+}
+
+"""Added in 25.14.0"""
+type CreateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
+}
+
+"""
+Added in 25.19.0. Input for creating a revision without attaching to a deployment.
+"""
+input CreateRevisionInput {
+  name: String = null
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
+}
+
+"""Added in 25.16.0"""
+type CreateRevisionPayload {
+  revision: ModelRevision!
+}
+
+"""Added in 25.16.0. Input for creating VFS storage"""
+input CreateVFSStorageInput {
+  name: String!
+  host: String!
+  basePath: String!
+}
+
+"""Added in 25.16.0. Payload for creating VFS storage"""
+type CreateVFSStoragePayload {
+  vfsStorage: VFSStorage!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+input DateTimeFilter {
+  before: DateTime = null
+  after: DateTime = null
+  equals: DateTime = null
+  notEquals: DateTime = null
+}
+
+"""Decimal (fixed-point)"""
+scalar Decimal
+
+"""
+Added in 25.15.0.
+
+Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+Used to specify which artifact revisions should be imported from the remote registry source
+into the local reservoir registry storage.
+"""
+input DelegateImportArtifactsInput {
+  """List of artifact revision IDs of delegatee artifact registry"""
+  artifactRevisionIds: [ID!]!
+
+  """ID of the reservoir registry to delegate the import request to"""
+  delegatorReservoirId: ID = null
+  artifactType: ArtifactType = null
+  delegateeTarget: DelegateeTarget = null
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact import operation.
+Contains the imported artifact revisions and associated background tasks.
+The tasks can be monitored to track the progress of the import operation.
+"""
+type DelegateImportArtifactsPayload {
+  """
+  Connection of artifact revisions that were imported from the reservoir registry's remote registry
+  """
+  artifactRevisions: ArtifactRevisionConnection!
+
+  """List of background tasks created for importing the artifact revisions"""
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""
+Added in 25.15.0.
+
+Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+"""
+input DelegateScanArtifactsInput {
+  """ID of the reservoir registry to delegate the scan request to"""
+  delegatorReservoirId: ID = null
+
+  """Target delegatee reservoir registry and its remote registry to scan"""
+  delegateeTarget: DelegateeTarget = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+
+  """Filter artifacts by type (e.g., model, image, package)"""
+  artifactType: ArtifactType = null
+
+  """Search term to filter artifacts by name or description"""
+  search: String = null
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact scanning operation.
+Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
+These artifacts are now available for import or direct use.
+"""
+type DelegateScanArtifactsPayload {
+  """
+  List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
+  """
+  artifacts: [Artifact!]!
+}
+
+"""Added in 25.15.0"""
+input DelegateeTarget {
+  delegateeReservoirId: ID!
+  targetRegistryId: ID!
+}
+
+"""
+Added in 25.15.0.
+
+Input for soft-deleting artifacts from the system.
+
+Marks artifacts as deleted without permanently removing them.
+Deleted artifacts can be restored using restore_artifacts.
+"""
+input DeleteArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for artifact deletion operations.
+
+Contains the artifacts that were soft-deleted. These can be restored later.
+"""
+type DeleteArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
+input DeleteAutoScalingRuleInput {
+  id: ID!
+}
+
+type DeleteAutoScalingRulePayload {
+  id: ID!
+}
+
+"""Added in 25.19.0"""
+input DeleteDeploymentInput {
+  id: ID!
+}
+
+"""Added in 25.19.0"""
+type DeleteDeploymentPayload {
+  id: ID!
+}
+
+"""Added in 25.16.0. Input for deleting domain-level app configuration"""
+input DeleteDomainConfigInput {
+  domainName: String!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting domain-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteDomainConfigPayload {
+  deleted: Boolean!
+}
+
+"""Added in 25.14.0"""
+input DeleteHuggingFaceRegistryInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteHuggingFaceRegistryPayload {
+  id: ID!
+}
+
+"""Input for deleting a notification channel"""
+input DeleteNotificationChannelInput {
+  id: ID!
+}
+
+"""Payload for delete notification channel mutation"""
+type DeleteNotificationChannelPayload {
+  id: ID!
+}
+
+"""Input for deleting a notification rule"""
+input DeleteNotificationRuleInput {
+  id: ID!
+}
+
+"""Payload for delete notification rule mutation"""
+type DeleteNotificationRulePayload {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+input DeleteObjectStorageInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteObjectStoragePayload {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+input DeleteReservoirRegistryInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteReservoirRegistryPayload {
+  id: ID!
+}
+
+"""
+Added in 25.16.0.
+Input for deleting user-level app configuration.
+If user_id is not provided, the current user's configuration will be deleted.
+"""
+input DeleteUserConfigInput {
+  userId: ID = null
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting user-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteUserConfigPayload {
+  deleted: Boolean!
+}
+
+"""Added in 25.16.0. Input for deleting VFS storage"""
+input DeleteVFSStorageInput {
+  id: ID!
+}
+
+"""Added in 25.16.0. Payload for deleting VFS storage"""
+type DeleteVFSStoragePayload {
+  id: ID!
+}
+
+"""Added in 25.19.0"""
+input DeploymentFilter {
+  name: StringFilter = null
+  status: DeploymentStatusFilter = null
+  openToPublic: Boolean = null
+  tags: StringFilter = null
+  endpointUrl: StringFilter = null
+  AND: [DeploymentFilter!] = null
+  OR: [DeploymentFilter!] = null
+  NOT: [DeploymentFilter!] = null
+}
+
+"""Added in 25.19.0"""
+input DeploymentOrderBy {
+  field: DeploymentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum DeploymentOrderField {
+  CREATED_AT
+  UPDATED_AT
+  NAME
+}
+
+"""Added in 25.19.0. Deployment policy configuration."""
+type DeploymentPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  strategySpec: DeploymentStrategySpec!
+  rollbackOnFailure: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
+"""
+enum DeploymentStatus {
+  PENDING
+  SCALING
+  DEPLOYING
+  READY
+  STOPPING
+  STOPPED
+}
+
+"""Added in 25.19.0"""
+type DeploymentStatusChangedPayload {
+  deployment: ModelDeployment!
+}
+
+"""Added in 25.19.0"""
+input DeploymentStatusFilter {
+  in: [DeploymentStatus!] = null
+  equals: DeploymentStatus = null
+}
+
+type DeploymentStrategyGQL {
+  type: DeploymentStrategyType!
+}
+
+"""
+Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
+"""
+input DeploymentStrategyInput {
+  type: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
+Added in 25.19.0. Base interface for deployment strategy specifications.
+"""
+interface DeploymentStrategySpec {
+  strategy: DeploymentStrategyType!
+}
+
+"""
+Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+"""
+enum DeploymentStrategyType {
+  ROLLING
+  BLUE_GREEN
+}
+
+extend type DomainNode @key(fields: "id") {
+  id: ID! @external
+}
+
+type ExtraVFolderMount implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  mountDestination: String!
+  vfolder: VirtualFolderNode!
+}
+
+"""Added in 25.16.0"""
+type ExtraVFolderMountConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ExtraVFolderMountEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ExtraVFolderMountEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ExtraVFolderMount!
+}
+
+"""Added in 25.19.0"""
+input ExtraVFolderMountInput {
+  vfolderId: ID!
+  mountDestination: String
+}
+
+"""Added in 25.14.0"""
+input GetPresignedDownloadURLInput {
+  artifactRevisionId: ID!
+  key: String!
+  expiration: Int = null
+}
+
+"""Added in 25.14.0"""
+type GetPresignedDownloadURLPayload {
+  presignedUrl: String!
+}
+
+"""Added in 25.14.0"""
+input GetPresignedUploadURLInput {
+  artifactRevisionId: ID!
+  key: String!
+}
+
+"""Added in 25.14.0"""
+type GetPresignedUploadURLPayload {
+  presignedUrl: String!
+  fields: String!
+}
+
+extend type GroupNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""Added in 25.14.0"""
+type HuggingFaceRegistry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  url: String!
+  name: String!
+  token: String
+}
+
+"""Added in 25.14.0"""
+type HuggingFaceRegistryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [HuggingFaceRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type HuggingFaceRegistryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: HuggingFaceRegistry!
+}
+
+"""Added in 25.19.0"""
+input ImageInput {
+  id: ID!
+}
+
+extend type ImageNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""
+Added in 25.14.0.
+
+Input for importing scanned artifact revisions from external registries.
+
+Downloads artifact files from the external source and transitions them through:
+SCANNED → PULLING → PULLED → AVAILABLE status progression.
+"""
+input ImportArtifactsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact import operations.
+
+Contains the imported artifact revisions and their associated background tasks.
+Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
+"""
+type ImportArtifactsPayload {
+  artifactRevisions: ArtifactRevisionConnection!
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+input IntFilter {
+  equals: Int = null
+  notEquals: Int = null
+  greaterThan: Int = null
+  greaterThanOrEqual: Int = null
+  lessThan: Int = null
+  lessThanOrEqual: Int = null
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""Added in 25.15.0"""
+scalar JSONString
+
+"""
+Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
+"""
+enum LivenessStatus {
+  NOT_CHECKED
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+}
+
+type ModelDeployment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  metadata: ModelDeploymentMetadata!
+  networkAccess: ModelDeploymentNetworkAccess!
+  revision: ModelRevision
+  defaultDeploymentStrategy: DeploymentStrategyGQL!
+  replicaState: ReplicaState!
+  createdUser: UserNode!
+  scalingRule: ScalingRule!
+
+  """Added in 25.19.0. Deployment policy configuration."""
+  deploymentPolicy: DeploymentPolicy
+  revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
+}
+
+"""Added in 25.19.0"""
+type ModelDeploymentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelDeploymentEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelDeploymentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelDeployment!
+}
+
+type ModelDeploymentMetadata {
+  name: String!
+  status: DeploymentStatus!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  project: GroupNode!
+  domain: DomainNode!
+}
+
+"""Added in 25.19.0"""
+input ModelDeploymentMetadataInput {
+  projectId: ID!
+  domainName: String!
+  name: String = null
+  tags: [String!] = null
+}
+
+type ModelDeploymentNetworkAccess {
+  endpointUrl: String
+  preferredDomainName: String
+  openToPublic: Boolean!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
+}
+
+"""Added in 25.19.0"""
+input ModelDeploymentNetworkAccessInput {
+  preferredDomainName: String = null
+  openToPublic: Boolean! = false
+}
+
+type ModelMountConfig {
+  """Path inside the container where the model is mounted."""
+  mountDestination: String!
+
+  """Path to the model definition file within the mounted folder."""
+  definitionPath: String!
+  vfolder: VirtualFolderNode!
+}
+
+"""Added in 25.19.0"""
+input ModelMountConfigInput {
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+type ModelReplica implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Whether the replica has been checked and its health state."""
+  readinessStatus: ReadinessStatus!
+
+  """Whether the replica is currently running and able to serve requests."""
+  livenessStatus: LivenessStatus!
+
+  """Whether the replica is currently active and able to serve requests."""
+  activenessStatus: ActivenessStatus!
+
+  """Traffic weight for load balancing between replicas."""
+  weight: Int!
+
+  """
+  Detailed information about the routing node including error or success messages.
+  """
+  detail: JSONString!
+
+  """Timestamp when the replica was created."""
+  createdAt: DateTime!
+
+  """Live statistics of the routing node (CPU utilization, etc.)."""
+  liveStat: JSONString!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
+  revision: ModelRevision!
+}
+
+type ModelReplicaConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelReplicaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelReplicaEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelReplica!
+}
+
+type ModelRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The name identifier for this revision."""
+  name: String!
+
+  """Cluster configuration for replica distribution."""
+  clusterConfig: ClusterConfig!
+
+  """Compute resource allocation settings."""
+  resourceConfig: ResourceConfig!
+
+  """Runtime configuration for the inference framework."""
+  modelRuntimeConfig: ModelRuntimeConfig!
+
+  """Model data mount configuration."""
+  modelMountConfig: ModelMountConfig
+
+  """Additional volume folder mounts."""
+  extraMounts: ExtraVFolderMountConnection!
+
+  """Timestamp when the revision was created."""
+  createdAt: DateTime!
+  image: ImageNode!
+}
+
+"""Added in 25.19.0"""
+type ModelRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelRevision!
+}
+
+"""Added in 25.19.0"""
+input ModelRevisionFilter {
+  name: StringFilter = null
+  deploymentId: ID = null
+  AND: [ModelRevisionFilter!] = null
+  OR: [ModelRevisionFilter!] = null
+  NOT: [ModelRevisionFilter!] = null
+}
+
+"""Added in 25.19.0"""
+input ModelRevisionOrderBy {
+  field: ModelRevisionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum ModelRevisionOrderField {
+  CREATED_AT
+  NAME
+}
+
+type ModelRuntimeConfig {
+  """The inference runtime variant (e.g., vllm, triton)."""
+  runtimeVariant: String!
+
+  """Framework-specific configuration in JSON format."""
+  inferenceRuntimeConfig: JSON
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
+  """
+  environ: JSONString
+}
+
+"""Added in 25.19.0"""
+input ModelRuntimeConfigInput {
+  runtimeVariant: String!
+  inferenceRuntimeConfig: JSON = null
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  """
+  environ: JSONString = null
+}
+
+"""
+Added in 25.14.0.
+
+Specifies a target model for scanning operations.
+
+Used to identify specific models in external registries for detailed scanning.
+If revision is not specified, defaults to 'main' revision.
+"""
+input ModelTarget {
+  modelId: String!
+  revision: String = null
+}
+
+type Mutation {
+  """
+  Added in 25.14.0.
+  
+  Scan external registries to discover available artifacts.
+  
+  Searches HuggingFace or Reservoir registries for artifacts matching the specified
+  criteria and registers them in the system with SCANNED status. The artifacts
+  become available for import but are not downloaded until explicitly imported.
+  
+  This is the first step in the artifact workflow: Scan → Import → Use.
+  """
+  scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Perform detailed scanning of specific models.
+  
+  Unlike the general scan_artifacts operation, this performs immediate detailed
+  scanning of specified models including README content and file sizes.
+  Returns artifact revisions with complete metadata ready for use.
+  """
+  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Import scanned artifact revisions from external registries.
+  
+  Downloads the actual files for the specified artifact revisions, transitioning
+  them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
+  
+  Returns background tasks that can be monitored for import progress.
+  Once AVAILABLE, artifacts can be used by users in their sessions.
+  """
+  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+
+  """
+  Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Create or update user-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  These settings will override domain-level settings when configurations are merged for this user.
+  If user_id is not provided, the current user's configuration will be updated.
+  Users can only modify their own configuration, but admins can modify any user's configuration.
+  """
+  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Delete user-level app configuration.
+  After deletion, the user will still receive domain-level configuration values
+  when configurations are merged, as domain settings remain unaffected.
+  If user_id is not provided, the current user's configuration will be deleted.
+  Users can only delete their own configuration, but admins can delete any user's configuration.
+  """
+  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload!
+
+  """
+  Added in 25.15.0.
+  
+  Triggers artifact scanning on a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to initiate a scan of artifacts
+  from its associated remote reservoir registry source. The scan process will discover and
+  catalog artifacts available in the remote reservoir, making them accessible
+  through the local reservoir registry.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator reservoir registry must have a valid remote registry configuration
+  """
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload!
+
+  """
+  Added in 25.15.0.
+  
+  Trigger import of artifact revisions from a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to import specific artifact revisions
+  that were previously discovered during a scan from its remote registry.
+  Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator registry must have a valid remote registry configuration
+  """
+  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Update artifact metadata properties.
+  
+  Modifies artifact metadata such as readonly status and description.
+  This operation does not affect the actual artifact files or revisions.
+  """
+  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+
+  """
+  Added in 25.15.0.
+  
+  Soft-delete artifacts from the system.
+  
+  Marks artifacts as deleted without permanently removing them.
+  Deleted artifacts can be restored using the restore_artifacts mutation.
+  """
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
+
+  """
+  Added in 25.15.0.
+  
+  Restore previously deleted artifacts.
+  
+  Reverses the soft-delete operation, making the artifacts available again
+  for use in the system.
+  """
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Clean up stored artifact revision data to free storage space.
+  
+  Removes the downloaded files for the specified artifact revisions and
+  transitions them back to SCANNED status. The metadata remains, allowing
+  the artifacts to be re-imported later if needed.
+  
+  Use this operation to manage storage usage by removing unused artifacts.
+  """
+  cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Cancel an in-progress artifact import operation.
+  
+  Stops the download process for the specified artifact revision and
+  reverts its status back to SCANNED. The partially downloaded data is cleaned up.
+  """
+  cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
+
+  """Added in 25.16.0"""
+  createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload!
+
+  """Added in 25.16.0"""
+  updateModelDeployment(input: UpdateDeploymentInput!): UpdateDeploymentPayload!
+
+  """Added in 25.16.0"""
+  deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload!
+
+  """
+  Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
+  """
+  syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
+
+  """Added in 25.16.0"""
+  addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
+
+  """
+  Added in 25.16.0. Create model revision which is not attached to any deployment.
+  """
+  createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
+
+  """Create a new notification channel"""
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
+
+  """Update a notification channel"""
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
+
+  """Delete a notification channel"""
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
+
+  """Validate a notification channel"""
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+
+  """Create a new notification rule"""
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
+
+  """Update a notification rule"""
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
+
+  """Delete a notification rule"""
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+
+  """Validate a notification rule"""
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
+
+  """Added in 25.14.0"""
+  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+
+  """Added in 25.14.0"""
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+
+  """Added in 25.16.0"""
+  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload!
+
+  """Added in 25.16.0"""
+  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload!
+
+  """Added in 25.16.0"""
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
+
+  """Added in 25.14.0"""
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+
+  """Added in 25.16.0. Create a new VFS storage"""
+  createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload!
+
+  """Added in 25.16.0. Update an existing VFS storage"""
+  updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload!
+
+  """Added in 25.16.0. Delete a VFS storage"""
+  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
+
+  """
+  Added in 25.15.0.
+  
+  Registers a new namespace within a storage.
+  """
+  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload!
+
+  """
+  Added in 25.15.0.
+  
+  Unregisters an existing namespace from a storage.
+  """
+  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload!
+
+  """Added in 25.14.0"""
+  createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+
+  """Added in 25.14.0"""
+  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Approve an artifact revision for general use.
+  
+  Admin-only operation to approve artifact revisions, typically used
+  in environments with approval workflows for artifact deployment.
+  """
+  approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Reject an artifact revision, preventing its use.
+  
+  Admin-only operation to reject artifact revisions, typically used
+  in environments with approval workflows for artifact deployment.
+  """
+  rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
+
+  """Added in 25.16.0"""
+  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
+
+  """
+  Added in 25.19.0. Activate a specific revision to be the current revision.
+  """
+  activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
+
+  """Added in 25.19.0. Update the traffic status of a route."""
+  updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
+}
+
+"""An object with a Globally Unique ID"""
+interface Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
+"""Notification channel"""
+type NotificationChannel implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  channelType: NotificationChannelType!
+  config: WebhookConfigGQL!
+  enabled: Boolean!
+  createdAt: DateTime!
+}
+
+"""Notification channel connection"""
+type NotificationChannelConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationChannelEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationChannelEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationChannel!
+}
+
+"""Filter for notification channels"""
+input NotificationChannelFilter {
+  name: StringFilter = null
+  channelType: [NotificationChannelType!] = null
+  enabled: Boolean = null
+  AND: [NotificationChannelFilter!] = null
+  OR: [NotificationChannelFilter!] = null
+  NOT: [NotificationChannelFilter!] = null
+}
+
+"""Order by specification for notification channels"""
+input NotificationChannelOrderBy {
+  field: NotificationChannelOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationChannelOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Notification channel types"""
+enum NotificationChannelType {
+  WEBHOOK
+}
+
+"""Notification rule"""
+type NotificationRule implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  ruleType: NotificationRuleType!
+  channel: NotificationChannel!
+  messageTemplate: String!
+  enabled: Boolean!
+  createdAt: DateTime!
+}
+
+"""Notification rule connection"""
+type NotificationRuleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationRuleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationRuleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationRule!
+}
+
+"""Filter for notification rules"""
+input NotificationRuleFilter {
+  name: StringFilter = null
+  ruleType: [NotificationRuleType!] = null
+  enabled: Boolean = null
+  AND: [NotificationRuleFilter!] = null
+  OR: [NotificationRuleFilter!] = null
+  NOT: [NotificationRuleFilter!] = null
+}
+
+"""Order by specification for notification rules"""
+input NotificationRuleOrderBy {
+  field: NotificationRuleOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationRuleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Notification rule types"""
+enum NotificationRuleType {
+  SESSION_STARTED
+  SESSION_TERMINATED
+  ARTIFACT_DOWNLOAD_COMPLETED
+}
+
+"""Added in 25.14.0"""
+type ObjectStorage implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
+}
+
+"""Added in 25.14.0"""
+type ObjectStorageConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorage!
+}
+
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+"""Information to aid in pagination."""
+type PageInfo @shareable {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+
+  """
+  Added in 25.14.0.
+  
+  Retrieve a specific artifact by its ID.
+  
+  Returns detailed information about the artifact including its metadata,
+  registry information, and availability status.
+  """
+  artifact(id: ID!): Artifact
+
+  """
+  Added in 25.14.0.
+  
+  Query artifacts with optional filtering, ordering, and pagination.
+  
+  Returns artifacts that are available in the system, discovered through scanning
+  external registries like HuggingFace or Reservoir. By default, only shows
+  ALIVE (non-deleted) artifacts.
+  
+  Use filters to narrow down results by type, name, registry, or availability.
+  Supports cursor-based pagination for efficient browsing of large datasets.
+  """
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+
+  """
+  Added in 25.14.0.
+  
+  Retrieve a specific artifact revision by its ID.
+  
+  Returns detailed information about the revision including its status,
+  version, file size, and README content.
+  """
+  artifactRevision(id: ID!): ArtifactRevision
+
+  """
+  Added in 25.14.0.
+  
+  Query artifact revisions with optional filtering, ordering, and pagination.
+  
+  Returns specific versions/revisions of artifacts. Each revision represents
+  a specific version of an artifact with its own status, file data, and metadata.
+  
+  Use filters to find revisions by status, version, or artifact ID.
+  Supports cursor-based pagination for efficient browsing.
+  """
+  artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+
+  """
+  Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig
+
+  """
+  Added in 25.16.0.
+  Retrieve user-level app configuration.
+  Returns only the configuration set specifically for the user, without merging with domain config.
+  This query is useful for checking what values are configured at the user level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  If user_id is not provided, returns the current user's configuration.
+  Users can only access their own configuration, but admins can access any user's configuration.
+  """
+  userAppConfig(userId: ID = null): AppConfig
+
+  """
+  Added in 25.16.0.
+  Retrieve merged app configuration for the current user.
+  The result combines domain-level and user-level configurations,
+  where user settings override domain settings for the same keys.
+  This query should be used when working with user app configurations
+  to get the actual configuration values that will be applied.
+  """
+  mergedAppConfig: AppConfig!
+
+  """Added in 25.16.0"""
+  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection!
+
+  """Added in 25.16.0"""
+  deployment(id: ID!): ModelDeployment
+
+  """Added in 25.16.0"""
+  revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
+
+  """Added in 25.16.0"""
+  revision(id: ID!): ModelRevision!
+
+  """Added in 25.16.0"""
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
+
+  """Added in 25.16.0"""
+  replica(id: ID!): ModelReplica
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
+
+  """List available notification rule types"""
+  notificationRuleTypes: [NotificationRuleType!]!
+
+  """Added in 25.14.0"""
+  objectStorage(id: ID!): ObjectStorage
+
+  """Added in 25.14.0"""
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
+
+  """Added in 25.16.0. Get a VFS storage by ID"""
+  vfsStorage(id: ID!): VFSStorage
+
+  """Added in 25.16.0. List all VFS storages"""
+  vfsStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFSStorageConnection!
+
+  """Added in 25.14.0"""
+  huggingfaceRegistry(id: ID!): HuggingFaceRegistry
+
+  """Added in 25.14.0"""
+  huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
+
+  """Added in 25.14.0"""
+  reservoirRegistry(id: ID!): ReservoirRegistry
+
+  """Added in 25.14.0"""
+  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+
+  """Added in 25.18.0. List scaling groups for a specific project"""
+  scalingGroupsV2(project: ID!, filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
+
+  """Added in 25.18.0. List all scaling groups"""
+  allScalingGroupsV2(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
+
+  """Added in 25.15.0"""
+  agentStats: AgentStats!
+
+  """
+  Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes
+  """
+  inferenceRuntimeConfigs: JSON!
+
+  """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
+  inferenceRuntimeConfig(name: String!): JSON!
+
+  """Added in 25.19.0. Get a specific route by ID."""
+  route(id: ID!): Route
+
+  """Added in 25.19.0. List routes for a deployment with optional filters."""
+  routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
+}
+
+"""
+Added in 25.19.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
+"""
+enum ReadinessStatus {
+  NOT_CHECKED
+  HEALTHY
+  UNHEALTHY
+}
+
+"""
+Added in 25.15.0.
+
+Input type for registering a storage namespace.
+"""
+input RegisterStorageNamespaceInput {
+  storageId: UUID!
+  namespace: String!
+}
+
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace registration.
+"""
+type RegisterStorageNamespacePayload {
+  id: UUID!
+}
+
+"""
+Added in 25.14.0.
+
+Input for rejecting an artifact revision.
+
+Admin-only operation to reject artifact revisions, preventing their use.
+"""
+input RejectArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision rejection operations.
+
+Contains the rejected artifact revision. Admin-only operation.
+"""
+type RejectArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.19.0"""
+input ReplicaFilter {
+  status: ReplicaStatusFilter = null
+  trafficStatus: TrafficStatusFilter = null
+  AND: [ReplicaFilter!] = null
+  OR: [ReplicaFilter!] = null
+  NOT: [ReplicaFilter!] = null
+}
+
+"""Added in 25.19.0"""
+input ReplicaOrderBy {
+  field: ReplicaOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum ReplicaOrderField {
+  CREATED_AT
+  ID
+}
+
+type ReplicaState {
+  desiredReplicaCount: Int!
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
+}
+
+"""
+Added in 25.19.0. This enum represents the provisioning status of a replica.
+"""
+enum ReplicaStatus {
+  PROVISIONING
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+  TERMINATING
+  TERMINATED
+  FAILED_TO_START
+}
+
+"""Added in 25.19.0"""
+type ReplicaStatusChangedPayload {
+  replica: ModelReplica!
+}
+
+"""Added in 25.19.0"""
+input ReplicaStatusFilter {
+  in: [ReplicaStatus!] = null
+  equals: ReplicaStatus = null
+}
+
+"""Added in 25.14.0"""
+type ReservoirRegistry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+  remoteArtifactRegistries: ArtifactRegistryMetaConnection!
+}
+
+"""Added in 25.14.0"""
+type ReservoirRegistryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReservoirRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReservoirRegistryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ReservoirRegistry!
+}
+
+type ResourceConfig {
+  """
+  JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
+  """
+  resourceSlots: JSONString!
+
+  """
+  Additional resource options such as shared memory. Example: {"shmem": "64m"}.
+  """
+  resourceOpts: JSONString
+  resourceGroup: ScalingGroupNode!
+}
+
+"""Added in 25.19.0"""
+input ResourceConfigInput {
+  resourceGroup: ResourceGroupInput!
+
+  """
+  Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  """
+  resourceSlots: JSONString!
+
+  """
+  Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  """
+  resourceOpts: JSONString = null
+}
+
+"""Added in 25.19.0"""
+input ResourceGroupInput {
+  name: String!
+}
+
+"""
+Added in 25.15.0.
+
+Input for restoring previously deleted artifacts.
+
+Reverses the soft-delete operation, making the artifacts available again.
+"""
+input RestoreArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for artifact restoration operations.
+
+Contains the artifacts that were restored from soft-deleted state.
+"""
+type RestoreArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
+"""Added in 25.19.0. Configuration for rolling update strategy."""
+input RollingUpdateConfigInput {
+  maxSurge: Int! = 1
+  maxUnavailable: Int! = 0
+}
+
+"""Added in 25.19.0. Represents a route for a model deployment."""
+type Route implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The current status of the route indicating its health state."""
+  status: RouteStatus!
+
+  """
+  The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.
+  """
+  trafficStatus: RouteTrafficStatus!
+
+  """The traffic ratio for load balancing."""
+  trafficRatio: Float!
+
+  """The timestamp when the route was created."""
+  createdAt: DateTime
+
+  """Error data if the route is in a failed state."""
+  errorData: JSONString
+
+  """The deployment this route belongs to."""
+  deployment: ModelDeployment!
+
+  """
+  The session associated with the route. Can be null if the route is still provisioning.
+  """
+  session: ID
+
+  """The revision associated with the route."""
+  revision: ModelRevision
+}
+
+"""Added in 25.19.0. Connection type for paginated route results."""
+type RouteConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RouteEdge!]!
+
+  """Total number of routes matching the filter criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RouteEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Route!
+}
+
+"""Added in 25.19.0. Filter for routes."""
+input RouteFilter {
+  status: [RouteStatus!] = null
+  trafficStatus: [RouteTrafficStatus!] = null
+}
+
+"""Added in 25.19.0. Order by specification for routes."""
+input RouteOrderBy {
+  field: RouteOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum RouteOrderField {
+  CREATED_AT
+  STATUS
+  TRAFFIC_RATIO
+}
+
+"""
+Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
+"""
+enum RouteStatus {
+  PROVISIONING
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+  TERMINATING
+  TERMINATED
+  FAILED_TO_START
+}
+
+"""
+Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.
+"""
+enum RouteTrafficStatus {
+  ACTIVE
+  INACTIVE
+}
+
+"""Added in 25.18.0. Driver configuration for resource allocation"""
+type ScalingGroupDriverConfig {
+  """
+  Agent resource driver implementation name.
+  'static' uses a predefined set of agents registered to this scaling group.
+  """
+  name: String!
+
+  """Driver-specific configuration options. Contents vary by driver type."""
+  options: JSON!
+}
+
+"""Added in 25.18.0. Filter for scaling groups"""
+input ScalingGroupFilter {
+  name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
+  driver: String = null
+  scheduler: String = null
+  useHostNetwork: Boolean = null
+  AND: [ScalingGroupFilter!] = null
+  OR: [ScalingGroupFilter!] = null
+  NOT: [ScalingGroupFilter!] = null
+}
+
+"""Added in 25.18.0. Metadata information for a scaling group"""
+type ScalingGroupMetadata {
+  """Human-readable description of the scaling group's purpose"""
+  description: String!
+
+  """Timestamp when the scaling group was created"""
+  createdAt: DateTime!
+}
+
+"""Added in 25.18.0. Network configuration for a scaling group"""
+type ScalingGroupNetworkConfig {
+  """
+  App-proxy coordinator API server address.
+  Manager uses this address to communicate with the app-proxy coordinator
+  for managing service routes, endpoint registration, and proxying client connections
+  to session services.
+  """
+  wsproxyAddr: String!
+
+  """Authentication token for the App-proxy coordinator API server."""
+  wsproxyApiToken: String!
+
+  """
+  Whether session containers use the host's network namespace
+  instead of isolated container networking.
+  Enables direct host port binding but reduces isolation.
+  """
+  useHostNetwork: Boolean!
+}
+
+extend type ScalingGroupNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""Added in 25.18.0. Order by specification for scaling groups"""
+input ScalingGroupOrderBy {
+  field: ScalingGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ScalingGroupOrderField {
+  NAME
+  CREATED_AT
+  IS_ACTIVE
+  IS_PUBLIC
+}
+
+"""Added in 25.18.0. Scheduler configuration for session scheduling"""
+type ScalingGroupSchedulerConfig {
+  """
+  Scheduling algorithm implementation.
+  'fifo' schedules oldest pending sessions first,
+  'lifo' schedules newest first,
+  'drf' (Dominant Resource Fairness) balances resource usage across users.
+  """
+  name: ScalingGroupSchedulerType!
+
+  """
+  Detailed scheduler behavior configuration including session type restrictions,
+  timeouts, agent selection strategy, and resource allocation policies.
+  """
+  options: ScalingGroupSchedulerOptions!
+}
+
+"""Added in 25.18.0. Scheduler configuration options"""
+type ScalingGroupSchedulerOptions {
+  """
+  Session types that can be scheduled in this scaling group.
+  Valid values: 'interactive' , 'batch', 'inference'.
+  Requests for unlisted types are rejected.
+  """
+  allowedSessionTypes: [String!]!
+
+  """
+  Maximum time in seconds a session can wait in PENDING state
+  before automatic cancellation.
+  Zero means no timeout.
+  Used to prevent indefinite resource waiting when no agents are available.
+  """
+  pendingTimeout: Float!
+
+  """
+  Scheduler-specific configuration options.
+  Contents depend on the scheduler implementation (fifo/lifo/drf).
+  Used for advanced scheduling behavior customization.
+  """
+  config: JSON!
+
+  """
+  Algorithm for selecting target agents when scheduling sessions.
+  'dispersed' spreads sessions across available agents,
+  'concentrated' packs sessions onto fewer agents,
+  'roundrobin' cycles through agents sequentially.
+  """
+  agentSelectionStrategy: String!
+
+  """
+  Configuration for the agent selection strategy.
+  Structure varies by strategy - for example,
+  concentrated strategy may specify endpoint spreading rules.
+  """
+  agentSelectorConfig: JSON!
+
+  """
+  Whether inference service replicas should be distributed across different agents
+  instead of co-locating on same agent.
+  When true, forces replica spreading.
+  Applied only when using concentrated agent selection strategy.
+  Improves fault tolerance for model serving.
+  """
+  enforceSpreadingEndpointReplica: Boolean!
+
+  """
+  Whether agents accept session requests that allocate fractional resources
+  (e.g., 0.5 GPU) causing resource fragmentation.
+  When false, agents reject sessions that would prevent future efficient resource allocation.
+  """
+  allowFractionalResourceFragmentation: Boolean!
+
+  """
+  List of route health statuses that trigger automatic cleanup of service routes.
+  Valid values: 'healthy', 'unhealthy', 'degraded'.
+  Default: ['unhealthy'].
+  """
+  routeCleanupTargetStatuses: [String!]!
+}
+
+"""
+Added in 25.18.0. Scheduler type for session scheduling.
+
+- FIFO: First-In-First-Out - Schedules oldest pending sessions first
+- LIFO: Last-In-First-Out - Schedules newest pending sessions first
+- DRF: Dominant Resource Fairness - Balances resource usage across users
+"""
+enum ScalingGroupSchedulerType {
+  FIFO
+  LIFO
+  DRF
+}
+
+"""Added in 25.18.0. Status information for a scaling group"""
+type ScalingGroupStatus {
+  """
+  Whether the scaling group can accept new session creation requests.
+  Inactive scaling groups are excluded from scheduling and cannot start new sessions.
+  """
+  isActive: Boolean!
+
+  """
+  Whether this scaling group is available for regular user sessions
+  (interactive/batch/inference).
+  When false, the scaling group is reserved for internal SYSTEM-type sessions only,
+  such as management or infrastructure sessions.
+  """
+  isPublic: Boolean!
+}
+
+"""Added in 25.18.0. Scaling group with structured configuration"""
+type ScalingGroupV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique name identifying the scaling group.
+  Used as primary key and referenced by agents, sessions, and resource presets.
+  """
+  name: String!
+
+  """
+  Operational status controlling whether this scaling group accepts new sessions
+  and its visibility to users without explicit access grants.
+  """
+  status: ScalingGroupStatus!
+
+  """
+  Administrative metadata including human-readable description
+  and creation timestamp for audit and documentation purposes.
+  """
+  metadata: ScalingGroupMetadata!
+
+  """
+  Network configuration for connecting clients to interactive session services
+  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
+  """
+  network: ScalingGroupNetworkConfig!
+
+  """
+  Agent resource management driver determining how compute agents are provisioned
+  and registered to this scaling group (static registration vs dynamic provisioning).
+  """
+  driver: ScalingGroupDriverConfig!
+
+  """
+  Session scheduling configuration controlling queue management,
+  agent selection strategy, resource allocation policies,
+  and session lifecycle timeouts.
+  """
+  scheduler: ScalingGroupSchedulerConfig!
+}
+
+"""Added in 25.18.0. Scaling group connection"""
+type ScalingGroupV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ScalingGroupV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ScalingGroupV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScalingGroupV2!
+}
+
+type ScalingRule {
+  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
+}
+
+"""
+Added in 25.14.0.
+
+Input for batch scanning of specific models from external registries.
+
+Scans multiple specified models and retrieves detailed information including
+README content and file sizes. This operation performs immediate detailed scanning
+unlike the general scan_artifacts which only retrieves basic metadata.
+"""
+input ScanArtifactModelsInput {
+  models: [ModelTarget!]!
+  registryId: UUID = null
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for batch model scanning operations.
+
+Contains the artifact revisions discovered during detailed scanning of specific models,
+including README content and file size information.
+"""
+type ScanArtifactModelsPayload {
+  artifactRevision: ArtifactRevisionConnection!
+}
+
+"""
+Added in 25.14.0.
+
+Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+
+Discovers available artifacts and registers their metadata in the system.
+Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
+"""
+input ScanArtifactsInput {
+  registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+  artifactType: ArtifactType = null
+  search: String = null
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact scanning operations.
+
+Contains the list of artifacts discovered during scanning of external registries.
+These artifacts are registered with SCANNED status and can be imported for actual use.
+"""
+type ScanArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
+"""Added in 25.15.0. Scheduling event broadcast payload"""
+type SchedulingBroadcastEventPayload {
+  statusTransition: SchedulingStatus!
+  reason: String!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
+}
+
+"""Status of session scheduling transitions"""
+enum SchedulingStatus {
+  PENDING
+  SCHEDULED
+  PREPARING
+  PULLING
+  PREPARED
+  CREATING
+  RUNNING
+  TERMINATING
+  TERMINATED
+  CANCELLED
+  ERROR
+}
+
+"""
+Added in 25.14.0.
+
+Information about the source or registry of an artifact.
+
+Contains the name and URL of the registry where the artifact is stored or originates from.
+"""
+type SourceInfo {
+  name: String
+  url: String
+}
+
+"""
+Added in 25.15.0.
+
+Storage namespace provides logical separation of data within a single storage system
+to organize and isolate domain-specific concerns.
+
+Implementation varies by storage type:
+- Object Storage (S3, MinIO): Uses bucket-based namespace separation
+- File System (VFS): Uses directory path prefix for namespace distinction
+"""
+type StorageNamespace implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  namespace: String!
+}
+
+"""
+Added in 25.15.0.
+
+Storage namespace connection for pagination.
+"""
+type StorageNamespaceConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [StorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type StorageNamespaceEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageNamespace!
+}
+
+input StringFilter {
+  contains: String = null
+  startsWith: String = null
+  endsWith: String = null
+  equals: String = null
+  notContains: String = null
+  notStartsWith: String = null
+  notEndsWith: String = null
+  notEquals: String = null
+  iContains: String = null
+  iStartsWith: String = null
+  iEndsWith: String = null
+  iEquals: String = null
+  iNotContains: String = null
+  iNotStartsWith: String = null
+  iNotEndsWith: String = null
+  iNotEquals: String = null
+}
+
+type Subscription {
+  """
+  Added in 25.14.0.
+  
+  Subscribe to real-time artifact status change notifications.
+  
+  Receives updates when artifact revision statuses change during import,
+  cleanup, or other operations. Useful for building reactive UIs that
+  show live progress of artifact operations.
+  """
+  artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
+
+  """
+  Added in 25.14.0.
+  
+  Subscribe to real-time artifact import progress updates.
+  
+  Receives progress notifications during artifact import operations,
+  including percentage completed and current status. Useful for displaying
+  progress bars and real-time import status to users.
+  """
+  artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
+
+  """Added in 25.16.0. Subscribe to deployment status changes"""
+  deploymentStatusChanged: DeploymentStatusChangedPayload!
+
+  """Added in 25.16.0"""
+  replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+
+  """
+  Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
+  """
+  schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
+
+  """
+  Subscribe to real-time events for a specific background task. Streams progress updates and completion events (done/cancelled/failed) for the task lifecycle.
+  """
+  backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
+}
+
+"""Added in 25.19.0"""
+input SyncReplicaInput {
+  modelDeploymentId: ID!
+}
+
+"""Added in 25.19.0"""
+type SyncReplicaPayload {
+  success: Boolean!
+}
+
+"""
+Added in 25.19.0. This enum represents the traffic status of a replica.
+"""
+enum TrafficStatus {
+  ACTIVE
+  INACTIVE
+}
+
+"""Added in 25.19.0"""
+input TrafficStatusFilter {
+  in: [TrafficStatus!] = null
+  equals: TrafficStatus = null
+}
+
+scalar UUID
+
+"""
+Added in 25.15.0.
+
+Input type for unregistering a storage namespace.
+"""
+input UnregisterStorageNamespaceInput {
+  storageId: UUID!
+  namespace: String!
+}
+
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace unregistration.
+"""
+type UnregisterStorageNamespacePayload {
+  id: UUID!
+}
+
+"""
+Added in 25.14.0.
+
+Input for updating artifact metadata properties.
+
+Modifies artifact metadata such as readonly status and description.
+This operation does not affect the actual artifact files or revisions.
+"""
+input UpdateArtifactInput {
+  artifactId: ID!
+  readonly: Boolean
+  description: String
+}
+
+"""
+Added in 25.14.0.
+
+Response payload for artifact update operations.
+
+Returns the updated artifact with modified metadata properties.
+"""
+type UpdateArtifactPayload {
+  artifact: Artifact!
+}
+
+input UpdateAutoScalingRuleInput {
+  id: ID!
+  metricSource: AutoScalingMetricSource
+  metricName: String
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int
+  timeWindow: Int
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type UpdateAutoScalingRulePayload {
+  autoScalingRule: AutoScalingRule!
+}
+
+"""Added in 25.19.0"""
+input UpdateDeploymentInput {
+  id: ID!
+  openToPublic: Boolean = null
+  tags: [String!] = null
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
+  activeRevisionId: ID = null
+  desiredReplicaCount: Int = null
+  name: String = null
+  preferredDomainName: String = null
+}
+
+"""Added in 25.19.0"""
+type UpdateDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
+"""Added in 25.14.0"""
+input UpdateHuggingFaceRegistryInput {
+  id: ID!
+  url: String
+  name: String
+  token: String
+}
+
+"""Added in 25.14.0"""
+type UpdateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""Input for updating a notification channel"""
+input UpdateNotificationChannelInput {
+  id: ID!
+  name: String
+  description: String
+  config: WebhookConfigInput
+  enabled: Boolean
+}
+
+"""Payload for update notification channel mutation"""
+type UpdateNotificationChannelPayload {
+  channel: NotificationChannel!
+}
+
+"""Input for updating a notification rule"""
+input UpdateNotificationRuleInput {
+  id: ID!
+  name: String
+  description: String
+  messageTemplate: String
+  enabled: Boolean
+}
+
+"""Payload for update notification rule mutation"""
+type UpdateNotificationRulePayload {
+  rule: NotificationRule!
+}
+
+"""Added in 25.14.0"""
+input UpdateObjectStorageInput {
+  id: ID!
+  name: String
+  host: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
+  region: String
+}
+
+"""Added in 25.14.0"""
+type UpdateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
+"""Added in 25.14.0"""
+input UpdateReservoirRegistryInput {
+  id: ID!
+  name: String
+  endpoint: String
+  accessKey: String
+  secretKey: String
+  apiVersion: String
+}
+
+"""Added in 25.14.0"""
+type UpdateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
+}
+
+"""Added in 25.19.0. Input for updating route traffic status."""
+input UpdateRouteTrafficStatusInput {
+  """The ID of the route to update."""
+  routeId: ID!
+
+  """The new traffic status (ACTIVE/INACTIVE)."""
+  trafficStatus: RouteTrafficStatus!
+}
+
+"""Added in 25.19.0. Result of updating route traffic status."""
+type UpdateRouteTrafficStatusPayload {
+  """The updated route."""
+  route: Route!
+}
+
+"""Added in 25.16.0. Input for updating VFS storage"""
+input UpdateVFSStorageInput {
+  id: ID!
+  name: String
+  host: String
+  basePath: String
+}
+
+"""Added in 25.16.0. Payload for updating VFS storage"""
+type UpdateVFSStoragePayload {
+  vfsStorage: VFSStorage!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating domain-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+All users in this domain will be affected by these settings when their configurations are merged.
+"""
+input UpsertDomainConfigInput {
+  domainName: String!
+  extraConfig: JSON!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting domain-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertDomainConfigPayload {
+  appConfig: AppConfig!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating user-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+These settings will override domain-level settings when configurations are merged for this user.
+If user_id is not provided, the current user's configuration will be updated.
+"""
+input UpsertUserConfigInput {
+  extraConfig: JSON!
+  userId: ID = null
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting user-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertUserConfigPayload {
+  appConfig: AppConfig!
+}
+
+extend type UserNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""Added in 25.16.0. VFS Storage configuration"""
+type VFSStorage implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  host: String!
+  basePath: String!
+}
+
+"""Added in 25.16.0. VFS Storage connection"""
+type VFSStorageConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [VFSStorageEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type VFSStorageEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: VFSStorage!
+}
+
+"""Input for validate notification channel mutation"""
+input ValidateNotificationChannelInput {
+  id: ID!
+  testMessage: String!
+}
+
+"""Payload for validate notification channel mutation"""
+type ValidateNotificationChannelPayload {
+  id: ID!
+}
+
+"""Input for validate notification rule mutation"""
+input ValidateNotificationRuleInput {
+  id: ID!
+  notificationData: JSON
+}
+
+"""Payload for validate notification rule mutation"""
+type ValidateNotificationRulePayload {
+  message: String!
+}
+
+extend type VirtualFolderNode @key(fields: "id") {
+  id: ID! @external
+}
+
+type WebhookConfigGQL {
+  url: String!
+}
+
+"""Input for webhook configuration"""
+input WebhookConfigInput {
+  url: String!
+}
+
+scalar _Any
+
+union _Entity = ComputeSessionNode | DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
+
+type _Service {
+  sdl: String!
+}

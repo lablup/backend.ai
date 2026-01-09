@@ -7,18 +7,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import weakref
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import AbstractAsyncContextManager
 from contextlib import contextmanager as ctxmgr
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterator,
     NotRequired,
     Optional,
     TypedDict,
@@ -26,16 +23,23 @@ from typing import (
 )
 
 import attr
-import attrs
 import jwt
 import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    api_handler,
+)
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.events.event_types.vfolder.anycast import (
-    VFolderDeletionFailureEvent,
-    VFolderDeletionSuccessEvent,
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
+from ai.backend.common.dto.storage.response import (
+    FileDeleteAsyncResponse,
+    VFolderCloneResponse,
+    VFolderDeleteResponse,
 )
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
@@ -59,26 +63,36 @@ from ai.backend.common.types import (
     VolumeMountableNodeType,
 )
 from ai.backend.logging import BraceStyleAdapter
-
-from .. import __version__
-from ..exception import (
-    ExecutionError,
-    ExternalError,
+from ai.backend.storage import __version__
+from ai.backend.storage.bgtask.tasks.clone import VFolderCloneManifest
+from ai.backend.storage.bgtask.tasks.delete import VFolderDeleteManifest
+from ai.backend.storage.bgtask.tasks.delete_files import FileDeleteManifest
+from ai.backend.storage.bgtask.types import StorageBgtaskName
+from ai.backend.storage.dto.context import StorageRootCtx
+from ai.backend.storage.errors import (
+    ExternalStorageServiceError,
+    InvalidAPIParameters,
     InvalidQuotaConfig,
     InvalidSubpathError,
+    ProcessExecutionError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ..types import QuotaConfig, VFolderID
-from ..utils import check_params, log_manager_api_entry
-from ..watcher import ChownTask, MountTask, UmountTask
+from ai.backend.storage.types import QuotaConfig, VFolderID
+from ai.backend.storage.utils import check_params, log_manager_api_entry
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
+
+from .v1.registries.huggingface import create_app as create_huggingface_registries_app
+from .v1.registries.reservoir import create_app as create_reservoir_registries_app
+from .v1.storages.object_storage import create_app as create_object_storages_app
+from .v1.storages.vfs_storage import create_app as create_vfs_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..context import RootContext, ServiceContext
-    from ..volumes.abc import AbstractVolume
+    from ai.backend.storage.context import RootContext, ServiceContext
+    from ai.backend.storage.volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -92,10 +106,26 @@ async def token_auth_middleware(
     if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (missing auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
         ctx: RootContext = request.app["ctx"]
         if token != ctx.local_config.api.manager.secret:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (invalid auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
     return await handler(request)
 
 
@@ -104,6 +134,24 @@ def skip_token_auth(
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     setattr(handler, "skip_token_auth", True)
     return handler
+
+
+@skip_token_auth
+async def check_health(request: web.Request) -> web.Response:
+    """Health check endpoint with dependency connectivity status"""
+
+    request["do_not_print_access_log"] = True
+
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="storage-proxy",
+        connectivity=connectivity,
+    )
+
+    return web.json_response(response.model_dump(mode="json"))
 
 
 @skip_token_auth
@@ -156,7 +204,7 @@ def handle_fs_errors(
 def handle_external_errors() -> Iterator[None]:
     try:
         yield
-    except ExternalError as e:
+    except ExternalStorageServiceError as e:
         raise web.HTTPInternalServerError(
             text=dump_json_str({
                 "msg": str(e),
@@ -195,7 +243,7 @@ async def get_hwinfo(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -220,7 +268,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -255,7 +303,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -286,7 +334,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         options: QuotaConfig
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -324,7 +372,7 @@ async def unset_quota(request: web.Request) -> web.Response:
         qsid: QuotaScopeID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -354,7 +402,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -369,7 +417,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
-        assert params["vfid"].quota_scope_id is not None
+        if params["vfid"].quota_scope_id is None:
+            raise InvalidAPIParameters("quota_scope_id is required for vfid")
         ctx: RootContext = request.app["ctx"]
         perm_mode = cast(
             int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
@@ -378,7 +427,12 @@ async def create_vfolder(request: web.Request) -> web.Response:
             try:
                 await volume.create_vfolder(params["vfid"], mode=perm_mode)
             except QuotaScopeNotFoundError:
-                assert params["vfid"].quota_scope_id
+                if not ctx.local_config.storage_proxy.auto_quota_scope_creation:
+                    raise
+                if not params["vfid"].quota_scope_id:
+                    raise InvalidAPIParameters(
+                        "quota_scope_id is required for auto quota scope creation"
+                    )
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):
@@ -391,7 +445,9 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 try:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
-                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found."
+                    )
             return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -401,7 +457,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -414,57 +470,17 @@ async def delete_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
-        app_ctx: PrivateContext = request.app["app_ctx"]
         vfid: VFolderID = params["vfid"]
-
-        async def _delete_vfolder(
-            task_map: weakref.WeakValueDictionary[VFolderID, asyncio.Task],
-        ) -> None:
-            current_task = asyncio.current_task()
-            assert current_task is not None
-            task_map[vfid] = current_task
-
-            try:
-                async with ctx.get_volume(params["volume"]) as volume:
-                    await volume.delete_vfolder(vfid)
-            except OSError as e:
-                msg = str(e) if e.strerror is None else e.strerror
-                msg = f"{msg} (errno:{e.errno})"
-                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
-                await ctx.event_producer.anycast_event(
-                    VFolderDeletionFailureEvent(
-                        vfid,
-                        msg,
-                    )
-                )
-            except Exception as e:
-                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
-                await ctx.event_producer.anycast_event(
-                    VFolderDeletionFailureEvent(
-                        vfid,
-                        str(e),
-                    )
-                )
-            except asyncio.CancelledError:
-                log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
-            else:
-                log.info(f"VFolder deletion task successed. (vfid:{vfid})")
-                await ctx.event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid))
-
-        try:
-            async with ctx.get_volume(params["volume"]) as volume:
-                await volume.get_vfolder_mount(vfid, ".")
-        except VFolderNotFoundError:
-            ongoing_task = app_ctx.deletion_tasks.get(vfid)
-            if ongoing_task is not None:
-                ongoing_task.cancel()
-            return web.Response(status=HTTPStatus.GONE)
-        else:
-            ongoing_task = app_ctx.deletion_tasks.get(vfid)
-            if ongoing_task is None or ongoing_task.done():
-                asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
-
-    return web.Response(status=HTTPStatus.ACCEPTED)
+        delete_manifest = VFolderDeleteManifest(
+            volume=params["volume"],
+            vfolder_id=vfid,
+        )
+        task_id = await ctx.background_task_manager.start_retriable(
+            StorageBgtaskName.DELETE_VFOLDER,
+            delete_manifest,
+        )
+        data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
+        return web.json_response(data, status=HTTPStatus.ACCEPTED)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -473,10 +489,9 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         src_vfid: VFolderID
         dst_volume: str | None  # deprecated
         dst_vfid: VFolderID
-        options: dict[str, Any] | None  # deprecated
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -485,9 +500,8 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                     t.Key("src_vfid"): tx.VFolderID(),
                     t.Key("dst_volume"): t.String() | t.Null,
                     t.Key("dst_vfid"): tx.VFolderID(),
-                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
-            ),
+            ).allow_extra("*"),
         ),
     ) as params:
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
@@ -496,12 +510,17 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
-        async with ctx.get_volume(params["src_volume"]) as src_volume:
-            await src_volume.clone_vfolder(
-                params["src_vfid"],
-                params["dst_vfid"],
-            )
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        clone_manifest = VFolderCloneManifest(
+            volume=params["src_volume"],
+            src_vfolder=params["src_vfid"],
+            dst_vfolder=params["dst_vfid"],
+        )
+        task_id = await ctx.background_task_manager.start_retriable(
+            StorageBgtaskName.CLONE_VFOLDER,
+            clone_manifest,
+        )
+        data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
+        return web.json_response(data)
 
 
 async def get_vfolder_mount(request: web.Request) -> web.Response:
@@ -511,7 +530,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
         subpath: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -564,7 +583,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -597,7 +616,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -641,7 +660,7 @@ async def get_metadata(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -667,7 +686,7 @@ async def set_metadata(request: web.Request) -> web.Response:
         payload: bytes
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -692,7 +711,7 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
         volume: str
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -720,7 +739,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -742,7 +761,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                         "used_bytes": usage.used_bytes,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
@@ -755,7 +774,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -776,7 +795,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
                         "used_bytes": usage,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
@@ -789,7 +808,7 @@ async def get_quota(request: web.Request) -> web.Response:
         vfid: VFolderID
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -814,7 +833,7 @@ async def set_quota(request: web.Request) -> web.Response:
         size_bytes: BinarySize
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -842,7 +861,7 @@ async def mkdir(request: web.Request) -> web.Response:
         exist_ok: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -874,7 +893,7 @@ async def mkdir(request: web.Request) -> web.Response:
             result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
             failed_cases = [isinstance(res, BaseException) for res in result_group]
 
-        for relpath, result_or_exception in zip(relpaths, result_group):
+        for relpath, result_or_exception in zip(relpaths, result_group, strict=True):
             if isinstance(result_or_exception, BaseException):
                 log.error(
                     "Failed to create the directory {!r} in vol:{}/vfid:{}:",
@@ -915,7 +934,7 @@ async def list_files(request: web.Request) -> web.Response:
         relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -965,7 +984,7 @@ async def rename_file(request: web.Request) -> web.Response:
         is_dir: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1000,7 +1019,7 @@ async def move_file(request: web.Request) -> web.Response:
         dst_relpath: PurePosixPath
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1034,7 +1053,7 @@ async def create_download_session(request: web.Request) -> web.Response:
         unmanaged_path: str | None
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1055,7 +1074,7 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
@@ -1077,7 +1096,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         size: int
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1101,7 +1120,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow() + ctx.local_config.storage_proxy.session_expire,
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
         }
         token = jwt.encode(
             token_data,
@@ -1123,7 +1142,7 @@ async def delete_files(request: web.Request) -> web.Response:
         recursive: bool
 
     async with cast(
-        AsyncContextManager[Params],
+        AbstractAsyncContextManager[Params],
         check_params(
             request,
             t.Dict(
@@ -1152,18 +1171,39 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
-@attrs.define(slots=True)
-class PrivateContext:
-    deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
+class FileOperationHandler:
+    """Handler for file operations within vfolders."""
+
+    @api_handler
+    async def delete_files_async(
+        self,
+        body: BodyParam[FileDeleteAsyncRequest],
+        ctx: StorageRootCtx,
+    ) -> APIResponse:
+        """Delete files or directories asynchronously using background tasks."""
+        # Create file deletion manifest
+        delete_manifest = FileDeleteManifest(
+            volume=body.parsed.volume,
+            vfolder_id=body.parsed.vfid,
+            relpaths=body.parsed.relpaths,
+            recursive=body.parsed.recursive,
+        )
+
+        # Start background task
+        task_id = await ctx.root_ctx.background_task_manager.start_retriable(
+            StorageBgtaskName.DELETE_FILES,
+            delete_manifest,
+        )
+
+        # Return task ID with HTTP 202 ACCEPTED
+        return APIResponse.build(
+            status_code=HTTPStatus.ACCEPTED,
+            response_model=FileDeleteAsyncResponse(bgtask_id=task_id),
+        )
 
 
 async def _shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["app_ctx"]
-    for task in app_ctx.deletion_tasks.values():
-        task.cancel()
-        await asyncio.sleep(0)
-        if not task.done():
-            await task
+    pass
 
 
 def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
@@ -1224,10 +1264,13 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
         ],
     )
     app["ctx"] = ctx
-    app_ctx = PrivateContext(deletion_tasks=weakref.WeakValueDictionary())
-    app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
+
+    # Initialize handlers
+    file_operation_handler = FileOperationHandler()
+
     app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1255,8 +1298,15 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route(
+        "POST", "/folder/file/delete-async", file_operation_handler.delete_files_async
+    )
 
-    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
+    app.add_subapp("/v1/storages/s3", create_object_storages_app(ctx))
+    app.add_subapp("/v1/storages/vfs", create_vfs_storages_app(ctx))
+    app.add_subapp("/v1/registries/huggingface", create_huggingface_registries_app(ctx))
+    app.add_subapp("/v1/registries/reservoir", create_reservoir_registries_app(ctx))
+
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
@@ -1264,9 +1314,11 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
-def init_internal_app() -> web.Application:
+def init_internal_app(ctx: RootContext) -> web.Application:
     app = web.Application()
+    app["ctx"] = ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 

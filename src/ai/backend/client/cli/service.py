@@ -1,11 +1,11 @@
 import json
 import sys
-from typing import Literal, Optional, Sequence
+from collections.abc import Sequence
+from typing import Literal, Optional
 from uuid import UUID
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import (
     prepare_env_arg,
@@ -13,16 +13,16 @@ from ai.backend.client.cli.session.execute import (
     prepare_resource_arg,
 )
 from ai.backend.client.compat import asyncio_run
+from ai.backend.client.exceptions import BackendError
+from ai.backend.client.output.fields import routing_fields, service_fields
+from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
-from ..exceptions import BackendError
-from ..output.fields import routing_fields, service_fields
-from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .pretty import ProgressViewer, print_done, print_fail, print_warn
+from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
@@ -59,7 +59,7 @@ def get_service_id(session: Session, name_or_id: str) -> UUID:
         return UUID(name_or_id)
 
 
-@main.group()
+@click.group()
 def service() -> None:
     """Set of service operations"""
 
@@ -550,23 +550,20 @@ def try_start(
 
     async def try_start_tracker(bgtask_id):
         async with AsyncSession() as session:
+            completion_msg_func = lambda: print_done("Model service validation started.")
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Model service validation started.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Starting the session...") as viewer,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
                                 print(data["message"])
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-                                else:
-                                    pbar.total = data["total_progress"]
-                                    pbar.update(data["current_progress"] - pbar.n)
+                                pbar.total = data["total_progress"]
+                                pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Mapping, TypeAlias
+from collections.abc import Awaitable, Callable, Mapping
+from typing import TypeAlias
 
 import aiohttp_cors
 from aiohttp import web

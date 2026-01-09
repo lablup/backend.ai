@@ -8,25 +8,12 @@ import asyncio
 import functools
 import json
 import logging
-import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-    cast,
-    get_args,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
+from uuid import UUID
 
 import aiohttp_cors
 import aiotools
@@ -35,6 +22,7 @@ import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
+from aiotools import cancel_and_wait
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, Field
 from sqlalchemy.sql.expression import null, true
@@ -92,6 +80,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import (
+    SESSION_PRIORITY_DEFAULT,
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
+)
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
@@ -108,24 +101,17 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    SessionDependencyRow,
-    SessionRow,
-    UserRole,
-    kernels,
-    keypairs,
-)
-from ..models.session import (
-    SESSION_PRIORITY_DEFAULT,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
-)
-from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -153,9 +139,8 @@ class UndefChecker(t.Trafaret):
     def check_and_return(self, value: Any) -> object:
         if value == undefined:
             return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
+        self._failure("Invalid Undef format", value=value)
+        return None
 
 
 resource_opts_iv = t.Dict({
@@ -353,7 +338,7 @@ overwritten_param_check = t.Dict({
 
 def sub(d, old, new):
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             d[k] = sub(v, old, new)
         elif d[k] == old:
             d[k] = new
@@ -363,7 +348,7 @@ def sub(d, old, new):
 def drop_undefined(d):
     newd = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             newval = drop_undefined(v)
             if len(newval.keys()) > 0:  # exclude empty dict always
                 newd[k] = newval
@@ -376,7 +361,7 @@ async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
-) -> Tuple[uuid.UUID, uuid.UUID, dict]:
+) -> tuple[UUID, UUID, dict]:
     try:
         return await _query_userinfo(
             conn,
@@ -455,13 +440,13 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 8 <= api_version[0]:
+        if api_version[0] >= 8:
             params["config"] = creation_config_v6_template.check(params["config"])
-        elif 6 <= api_version[0]:
+        elif api_version[0] >= 6:
             params["config"] = creation_config_v5_template.check(params["config"])
-        elif 5 <= api_version[0]:
+        elif api_version[0] >= 5:
             params["config"] = creation_config_v4_template.check(params["config"])
-        elif (4, "20190315") <= api_version:
+        elif api_version >= (4, "20190315"):
             params["config"] = creation_config_v3_template.check(params["config"])
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
@@ -568,15 +553,15 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
-    if 9 <= api_version[0]:
+    if api_version[0] >= 9:
         creation_config = creation_config_v7.check(params["config"])
-    elif 8 <= api_version[0]:
+    elif api_version[0] >= 8:
         creation_config = creation_config_v6.check(params["config"])
-    elif 6 <= api_version[0]:
+    elif api_version[0] >= 6:
         creation_config = creation_config_v5.check(params["config"])
-    elif 5 <= api_version[0]:
+    elif api_version[0] >= 5:
         creation_config = creation_config_v4.check(params["config"])
-    elif (4, "20190315") <= api_version:
+    elif api_version >= (4, "20190315"):
         creation_config = creation_config_v3.check(params["config"])
     elif 2 <= api_version[0] <= 4:
         creation_config = creation_config_v2.check(params["config"])
@@ -597,20 +582,6 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
             )
-        agent_count = len(agent_list)
-        if params["cluster_mode"] == "multi-node":
-            if agent_count != params["cluster_size"]:
-                raise InvalidAPIParameters(
-                    "For multi-node cluster sessions, the number of manually assigned"
-                    " agents must be same to the cluster size. Note that you may specify"
-                    " duplicate agents in the list.",
-                )
-        else:
-            if agent_count != 1:
-                raise InvalidAPIParameters(
-                    "For non-cluster sessions and single-node cluster sessions, "
-                    "you may specify only one manually assigned agent.",
-                )
 
     if params["domain"] is None:
         domain_name = request["user"]["domain_name"]
@@ -752,7 +723,8 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     result = await root_ctx.processors.session.start_service.wait_for_complete(
         StartServiceAction(
             session_name=session_name,
@@ -785,7 +757,8 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
 
     log.info(
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -840,20 +813,16 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     log.info(
         "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
     )
-    try:
-        await root_ctx.processors.agent.sync_agent_registry.wait_for_complete(
-            SyncAgentRegistryAction(
-                agent_id=agent_id,
-            )
+    await root_ctx.processors.agent.sync_agent_registry.wait_for_complete(
+        SyncAgentRegistryAction(
+            agent_id=agent_id,
         )
-    except BackendAIError:
-        log.exception("SYNC_AGENT_REGISTRY: exception")
-        raise
+    )
     return web.json_response({}, status=HTTPStatus.OK)
 
 
 class TransitSessionStatusRequestModel(LegacyBaseRequestModel):
-    ids: list[uuid.UUID] = Field(
+    ids: list[UUID] = Field(
         validation_alias=AliasChoices("session_ids", "sessionIds", "SessionIds"),
         description="ID array of sessions to check and transit status.",
     )
@@ -872,7 +841,7 @@ async def check_and_transit_status(
     root_ctx: RootContext = request.app["_root.context"]
     session_ids = [SessionId(id) for id in params.ids]
     user_role = cast(UserRole, request["user"]["role"])
-    user_id = cast(uuid.UUID, request["user"]["uuid"])
+    user_id = cast(UUID, request["user"]["uuid"])
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
 
@@ -903,7 +872,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-    filename: str | None = params["filename"]
+    filename: Optional[str] = params["filename"]
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -925,7 +894,7 @@ class ConvertSessionToImageRequesteModel(LegacyBaseRequestModel):
         pattern=r"[a-zA-Z0-9\.\-_]+",
         description="Name of the image to be created.",
     )
-    login_session_token: Annotated[str | None, Field(default=None)]
+    login_session_token: Annotated[Optional[str], Field(default=None)]
     image_visibility: CustomizedImageVisibilityScope = Field(
         default=CustomizedImageVisibilityScope.USER,
         description="Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error.",
@@ -1002,7 +971,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(kernels)
                 .where(
                     (kernels.c.cluster_role == DEFAULT_ROLE)
@@ -1012,22 +981,22 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
             subquery = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(keypairs)
                 .where(keypairs.c.is_active == true())
                 .group_by(keypairs.c.user_id)
             )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
 
             subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
 
             """
-            query = sa.select([sa.func.count()]).select_from(usage)
+            query = sa.select(sa.func.count()).select_from(usage)
             n = await conn.scalar(query)
             await stats_monitor.report_metric(
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
@@ -1322,19 +1291,19 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
 
 
 async def find_dependent_sessions(
-    root_session_name_or_id: str | uuid.UUID,
+    root_session_name_or_id: str | UUID,
     db_session: SASession,
     access_key: AccessKey,
     *,
     allow_stale: bool = False,
-) -> Set[uuid.UUID]:
-    async def _find_dependent_sessions(session_id: uuid.UUID) -> Set[uuid.UUID]:
+) -> set[UUID]:
+    async def _find_dependent_sessions(session_id: UUID) -> set[UUID]:
         result = await db_session.execute(
             sa.select(SessionDependencyRow).where(SessionDependencyRow.depends_on == session_id)
         )
-        dependent_sessions: set[uuid.UUID] = {x.session_id for x in result.scalars()}
+        dependent_sessions: set[UUID] = {x.session_id for x in result.scalars()}
 
-        recursive_dependent_sessions: List[Set[uuid.UUID]] = [
+        recursive_dependent_sessions: list[set[UUID]] = [
             await _find_dependent_sessions(dependent_session)
             for dependent_session in dependent_sessions
         ]
@@ -1350,12 +1319,12 @@ async def find_dependent_sessions(
         access_key=access_key,
         allow_stale=allow_stale,
     )
-    return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
+    return await _find_dependent_sessions(cast(UUID, root_session.id))
 
 
 @aiotools.lru_cache(maxsize=100)
 async def _find_dependency_sessions(
-    session_name_or_id: uuid.UUID | str,
+    session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
 ):
@@ -1365,37 +1334,36 @@ async def _find_dependency_sessions(
         access_key=access_key,
     )
 
-    assert len(sessions) >= 1, "session not found!"
+    if len(sessions) < 1:
+        raise SessionNotFound("session not found!")
 
     session_id = str(sessions[0].id)
     session_name = sessions[0].name
 
-    assert isinstance(session_id, get_args(uuid.UUID | str))
-    assert isinstance(session_name, str)
+    if not isinstance(session_name, str):
+        raise InvalidSessionData("Invalid session_name type")
 
     kernel_query = (
-        sa.select([
+        sa.select(
             kernels.c.status,
             kernels.c.status_changed,
-        ])
+        )
         .select_from(kernels)
         .where(kernels.c.session_id == session_id)
     )
 
-    dependency_session_ids: list[SessionDependencyRow] = (
-        await db_session.execute(
-            sa.select(SessionDependencyRow.depends_on).where(
-                SessionDependencyRow.session_id == session_id
-            )
+    dependency_result = await db_session.execute(
+        sa.select(SessionDependencyRow.depends_on).where(
+            SessionDependencyRow.session_id == session_id
         )
-    ).first()
-
-    if not dependency_session_ids:
-        dependency_session_ids = []
+    )
+    dependency_session_ids = [row[0] for row in dependency_result.fetchall()]
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
+    if kernel_query_result is None:
+        raise ValueError(f"Kernel not found for session {session_id}")
 
-    session_info: Dict[str, Union[List, str]] = {
+    session_info: dict[str, list | str] = {
         "session_id": session_id,
         "session_name": session_name,
         "status": str(kernel_query_result[0]),
@@ -1410,7 +1378,7 @@ async def _find_dependency_sessions(
 
 
 async def find_dependency_sessions(
-    session_name_or_id: uuid.UUID | str,
+    session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
 ):
@@ -1558,7 +1526,7 @@ async def list_files(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
+    except (TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 
@@ -1566,11 +1534,11 @@ async def list_files(request: web.Request) -> web.Response:
 
 
 class ContainerLogRequestModel(LegacyBaseRequestModel):
-    owner_access_key: str | None = Field(
+    owner_access_key: Optional[str] = Field(
         default=None,
         alias="ownerAccessKey",
     )
-    kernel_id: uuid.UUID | None = Field(
+    kernel_id: Optional[UUID] = Field(
         description="Target kernel to get container logs.",
         default=None,
         alias="kernelId",
@@ -1703,10 +1671,8 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["session.context"]
-    app_ctx.agent_lost_checker.cancel()
-    await app_ctx.agent_lost_checker
-    app_ctx.stats_task.cancel()
-    await app_ctx.stats_task
+    await cancel_and_wait(app_ctx.agent_lost_checker)
+    await cancel_and_wait(app_ctx.stats_task)
 
     await app_ctx.webhook_ptask_group.shutdown()
     await app_ctx.database_ptask_group.shutdown()
@@ -1715,7 +1681,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

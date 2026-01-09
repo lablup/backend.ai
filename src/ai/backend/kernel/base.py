@@ -14,20 +14,14 @@ import urllib.error
 import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
+from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
     ClassVar,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     TypeVar,
-    Union,
 )
 
 import janus
@@ -44,7 +38,7 @@ from .intrinsic import (
     prepare_ttyd_service,
 )
 from .jupyter_client import aexecute_interactive
-from .logging import BraceStyleAdapter, setup_logger
+from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
@@ -95,7 +89,7 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         proc.terminate()
         try:
             await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
     except ProcessLookupError:
@@ -151,7 +145,7 @@ class BaseRunner(metaclass=ABCMeta):
     service_parser: Optional[ServiceParser]
     runtime_path: Path
 
-    services_running: Dict[str, asyncio.subprocess.Process]
+    services_running: dict[str, asyncio.subprocess.Process]
 
     intrinsic_host_ports_mapping: Mapping[str, int]
 
@@ -165,6 +159,7 @@ class BaseRunner(metaclass=ABCMeta):
     _health_check_task: Optional[asyncio.Task]
 
     def __init__(self, runtime_path: Path) -> None:
+        setup_logger_basic(self.log_prefix, False)
         self.subproc = None
         self.runtime_path = runtime_path
         self.child_env = {**os.environ, **self.default_child_env}
@@ -184,6 +179,14 @@ class BaseRunner(metaclass=ABCMeta):
             pass
         except Exception:
             log.exception("Reading /home/config/environ.txt failed!")
+
+        work_dir = Path("/home/work")
+        work_dir_owner = work_dir.stat().st_uid
+        process_owner = os.getuid()
+        if work_dir_owner != process_owner:
+            log.warning(
+                f"{work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
+            )
 
         path_env = self.child_env["PATH"]
         if Path("/usr/local/cuda/bin").is_dir():
@@ -214,6 +217,7 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
+        setup_logger_basic(self.log_prefix, cmdargs.debug)
         loop = current_loop()
         self._service_lock = asyncio.Lock()
 
@@ -237,10 +241,10 @@ class BaseRunner(metaclass=ABCMeta):
         outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
         self.insock.bind(f"tcp://*:{insock_port}")
-        print(f"binding to tcp://*:{insock_port}")
+        log.debug(f"binding the kernel-runner inbound socket to tcp://*:{insock_port}")
         self.outsock = self.zctx.socket(zmq.PUSH)
         self.outsock.bind(f"tcp://*:{outsock_port}")
-        print(f"binding to tcp://*:{outsock_port}")
+        log.debug(f"binding the kernel-runner outbound socket to tcp://*:{outsock_port}")
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -264,7 +268,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def _shutdown(self) -> None:
         try:
             self.insock.close()
-            log.debug("shutting down...")
+            log.info("shutting down...")
             self._run_task.cancel()
             self._main_task.cancel()
             await self._run_task
@@ -272,7 +276,7 @@ class BaseRunner(metaclass=ABCMeta):
             if health_check_task := self._health_check_task:
                 health_check_task.cancel()
                 await health_check_task
-            log.debug("terminating service processes...")
+            log.info("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
                 await asyncio.gather(
@@ -280,7 +284,7 @@ class BaseRunner(metaclass=ABCMeta):
                     return_exceptions=True,
                 )
                 await asyncio.sleep(0.01)
-            log.debug("terminated.")
+            log.info("terminated.")
         finally:
             # allow remaining logs to be flushed.
             await asyncio.sleep(0.1)
@@ -299,36 +303,46 @@ class BaseRunner(metaclass=ABCMeta):
         initialize jupyter kernel.
         """
         # Make inline backend defaults in Matplotlib.
-        kconfigdir = Path("/home/work/.ipython/profile_default/")
-        kconfigdir.mkdir(parents=True, exist_ok=True)
-        kconfig_file = kconfigdir / "ipython_kernel_config.py"
-        kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
+        self.kernel_mgr = None
+        try:
+            kconfigdir = Path("/home/work/.ipython/profile_default/")
+            kconfigdir.mkdir(parents=True, exist_ok=True)
+            kconfig_file = kconfigdir / "ipython_kernel_config.py"
+            kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
 
-        kernelspec_mgr = KernelSpecManager()
-        kernelspec_mgr.ensure_native_kernel = False
-        kspecs = kernelspec_mgr.get_all_specs()
-        for kname in kspecs:
-            if self.jupyter_kspec_name in kname:
-                log.debug("starting " + kname + " kernel...")
-                self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
-                await self.kernel_mgr.start_kernel()
-                if not await self.kernel_mgr.is_alive():
-                    log.error("jupyter query mode is disabled: failed to start jupyter kernel")
-                else:
-                    self.kernel_client = self.kernel_mgr.client()  # type: ignore
-                    assert self.kernel_client is not None
-                    self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
-                    try:
-                        await self.kernel_client.wait_for_ready(timeout=10)
-                        # self.init_jupyter_kernel()
-                    except RuntimeError:
-                        # Clean up for client and kernel will be done in `shutdown`.
-                        log.error("jupyter channel is not active!")
-                        self.kernel_mgr = None
-                break
-        else:
-            log.debug("jupyter query mode is not available: no jupyter kernelspec found")
-            self.kernel_mgr = None
+            kernelspec_mgr = KernelSpecManager()
+            kernelspec_mgr.ensure_native_kernel = False
+            kspecs = kernelspec_mgr.get_all_specs()
+            for kname in kspecs:
+                if self.jupyter_kspec_name in kname:
+                    log.debug("starting " + kname + " kernel...")
+                    self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                    await self.kernel_mgr.start_kernel()
+                    if not await self.kernel_mgr.is_alive():
+                        log.error("jupyter query mode is disabled: failed to start jupyter kernel")
+                    else:
+                        self.kernel_client = self.kernel_mgr.client()  # type: ignore
+                        assert self.kernel_client is not None
+                        self.kernel_client.start_channels(
+                            shell=True, iopub=True, stdin=True, hb=True
+                        )
+                        try:
+                            await self.kernel_client.wait_for_ready(timeout=10)
+                            # self.init_jupyter_kernel()
+                        except RuntimeError:
+                            # Clean up for client and kernel will be done in `shutdown`.
+                            log.error("jupyter channel is not active!")
+                            self.kernel_mgr = None
+                    break
+            else:
+                log.warning("jupyter query mode is not available: no jupyter kernelspec found")
+        except OSError:
+            log.exception(
+                "Failed to create the ipython kernel configuration to handle code execution requests."
+            )
+            log.warning(
+                "All query-mode code execution requests will get the exit code 127 immediately."
+            )
 
     async def _shutdown_jupyter_kernel(self):
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
@@ -388,7 +402,7 @@ class BaseRunner(metaclass=ABCMeta):
             if clean_cmd is None or clean_cmd == "":
                 # skipped
                 return
-            elif clean_cmd == "*":
+            if clean_cmd == "*":
                 ret = await self.clean_heuristic()
             else:
                 ret = await self.run_subproc(clean_cmd)
@@ -424,7 +438,7 @@ class BaseRunner(metaclass=ABCMeta):
             if build_cmd is None or build_cmd == "":
                 # skipped
                 return
-            elif build_cmd == "*":
+            if build_cmd == "*":
                 if Path("Makefile").is_file():
                     ret = await self.run_subproc("make")
                 else:
@@ -452,12 +466,12 @@ class BaseRunner(metaclass=ABCMeta):
             if exec_cmd is None or exec_cmd == "":
                 # skipped
                 return
-            elif exec_cmd == "*":
+            if exec_cmd == "*":
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception:
-            log.exception("unexpected error")
+        except Exception as e:
+            log.exception("unexpected error: {}", e)
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
@@ -567,7 +581,7 @@ class BaseRunner(metaclass=ABCMeta):
                 self.kernel_client.input(user_input)
 
         # Run jupyter kernel's blocking execution method in an executor pool.
-        allow_stdin = False if self.user_input_queue is None else True
+        allow_stdin = self.user_input_queue is not None
         stdin_hook = None if self.user_input_queue is None else stdin_hook  # type: ignore
         try:
             await aexecute_interactive(
@@ -723,7 +737,9 @@ class BaseRunner(metaclass=ABCMeta):
                 "options": {},
             }
             result = await self._start_service(
-                service_info, cwd=model_info["model_path"], do_not_wait=True
+                service_info,
+                cwd=model_info["model_path"],
+                launch_timeout=None,  # model service launches may take a long time
             )
             started = result["status"] == "running" or result["status"] == "started"
         finally:
@@ -767,7 +783,7 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
@@ -813,7 +829,7 @@ class BaseRunner(metaclass=ABCMeta):
         service_info,
         *,
         cwd: Optional[str] = None,
-        do_not_wait: bool = False,
+        launch_timeout: Optional[float] = 30.0,
     ):
         error_reason = None
         try:
@@ -838,7 +854,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "error": error_reason,
                         }
 
-                    cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
+                    cmdargs: Optional[Sequence[str | os.PathLike]]
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
@@ -884,8 +900,8 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                        if not do_not_wait:
-                            async with asyncio.timeout(30.0):
+                        if launch_timeout is not None:
+                            async with asyncio.timeout(launch_timeout):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",
@@ -902,7 +918,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Takes too much time to open a local port.
                         if service_info["name"] in self.services_running:
                             await terminate_and_wait(proc, timeout=10.0)
@@ -937,9 +953,7 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warning(
-                    "failed to start model service {}: {}", service_info["name"], error_reason
-                )
+                log.warning("failed to start service {}: {}", service_info["name"], error_reason)
 
     async def _wait_service_proc(
         self,
@@ -952,7 +966,7 @@ class BaseRunner(metaclass=ABCMeta):
         )
         self.services_running.pop(service_name, None)
 
-    async def run_subproc(self, cmd: Union[str, List[str]], batch: bool = False):
+    async def run_subproc(self, cmd: str | list[str], batch: bool = False):
         """A thin wrapper for an external command."""
         loop = current_loop()
         if Path("/home/work/.logs").is_dir():
@@ -1112,6 +1126,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
+                launch_timeout=10.0,
             )
         )
         intrinsic_spawn_coros.append(
@@ -1121,6 +1136,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
+                launch_timeout=10.0,
             )
         )
         results = await asyncio.gather(*intrinsic_spawn_coros, return_exceptions=True)

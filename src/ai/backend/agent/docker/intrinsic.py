@@ -15,13 +15,35 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent import __version__  # pants: no-infer-dep
+from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.errors import InvalidResourceConfigError
+from ai.backend.agent.exception import InvalidArgumentError
 from ai.backend.agent.plugin.network import (
     AbstractNetworkAgentPlugin,
     ContainerNetworkCapability,
     ContainerNetworkInfo,
 )
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+    StatModes,
+)
 from ai.backend.agent.types import MountInfo
+from ai.backend.agent.utils import closing_async, read_sysfs
+from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
@@ -38,26 +60,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop, nmget
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__  # pants: no-infer-dep
-from ..alloc_map import AllocationStrategy
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    Measurement,
-    MetricTypes,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-    StatModes,
-)
-from ..utils import closing_async, read_sysfs
-from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
@@ -79,8 +81,7 @@ pruned_disk_types = frozenset([
 
 def netstat_ns_work(ns_path: Path):
     with nsenter(ns_path):
-        result = psutil.net_io_counters(pernic=True)
-    return result
+        return psutil.net_io_counters(pernic=True)
 
 
 async def netstat_ns(ns_path: Path):
@@ -101,8 +102,7 @@ async def netstat_ns(ns_path: Path):
         is_daemon = False
 
     if is_daemon:
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
-        return result
+        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
     try:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
@@ -113,7 +113,7 @@ async def netstat_ns(ns_path: Path):
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
-    short_cid = container._id[:7]
+    short_cid = container.id[:7]
     try:
         ret = await container.stats(stream=False)  # TODO: cache
     except RuntimeError as e:
@@ -180,7 +180,10 @@ class CPUPlugin(AbstractComputePlugin):
     async def list_devices(self) -> Collection[CPUDevice]:
         cores = await libnuma.get_available_cores()
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidResourceConfigError(
+                f"BACKEND_CPU_OVERCOMMIT_FACTOR must be between 1 and 10, got {overcommit_factor}"
+            )
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
@@ -255,7 +258,7 @@ class CPUPlugin(AbstractComputePlugin):
                             )
                         }
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
-            except IOError as e:
+            except OSError as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -270,12 +273,11 @@ class CPUPlugin(AbstractComputePlugin):
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None
-                cpu_used = nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
-                return cpu_used
+                return nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -291,7 +293,7 @@ class CPUPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, cpu_used in zip(container_ids, results):
+        for cid, cpu_used in zip(container_ids, results, strict=True):
             if cpu_used is None:
                 continue
             per_container_cpu_used[cid] = Measurement(Decimal(cpu_used).quantize(q))
@@ -326,8 +328,7 @@ class CPUPlugin(AbstractComputePlugin):
             except psutil.NoSuchProcess:
                 log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
-                cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
-                return cpu_used
+                return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
 
         async def api_impl(cid: str, pids: list[int]) -> list[Optional[Decimal]]:
@@ -358,7 +359,7 @@ class CPUPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, cid), cpu_used in zip(pid_map_list, results):
+        for (pid, cid), cpu_used in zip(pid_map_list, results, strict=True):
             if cpu_used is None:
                 continue
             per_process_cpu_util[pid] = Measurement(
@@ -417,7 +418,10 @@ class CPUPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidArgumentError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+            )
         # Docker does not return the original cpuset.... :(
         # We need to read our own records.
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
@@ -679,7 +683,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_read_bytes += int(value)
                                 if stat == "wbytes":
                                     io_write_bytes += int(value)
-            except IOError as e:
+            except OSError as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -716,7 +720,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None
@@ -763,7 +767,7 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, result in zip(container_ids, results):
+        for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
             per_container_mem_used_bytes[cid] = Measurement(
@@ -875,7 +879,7 @@ class MemoryPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, _), result in zip(pid_map_list, results):
+        for (pid, _), result in zip(pid_map_list, results, strict=True):
             mem, io_read, io_write = result
             if mem is not None:
                 per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))
@@ -940,7 +944,10 @@ class MemoryPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidArgumentError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+            )
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
         alloc_map.apply_allocation({
             SlotName("mem"): {DeviceId("root"): memory_limit},
@@ -1011,6 +1018,7 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                 "EndpointsConfig": {
                     network_name: {
                         "Aliases": [kernel_config["cluster_hostname"]],
+                        "DriverOpts": {"com.docker.network.endpoint.ifname": "baimulti0"},
                     },
                 },
             },
@@ -1031,7 +1039,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         return await super().update_plugin_config(plugin_config)
 
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
-        return set([ContainerNetworkCapability.GLOBAL])
+        return {ContainerNetworkCapability.GLOBAL}
 
     async def join_network(
         self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
@@ -1046,12 +1054,11 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                     "NetworkMode": "host",
                 }
             }
-        else:
-            return {
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            }
+        return {
+            "HostConfig": {
+                "NetworkMode": "host",
+            },
+        }
 
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass

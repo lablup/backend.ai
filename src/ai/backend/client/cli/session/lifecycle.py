@@ -5,12 +5,13 @@ import json
 import secrets
 import subprocess
 import sys
-import uuid
 from collections import OrderedDict, defaultdict
-from datetime import datetime, timedelta
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, List, Literal, Optional, Sequence
+from typing import IO, Literal, Optional
+from uuid import UUID
 
 import click
 import inquirer
@@ -25,19 +26,9 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.types import ClusterMode
-
-from ...compat import asyncio_run
-from ...exceptions import BackendAPIError
-from ...func.session import ComputeSession
-from ...output.fields import network_fields, session_fields
-from ...output.types import FieldSpec
-from ...session import AsyncSession, Session
-from .. import events
-from ..pretty import (
-    ProgressViewer,
+from ai.backend.client.cli.events import SubscribableEvents
+from ai.backend.client.cli.pretty import (
+    ProgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -45,6 +36,15 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.func.session import ComputeSession
+from ai.backend.client.output.fields import network_fields, session_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import AsyncSession, Session
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode
+
 from .args import click_start_option
 from .execute import (
     format_stats,
@@ -92,7 +92,7 @@ def _create_cmd(docs: Optional[str] = None):
     @click.option(
         "--depends",
         metavar="SESSION_ID",
-        type=str,
+        type=click.UUID,
         multiple=True,
         help=(
             "Set the list of session ID or names that the newly created session depends on. "
@@ -142,38 +142,38 @@ def _create_cmd(docs: Optional[str] = None):
     def create(
         # base args
         image: str,
-        name: str | None,  # click_start_option
-        owner: str | None,
+        name: Optional[str],  # click_start_option
+        owner: Optional[str],
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        starts_at: str | None,  # click_start_option
-        startup_command: str | None,
-        timeout: str | None,
+        starts_at: Optional[str],  # click_start_option
+        startup_command: Optional[str],
+        timeout: Optional[str],
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
-        depends: Sequence[str],
-        priority: int | None,  # click_start_option
+        depends: Sequence[UUID],
+        priority: Optional[int],  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        bootstrap_script: IO | None,
-        tag: str | None,  # click_start_option
+        bootstrap_script: Optional[IO],
+        tag: Optional[str],  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: str | None,  # click_start_option
+        scaling_group: Optional[str],  # click_start_option
         resources: Sequence[str],  # click_start_option
         cluster_size: int,  # click_start_option
-        cluster_mode: Literal["single-node", "multi-node"],
+        cluster_mode: ClusterMode,
         resource_opts: Sequence[str],  # click_start_option
-        preopen: str | None,
-        assign_agent: str | None,
+        preopen: Optional[str],
+        assign_agent: Optional[str],
         # resource grouping
-        domain: str | None,  # click_start_option
-        group: str | None,  # click_start_option
-        network: str | None,  # click_start_option
+        domain: Optional[str],  # click_start_option
+        group: Optional[str],  # click_start_option
+        network: Optional[str],  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -204,7 +204,7 @@ def _create_cmd(docs: Optional[str] = None):
             try:
                 if network:
                     try:
-                        network_info = session.Network(uuid.UUID(network)).get()
+                        network_info = session.Network(UUID(network)).get()
                     except (ValueError, BackendAPIError):
                         networks = session.Network.paginated_list(
                             filter=f'name == "{network}"',
@@ -262,48 +262,32 @@ def _create_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info(
-                        "Session ID {0} is enqueued for scheduling.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
                     print_info(
-                        "Session ID {0} is scheduled and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is scheduled and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARED":
                     print_info(
-                        "Session ID {0} is prepared and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is prepared and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
                     print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} creation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info(
-                            "Session ID {0} is created and ready.".format(compute_session.id)
-                        )
+                        print_info(f"Session ID {compute_session.id} is created and ready.")
                     else:
-                        print_info(
-                            "Session ID {0} is already running and ready.".format(
-                                compute_session.id
-                            )
-                        )
+                        print_info(f"Session ID {compute_session.id} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -311,20 +295,14 @@ def _create_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info(
-                        "Session ID {0} is still on the job queue.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
@@ -456,24 +434,24 @@ def _create_from_template_cmd(docs: Optional[str] = None):
     def create_from_template(
         # base args
         template_id: str,
-        name: str | None,  # click_start_option
+        name: Optional[str],  # click_start_option
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        priority: int | None,  # click_start_option
-        starts_at: str | None,  # click_start_option
+        priority: Optional[int],  # click_start_option
+        starts_at: Optional[str],  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         timeout: str | Undefined,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
-        depends: Sequence[str],
-        callback_url: str | None,  # click_start_option
+        depends: Sequence[UUID],
+        callback_url: Optional[str],  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | None,  # click_start_option
+        tag: Optional[str],  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,
@@ -487,7 +465,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
-        network: str | None,  # click_start_option
+        network: Optional[str],  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -545,7 +523,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         with Session() as session:
             if network:
                 try:
-                    network_info = session.Network(uuid.UUID(network)).get()
+                    network_info = session.Network(UUID(network)).get()
                 except (ValueError, BackendAPIError):
                     networks = session.Network.paginated_list(
                         filter=f'name == "{network}"',
@@ -575,30 +553,26 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info("Session ID {0} is enqueued for scheduling.".format(name))
+                    print_info(f"Session ID {name} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
-                    print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    print_info(f"Session ID {name} is scheduled and about to be started.")
                     return
                 elif compute_session.status == "PREPARED":
-                    print_info("Session ID {0} is prepared and about to be started.".format(name))
+                    print_info(f"Session ID {name} is prepared and about to be started.")
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            name
-                        )
+                        f"Session ID {name} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
-                    print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(name)
-                    )
+                    print_info(f"Session ID {name} creation in progress and about to be started.")
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info("Session ID {0} is created and ready.".format(name))
+                        print_info(f"Session ID {name} is created and ready.")
                     else:
-                        print_info("Session ID {0} is already running and ready.".format(name))
+                        print_info(f"Session ID {name} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -606,16 +580,14 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(name)
+                        f"Session ID {name} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info("Session ID {0} is still on the job queue.".format(name))
+                    print_info(f"Session ID {name} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            name
-                        )
+                        f"Session ID {name} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
@@ -811,10 +783,10 @@ def download(session_id, files, dest):
         return
     with Session() as session:
         try:
-            print_wait("Downloading file(s) from {}...".format(session_id))
+            print_wait(f"Downloading file(s) from {session_id}...")
             kernel = session.ComputeSession(session_id)
             kernel.download(files, dest, show_progress=True)
-            print_done("Downloaded to {}.".format(dest.resolve()))
+            print_done(f"Downloaded to {dest.resolve()}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -835,11 +807,11 @@ def ls(session_id, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             kernel = session.ComputeSession(session_id)
             result = kernel.list_files(path)
 
-            if "errors" in result and result["errors"]:
+            if result.get("errors"):
                 print_fail(result["errors"])
                 sys.exit(ExitCode.FAILURE)
 
@@ -847,7 +819,7 @@ def ls(session_id, path):
             table = []
             headers = ["File name", "Size", "Modified", "Mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromtimestamp(file["mtime"], tz=UTC)
                 fsize = naturalsize(file["size"], binary=True)
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], fsize, mtime, file["mode"]]
@@ -869,14 +841,14 @@ def ls(session_id, path):
     default=None,
     help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
 )
-def logs(session_id: str, kernel: str | None) -> None:
+def logs(session_id: str, kernel: Optional[str]) -> None:
     """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
-    _kernel_id = uuid.UUID(kernel) if kernel is not None else None
+    _kernel_id = UUID(kernel) if kernel is not None else None
     with Session() as session:
         try:
             print_wait("Retrieving live container logs...")
@@ -1034,21 +1006,17 @@ def convert_to_image(session_id: str, image_name: str) -> None:
 
     async def export_tracker(bgtask_id):
         async with AsyncSession() as session:
+            completion_msg_func = lambda: print_done("Session export process completed.")
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Session export process completed.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Starting the session...") as viewer,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-
-                                pbar = viewer.tqdm
                                 pbar.total = data["total_progress"]
                                 pbar.update(data["current_progress"] - pbar.n)
                                 pbar.display(data["message"])
@@ -1074,7 +1042,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                 completion_msg_func()
                 sys.exit()
 
-    asyncio_run(export_tracker(result["task_id"]))
+    asyncio.run(export_tracker(result["task_id"]))
 
 
 @session.command()
@@ -1097,7 +1065,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: str | None = None):
+def _ssh_cmd(docs: Optional[str] = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -1262,16 +1230,45 @@ def _events_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
         default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
-    def events(session_id_or_name, owner_access_key, scope):
+    @click.option(
+        "-q",
+        "--quiet",
+        is_flag=True,
+        help="Run silently without logging events.",
+    )
+    @click.option(
+        "--wait",
+        metavar="EVENT_NAME",
+        help="Wait until the specified event is received and exit (supports 'batch_session_result' for success/failure).",
+    )
+    def events(
+        session_id_or_name: str,
+        owner_access_key: str,
+        scope: str,
+        quiet: bool,
+        wait: Optional[str] = None,
+    ) -> None:
         """
         Monitor the lifecycle events of a compute session.
 
         SESSID: session ID or its alias given when creating the session.
+
+        \b
+        The --wait option allows you to wait for specific events:
+        - Use 'batch_session_result' to wait for either success or failure of batch sessions
+        - Exit code will be 0 for success, 1 for failure
+        - Any other event name waits for that specific event (exit code 0)
         """
+
+        def print_event(ev):
+            click.echo(
+                click.style(ev.event, fg="cyan", bold=True)
+                + " "
+                + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+            )
 
         async def _run_events():
             async with AsyncSession() as session:
@@ -1279,14 +1276,21 @@ def _events_cmd(docs: Optional[str] = None):
 
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        click.echo(
-                            click.style(ev.event, fg="cyan", bold=True)
-                            + " "
-                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
-                        )
+                        if not quiet:
+                            print_event(ev)
+                        match wait:
+                            case SubscribableEvents.BATCH_SESSION_RESULT:
+                                # Stop at batch session completion
+                                if ev.event == SubscribableEvents.SESSION_SUCCESS:
+                                    sys.exit(0)
+                                elif ev.event == SubscribableEvents.SESSION_FAILURE:
+                                    sys.exit(1)
+                            case ev.event:
+                                # Stop at specific event
+                                sys.exit(0)
 
         try:
-            asyncio_run(_run_events())
+            asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
 
@@ -1315,7 +1319,7 @@ def _fetch_session_names() -> tuple[str]:
         "TERMINATING",
         "ERROR",
     ])
-    fields: List[FieldSpec] = [
+    fields: Sequence[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
@@ -1352,9 +1356,8 @@ def _watch_cmd(docs: Optional[str] = None):
     )
     @click.option(
         "--scope",
-        type=click.Choice(["*", "session", "kernel"]),
-        default="*",
-        help="Filter the events by kernel-specific ones or session-specific ones.",
+        default="session,kernel",
+        help="A comma-separated event filter of 'session', 'kernel'. A wildcard '*' unions all available filters.",
     )
     @click.option(
         "--max-wait",
@@ -1413,17 +1416,17 @@ def _watch_cmd(docs: Optional[str] = None):
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     match ev.event:
-                        case events.SESSION_SUCCESS:
-                            print_done(events.SESSION_SUCCESS)
+                        case SubscribableEvents.SESSION_SUCCESS:
+                            print_done(SubscribableEvents.SESSION_SUCCESS)
                             sys.exit(json.loads(ev.data).get("exitCode", 0))
-                        case events.SESSION_FAILURE:
-                            print_fail(events.SESSION_FAILURE)
+                        case SubscribableEvents.SESSION_FAILURE:
+                            print_fail(SubscribableEvents.SESSION_FAILURE)
                             sys.exit(json.loads(ev.data).get("exitCode", 1))
-                        case events.KERNEL_CANCELLED:
-                            print_fail(events.KERNEL_CANCELLED)
+                        case SubscribableEvents.KERNEL_CANCELLED:
+                            print_fail(SubscribableEvents.KERNEL_CANCELLED)
                             break
-                        case events.SESSION_TERMINATED:
-                            print_done(events.SESSION_TERMINATED)
+                        case SubscribableEvents.SESSION_TERMINATED:
+                            print_done(SubscribableEvents.SESSION_TERMINATED)
                             break
                         case _:
                             print_done(ev.event)
@@ -1438,17 +1441,20 @@ def _watch_cmd(docs: Optional[str] = None):
                     click.echo(event)
 
                     match ev.event:
-                        case events.SESSION_SUCCESS:
+                        case SubscribableEvents.SESSION_SUCCESS:
                             sys.exit(event.get("exitCode", 0))
-                        case events.SESSION_FAILURE:
+                        case SubscribableEvents.SESSION_FAILURE:
                             sys.exit(event.get("exitCode", 1))
-                        case events.SESSION_TERMINATED | events.KERNEL_CANCELLED:
+                        case (
+                            SubscribableEvents.SESSION_TERMINATED
+                            | SubscribableEvents.KERNEL_CANCELLED
+                        ):
                             break
 
         async def _run_events():
             async with AsyncSession() as session:
                 try:
-                    session_id = uuid.UUID(session_name_or_id)
+                    session_id = UUID(session_name_or_id)
                     compute_session = session.ComputeSession.from_session_id(session_id)
                 except ValueError:
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
@@ -1462,14 +1468,14 @@ def _watch_cmd(docs: Optional[str] = None):
             try:
                 async with timeout(max_wait):
                     await _run_events()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:
-                asyncio_run(_run_events_with_timeout(max_wait))
+                asyncio.run(_run_events_with_timeout(max_wait))
             else:
-                asyncio_run(_run_events())
+                asyncio.run(_run_events())
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -1479,7 +1485,7 @@ def _watch_cmd(docs: Optional[str] = None):
     return watch
 
 
-def get_dependency_session_table(root_node: OrderedDict) -> List[OrderedDict]:
+def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
     ts: TopologicalSorter = TopologicalSorter()
     session_info_dict = {}
     visited = {}
@@ -1538,8 +1544,8 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
         if session["status_changed"] != "None":
             status_changed = datetime.strptime(
                 discard_below_dot(session["status_changed"]), "%Y-%m-%d %H:%M:%S"
-            )
-            delta = f" {discard_below_dot(str(datetime.now() - status_changed))} ago"
+            ).replace(tzinfo=UTC)
+            delta = f" {discard_below_dot(str(datetime.now(UTC) - status_changed))} ago"
 
         return f'{task_name} ("{status}"{delta})'
 
@@ -1568,7 +1574,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
 @click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
-def show_dependency_graph(session_id: uuid.UUID | str, table: bool):
+def show_dependency_graph(session_id: UUID | str, table: bool):
     """
     Shows the dependency graph of a compute session.
     \b

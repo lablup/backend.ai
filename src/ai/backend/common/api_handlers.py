@@ -1,18 +1,16 @@
+import enum
 import functools
 import inspect
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Coroutine,
     Generic,
     Optional,
     Self,
-    Type,
     TypeAlias,
     TypeVar,
     get_args,
@@ -25,6 +23,8 @@ from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
+from ai.backend.common.types import StreamReader
+
 from .exception import (
     InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
@@ -32,6 +32,15 @@ from .exception import (
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
+
+
+class Sentinel(enum.Enum):
+    """A sentinel value to represent an unset value."""
+
+    TOKEN = enum.auto()
+
+
+SENTINEL = Sentinel.TOKEN
 
 
 class BaseRequestModel(BaseModel):
@@ -67,10 +76,10 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
 
 
 class BodyParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -89,10 +98,10 @@ class BodyParam(Generic[TRequestModel]):
 
 
 class QueryParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -111,10 +120,10 @@ class QueryParam(Generic[TRequestModel]):
 
 
 class HeaderParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -133,10 +142,10 @@ class HeaderParam(Generic[TRequestModel]):
 
 
 class PathParam(Generic[TRequestModel]):
-    _model: Type[TRequestModel]
+    _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TRequestModel]) -> None:
+    def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: Optional[TRequestModel] = None
 
@@ -157,7 +166,7 @@ class PathParam(Generic[TRequestModel]):
 class MiddlewareParam(ABC, BaseModel):
     @classmethod
     @abstractmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         pass
 
 
@@ -186,6 +195,13 @@ class APIResponse:
         return self._status_code
 
 
+@dataclass
+class APIStreamResponse:
+    body: StreamReader
+    status: int
+    headers: Mapping[str, str] = field(default_factory=dict)
+
+
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
 _ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
@@ -195,7 +211,7 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
             try:
-                return input_param_type.from_request(request)
+                return await input_param_type.from_request(request)
             except ValidationError:
                 raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}")
 
@@ -217,19 +233,18 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
                 )
             return param_instance.from_body(body)
 
-        elif origin_type is QueryParam:
+        if origin_type is QueryParam:
             return param_instance.from_query(request.query)
 
-        elif origin_type is HeaderParam:
+        if origin_type is HeaderParam:
             return param_instance.from_header(request.headers)
 
-        elif origin_type is PathParam:
+        if origin_type is PathParam:
             return param_instance.from_path(request.match_info)
 
-        else:
-            raise InvalidAPIParameters(
-                f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-            )
+        raise InvalidAPIParameters(
+            f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+        )
 
     except ValidationError as e:
         raise InvalidAPIParameters(str(e))
@@ -253,6 +268,11 @@ HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
 BaseHandler: TypeAlias = Callable[..., HandlerReturn]
 ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
+
+StreamHandlerReturn: TypeAlias = (
+    Awaitable[APIStreamResponse] | Coroutine[Any, Any, APIStreamResponse]
+)
+StreamBaseHandler: TypeAlias = Callable[..., StreamHandlerReturn]
 
 
 async def _parse_and_execute_handler(
@@ -337,7 +357,7 @@ async def _serialize_parameter(
                 body = await request.json()
             except json.decoder.JSONDecodeError as e:
                 raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
+                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {e!r}"
                 )
             return param_instance_or_class.from_body(body)
         case QueryParam():
@@ -348,10 +368,10 @@ async def _serialize_parameter(
             return param_instance_or_class.from_path(request.match_info)
         case _:
             try:
-                param_instance = param_instance_or_class.from_request(request)
+                param_instance = await param_instance_or_class.from_request(request)
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
-                    f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
+                    f"Failed while parsing {param_instance_or_class}. (error:{e!r})"
                 )
     return param_instance
 
@@ -366,30 +386,30 @@ def _parse_response(response: APIResponse) -> web.Response:
 def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     """
     This decorator processes HTTP request parameters using Pydantic models.
-    NOTICE: API hander methods must be classmethod. It handlers are not class methods it will not work as intended
+    NOTICE: API hander methods must be instance method. It handlers are not instance methods it will not work as intended
 
     1. Request Body:
         @api_handler
-        async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
+        async def handler(self, body: BodyParam[UserModel]):  # UserModel is a Pydantic model
             user = body.parsed                          # 'parsed' property gets pydantic model you defined
             # Response model should inherit BaseResponseModel
             return APIResponse.build(status_code=200, response_model=YourResponseModel(user=user.id))
 
     2. Query Parameters:
         @api_handler
-        async def handler(query: QueryParam[QueryPathModel]):
+        async def handler(self, query: QueryParam[QueryPathModel]):
             parsed_query = query.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(search=parsed_query.query))
 
     3. Headers:
         @api_handler
-        async def handler(headers: HeaderParam[HeaderModel]):
+        async def handler(self, headers: HeaderParam[HeaderModel]):
             parsed_header = headers.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(data=parsed_header.token))
 
     4. Path Parameters:
         @api_handler
-        async def handler(path: PathParam[PathModel]):
+        async def handler(self, path: PathParam[PathModel]):
             parsed_path = path.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
 
@@ -399,19 +419,20 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             user_id: str
             user_email: str
             @classmethod
-            def from_request(cls, request: web.Request) -> Self:
+            async def from_request(cls, request: web.Request) -> Self:
                 # Extract and validate data from request
                 user_id = request["user"]["uuid"]
                 user_email = request["user"]["email"]
                 return cls(user_id=user_id)
 
         @api_handler
-        async def handler(auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
+        async def handler(self, auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
             return APIResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
         @api_handler
         async def handler(
+            self,
             user: BodyParam[UserModel],  # body
             query: QueryParam[QueryModel],  # query parameters
             headers: HeaderParam[HeaderModel],  # headers
@@ -434,7 +455,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     - MiddlewareParam classes must implement the from_request classmethod
     """
 
-    original_signature: Signature = inspect.signature(handler)
+    original_signature: Signature = inspect.signature(handler, eval_str=True)
 
     sanitized_signature = original_signature.replace(
         parameters=list(original_signature.parameters.values())[1:]
@@ -451,5 +472,53 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
         return _parse_response(response)
+
+    return wrapped
+
+
+def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
+    """
+    This decorator processes HTTP request parameters using Pydantic models and returns a streaming response.
+    NOTICE: API handler methods must be instance methods. If handlers are not instance methods, it may not work as expected.
+    """
+
+    original_signature = inspect.signature(handler, eval_str=True)
+    sanitized_signature = original_signature.replace(
+        parameters=list(original_signature.parameters.values())[1:]
+    )
+    signature_parser_map = _register_parameter_parser(
+        sanitized_signature, handler_name=str(handler)
+    )
+
+    @functools.wraps(handler)
+    async def wrapped(first_arg: Any, request: web.Request) -> web.StreamResponse:
+        kwargs: dict[str, _ParamType] = {}
+        for name, param_instance_or_class in signature_parser_map.items():
+            param_instance = await _serialize_parameter(request, param_instance_or_class)
+            kwargs[name] = param_instance
+
+        result: APIStreamResponse = await handler(first_arg, **kwargs)
+
+        body_stream = result.body
+        status = result.status
+        resp = web.StreamResponse(status=status, headers=result.headers)
+
+        body_iter = body_stream.read()
+
+        # Send first chunk, and check if it raises an exception
+        try:
+            first_chunk = await body_iter.__anext__()
+            await resp.prepare(request)
+            await resp.write(first_chunk)
+        except Exception as e:
+            raise web.HTTPInternalServerError(
+                reason=f"Failed to send first chunk from stream: {e!r}"
+            ) from e
+
+        async for chunk in body_iter:
+            await resp.write(chunk)
+
+        await resp.write_eof()
+        return resp
 
     return wrapped

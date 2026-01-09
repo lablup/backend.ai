@@ -12,10 +12,10 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: [ubuntu-latest-8-cores]
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout the revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 2
     - name: Extract Python version from pants.toml
@@ -24,18 +24,18 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        gha-cache-key: pants-cache-main-1-coverage-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Run the full test suite
-      timeout-minutes: 15
+      timeout-minutes: 60
       run: |
         # configure redis sentinel cluster hostnames for testing
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
@@ -48,7 +48,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.coverage.log
         path: .pants.d/workdir/pants.log

@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 import yarl
 
 from ai.backend.common.container_registry import ContainerRegistryType
 
 if TYPE_CHECKING:
-    from ..models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
     from .base import BaseContainerRegistry
 
 
-def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[BaseContainerRegistry]:
+def get_container_registry_cls(registry_info: ContainerRegistryRow) -> type[BaseContainerRegistry]:
     registry_url = yarl.URL(registry_info.url)
     registry_type = registry_info.type
-    cr_cls: Type[BaseContainerRegistry]
+    cr_cls: type[BaseContainerRegistry]
     if registry_url.host is not None and registry_url.host.endswith(".docker.io"):
         from .docker import DockerHubRegistry
 
@@ -47,6 +48,10 @@ def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[Base
         from .local import LocalRegistry
 
         cr_cls = LocalRegistry
+    elif registry_type == ContainerRegistryType.OCP:
+        from .ocp import OpenShiftPlatformContainerRegistry
+
+        cr_cls = OpenShiftPlatformContainerRegistry
     else:
         raise RuntimeError(f"Unsupported registry type: {registry_type}")
     return cr_cls

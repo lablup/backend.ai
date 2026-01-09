@@ -7,17 +7,13 @@ import socket
 import sys
 from abc import abstractmethod
 from collections import UserDict
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Final,
-    List,
     Optional,
-    Sequence,
     TypeAlias,
 )
 
@@ -29,9 +25,9 @@ from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
-from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -387,7 +383,7 @@ class AbstractConfig(UserDict):
     Deprecated: Use ai.backend.manager.config.unified instead.
     """
 
-    _watch_callbacks: List[ConfigWatchCallback]
+    _watch_callbacks: list[ConfigWatchCallback]
 
     def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(initial_data)
@@ -451,7 +447,6 @@ def load(
     if log_level != LogLevel.NOTSET:
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-compatible)

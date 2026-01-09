@@ -32,23 +32,17 @@ class UserResourcePolicyService:
     async def create_user_resource_policy(
         self, action: CreateUserResourcePolicyAction
     ) -> CreateUserResourcePolicyActionResult:
-        creator = action.creator
-        to_create = creator.fields_to_store()
-        result = await self._user_resource_policy_repository.create(to_create)
+        result = await self._user_resource_policy_repository.create(action.creator)
         return CreateUserResourcePolicyActionResult(user_resource_policy=result)
 
     async def modify_user_resource_policy(
         self, action: ModifyUserResourcePolicyAction
     ) -> ModifyUserResourcePolicyActionResult:
-        name = action.name
-        modifier = action.modifier
-        to_update = modifier.fields_to_update()
-        result = await self._user_resource_policy_repository.update(name, to_update)
+        result = await self._user_resource_policy_repository.update(action.updater)
         return ModifyUserResourcePolicyActionResult(user_resource_policy=result)
 
     async def delete_user_resource_policy(
         self, action: DeleteUserResourcePolicyAction
     ) -> DeleteUserResourcePolicyActionResult:
-        name = action.name
-        result = await self._user_resource_policy_repository.delete(name)
+        result = await self._user_resource_policy_repository.delete(action.name)
         return DeleteUserResourcePolicyActionResult(user_resource_policy=result)

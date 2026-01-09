@@ -1,6 +1,7 @@
 {
+  "$schema": "./image_metadata.schema.json",
   "imageInfo": {
-	  "rbln-ubuntu": {
+    "rbln-ubuntu": {
       "name": "Rebellions Ubuntu",
       "description": "Rebellions Ubuntu is a basic image for Rebellions NPU.",
       "group": "NPU",
@@ -812,15 +813,71 @@
           "color": "red"
         }
       ]
+    },
+    "vllm": {
+      "name": "vLLM",
+      "description": "vLLM is a high-performance inference engine for large language models (LLMs) that supports both autoregressive and non-autoregressive decoding.",
+      "group": "Inference",
+      "tags": [],
+      "icon": "vllm.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "vLLM",
+          "color": "blue"
+        }
+      ]
+    },
+    "mojo-max": {
+      "name": "MAX (Mojo)",
+      "description": "A high-performance inference engine to build, optimize, and deploy AI apps fast.",
+      "group": "Framework",
+      "tags": [],
+      "icon": "modular.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Modular",
+          "color": "blue"
+        }
+      ]
+    },
+    "gromacs-runtime": {
+      "name": "GROMACS",
+      "description": "A free and open-source software suite for high-performance molecular dynamics and output analysis.",
+      "group": "Molecular Dynamics",
+      "tags": [],
+      "icon": "gromacs.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "GROMACS",
+          "color": "blue"
+        }
+      ]
+    },
+    "sglang": {
+      "name": "SGLang",
+      "description": "SGLang is a high-performance serving framework for large language models and vision-language models.",
+      "group": "Inference",
+      "tags": [],
+      "icon": "sglang.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "SGLang",
+          "color": "red"
+        }
+      ]
     }
   },
   "tagAlias": {
     "python": "Python",
     "tensorflow": "TensorFlow",
     "pytorch": "PyTorch",
-    "pytorch2.1":"PyTorch 2.1",
-    "pytorch2.0":"PyTorch 2.0",
-    "pytorch2.2":"PyTorch 2.2",
+    "pytorch2.1": "PyTorch 2.1",
+    "pytorch2.0": "PyTorch 2.0",
+    "pytorch2.2": "PyTorch 2.2",
     "lua": "Lua",
     "r": "R",
     "r-base": "R",
@@ -924,7 +981,10 @@
     "alpine3.12": "Alpine Linux 3.12",
     "ngc": "NVIDIA GPU Cloud",
     "ff": "Research Env.",
-    "atom-orbit": "Orbit"
+    "atom-orbit": "Orbit",
+    "vllm": "vLLM",
+    "mojo-max": "MAX (Mojo)",
+    "sglang": "SGLang"
   },
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",
@@ -939,7 +999,11 @@
     "^ji(\\d)\\.(\\d+)$": "Julia $1.$2",
     "^tpuv(\\d+)$": "TPU:TPUv$1",
     "^alpine(\\d+)$": "Alpine Linux $1",
+    "^gromacs*$": "GROMACS",
     "^(customized)_.*$": "Customized",
     "^(-_)$": " "
+  },
+  "groupSortKeyMap": {
+    "Custom Environments": "00000"
   }
 }

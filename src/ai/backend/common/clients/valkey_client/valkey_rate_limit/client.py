@@ -7,17 +7,37 @@ from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary, Script
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_rate_limit client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_RATE_LIMIT)
+# Resilience instance for valkey_rate_limit layer
+valkey_rate_limit_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_RATE_LIMIT)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 _DEFAULT_RATE_LIMIT_EXPIRATION = 60 * 15  # 15 minutes
 _TIME_PRECISION = Decimal("1e-3")  # milliseconds
@@ -55,7 +75,7 @@ class ValkeyRateLimitClient:
     @classmethod
     async def create(
         cls,
-        redis_target: RedisTarget,
+        valkey_target: ValkeyTarget,
         *,
         db_id: int,
         human_readable_name: str,
@@ -69,25 +89,25 @@ class ValkeyRateLimitClient:
         :return: An instance of ValkeyRateLimitClient.
         """
         client = create_valkey_client(
-            target=redis_target,
+            valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
         )
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyRateLimitClient connection.
         """
         if self._closed:
-            log.warning("ValkeyRateLimitClient is already closed.")
+            log.debug("ValkeyRateLimitClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def execute_rate_limit_logic(
         self,
         access_key: str,
@@ -111,10 +131,9 @@ class ValkeyRateLimitClient:
         )
 
         # The last result is the count
-        count = cast(int, result)
-        return count
+        return cast(int, result)
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def get_rolling_count(self, access_key: str) -> int:
         """
         Get the current rolling count for an access key.
@@ -124,7 +143,7 @@ class ValkeyRateLimitClient:
         """
         return await self._client.client.zcard(access_key)
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def set_rate_limit_config(
         self,
         key: str,
@@ -144,7 +163,7 @@ class ValkeyRateLimitClient:
             expiry=ExpirySet(ExpiryType.SEC, expiration),
         )
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def increment_with_expiration(
         self,
         key: str,
@@ -166,7 +185,7 @@ class ValkeyRateLimitClient:
             return cast(int, results[0])
         return 0
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def get_rate_limit_data(self, key: str) -> Optional[str]:
         """
         Get rate limit data by key.
@@ -177,7 +196,7 @@ class ValkeyRateLimitClient:
         result = await self._client.client.get(key)
         return result.decode("utf-8") if result else None
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def get_key(self, key: str) -> Optional[str]:
         """
         Get the value of a key (deprecated: use get_rate_limit_data).
@@ -188,7 +207,7 @@ class ValkeyRateLimitClient:
         result = await self._client.client.get(key)
         return result.decode("utf-8") if result else None
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def delete_key(self, key: str) -> bool:
         """
         Delete a key.
@@ -199,14 +218,14 @@ class ValkeyRateLimitClient:
         result = await self._client.client.delete([key])
         return result > 0
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def flush_database(self) -> None:
         """
         Flush all keys in the current database.
         """
         await self._client.client.flushdb()
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def remove_expired_entries(
         self,
         key: str,
@@ -225,7 +244,7 @@ class ValkeyRateLimitClient:
             key, ScoreBoundary(0), ScoreBoundary(cutoff_time)
         )
 
-    @valkey_decorator()
+    @valkey_rate_limit_resilience.apply()
     async def add_to_sorted_set_with_expiration(
         self,
         key: str,

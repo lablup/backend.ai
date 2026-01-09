@@ -1,23 +1,22 @@
+from __future__ import annotations
+
 import asyncio
 import dataclasses
 import enum
 import time
+from collections.abc import Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
-    Callable,
     Final,
-    FrozenSet,
     Generic,
-    Mapping,
     Optional,
     Self,
     TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -30,8 +29,11 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     SerializableCircuit,
 )
-from ai.backend.appproxy.worker.config import ServerConfig
+from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
     EventMetricObserver,
@@ -41,12 +43,14 @@ from ai.backend.common.types import (
     MetricKey,
     MetricValue,
     MovingStatValue,
-    RedisConnectionInfo,
     RuntimeVariant,
 )
 
+from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
+
 if TYPE_CHECKING:
-    from ai.backend.appproxy.worker.proxy.frontend.abc import AbstractFrontend
+    from .config import ServerConfig
+    from .proxy.frontend.base import BaseFrontend
 
 
 class ProxyMetricObserver:
@@ -301,20 +305,22 @@ class PrometheusMetrics:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: "AbstractFrontend"
+    proxy_frontend: BaseFrontend
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
-    redis_live: RedisConnectionInfo
-    redis_stat: RedisConnectionInfo
+    valkey_live: ValkeyLiveClient
+    valkey_stat: ValkeyStatClient
+    http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
     request_counter_redis_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
+    health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 
@@ -356,9 +362,9 @@ class Circuit(SerializableCircuit):
     runtime_variant: str | None
     "for initialization usage only; use `app_info` variable"
 
-    _app_inference_metrics: dict[MetricKey, "Metric | HistogramMetric"]
+    _app_inference_metrics: dict[MetricKey, Metric | HistogramMetric]
     _replica_inference_metrics: dict[
-        MetricKey, dict[UUID, "Metric | HistogramMetric"]
+        MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
     def __init__(self, *args, **kwargs) -> None:
@@ -367,16 +373,18 @@ class Circuit(SerializableCircuit):
         self._replica_inference_metrics = {}
 
     @classmethod
-    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> "Circuit":
+    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> Circuit:
         frontend: PortFrontendInfo | SubdomainFrontendInfo
         app_info: InteractiveAppInfo | InferenceAppInfo
 
         match circuit.app_mode:
             case AppMode.INTERACTIVE:
-                assert circuit.user_id
+                if not circuit.user_id:
+                    raise InvalidCircuitDataError("User ID is required for interactive app mode")
                 app_info = InteractiveAppInfo(circuit.user_id)
             case AppMode.INFERENCE:
-                assert circuit.endpoint_id
+                if not circuit.endpoint_id:
+                    raise InvalidCircuitDataError("Endpoint ID is required for inference app mode")
                 app_info = InferenceAppInfo(
                     circuit.endpoint_id,
                     RuntimeVariant(circuit.runtime_variant)
@@ -386,19 +394,21 @@ class Circuit(SerializableCircuit):
 
         match circuit.frontend_mode:
             case FrontendMode.PORT:
-                assert circuit.port is not None
+                if circuit.port is None:
+                    raise InvalidFrontendTypeError("Port is required for PORT frontend mode")
                 frontend = PortFrontendInfo(circuit.port)
             case FrontendMode.WILDCARD_DOMAIN:
-                assert circuit.subdomain is not None
+                if circuit.subdomain is None:
+                    raise InvalidFrontendTypeError(
+                        "Subdomain is required for WILDCARD_DOMAIN frontend mode"
+                    )
                 frontend = SubdomainFrontendInfo(circuit.subdomain)
 
         return cls(frontend=frontend, app_info=app_info, **circuit.model_dump())
 
     @property
     def prometheus_metric_label(self) -> dict[str, str]:
-        metric_labels = {"protocol": self.protocol.name}
-
-        return metric_labels
+        return {"protocol": self.protocol.name}
 
 
 class MetricTypes(enum.Enum):
@@ -444,7 +454,7 @@ class HistogramMeasurement:
     sum: Optional[Decimal] = dataclasses.field(default=None)
 
 
-TMeasurement = TypeVar("TMeasurement", bound=Union[Measurement, HistogramMeasurement])
+TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
@@ -457,7 +467,7 @@ class InferenceMeasurement(Generic[TMeasurement]):
     type: MetricTypes
     per_app: TMeasurement
     per_replica: Mapping[UUID, TMeasurement]  # [Route Id: Measurement] pair
-    stats_filter: FrozenSet[str] = dataclasses.field(default_factory=frozenset)
+    stats_filter: frozenset[str] = dataclasses.field(default_factory=frozenset)
     unit_hint: str = dataclasses.field(default="count")
 
 
@@ -467,11 +477,11 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 class MovingStatistics:
     __slots__ = (
-        "_sum",
         "_count",
-        "_min",
-        "_max",
         "_last",
+        "_max",
+        "_min",
+        "_sum",
     )
     _sum: Decimal
     _count: int
@@ -479,7 +489,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None):
+    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -554,10 +564,10 @@ class Metric:
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
-    stats_filter: FrozenSet[str]
+    stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
 
     def update(self, value: Measurement):
         if value.capacity is not None:
@@ -571,7 +581,7 @@ class Metric:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "__type": self.type.name,
+            "__type": self.type.name,  # type: ignore
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
                 str(remove_exponent(self.capacity.quantize(q)))

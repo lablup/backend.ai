@@ -1,9 +1,9 @@
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any, Final, Optional, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.agent.stage.kernel_lifecycle.defs import LIBBAIHOOK_MOUNT_PATH
 from ai.backend.common.docker import KernelFeatures, LabelName
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
@@ -17,8 +17,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     SlotName,
 )
-
-from ..defs import LIBBAIHOOK_MOUNT_PATH
 
 LD_PRELOAD: Final[str] = "LD_PRELOAD"
 LOCAL_USER_ID: Final[str] = "LOCAL_USER_ID"
@@ -163,14 +161,8 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
 
     async def _get_container_hooks(self, spec: EnvironSpec) -> set[str]:
         container_hook_path_set: set[str] = set()
-        for dev_type, device_alloc in spec.kernel_info.resource_spec.allocations.items():
-            alloc_sum = Decimal(0)
-            for per_dev_alloc in device_alloc.values():
-                alloc_sum += sum(per_dev_alloc.values())
-            do_hook_mount = alloc_sum > 0
-            if not do_hook_mount:
-                continue
-            computer_ctx = spec.agent_info.computers[dev_type]
+        for device_view in spec.kernel_info.resource_spec.device_list:
+            computer_ctx = spec.agent_info.computers[device_view.device]
             hook_paths = await computer_ctx.instance.get_hooks(
                 spec.agent_info.distro, spec.agent_info.architecture
             )

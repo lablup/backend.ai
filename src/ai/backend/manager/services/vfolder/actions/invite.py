@@ -9,8 +9,7 @@ from typing import (
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
-
-from ..types import VFolderInvitationInfo
+from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 
 @dataclass
@@ -43,7 +42,7 @@ class InviteVFolderAction(VFolderInvitationAction):
 @dataclass
 class InviteVFolderActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
-    invitation_ids: list[uuid.UUID]
+    invitation_ids: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -170,3 +169,55 @@ class LeaveInvitedVFolderActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.vfolder_uuid)
+
+
+@dataclass
+class RevokeInvitedVFolderAction(VFolderInvitationAction):
+    vfolder_id: uuid.UUID
+    shared_user_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "revoke"
+
+
+@dataclass
+class RevokeInvitedVFolderActionResult(BaseActionResult):
+    vfolder_id: uuid.UUID
+    shared_user_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)
+
+
+@dataclass
+class UpdateInvitedVFolderMountPermissionAction(VFolderInvitationAction):
+    vfolder_id: uuid.UUID
+    user_id: uuid.UUID
+    permission: VFolderMountPermission
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "update_permission"
+
+
+@dataclass
+class UpdateInvitedVFolderMountPermissionActionResult(BaseActionResult):
+    vfolder_id: uuid.UUID
+    user_id: uuid.UUID
+    permission: VFolderMountPermission
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)

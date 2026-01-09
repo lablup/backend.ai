@@ -1,4 +1,4 @@
-from typing import override
+from typing import Protocol, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
@@ -51,7 +51,36 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
-from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
+
+
+class ModelServingServiceProtocol(Protocol):
+    """Protocol defining the interface for model serving services."""
+
+    async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult: ...
+
+    async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult: ...
+
+    async def delete(self, action: DeleteModelServiceAction) -> DeleteModelServiceActionResult: ...
+
+    async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult: ...
+
+    async def get_model_service_info(
+        self, action: GetModelServiceInfoAction
+    ) -> GetModelServiceInfoActionResult: ...
+
+    async def list_errors(self, action: ListErrorsAction) -> ListErrorsActionResult: ...
+
+    async def clear_error(self, action: ClearErrorAction) -> ClearErrorActionResult: ...
+
+    async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult: ...
+
+    async def update_route(self, action: UpdateRouteAction) -> UpdateRouteActionResult: ...
+
+    async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult: ...
+
+    async def generate_token(self, action: GenerateTokenAction) -> GenerateTokenActionResult: ...
+
+    async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult: ...
 
 
 class ModelServingProcessors(AbstractProcessorPackage):
@@ -70,7 +99,11 @@ class ModelServingProcessors(AbstractProcessorPackage):
     generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
     modify_endpoint: ActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
 
-    def __init__(self, service: ModelServingService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ModelServingServiceProtocol,
+        action_monitors: list[ActionMonitor],
+    ) -> None:
         self.create_model_service = ActionProcessor(service.create, action_monitors)
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
         self.delete_model_service = ActionProcessor(service.delete, action_monitors)

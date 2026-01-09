@@ -1,16 +1,11 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
 from .role import RoleData
-
-
-@dataclass
-class UserRoleCreateInput:
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
 
 
 @dataclass

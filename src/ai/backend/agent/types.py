@@ -1,24 +1,36 @@
+from __future__ import annotations
+
 import asyncio
 import enum
+import importlib
 import uuid
+from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, TypeAlias
 
 import attrs
-from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Middleware
 
 from ai.backend.common.docker import LabelName
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AgentId,
     ContainerId,
     ContainerStatus,
+    DeviceName,
     KernelId,
     MountTypes,
     SessionId,
+    SlotName,
 )
+
+if TYPE_CHECKING:
+    from .agent import AbstractAgent
+    from .resources import AbstractComputePlugin
 
 
 class AgentBackend(enum.StrEnum):
@@ -26,6 +38,52 @@ class AgentBackend(enum.StrEnum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     DUMMY = "dummy"
+
+
+class AbstractAgentDiscovery(ABC):
+    @abstractmethod
+    def get_agent_cls(self) -> type[AbstractAgent]:
+        """
+        Return the concrete implementation class of AbstactAgent for the backend.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def load_resources(
+        self,
+        etcd: AbstractKVStore,
+        local_config: Mapping[str, Any],
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
+        """
+        Detect and load the accelerator plugins.
+
+        limit_cpus, limit_gpus are deprecated.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def scan_available_resources(
+        self,
+        compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
+    ) -> Mapping[SlotName, Decimal]:
+        """
+        Detect available computing resource of the system.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
+        """
+        Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
+        If not, automatically create it and update its content from the packaged pre-built krunner
+        tar archives.
+        """
+        raise NotImplementedError
+
+
+def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
+    agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+    return agent_mod.get_agent_discovery()
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -73,6 +131,11 @@ class Container:
         return str(self.id)[:12]
 
     @property
+    def agent_id(self) -> AgentId:
+        raw_agent_id = self.labels[LabelName.AGENT_ID]
+        return AgentId(raw_agent_id)
+
+    @property
     def kernel_id(self) -> KernelId:
         raw_kernel_id = self.labels[LabelName.KERNEL_ID]
         return KernelId(uuid.UUID(raw_kernel_id))
@@ -114,7 +177,7 @@ class ContainerLifecycleEvent:
     exit_code: Optional[int] = None
     suppress_events: bool = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.container_id:
             cid = self.container_id[:13]
         else:
@@ -152,9 +215,13 @@ class KernelOwnershipData:
     owner_user_id: Optional[uuid.UUID] = None
     owner_project_id: Optional[uuid.UUID] = None
 
-    def __post_init__(self):
-        def to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
-            return uuid.UUID(value) if value is not None else None
+    def __post_init__(self) -> None:
+        def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
+            if value is None:
+                return None
+            if isinstance(value, uuid.UUID):
+                return value
+            return uuid.UUID(value)
 
         self.owner_user_id = to_uuid(self.owner_user_id)
         self.owner_project_id = to_uuid(self.owner_project_id)
@@ -168,7 +235,4 @@ class KernelOwnershipData:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
-WebMiddleware = Callable[
-    [web.Request, Handler],
-    Awaitable[web.StreamResponse],
-]
+WebMiddleware: TypeAlias = Middleware

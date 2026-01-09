@@ -1,14 +1,13 @@
-from collections.abc import Sequence
-from datetime import datetime
+from collections.abc import AsyncIterator, Sequence
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, Optional
+from typing import Any, Optional, override
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-
-from ...types import (
+from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
     DirEntryType,
@@ -18,13 +17,19 @@ from ...types import (
     Stat,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
-from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.volumes.abc import (
+    _CURRENT_DIR,
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+    AbstractVolume,
+)
 
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
     yield DirEntry(
-        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(), datetime.now()), ""
+        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(UTC), datetime.now(UTC)), ""
     )
 
 
@@ -117,6 +122,15 @@ class NoopFSOpModel(AbstractFSOpModel):
 class NoopVolume(AbstractVolume):
     name = NOOP_STORAGE_BACKEND_TYPE
 
+    @override
+    def info(self) -> VolumeInfo:
+        return VolumeInfo(
+            backend=NOOP_STORAGE_BACKEND_TYPE,
+            path=self.mount_path,
+            fsprefix=None,
+            options=None,
+        )
+
     async def create_quota_model(self) -> AbstractQuotaModel:
         return NoopQuotaModel()
 
@@ -171,7 +185,7 @@ class NoopVolume(AbstractVolume):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         return TreeUsage(0, 0)
 

@@ -5,17 +5,37 @@ from glide import ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_session client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_SESSION)
+# Resilience instance for valkey_session layer
+valkey_session_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_SESSION)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ValkeySessionClient:
@@ -37,7 +57,7 @@ class ValkeySessionClient:
     @classmethod
     async def create(
         cls,
-        redis_target: RedisTarget,
+        valkey_target: ValkeyTarget,
         *,
         db_id: int,
         human_readable_name: str,
@@ -51,25 +71,25 @@ class ValkeySessionClient:
         :return: An instance of ValkeySessionClient.
         """
         client = create_valkey_client(
-            target=redis_target,
+            valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
         )
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeySessionClient connection.
         """
         if self._closed:
-            log.warning("ValkeySessionClient is already closed.")
+            log.debug("ValkeySessionClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def get_session_data(self, session_key: str) -> Optional[bytes]:
         """
         Get session data by session key.
@@ -79,7 +99,7 @@ class ValkeySessionClient:
         """
         return await self._client.client.get(session_key)
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def set_session_data(
         self, session_key: str, session_data: str | bytes, ttl_seconds: int
     ) -> None:
@@ -96,7 +116,7 @@ class ValkeySessionClient:
             expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
         )
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def get_login_history(self, username: str) -> Optional[bytes]:
         """
         Get login failure history for a user.
@@ -107,7 +127,7 @@ class ValkeySessionClient:
         key = f"login_history_{username}"
         return await self._client.client.get(key)
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def set_login_block(
         self, username: str, block_data: str | bytes, block_duration_seconds: int
     ) -> None:
@@ -125,14 +145,14 @@ class ValkeySessionClient:
             expiry=ExpirySet(ExpiryType.SEC, block_duration_seconds),
         )
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def flush_all_sessions(self) -> None:
         """
         Flush all data in the current database (typically used for session cleanup).
         """
         await self._client.client.flushdb()
 
-    @valkey_decorator()
+    @valkey_session_resilience.apply()
     async def get_server_time_second(self) -> int:
         """
         Get the current server time.
@@ -142,3 +162,11 @@ class ValkeySessionClient:
         result = await self._client.client.time()
         seconds_bytes, _ = result
         return int(seconds_bytes)
+
+    async def ping(self) -> None:
+        """
+        Ping the Valkey server to check connection.
+
+        :raises: Exception if ping fails
+        """
+        await self._client.client.ping()

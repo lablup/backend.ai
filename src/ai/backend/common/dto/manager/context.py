@@ -1,9 +1,10 @@
 import uuid
-from typing import Any, Mapping, Self
+from collections.abc import Mapping
+from typing import Any, Self
 
 from aiohttp import web
 
-from ...api_handlers import MiddlewareParam
+from ai.backend.common.api_handlers import MiddlewareParam
 
 
 class UserIdentityCtx(MiddlewareParam):
@@ -13,7 +14,7 @@ class UserIdentityCtx(MiddlewareParam):
     domain_name: str
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
@@ -27,7 +28,7 @@ class KeypairCtx(MiddlewareParam):
     resource_policy: Mapping[str, Any]
 
     @classmethod
-    def from_request(cls, request: web.Request) -> Self:
+    async def from_request(cls, request: web.Request) -> Self:
         return cls(
             access_key=request["keypair"]["access_key"],
             resource_policy=request["keypair"]["resource_policy"],

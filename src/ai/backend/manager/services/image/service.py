@@ -4,12 +4,15 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
+    ImageRow,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -31,6 +34,26 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.get_all_images import (
+    GetAllImagesAction,
+    GetAllImagesActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_by_id import (
+    GetImageByIdAction,
+    GetImageByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+    GetImageInstalledAgentsActionResult,
+)
+from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+    GetImagesByCanonicalsAction,
+    GetImagesByCanonicalsActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -82,6 +105,58 @@ class ImageService:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
         self._admin_image_repository = admin_image_repository
+
+    async def get_images_by_canonicals(
+        self, action: GetImagesByCanonicalsAction
+    ) -> GetImagesByCanonicalsActionResult:
+        images_with_agent_install_status: list[
+            ImageWithAgentInstallStatus
+        ] = await self._image_repository.get_images_by_canonicals(
+            action.image_canonicals,
+            status_filter=action.image_status,
+            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+        )
+        return GetImagesByCanonicalsActionResult(
+            images_with_agent_install_status=images_with_agent_install_status
+        )
+
+    async def get_image_by_identifier(
+        self, action: GetImageByIdentifierAction
+    ) -> GetImageByIdentifierActionResult:
+        image_with_agent_install_status: ImageWithAgentInstallStatus = (
+            await self._image_repository.get_image_by_identifier(
+                action.image_identifier,
+                status_filter=action.image_status,
+                requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            )
+        )
+        return GetImageByIdentifierActionResult(
+            image_with_agent_install_status=image_with_agent_install_status
+        )
+
+    async def get_image_installed_agents(
+        self, action: GetImageInstalledAgentsAction
+    ) -> GetImageInstalledAgentsActionResult:
+        image_ids = action.image_ids
+        agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
+        return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
+
+    async def get_all_images(self, action: GetAllImagesAction) -> GetAllImagesActionResult:
+        images = await self._image_repository.get_all_images(status_filter=action.status_filter)
+        return GetAllImagesActionResult(data=images)
+
+    async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
+        image_with_agent_install_status: ImageWithAgentInstallStatus = (
+            await self._image_repository.get_image_by_id(
+                action.image_id,
+                load_aliases=True,
+                status_filter=action.image_status,
+                requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            )
+        )
+        return GetImageByIdActionResult(
+            image_with_agent_install_status=image_with_agent_install_status
+        )
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
         if action.client_role == UserRole.SUPERADMIN:
@@ -136,17 +211,20 @@ class ImageService:
         )
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        props = action.modifier
-
         try:
-            to_update = props.fields_to_update()
-            image_data = await self._image_repository.update_image_properties(
-                action.target, action.architecture, to_update
-            )
+            # Resolve image first to get its ID
+            image_data = await self._image_repository.resolve_image([
+                ImageIdentifier(action.target, action.architecture),
+                ImageAlias(action.target),
+            ])
+            # Create Updater with resolved image ID
+            updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=image_data.id)
+            # Pass Updater to repository
+            updated_image_data = await self._image_repository.update_image_properties(updater)
         except UnknownImageReference:
             raise ModifyImageActionUnknownImageReferenceError
 
-        return ModifyImageActionResult(image=image_data)
+        return ModifyImageActionResult(image=updated_image_data)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
@@ -251,7 +329,9 @@ class ImageService:
                 image_data_list = await self._image_repository.resolve_images_batch(
                     successful_identifiers
                 )
-                for image_data, canonical in zip(image_data_list, successful_canonicals):
+                for image_data, canonical in zip(
+                    image_data_list, successful_canonicals, strict=True
+                ):
                     purged_images_data.purged_images.append(canonical)
                     total_reserved_bytes += image_data.size_bytes
 

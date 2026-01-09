@@ -5,20 +5,29 @@ import base64
 import json
 import logging
 import random
-from typing import Iterable, Optional, Tuple, Union, cast
+from collections.abc import Iterable
+from typing import Final, Optional, cast
 
 import aiohttp
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
+from multidict import CIMultiDict
+from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.request import Request
+from ai.backend.client.request import Request, RequestContent, SessionMode
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
-from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
+from .auth import (
+    fill_forwarding_hdrs_to_api_session,
+    generate_jwt_token_for_session,
+    get_anonymous_session,
+    get_api_session,
+)
 from .stats import WebStats
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -28,18 +37,31 @@ HTTP_HEADERS_TO_FORWARD = [
     "Authorization",
 ]
 
+CHUNK_SIZE: Final[int] = 64 * 1024
+
+HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Connection", 1),
+    ("Keep-Alive", 1),
+    ("Proxy-Authenticate", 1),
+    ("Proxy-Authorization", 1),
+    ("TE", 1),
+    ("Trailers", 1),
+    ("Transfer-Encoding", 1),
+    ("Upgrade", 1),
+])
+
 
 class WebSocketProxy:
     __slots__ = (
-        "up_conn",
         "down_conn",
+        "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
     )
 
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
-    upstream_buffer: asyncio.Queue[Tuple[Union[str, bytes], aiohttp.WSMsgType]]
+    upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
     upstream_buffer_task: Optional[asyncio.Task]
 
     def __init__(
@@ -82,9 +104,7 @@ class WebSocketProxy:
                     await self.down_conn.send_str(msg.data)
                 elif msg.type == aiohttp.WSMsgType.BINARY:
                     await self.down_conn.send_bytes(msg.data)
-                elif msg.type == aiohttp.WSMsgType.CLOSED:
-                    break
-                elif msg.type == aiohttp.WSMsgType.ERROR:
+                elif msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.ERROR:
                     break
             # here, server gracefully disconnected
         except asyncio.CancelledError:
@@ -131,13 +151,16 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 @web.middleware
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
-    request_headers = extra_config_headers.check(request.headers)
+    config: WebServerUnifiedConfig = request.app["config"]
+    try:
+        request_headers = extra_config_headers.check(request.headers)
+    except DataError as e:
+        raise InvalidAPIParameters(f"Invalid request headers: {e}") from e
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        if not request.can_read_body:  # designated as encrypted but has an empty payload
-            request["payload"] = ""
+        if not request.body_exists:  # designated as encrypted but has an empty payload
+            request["payload"] = None
             return await handler(request)
-        config = cast(WebServerUnifiedConfig, request.app["config"])
         scheme = (
             str(config.service.force_endpoint_protocol)
             if config.service.force_endpoint_protocol
@@ -151,81 +174,105 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     else:
         # For all other requests without explicit encryption,
         # let the handler decide how to read the body.
-        request["payload"] = ""
+        request["payload"] = None
     return await handler(request)
 
 
 async def web_handler(
-    request: web.Request,
+    frontend_rqst: web.Request,
     *,
     is_anonymous: bool = False,
     api_endpoint: Optional[str] = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
+    # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
+    if (
+        frontend_rqst.headers.get("Upgrade", "").lower() == "websocket"
+        and "upgrade" in frontend_rqst.headers.get("Connection", "").lower()
+    ):
+        return await websocket_handler(
+            frontend_rqst,
+            is_anonymous=is_anonymous,
+            api_endpoint=api_endpoint,
+        )
+
+    stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info.get("path", "")
+    path = frontend_rqst.match_info.get("path", None)
+    if path is None:
+        request_path = frontend_rqst.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
+        api_session = await asyncio.shield(get_anonymous_session(frontend_rqst, api_endpoint))
     else:
-        api_session = await asyncio.shield(get_api_session(request, api_endpoint))
+        api_session = await asyncio.shield(get_api_session(frontend_rqst, api_endpoint))
     http_headers_to_forward_extra = http_headers_to_forward_extra or []
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
-            request_headers = extra_config_headers.check(request.headers)
-            request_api_version = request_headers.get("X-BackendAI-Version", None)
-            secure_context = request_headers.get("X-BackendAI-Encoded", None)
+            backend_rqst_hdrs = extra_config_headers.check(frontend_rqst.headers)
+            request_api_version = backend_rqst_hdrs.get("X-BackendAI-Version", None)
+            secure_context = backend_rqst_hdrs.get("X-BackendAI-Encoded", None)
             decrypted_payload_length = 0
-            if secure_context:
-                payload = request["payload"]
-                decrypted_payload_length = len(payload)
-            else:
-                payload = request.content
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            content: RequestContent = None
+            if frontend_rqst.body_exists:
+                if secure_context:
+                    # Use the decrypted payload as request content
+                    content = cast(bytes, frontend_rqst["payload"])
+                    decrypted_payload_length = len(content)
+                else:
+                    # Passthrough the streamed content
+                    content = frontend_rqst.content
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
             # Deliver cookie for token-based authentication.
-            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            # We treat all requests and responses as streaming universally
-            # to be a transparent proxy.
-            api_request = Request(
-                request.method,
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+            backend_rqst = Request(
+                frontend_rqst.method,
                 path,
-                payload,
-                params=request.query,
+                content,
+                params=frontend_rqst.query,
                 override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
             )
-            if "Content-Type" in request.headers:
-                api_request.content_type = request.content_type  # set for signing
-                api_request.headers["Content-Type"] = request.headers[
+            if "Content-Type" in frontend_rqst.headers:
+                backend_rqst.content_type = frontend_rqst.content_type  # set for signing
+                backend_rqst.headers["Content-Type"] = frontend_rqst.headers[
                     "Content-Type"
                 ]  # preserve raw value
-            if "Content-Length" in request.headers and not secure_context:
-                api_request.headers["Content-Length"] = request.headers["Content-Length"]
-            if "Content-Length" in request.headers and secure_context:
-                api_request.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+            if "Content-Length" in frontend_rqst.headers and not secure_context:
+                backend_rqst.headers["Content-Length"] = frontend_rqst.headers["Content-Length"]
+            if "Content-Length" in frontend_rqst.headers and secure_context:
+                backend_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+            for key in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
                 # Prevent malicious or accidental modification of critical headers.
-                if hdr in api_request.headers:
+                if key in backend_rqst.headers:
                     continue
-                if request.headers.get(hdr) is not None:
-                    api_request.headers[hdr] = request.headers[hdr]
-            # Uploading request body happens at the entering of the block,
-            # and downloading response body happens in the read loop inside.
-            async with api_request.fetch() as up_resp:
-                down_resp = web.StreamResponse()
-                down_resp.set_status(up_resp.status, up_resp.reason)
-                down_resp.headers.update(up_resp.headers)
-                # We already have configured CORS handlers and the API server
-                # also provides those headers.  Just let them as-is.
-                await down_resp.prepare(request)
-                while True:
-                    chunk = await up_resp.read(8192)
-                    if not chunk:
-                        break
-                    await down_resp.write(chunk)
-                return down_resp
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                await frontend_resp.prepare(frontend_rqst)
+                try:
+                    while True:
+                        chunk = await backend_resp.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        await frontend_resp.write(chunk)
+                finally:
+                    await frontend_resp.write_eof()
+                return frontend_resp
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
@@ -257,55 +304,236 @@ async def web_handler(
         await api_session.close()
 
 
-async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamResponse:
+async def web_handler_with_jwt(
+    frontend_rqst: web.Request,
+    *,
+    api_endpoints: list[str] | None = None,
+    http_headers_to_forward_extra: Iterable[str] | None = None,
+) -> web.StreamResponse:
+    """
+    Web handler with JWT authentication for Apollo Router GraphQL requests.
+
+    This handler generates a JWT token from the user's web session and adds it
+    to the X-BackendAI-Token header when proxying requests to the Manager API.
+    It is used specifically for GraphQL Federation requests through Apollo Router,
+    including WebSocket connections for GraphQL subscriptions.
+
+    Args:
+        frontend_rqst: The incoming frontend request
+        api_endpoints: List of API endpoints (Apollo Router endpoints) for load balancing
+        http_headers_to_forward_extra: Additional HTTP headers to forward
+
+    Returns:
+        Streamed response from the backend API
+    """
+    # Select random endpoint if multiple endpoints are provided
+    api_endpoint: Optional[str] = None
+    if api_endpoints:
+        api_endpoint = random.choice(api_endpoints)
+
+    # Generate JWT token from session (needed for both HTTP and WebSocket)
+    jwt_token = await generate_jwt_token_for_session(frontend_rqst)
+    log.debug(
+        "web_handler_with_jwt: Generated JWT token (length: {}, path: {})",
+        len(jwt_token) if jwt_token else 0,
+        frontend_rqst.path,
+    )
+
+    # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
+    if (
+        frontend_rqst.headers.get("Upgrade", "").lower() == "websocket"
+        and "upgrade" in frontend_rqst.headers.get("Connection", "").lower()
+    ):
+        # Pass JWT token to websocket handler for authentication
+        return await websocket_handler(
+            frontend_rqst,
+            is_anonymous=False,
+            api_endpoint=api_endpoint,
+            jwt_token=jwt_token,
+        )
+
+    stats: WebStats = frontend_rqst.app["stats"]
+    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+    path = frontend_rqst.match_info.get("path", None)
+    if path is None:
+        request_path = frontend_rqst.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
+
+    # Create API session with ak/sk (JWT will be used for auth instead of HMAC)
+    api_session = await asyncio.shield(get_api_session(frontend_rqst, api_endpoint))
+    http_headers_to_forward_extra = http_headers_to_forward_extra or []
+
+    try:
+        async with api_session:
+            # Prepare backend request headers
+            backend_rqst_hdrs = extra_config_headers.check(frontend_rqst.headers)
+            request_api_version = backend_rqst_hdrs.get("X-BackendAI-Version", None)
+            secure_context = backend_rqst_hdrs.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
+            content: RequestContent = None
+
+            if frontend_rqst.body_exists:
+                if secure_context:
+                    # Use the decrypted payload as request content
+                    content = cast(bytes, frontend_rqst["payload"])
+                    decrypted_payload_length = len(content)
+                else:
+                    # Passthrough the streamed content
+                    content = frontend_rqst.content
+
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
+
+            # Deliver cookie for token-based authentication (if needed)
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+
+            # Create backend request
+            backend_rqst = Request(
+                frontend_rqst.method,
+                path,
+                content,
+                params=frontend_rqst.query,
+                override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
+            )
+
+            # Add JWT token to request header
+            backend_rqst.headers["X-BackendAI-Token"] = jwt_token
+
+            if "Content-Type" in frontend_rqst.headers:
+                backend_rqst.content_type = frontend_rqst.content_type  # set for signing
+                backend_rqst.headers["Content-Type"] = frontend_rqst.headers[
+                    "Content-Type"
+                ]  # preserve raw value
+            if "Content-Length" in frontend_rqst.headers and not secure_context:
+                backend_rqst.headers["Content-Length"] = frontend_rqst.headers["Content-Length"]
+            if "Content-Length" in frontend_rqst.headers and secure_context:
+                backend_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+
+            for key in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+                # Prevent malicious or accidental modification of critical headers.
+                if key in backend_rqst.headers:
+                    continue
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+
+            # Fetch from backend and stream response
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                await frontend_resp.prepare(frontend_rqst)
+                try:
+                    while True:
+                        chunk = await backend_resp.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        await frontend_resp.write(chunk)
+                finally:
+                    await frontend_resp.write_eof()
+                return frontend_resp
+    except asyncio.CancelledError:
+        raise
+    except BackendAPIError as e:
+        return web.Response(
+            body=json.dumps(e.data),
+            content_type="application/problem+json",
+            status=e.status,
+            reason=e.reason,
+        )
+    except BackendClientError:
+        log.exception("web_handler_with_jwt: BackendClientError")
+        return web.HTTPBadGateway(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
+            content_type="application/problem+json",
+        )
+    except Exception:
+        log.exception("web_handler_with_jwt: unexpected error")
+        return web.HTTPInternalServerError(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
+            content_type="application/problem+json",
+        )
+    finally:
+        await api_session.close()
+
+
+async def web_plugin_handler(
+    frontend_rqst: web.Request,
+    *,
+    is_anonymous: bool = False,
+) -> web.StreamResponse:
     """
     This handler is almost same to web_handler, but does not manipulate the
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
-    stats: WebStats = request.app["stats"]
+    stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info["path"]
+    path = frontend_rqst.match_info["path"]
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request))
+        api_session = await asyncio.shield(get_anonymous_session(frontend_rqst))
     else:
-        api_session = await asyncio.shield(get_api_session(request))
+        api_session = await asyncio.shield(get_api_session(frontend_rqst))
+    config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     try:
+        content: RequestContent = None
         async with api_session:
-            content = request.content
-            if path == "auth/signup":
-                body = await request.json()
-                config = cast(WebServerUnifiedConfig, request.app["config"])
-                body["domain"] = config.api.domain
-                content = json.dumps(body).encode("utf8")
-            request_api_version = request.headers.get("X-BackendAI-Version", None)
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            if frontend_rqst.body_exists:
+                content = frontend_rqst.content
+                if path == "auth/signup":
+                    body = await frontend_rqst.json()
+                    body["domain"] = config.api.domain
+                    content = json.dumps(body).encode("utf8")
+            request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
             # Deliver cookie for token-based authentication.
-            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            api_request = Request(
-                request.method,
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+            backend_rqst = Request(
+                frontend_rqst.method,
                 path,
                 content,
-                params=request.query,
-                content_type=request.content_type,
+                params=frontend_rqst.query,
+                content_type=frontend_rqst.content_type,
                 override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
             )
-            for hdr in HTTP_HEADERS_TO_FORWARD:
-                if request.headers.get(hdr) is not None:
-                    api_request.headers[hdr] = request.headers[hdr]
-            async with api_request.fetch() as up_resp:
-                down_resp = web.StreamResponse()
-                down_resp.set_status(up_resp.status, up_resp.reason)
-                down_resp.headers.update(up_resp.headers)
-                # We already have configured CORS handlers and the API server
-                # also provides those headers.  Just let them as-is.
-                await down_resp.prepare(request)
-                while True:
-                    chunk = await up_resp.read(8192)
-                    if not chunk:
-                        break
-                    await down_resp.write(chunk)
-                return down_resp
+            for key in HTTP_HEADERS_TO_FORWARD:
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                await frontend_resp.prepare(frontend_rqst)
+                try:
+                    while True:
+                        chunk = await backend_resp.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        await frontend_resp.write(chunk)
+                finally:
+                    await frontend_resp.write_eof()
+                return frontend_resp
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
@@ -336,11 +564,22 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
 
 
 async def websocket_handler(
-    request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+    request: web.Request,
+    *,
+    is_anonymous=False,
+    api_endpoint: Optional[str] = None,
+    jwt_token: Optional[str] = None,
 ) -> web.StreamResponse:
+    if api_endpoint:
+        if api_endpoint.startswith("http://"):
+            api_endpoint = api_endpoint.replace("http://", "ws://", 1)
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info["path"]
+    path = request.match_info.get("path", None)
+    if path is None:
+        request_path = request.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     session = await get_session(request)
     app = request.query.get("app")
 
@@ -359,9 +598,15 @@ async def websocket_handler(
         session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
+    # Choose session type based on authentication method
     if is_anonymous:
+        # Truly anonymous request (no authentication)
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
+    elif jwt_token:
+        # JWT authentication: has ak/sk but uses JWT instead of HMAC signing
+        api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     else:
+        # HMAC authentication
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     try:
         async with api_session:
@@ -375,13 +620,23 @@ async def websocket_handler(
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
-            async with api_request.connect_websocket() as up_conn:
-                down_conn = web.WebSocketResponse()
+
+            # Add JWT token to request header if provided
+            if jwt_token:
+                api_request.headers["X-BackendAI-Token"] = jwt_token
+
+            # Extract WebSocket subprotocols from client request (e.g., graphql-ws for GraphQL subscriptions)
+            protocols_header: str = request.headers.get("Sec-WebSocket-Protocol", "")
+            protocols = tuple([p.strip() for p in protocols_header.split(",") if p.strip()])
+            async with api_request.connect_websocket(protocols=protocols) as up_conn:
+                down_conn = web.WebSocketResponse(protocols=protocols)
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
+                    if storage is None:
+                        raise RuntimeError("Session storage is not available in the request.")
                     config = cast(WebServerUnifiedConfig, request.app["config"])
                     extension_sec = config.session.login_session_extension_sec
                     await storage.save_session(request, down_conn, session, extension_sec)

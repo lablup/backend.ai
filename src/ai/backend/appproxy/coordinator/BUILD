@@ -1,6 +1,14 @@
 resource(name="version", source="VERSION")
 resource(name="buildscript", source="BUILD")
 
+python_sources(
+    name="src",
+    sources=["**/*.py"],
+    dependencies=[
+        ":resources",
+    ],
+)
+
 resources(
     name="resources",
     dependencies=[
@@ -8,16 +16,7 @@ resources(
     ],
     sources=[
         "**/py.typed",
-    ],
-)
-
-python_sources(
-    name="src",
-    dependencies=[
-        "src/ai/backend/appproxy/coordinator/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/appproxy/coordinator/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
-        "src/ai/backend/appproxy/coordinator/models/alembic:migrations",  # not auto-inferred
-        ":resources",
+        "models/alembic/script.py.mako",
     ],
 )
 
@@ -35,7 +34,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "app-proxy-coordinator": "ai.backend.appproxy.coordinator.cli.__main__:main",
-            "app-proxy-coordinator.start-server": "ai.backend.appproxy.coordinator.server:main",
+            "app-proxy-coordinator.start-server": "ai.backend.appproxy.coordinator.cli.start_server:main",
         },
     },
     generate_setup=True,

@@ -1,13 +1,19 @@
 import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Self, Sequence
+from typing import Any, Self
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import RedisTarget
-
-from ..service_discovery import ServiceDiscovery, ServiceMetadata
+from ai.backend.common.service_discovery.service_discovery import (
+    MODEL_SERVICE_GROUP,
+    MODEL_SERVICE_ROUTE_TTL,
+    ModelServiceMetadata,
+    ServiceDiscovery,
+    ServiceMetadata,
+)
+from ai.backend.common.types import ValkeyTarget
 
 _DEFAULT_PREFIX = "service_discovery"
 _DEFAULT_TTL = 60 * 3  # 3 minutes
@@ -15,7 +21,7 @@ _DEFAULT_TTL = 60 * 3  # 3 minutes
 
 @dataclass
 class RedisServiceDiscoveryArgs:
-    redis_target: RedisTarget
+    valkey_target: ValkeyTarget
     db_id: int = 0
     ttl: int = _DEFAULT_TTL  # 3 minutes
     prefix: str = _DEFAULT_PREFIX
@@ -27,7 +33,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
     _prefix: str
 
     def __init__(self, valkey_client: ValkeyLiveClient, args: RedisServiceDiscoveryArgs) -> None:
-        self._redis_target = args.redis_target
+        self._valkey_target = args.valkey_target
         self._db_id = args.db_id
         self._ttl = args.ttl
         self._prefix = args.prefix
@@ -36,7 +42,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
     @classmethod
     async def create(cls, args: RedisServiceDiscoveryArgs) -> Self:
         valkey_client = await ValkeyLiveClient.create(
-            args.redis_target,
+            args.valkey_target,
             db_id=args.db_id,
             human_readable_name="service_discovery",
         )
@@ -99,6 +105,42 @@ class RedisServiceDiscovery(ServiceDiscovery):
     async def get_service(self, service_group: str, service_id: uuid.UUID) -> ServiceMetadata:
         key = self._service_prefix(service_group, service_id)
         return await self._hget_json(key)
+
+    async def sync_model_service_routes(
+        self,
+        routes: Sequence[ModelServiceMetadata],
+    ) -> None:
+        """
+        Synchronize model service routes for Prometheus service discovery.
+
+        Writes all current routes to Redis with TTL. Routes not included in this sync
+        will be explicitly removed.
+        """
+        # Get all existing model-services to clean up stale ones
+        existing_route_ids = set()
+        try:
+            existing_routes = await self.get_service_group(MODEL_SERVICE_GROUP)
+            existing_route_ids = {route.id for route in existing_routes}
+        except ValueError:
+            # No existing routes, which is fine
+            pass
+
+        # Batch write all current routes
+        for route in routes:
+            # Convert to ServiceMetadata for storage
+            service_meta = route.to_service_metadata()
+            service_meta.health_status.update_heartbeat()
+
+            key = self._service_prefix(service_meta.service_group, service_meta.id)
+            # Use model service route TTL instead of default TTL
+            json_mapping = {k: dump_json_str(v) for k, v in service_meta.to_dict().items()}
+            await self._valkey_client.hset_with_expiry(key, json_mapping, MODEL_SERVICE_ROUTE_TTL)
+
+        # Remove routes that are no longer present
+        current_route_ids = {route.route_id for route in routes}
+        stale_route_ids = existing_route_ids - current_route_ids
+        for stale_id in stale_route_ids:
+            await self.unregister(MODEL_SERVICE_GROUP, stale_id)
 
     def _service_group_prefix(self, service_group: str) -> str:
         return f"{self._prefix}.{service_group}"

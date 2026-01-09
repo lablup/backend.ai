@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any, Callable, Optional, override
+from collections.abc import Callable
+from typing import Any, Optional, override
 
 from aiohttp import web
 
@@ -63,8 +64,7 @@ class RedisStorage(AbstractStorage):
             cookie = self.load_cookie(request)
             if cookie is None:
                 return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
-            else:
-                key = str(cookie)
+            key = str(cookie)
         data_bytes = await self._valkey_client.get_session_data(self.cookie_name + "_" + key)
         if data_bytes is None:
             return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
@@ -110,6 +110,7 @@ class RedisStorage(AbstractStorage):
                 # response.headers.set('X-BackendAI-SessionID', "")
             else:
                 key = str(key)
+                response._headers["X-BackendAI-SessionID"] = key
                 self.save_cookie(
                     response=response,
                     cookie_data=key,

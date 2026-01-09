@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, MutableMapping, Sequence
+from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
     Any,
     Final,
     Generic,
-    Mapping,
-    MutableMapping,
     Optional,
     Self,
-    Sequence,
-    Set,
     TypeVar,
     override,
 )
@@ -33,14 +31,42 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.errors.resource import InvalidSchedulerState
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 
 if TYPE_CHECKING:
-    from ..registry import AgentRegistry
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+
+
+class ScheduleType(StrEnum):
+    """Types of scheduling operations that can be triggered."""
+
+    SCHEDULE = "schedule"  # Schedule pending sessions
+    SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
+    SWEEP_LOST_AGENT_KERNELS = (
+        "sweep_lost_agent_kernels"  # Sweep kernels with lost or missing agents
+    )
+    CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
+    START = "start"  # Start prepared sessions
+    TERMINATE = "terminate"  # Terminate sessions
+    CHECK_PULLING_PROGRESS = "check_pulling_progress"  # Check if PULLING sessions can transition
+    CHECK_CREATING_PROGRESS = (
+        "check_creating_progress"  # Check if CREATING sessions can transition to RUNNING
+    )
+    CHECK_TERMINATING_PROGRESS = (
+        "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
+    )
+    RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
+    RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
+    SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
+    CHECK_RUNNING_SESSION_TERMINATION = (
+        "check_running_session_termination"  # Check RUNNING sessions with all kernels TERMINATED
+    )
 
 
 def merge_resource(
@@ -73,7 +99,7 @@ class SchedulingContext:
     Context for each scheduling decision.
     """
 
-    registry: "AgentRegistry"
+    registry: AgentRegistry
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 
@@ -81,7 +107,7 @@ class SchedulingContext:
 class KernelAgentBinding:
     kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
-    allocated_host_ports: Set[int]
+    allocated_host_ports: set[int]
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -124,7 +150,8 @@ class AbstractScheduler(ABC):
         if not pending_sessions:
             return -1, []
         priorities = {s.priority for s in pending_sessions}
-        assert len(priorities) > 0
+        if len(priorities) == 0:
+            raise InvalidSchedulerState("Priority set is empty despite having pending sessions")
         top_priority = max(priorities)
         return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
 
@@ -222,7 +249,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     @classmethod
     @abstractmethod
     def get_state_cls(cls) -> type[T_ResourceGroupState]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def assign_agent_for_session(
         self,

@@ -7,16 +7,17 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.exceptions import GenericBadRequest, ServerMisconfiguredError
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
+from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractHTTPFrontend
+from .base import BaseHTTPFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class PortFrontend(AbstractHTTPFrontend[int]):
+class PortFrontend(BaseHTTPFrontend[int]):
     sites: list[web.TCPSite]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -87,20 +88,19 @@ class PortFrontend(AbstractHTTPFrontend[int]):
     async def ensure_slot_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
-        async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
-            port: int = request.app["port"]
-            circuit = self.circuits[port]
-            if circuit is None:
-                raise GenericBadRequest(f"Unregistered slot {port}")
-            self.ensure_credential(request, circuit)
-            circuit = self.circuits[port]
-            backend = self.backends[port]
-            request["circuit"] = circuit
-            request["backend"] = backend
-            return await handler(request)
-
-        return await self.exception_safe_handler_wrapper(request, _exception_safe_handler)
+        port: int = request.app["port"]
+        circuit = self.circuits.get(port, None)
+        if circuit is None:
+            raise GenericBadRequest(f"Unregistered slot {port}")
+        self.ensure_credential(request, circuit)
+        backend = self.backends[port]
+        request["circuit"] = circuit
+        request["backend"] = backend
+        return await handler(request)
 
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port

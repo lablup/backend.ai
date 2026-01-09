@@ -6,24 +6,25 @@ import time
 
 from aiohttp import web
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
     PortFrontendInfo,
     RootContext,
 )
+from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractFrontend
+from .base import BaseFrontend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class TCPFrontend(AbstractFrontend[TCPBackend, int]):
+class TCPFrontend(BaseFrontend[TCPBackend, int]):
     servers: list[asyncio.Server]
     server_tasks: list[asyncio.Task]
 
@@ -125,5 +126,8 @@ class TCPFrontend(AbstractFrontend[TCPBackend, int]):
             metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
 
     def get_circuit_key(self, circuit: Circuit) -> int:
-        assert isinstance(circuit.frontend, PortFrontendInfo)
+        if not isinstance(circuit.frontend, PortFrontendInfo):
+            raise InvalidFrontendTypeError(
+                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
+            )
         return circuit.frontend.port

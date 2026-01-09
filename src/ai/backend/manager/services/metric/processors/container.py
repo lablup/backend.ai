@@ -6,8 +6,7 @@ from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricMetadataAction,
     ContainerMetricMetadataActionResult,
 )
-
-from ..container_metric import ContainerUtilizationMetricService
+from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
 
 
 class ContainerUtilizationMetricProcessors(ActionProcessor):

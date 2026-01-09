@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime
-from typing import AsyncIterator, Mapping, override
+from typing import override
 
 import aiotools
 import sqlalchemy as sa
@@ -15,14 +16,13 @@ from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
-
-from ..api.context import RootContext
-from ..config_legacy import session_hang_tolerance_iv
-from ..models import SessionRow
-from ..models.session import SessionStatus
-from ..models.utils import ExtendedAsyncSAEngine
-from ..registry import AgentRegistry
-from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
+from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.config_legacy import session_hang_tolerance_iv
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.sweeper.base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -60,9 +60,9 @@ class SessionSweeper(AbstractSweeper):
                 )
             )
 
-            async with self._db.begin_readonly() as conn:
-                result = await conn.execute(query)
-                sessions = result.fetchall()
+            async with self._db.begin_readonly_session() as db_sess:
+                result = await db_sess.execute(query)
+                sessions = list(result.scalars().all())
 
             async def _destroy_session(session: SessionRow) -> None:
                 try:

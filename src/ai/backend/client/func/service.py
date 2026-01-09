@@ -1,21 +1,21 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Optional
 from uuid import UUID
+from warnings import deprecated
 
 from faker import Faker
-from typing_extensions import deprecated
 
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.output.fields import service_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
 from ai.backend.common.types import RuntimeVariant
 
-from ..exceptions import BackendClientError
-from ..output.fields import service_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Service",)
@@ -23,9 +23,10 @@ __all__ = ("Service",)
 _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
-    service_fields["image"],
+    service_fields["image_object"],
     service_fields["replicas"],
     service_fields["routings"],
+    service_fields["url"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
 )
@@ -179,8 +180,9 @@ class Service(BaseFunction):
                     vfolder_id = vfolder_name_to_id[mount]
                 extra_mount_body[str(vfolder_id)] = {
                     "mount_destination": extra_mount_map.get(mount),
-                    "type": extra_mount_options.get(mount, {}).get("type"),
                 }
+                if mount_type := extra_mount_options.get(mount, {}).get("type"):
+                    extra_mount_body[str(vfolder_id)]["type"] = mount_type
         model_config = {
             "model": model_id_or_name,
             "model_mount_destination": model_mount_destination,

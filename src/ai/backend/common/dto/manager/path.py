@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import AliasChoices, Field
 
-from ...api_handlers import BaseRequestModel
+from ai.backend.common.api_handlers import BaseRequestModel
 
 
 class VFolderIDPath(BaseRequestModel):

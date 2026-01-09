@@ -1,9 +1,10 @@
 import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
-from typing import AsyncIterator, Iterable, override
+from typing import override
 
 import aiotools
 import sqlalchemy as sa
@@ -12,16 +13,11 @@ from sqlalchemy.orm import load_only, noload
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-
-from ..api.context import RootContext
-from ..models import (
-    DEAD_KERNEL_STATUSES,
-    DEAD_SESSION_STATUSES,
-    KernelRow,
-    KernelStatus,
-    SessionRow,
-)
-from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
+from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.models.kernel import DEAD_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.sweeper.base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -46,9 +42,9 @@ class KernelSweeper(AbstractSweeper):
             )
         )
 
-        async with self._db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            kernels = result.fetchall()
+        async with self._db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(query)
+            kernels = list(result.scalars().all())
 
         kernels_per_session = defaultdict(list)
         for kernel in kernels:

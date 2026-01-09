@@ -9,8 +9,9 @@ import secrets
 import shutil
 import time
 from collections import deque
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final
+from typing import Any, Optional, final, override
 
 import aiofiles.os
 import janus
@@ -19,16 +20,16 @@ import trafaret as t
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...exception import (
-    ExecutionError,
+from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidQuotaScopeError,
-    NotEmptyError,
+    MetadataTooLargeError,
+    ProcessExecutionError,
+    QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
-from ...subproc import run
-from ...types import (
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -40,10 +41,17 @@ from ...types import (
     Stat,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
-from ...utils import fstime2datetime
-from ...watcher import DeletePathTask, WatcherClient
-from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.utils import fstime2datetime
+from ai.backend.storage.volumes.abc import (
+    _CURRENT_DIR,
+    CAP_VFOLDER,
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+    AbstractVolume,
+)
+from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -122,7 +130,9 @@ class BaseQuotaModel(AbstractQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
@@ -181,7 +191,9 @@ class SetGIDQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
@@ -229,14 +241,11 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        if self.watcher is not None:
-            await self.watcher.request_task(DeletePathTask(path))
-        else:
-            loop = asyncio.get_running_loop()
-            try:
-                await loop.run_in_executor(None, lambda: shutil.rmtree(path))
-            except FileNotFoundError:
-                pass
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
+        except FileNotFoundError:
+            pass
 
     def scan_tree(
         self,
@@ -372,6 +381,15 @@ class BaseFSOpModel(AbstractFSOpModel):
 class BaseVolume(AbstractVolume):
     name = "vfs"
 
+    @override
+    def info(self) -> VolumeInfo:
+        return VolumeInfo(
+            backend=self.name,
+            path=self.mount_path,
+            fsprefix=None,
+            options=self.config,
+        )
+
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 
@@ -382,7 +400,7 @@ class BaseVolume(AbstractVolume):
             self.watcher,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER])
 
     async def get_hwinfo(self) -> HardwareMetadata:
@@ -435,7 +453,7 @@ class BaseVolume(AbstractVolume):
         fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
-            raise ExecutionError("Not enough space available for clone.")
+            raise ProcessExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
@@ -448,7 +466,7 @@ class BaseVolume(AbstractVolume):
         except Exception:
             await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
-            raise ExecutionError("Copying files from source directories failed.")
+            raise ProcessExecutionError("Copying files from source directories failed.")
 
     @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
@@ -468,9 +486,8 @@ class BaseVolume(AbstractVolume):
         try:
             stat = await loop.run_in_executor(None, metadata_path.stat)
             if stat.st_size > 10 * (2**20):
-                raise RuntimeError("Too large metadata (more than 10 MiB)")
-            data = await loop.run_in_executor(None, metadata_path.read_bytes)
-            return data
+                raise MetadataTooLargeError("Too large metadata (more than 10 MiB)")
+            return await loop.run_in_executor(None, metadata_path.read_bytes)
         except FileNotFoundError:
             return b""
         # Other IO errors should be bubbled up.
@@ -490,7 +507,7 @@ class BaseVolume(AbstractVolume):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
         return await self.fsop_model.scan_tree_usage(target_path)
@@ -558,7 +575,7 @@ class BaseVolume(AbstractVolume):
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_dir():
             raise InvalidAPIParameters(
-                msg=f"source path {str(src_path)} is not a directory",
+                extra_msg=f"source path {src_path!s} is not a directory",
             )
         dst_path = self.sanitize_vfpath(vfid, dst)
         await self.fsop_model.move_tree(src_path, dst_path)
@@ -571,7 +588,7 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_file():
-            raise InvalidAPIParameters(msg=f"source path {str(src_path)} is not a file")
+            raise InvalidAPIParameters(extra_msg=f"source path {src_path!s} is not a file")
         dst_path = self.sanitize_vfpath(vfid, dst)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -634,11 +651,11 @@ class BaseVolume(AbstractVolume):
         chunk_size: int = 0,
     ) -> AsyncIterator[bytes]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        q: janus.Queue[Union[bytes, Exception]] = janus.Queue()
+        q: janus.Queue[bytes | Exception] = janus.Queue()
         loop = asyncio.get_running_loop()
 
         def _read(
-            q: janus._SyncQueueProxy[Union[bytes, Exception]],
+            q: janus._SyncQueueProxy[bytes | Exception],
             chunk_size: int,
         ) -> None:
             try:

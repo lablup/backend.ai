@@ -115,7 +115,7 @@ All metrics use consistent labeling:
 - `container_metric_name`: The metric being queried
 - `value_type`: "usage" or "capacity"
 - `agent_id`: Agent identifier
-- `kernel_id`: Kernel/container identifier
+- `kernel_id`: Kernel identifier (Backend.AI's container wrapper, not the actual container ID)
 - `session_id`: Session identifier
 - `owner_user_id`: User identifier
 - `owner_project_id`: Project identifier

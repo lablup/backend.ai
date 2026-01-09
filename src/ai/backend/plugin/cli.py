@@ -5,23 +5,21 @@ import itertools
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Self
+from typing import TYPE_CHECKING, Self
 
 import click
 import colorama
 import tabulate
 from colorama import Fore, Style
 
-from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
-
-from .entrypoint import (
-    prepare_wheelhouse,
-    scan_entrypoint_from_buildscript,
-    scan_entrypoint_from_package_metadata,
-    scan_entrypoint_from_plugin_checkouts,
-)
+if TYPE_CHECKING:
+    from ai.backend.logging import AbstractLogger
+    from ai.backend.logging.types import LogLevel
 
 log = logging.getLogger(__spec__.name)
+
+# LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
+_LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
 class FormatOptions(enum.StrEnum):
@@ -36,14 +34,9 @@ class CLIContext:
         self.log_level = log_level
 
     def __enter__(self) -> Self:
-        log_config: dict[str, Any] = {}
-        if self.log_level != LogLevel.NOTSET:
-            log_config["level"] = self.log_level
-            log_config["pkg-ns"] = {
-                "": LogLevel.WARNING,
-                "ai.backend": self.log_level,
-            }
-        self._logger = LocalLogger(log_config)
+        from ai.backend.logging import LocalLogger
+
+        self._logger = LocalLogger(log_level=self.log_level)
         self._logger.__enter__()
         return self
 
@@ -63,6 +56,8 @@ def main(
     debug: bool,
 ) -> None:
     """The root entrypoint for unified CLI of the plugin subsystem"""
+    from ai.backend.logging.types import LogLevel
+
     log_level = LogLevel.DEBUG if debug else LogLevel.NOTSET
     ctx.obj = ctx.with_resource(CLIContext(log_level))
 
@@ -80,6 +75,13 @@ def scan(
     group_name: str,
     format: FormatOptions,
 ) -> None:
+    from .entrypoint import (
+        prepare_wheelhouse,
+        scan_entrypoint_from_buildscript,
+        scan_entrypoint_from_package_metadata,
+        scan_entrypoint_from_plugin_checkouts,
+    )
+
     sources: dict[str, set[str]] = defaultdict(set)
     rows = []
 

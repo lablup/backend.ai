@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping, Optional, override
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Optional, override
 
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
@@ -11,8 +12,7 @@ from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-
-from ..models import error_logs
+from ai.backend.manager.models.error_logs import error_logs
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
@@ -29,8 +29,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
+        self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
         self.db = root_ctx.db
 
@@ -97,8 +96,7 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
+        self.enabled = True
         root_ctx: RootContext = context
         self._db = root_ctx.db
 

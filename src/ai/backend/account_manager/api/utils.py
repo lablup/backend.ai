@@ -1,12 +1,10 @@
 import functools
 import json
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Generic,
-    Mapping,
     TypeAlias,
     TypeVar,
 )
@@ -16,9 +14,8 @@ from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
-
-from ..exceptions import AuthorizationFailed, InvalidAPIParameters
+from ai.backend.account_manager.exceptions import AuthorizationFailed, InvalidAPIParameters
+from ai.backend.logging import BraceStyleAdapter
 
 
 def auth_required(handler):
@@ -38,7 +35,7 @@ def set_handler_attr(func, key, value):
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs
 
 
 def get_handler_attr(request, key, default=None):

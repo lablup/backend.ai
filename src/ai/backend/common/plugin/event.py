@@ -4,10 +4,10 @@ import logging
 from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
+from ai.backend.common.events.types import AbstractEvent
+from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..events.types import AbstractEvent
-from ..types import AgentId
 from . import AbstractPlugin, BasePluginContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

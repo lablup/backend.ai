@@ -16,6 +16,998 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.0 (2025-12-31)
+
+### Features
+
+#### RBAC System Data Migration
+Implemented the service and repository layers for the Role-Based Access Control (RBAC) system and migrated existing entities to the RBAC database. RBAC data migration has been completed for entities including Model Deployment, Artifact Registry, Artifact, App Config, and Notification. (Actual permission enforcement is planned for future releases)
+
+* Implement RBAC service and repository layer ([#7125](https://github.com/lablup/backend.ai/issues/7125))
+* Implement RBAC DTOs and custom exceptions including request/response models, path parameters, and error handling ([#7361](https://github.com/lablup/backend.ai/issues/7361))
+* Add RBAC API adapters for role management operations ([#7362](https://github.com/lablup/backend.ai/issues/7362))
+* Add RBAC REST API endpoints for role management, role assignment, and querying assigned users ([#7363](https://github.com/lablup/backend.ai/issues/7363))
+* Migrate Model Deployment data to RBAC database - add MODEL_DEPLOYMENT entity type and associate endpoints with user scopes based on creator ([#7619](https://github.com/lablup/backend.ai/issues/7619))
+* Migrate Artifact Registry entities to RBAC database ([#7571](https://github.com/lablup/backend.ai/issues/7571))
+* Add ARTIFACT entity type to RBAC system and migrate existing artifact data to RBAC database ([#7574](https://github.com/lablup/backend.ai/issues/7574))
+* Migrate App Config entities to RBAC database ([#7583](https://github.com/lablup/backend.ai/issues/7583))
+* Migrate Notification entities (channels and rules) to RBAC database ([#7584](https://github.com/lablup/backend.ai/issues/7584))
+
+#### Repository Pattern Standardization
+Introduced standardized patterns including Creator, Updater, Purger, and Querier to the repository layer, establishing a foundation for consistent application across all GraphQL APIs. Scheduling history data models were also newly added.
+
+* Add scheduling history data models and ORM tables ([#7260](https://github.com/lablup/backend.ai/issues/7260))
+* Add scheduling history repository with db_source layer ([#7265](https://github.com/lablup/backend.ai/issues/7265))
+* Add Purger pattern for bulk deletion in repository layer ([#7274](https://github.com/lablup/backend.ai/issues/7274))
+* Add Creator, Updater, Upserter patterns to repository layer ([#7279](https://github.com/lablup/backend.ai/issues/7279))
+* Add execute_updater and execute_batch_updater functions ([#7280](https://github.com/lablup/backend.ai/issues/7280))
+* Split Purger and Querier into single/batch patterns ([#7283](https://github.com/lablup/backend.ai/issues/7283))
+
+#### Model Deployment Data Model Extension
+Added database schemas to support version management, auto-scaling, and deployment policies for Model Deployment. (API and feature implementation is planned for future releases)
+
+* Implement DeploymentRevisionRow model and repository ([#7396](https://github.com/lablup/backend.ai/issues/7396))
+* Implement DeploymentAutoScalingPolicyRow model and repository ([#7410](https://github.com/lablup/backend.ai/issues/7410))
+* Implement DeploymentPolicyRow for deployment strategy management ([#7413](https://github.com/lablup/backend.ai/issues/7413))
+* Add DEPLOYING state and revision_history_limit to EndpointRow ([#7414](https://github.com/lablup/backend.ai/issues/7414))
+* Add revision and traffic_status to RoutingRow ([#7427](https://github.com/lablup/backend.ai/issues/7427))
+* Add DeploymentPolicy GraphQL API ([#7479](https://github.com/lablup/backend.ai/issues/7479))
+* Add activateDeploymentRevision GQL mutation ([#7494](https://github.com/lablup/backend.ai/issues/7494))
+* Add Route Traffic Control GQL API ([#7546](https://github.com/lablup/backend.ai/issues/7546))
+* Add Deployment REST API endpoints with DTOs ([#7547](https://github.com/lablup/backend.ai/issues/7547))
+* Add Deployment SDK and CLI ([#7548](https://github.com/lablup/backend.ai/issues/7548))
+* Refactor deployment module with Repository pattern and Creator pattern ([#7606](https://github.com/lablup/backend.ai/issues/7606))
+* Fix autoscaling issue where deployments in ready state would not scale when their desired replica count differs from the number of routes ([#7254](https://github.com/lablup/backend.ai/issues/7254))
+
+#### GraphQL DataLoader Extension
+Added domain-specific GraphQL DataLoader classes and implemented Strawberry GraphQL DataLoaders for entities that previously lacked DataLoader support. Search actions utilizing BatchQuerier from the new repository pattern were also implemented.
+
+* Add `DataLoaders` class for domain-specific GraphQL data loaders ([#7299](https://github.com/lablup/backend.ai/issues/7299))
+* Implement `Notification` Strawberry GraphQL DataLoaders ([#7300](https://github.com/lablup/backend.ai/issues/7300))
+* Implement `ScalingGroup` Strawberry GraphQL DataLoaders ([#7426](https://github.com/lablup/backend.ai/issues/7426))
+* Implement `ObjectStorage` Strawberry GraphQL DataLoaders ([#7429](https://github.com/lablup/backend.ai/issues/7429))
+* Implement `StorageNamespace` Strawberry GraphQL DataLoaders ([#7430](https://github.com/lablup/backend.ai/issues/7430))
+* Implement `VFSStorage` Strawberry GraphQL DataLoaders ([#7434](https://github.com/lablup/backend.ai/issues/7434))
+* Implement `HuggingFaceRegistry` Strawberry GraphQL DataLoaders ([#7437](https://github.com/lablup/backend.ai/issues/7437))
+* Implement `ReservoirRegistry` Strawberry GraphQL DataLoaders ([#7439](https://github.com/lablup/backend.ai/issues/7439))
+* Implement `ArtifactRegistry` Strawberry GraphQL DataLoaders ([#7440](https://github.com/lablup/backend.ai/issues/7440))
+* Implement `Artifact` Strawberry GraphQL DataLoaders ([#7441](https://github.com/lablup/backend.ai/issues/7441))
+* Implement `ArtifactRevision` Strawberry GraphQL DataLoaders ([#7443](https://github.com/lablup/backend.ai/issues/7443))
+* Implement BatchQuerier-based `SearchAutoScalingRulesAction` for model deployment auto scaling rules ([#7389](https://github.com/lablup/backend.ai/issues/7389))
+* Implement BatchQuerier-based `SearchArtifactRegistriesAction` for artifact registry search ([#7394](https://github.com/lablup/backend.ai/issues/7394))
+* Implement BatchQuerier-based `SearchReservoirRegistriesAction` for artifact registry search ([#7398](https://github.com/lablup/backend.ai/issues/7398))
+* Implement BatchQuerier-based `SearchHuggingFaceRegistriesAction` for artifact registry search ([#7399](https://github.com/lablup/backend.ai/issues/7399))
+* Implement BatchQuerier-based `SearchObjectStoragesAction` for artifact storage search ([#7400](https://github.com/lablup/backend.ai/issues/7400))
+* Implement BatchQuerier-based `SearchVFSStoragesAction` for artifact storage search ([#7401](https://github.com/lablup/backend.ai/issues/7401))
+* Implement BatchQuerier-based `SearchStorageNamespaceAction` for artifact storage search ([#7402](https://github.com/lablup/backend.ai/issues/7402))
+
+#### Storage and Plugins
+Hammerspace storage backend integration and open-sourcing of accelerator plugins were completed.
+
+* Add BaseHammerspaceVolume (hammerspace-base) and Hammerspace (hammerspace) integrations as storage volume backend options ([#6155](https://github.com/lablup/backend.ai/issues/6155))
+* Open source accelerator plugins ([#6916](https://github.com/lablup/backend.ai/issues/6916))
+
+#### Scaling Group Management
+Implemented Scaling Group creation action with the Creator pattern.
+
+* Implement `CreateScalingGroupAction` with the Creator pattern, and repository method ([#7510](https://github.com/lablup/backend.ai/issues/7510))
+
+### Security Fixes
+Security vulnerability fixes and hardening were applied.
+
+* **CVE-2025-49651**: Clarified that direct access to compute nodes via port scanning is not a software vulnerability but requires proper network isolation as part of deployment architecture. Backend.AI is designed to operate with compute nodes in network-isolated environments where inbound access is restricted to App Proxy components only. Added comprehensive documentation on required network security configuration ([#7587](https://github.com/lablup/backend.ai/issues/7587))
+* **CVE-2025-49652**: Change default signup status to inactive, preventing newly registered accounts from accessing system resources until an administrator explicitly activates them ([#7520](https://github.com/lablup/backend.ai/issues/7520))
+
+### Improvements
+Session management logic was separated into dedicated classes to improve code structure, and repository pattern standardization work was conducted. The action-processor pattern was also applied to container registry related APIs.
+
+* Refactor artifact and artifact-revision pagination logic based on `BatchQuerier` ([#7083](https://github.com/lablup/backend.ai/issues/7083))
+* Introduce action-processor pattern in container registry modification ([#7163](https://github.com/lablup/backend.ai/issues/7163))
+* Explicitly raise error when operation fails in auth repository ([#7177](https://github.com/lablup/backend.ai/issues/7177))
+* Optimize CLI startup time by deferring heavy imports ([#7218](https://github.com/lablup/backend.ai/issues/7218))
+* Extract provisioning logic to SessionProvisioner ([#7255](https://github.com/lablup/backend.ai/issues/7255))
+* Extract prepare/start logic to SessionLauncher ([#7256](https://github.com/lablup/backend.ai/issues/7256))
+* Extract terminate logic to SessionTerminator ([#7257](https://github.com/lablup/backend.ai/issues/7257))
+* Split repositories/base.py into subpackage ([#7275](https://github.com/lablup/backend.ai/issues/7275))
+* Migrate Creator ABC to CreatorSpec pattern ([#7286](https://github.com/lablup/backend.ai/issues/7286))
+* Migrate PartialModifier to Updater pattern ([#7314](https://github.com/lablup/backend.ai/issues/7314))
+* Refactor RBAC repository, service, and action layers to use the standardized Creator/Updater/Purger pattern ([#7360](https://github.com/lablup/backend.ai/issues/7360))
+* Add RBAC types and infrastructure for refactoring ([#7416](https://github.com/lablup/backend.ai/issues/7416))
+* Integrate `CreateScalingGroup` action with existing GQL resolver ([#7518](https://github.com/lablup/backend.ai/issues/7518))
+* Apply action-processor pattern in container registry deletion API ([#7559](https://github.com/lablup/backend.ai/issues/7559))
+* Reorganize deployment GQL module with fetcher/resolver/types pattern ([#7615](https://github.com/lablup/backend.ai/issues/7615))
+* Add pre-validation for user modification to prevent raw IntegrityError ([#7632](https://github.com/lablup/backend.ai/issues/7632))
+
+### Fixes
+Fixed issues including agent selection strategies not being applied in the scheduler, authentication-related bugs, and various API and data processing errors.
+
+* Replace `redis-py` with `valkey-glide` client in CLI context ([#7164](https://github.com/lablup/backend.ai/issues/7164))
+* Fix inconsistent GPU device mask evaluation by mapping device mask target device by its GPU UUID ([#7187](https://github.com/lablup/backend.ai/issues/7187))
+* Fix `model-store` vfolder creation failing when requested with `READ_ONLY` permission ([#7397](https://github.com/lablup/backend.ai/issues/7397))
+* Increase default time window size when querying container metric vector ranges to ensure RATE function calculations return valid results ([#7420](https://github.com/lablup/backend.ai/issues/7420))
+* Allow duplicated session names across users, enforce the session name unique constraint only for active sessions belonging to the same user ([#7462](https://github.com/lablup/backend.ai/issues/7462))
+* Include service labels in Prometheus service discovery response ([#7466](https://github.com/lablup/backend.ai/issues/7466))
+* Fix misuse of strawberry Dataloader in Model Artifact service ([#7468](https://github.com/lablup/backend.ai/issues/7468))
+* Fix artifact mutation not working due to wrong resolver import ([#7493](https://github.com/lablup/backend.ai/issues/7493))
+* Fix credential lookup to use keypairs table join instead of user table's `main_access_key` column, resolving authentication failures for non-main keypairs ([#7533](https://github.com/lablup/backend.ai/issues/7533))
+* Remove FK relationship rows (session, route, endpoint) when purging scaling group to prevent integrity errors ([#7582](https://github.com/lablup/backend.ai/issues/7582))
+* Add detailed log for command execution failures in kernel ([#7591](https://github.com/lablup/backend.ai/issues/7591))
+* Replace `getent group` with `getent passwd` to retrieve username from USER_ID in entrypoint.sh ([#7601](https://github.com/lablup/backend.ai/issues/7601))
+* Fix agent selection strategies (DISPERSED, CONCENTRATED, ROUNDROBIN, LEGACY) not being applied. Previously, the scheduler always used CONCENTRATED mode regardless of configuration. Now each scaling group's configured strategy works as intended ([#7605](https://github.com/lablup/backend.ai/issues/7605))
+* Return None instead of 0 for missing Redis fields in ValkeyScheduleClient ([#7614](https://github.com/lablup/backend.ai/issues/7614))
+* Suppress spurious error logs from Valkey monitor during shutdown ([#7630](https://github.com/lablup/backend.ai/issues/7630))
+* Fix `unified_config` incorrectly assigned as tuple in `ServiceConfigNode.load` ([#7635](https://github.com/lablup/backend.ai/issues/7635))
+* Use 422 error code for scaling group session type rejection ([#7649](https://github.com/lablup/backend.ai/issues/7649))
+* Fix `modify_keypair_resource_policy` ignores empty JSON for `total_resource_slots` ([#7658](https://github.com/lablup/backend.ai/issues/7658))
+
+### Documentation Updates
+Developer guidelines and security-related documentation were added.
+
+* Add DB ORM Model Design Guidelines to README ([#7357](https://github.com/lablup/backend.ai/issues/7357))
+* Add comprehensive network security documentation addressing compute node isolation requirements ([#7587](https://github.com/lablup/backend.ai/issues/7587))
+
+### External Dependency Updates
+GPU monitoring tools, container base images, and Redis client library were updated.
+
+* Update all-smi binaries to v0.11.0 ([#6962](https://github.com/lablup/backend.ai/issues/6962))
+* Upgrade krunner-extractor container image from Alpine 3.8 to Alpine 3.21 ([#7285](https://github.com/lablup/backend.ai/issues/7285))
+* Update `redis-py` version to latest, and refactor `redis_helper` package's utility functions ([#7317](https://github.com/lablup/backend.ai/issues/7317))
+
+### Miscellaneous
+Code cleanup and development environment improvements were made.
+
+* Relocate RBAC type definitions for better dependency management ([#7301](https://github.com/lablup/backend.ai/issues/7301))
+* Remove deprecated Java kernel directory ([#7325](https://github.com/lablup/backend.ai/issues/7325))
+* Add direct test execution to pre-commit hook ([#7327](https://github.com/lablup/backend.ai/issues/7327))
+* Remove unused REPL in kernels ([#7358](https://github.com/lablup/backend.ai/issues/7358))
+
+### Test Updates
+Test structure improvements and refactoring to mocking-based unit tests were conducted. Test speed and readability were improved by using mocking instead of full app initialization.
+
+* Rewrite `artifact` and `artifact_revision` service unit tests to use mocked repositories and separate DB integration tests to repository layer ([#7328](https://github.com/lablup/backend.ai/issues/7328))
+* Refactor `NewUserGracePeriodChecker` test to use mocking instead of full app ([#7390](https://github.com/lablup/backend.ai/issues/7390))
+* Refactor `NetworkTimeoutIdleChecker` test to use mocking instead of full app ([#7395](https://github.com/lablup/backend.ai/issues/7395))
+* Refactor `SessionLifetimeChecker` test to use mocking instead of full app ([#7403](https://github.com/lablup/backend.ai/issues/7403))
+* Refactor `UtilizationIdleChecker` test to use mocking instead of full app ([#7441](https://github.com/lablup/backend.ai/issues/7441))
+* Refactor `bgtask` test to use mocking instead of full app ([#7444](https://github.com/lablup/backend.ai/issues/7444))
+* Restructure tests into unit/component/integration directories ([#7579](https://github.com/lablup/backend.ai/issues/7579))
+* Add unit test for ratelimit middleware ([#7594](https://github.com/lablup/backend.ai/issues/7594))
+
+
+## 25.18.0 (2025-12-12)
+
+### Features
+
+#### Agent and Kernel Management
+Enhanced kernel recovery and presence monitoring with new scratch directory-based storage for kernel data, eliminating the need for pickle files under the var path. Added bidirectional kernel presence synchronization between agents and manager for improved reliability.
+
+* Implement Kernel data loader and writer that saves recovery data to the Kernel scratch directory ([#6975](https://github.com/lablup/backend.ai/issues/6975))
+* Add kernel data adapter that migrates pickled Kernel registry to Kernel Scratch, removing the need to save Kernel data to pickled files under `var` path ([#7004](https://github.com/lablup/backend.ai/issues/7004))
+* Add Scratch utils and data schema to serialize and validate data stored in scratch directories ([#6997](https://github.com/lablup/backend.ai/issues/6997))
+* Add kernel presence status storage to valkey_client ([#6978](https://github.com/lablup/backend.ai/issues/6978))
+* Add KernelPresenceObserver to Agent ([#6986](https://github.com/lablup/backend.ai/issues/6986))
+* Add SweepStaleKernelsHandler for stale kernel cleanup ([#6988](https://github.com/lablup/backend.ai/issues/6988))
+* Add scheduler handler for session and kernel cleanup ([#6994](https://github.com/lablup/backend.ai/issues/6994))
+* Add bidirectional kernel presence synchronization ([#7139](https://github.com/lablup/backend.ai/issues/7139))
+
+#### Scheduler and Resource Management
+Integrated RecorderContext into the Sokovan scheduler and updated dry-run functionality to use Sokovan scheduler events. Added support for DGX Spark hardware platform.
+
+* Add recorder package and result types for scheduler refactoring ([#6902](https://github.com/lablup/backend.ai/issues/6902))
+* Integrate RecorderContext into ScheduleCoordinator ([#6905](https://github.com/lablup/backend.ai/issues/6905))
+* Update dry_run to use Sokovan scheduler event ([#7119](https://github.com/lablup/backend.ai/issues/7119))
+* Support for DGX Spark ([#6809](https://github.com/lablup/backend.ai/issues/6809))
+
+#### GraphQL API and Pagination
+Implemented comprehensive pagination support for scaling groups with proper cursor-based and offset pagination, including PageInfo calculation and default ordering.
+
+* Add `ScalingGroup` layer service logic and implement pagination support ([#6985](https://github.com/lablup/backend.ai/issues/6985))
+* Add `ScalingGroup` strawberry-based GQL type ([#6992](https://github.com/lablup/backend.ai/issues/6992))
+* Add `project` filtering argument to the `scaling_groups` strawberry GQL resolver ([#6998](https://github.com/lablup/backend.ai/issues/6998))
+* Implement proper PageInfo calculation in QueryPagination ([#7099](https://github.com/lablup/backend.ai/issues/7099))
+* Implement proper cursor-based pagination in QueryPagination ([#7108](https://github.com/lablup/backend.ai/issues/7108))
+* Add default architecture selection from ScalingGroup agents ([#7109](https://github.com/lablup/backend.ai/issues/7109))
+* Apply default order for offset pagination when order_by is not provided ([#7137](https://github.com/lablup/backend.ai/issues/7137))
+* Move build_querier to BaseGQLAdapter with dataclasses ([#7113](https://github.com/lablup/backend.ai/issues/7113))
+
+#### Storage and Artifact Registry
+Added Valkey client for artifact registry configuration sharing between manager and storage-proxy, and implemented artifact cleanup on storage-proxy bootstrap. Enhanced model support with definition override capability and deep merge support.
+
+* Add valkey client for artifact registries configuration sharing between manager and storage-proxy ([#6950](https://github.com/lablup/backend.ai/issues/6950))
+* Cleanup artifact files from temporary storages when the storage-proxy bootstraps ([#6914](https://github.com/lablup/backend.ai/issues/6914))
+* Add `timeout` configuration argument to `StorageProxyHTTPClient` ([#7120](https://github.com/lablup/backend.ai/issues/7120))
+* Introduce configurable client timeout settings for `StorageSessionManager` by request type ([#7168](https://github.com/lablup/backend.ai/issues/7168))
+* Add model definition override feature with deep merge support ([#7204](https://github.com/lablup/backend.ai/issues/7204))
+* Support OCP (OpenShift Container Platform) Registry ([#6464](https://github.com/lablup/backend.ai/issues/6464))
+
+#### App Proxy and Routing
+Replaced GlobalTimer with LeaderCron for improved distributed task scheduling and added route-level initial delay configuration for health checks.
+
+* Add route-level initial delay to app proxy health check ([#6924](https://github.com/lablup/backend.ai/issues/6924))
+* Replace GlobalTimer with LeaderCron in App Proxy ([#6927](https://github.com/lablup/backend.ai/issues/6927))
+* Add a schema oneshot for the appproxy database ([#6899](https://github.com/lablup/backend.ai/issues/6899))
+
+#### Infrastructure and Configuration
+Enhanced Valkey/Redis connectivity with Sentinel master change detection and improved reconnection logic for consecutive exception handling. Added SSH directory auto-creation for connection setup.
+
+* Add need_reconnect method to detect Sentinel master changes ([#7134](https://github.com/lablup/backend.ai/issues/7134))
+* Enhance MonitoringValkeyClient reconnection logic for consecutive exception handling ([#6995](https://github.com/lablup/backend.ai/issues/6995))
+* Create `~/.ssh` directory if not exist when creating ssh connection ([#7208](https://github.com/lablup/backend.ai/issues/7208))
+* Make overlay network's linux interface name consistent (applicable for [Docker 28+](https://github.com/moby/moby/commit/6c3797923dcb082370a09f9381511da10120bd7b) only) ([#7094](https://github.com/lablup/backend.ai/issues/7094))
+
+### Improvements
+
+#### Resource Policy and Data Structure
+Introduced source-based structure in resource policies, separating DB source from repository layers for better modularity and maintainability.
+
+* Introduce source-based structure in user resource policy ([#6907](https://github.com/lablup/backend.ai/issues/6907))
+* Introduce db source layer in keypair resource policy ([#7097](https://github.com/lablup/backend.ai/issues/7097))
+* Since `AgentDataExtended` no longer uses the fields it additionally extended from `AgentData`, replace instances using `AgentDataExtended` with `AgentData` ([#7049](https://github.com/lablup/backend.ai/issues/7049))
+
+#### Kernel Registry Recovery
+Refactored Agent's kernel registry recovery by separating loader and writer components, improving maintainability and recovery reliability.
+
+* Refactor Agent's kernel registry recovery by separating loader and writer ([#6958](https://github.com/lablup/backend.ai/issues/6958))
+* Add `KernelRegistryType` alias and `KernelRecoveryData` type ([#6971](https://github.com/lablup/backend.ai/issues/6971))
+
+#### Error Handling
+Improved error reporting with explicit exceptions for Domain and Group operations.
+
+* Explicitly raise error when Domain operation fails ([#7102](https://github.com/lablup/backend.ai/issues/7102))
+* Explicitly raise error when Group operation fails ([#7101](https://github.com/lablup/backend.ai/issues/7101))
+
+### Fixes
+
+#### Session and Resource Management
+* Fix `check_presets` API returning inflated remaining resources by excluding non-ALIVE agents from calculation ([#7238](https://github.com/lablup/backend.ai/issues/7238))
+* Add missing lock IDs to handlers with short cycle preventing race conditions caused by concurrent execution between short and long cycles ([#7223](https://github.com/lablup/backend.ai/issues/7223))
+* Remove unnecessary shmem pre-deduction from Memory cgroup ([#7222](https://github.com/lablup/backend.ai/issues/7222))
+* Use asyncio.gather for concurrent session starts ([#7144](https://github.com/lablup/backend.ai/issues/7144))
+* Fixed an error when domain admin validated quota scope access by using the `domain_name` key instead of `domain`, preventing errors for both user dictionaries and UserRow ORM objects and avoiding lazy-loading issues outside database sessions ([#7017](https://github.com/lablup/backend.ai/issues/7017))
+
+#### Artifact and Model Management
+* Remove the race condition between the `ModelImportDone` and `ModelVerifyDone` events so that the artifact download done notification always includes a valid `verification_result` ([#7077](https://github.com/lablup/backend.ai/issues/7077))
+* Fix remote reservoir's `verification_result` is not propagated ([#7111](https://github.com/lablup/backend.ai/issues/7111))
+* Include `verification_result` in reservoir registry sync and `ArtifactDownloadCompletedMessage` payload ([#7034](https://github.com/lablup/backend.ai/issues/7034))
+* Move the entire directory after artifact import instead of copying files individually, and remove the model directory if it is empty ([#7115](https://github.com/lablup/backend.ai/issues/7115))
+* Remove synchronous artifact metadata sync logic ([#6915](https://github.com/lablup/backend.ai/issues/6915))
+* Add missing field in model health check ([#7082](https://github.com/lablup/backend.ai/issues/7082))
+* Add initial_delay field to model_definition_iv trafaret validator ([#7001](https://github.com/lablup/backend.ai/issues/7001))
+* Remove model definition YAML requirement for non-CUSTOM runtimes ([#6936](https://github.com/lablup/backend.ai/issues/6936))
+* Fix huggingFace token not applied in `HuggingFaceFileDownloadStreamReader` ([#7227](https://github.com/lablup/backend.ai/issues/7227))
+* Add missing `raise_for_status` for huggingface downloader ([#7233](https://github.com/lablup/backend.ai/issues/7233))
+
+#### App Proxy and Routing
+* Skip generating route info when kernel service port is none ([#7211](https://github.com/lablup/backend.ai/issues/7211))
+* Include DEGRADED status in target statuses for RunningRouteHandler ([#7135](https://github.com/lablup/backend.ai/issues/7135))
+* Update prometheus_address construction to exclude metrics path ([#7207](https://github.com/lablup/backend.ai/issues/7207))
+* Disable HTML autoescaping in `NotificationCenter` request ([#7191](https://github.com/lablup/backend.ai/issues/7191))
+
+#### Database and GraphQL
+* Fixed SQLAlchemy session synchronization errors and foreign key constraint violations in group endpoint deletion by adding proper execution_options and reordering deletions ([#7132](https://github.com/lablup/backend.ai/issues/7132))
+* Fix typo in Scaling Group GQL Objects (`ScalingGroupConnection`, `ScalingGroupEdge`) where 'g' was missing ([#6972](https://github.com/lablup/backend.ai/issues/6972))
+* Remove useless `fallback_count_table` from the `execute_querier` ([#6976](https://github.com/lablup/backend.ai/issues/6976))
+* `is_active` is not applied to `groups` GQL resolver when client role is `USER` ([#7116](https://github.com/lablup/backend.ai/issues/7116))
+
+#### Agent and Kernel Registry
+* Ensure agent-level kernel registry is synced with runtime-level global registry after pickle ([#6931](https://github.com/lablup/backend.ai/issues/6931))
+* Add fallback for SlotName type conversion to avoid unexpected pydantic validation error caused due to version mismatch between Manager and Agent ([#6923](https://github.com/lablup/backend.ai/issues/6923))
+* Read HTTP responses before connection closes in Agent Watcher APIs ([#7165](https://github.com/lablup/backend.ai/issues/7165))
+
+#### Storage and Client
+* Fix Pure Storage client to properly handle authentication tokens by correcting token storage that previously used context variables incorrectly, which could cause the client to lose access to authentication credentials ([#6913](https://github.com/lablup/backend.ai/issues/6913))
+
+#### CLI and Utilities
+* Fix service list CLI showing null image and missing URL ([#7006](https://github.com/lablup/backend.ai/issues/7006))
+* Print a warning log when `ConnectionError` occurs to make it easy to identify the types of errors ([#6910](https://github.com/lablup/backend.ai/issues/6910))
+
+### Security Improvements
+Comprehensive security hardening across multiple components with improved exception handling and security best practices.
+
+* Add tarfile.data_filter to prevent path traversal attacks ([#7035](https://github.com/lablup/backend.ai/issues/7035))
+* Add security attributes to permit cookie in App Proxy responses ([#7038](https://github.com/lablup/backend.ai/issues/7038))
+* Add usedforsecurity=False to hashlib MD5/SHA1 calls ([#7041](https://github.com/lablup/backend.ai/issues/7041))
+* Apply try-with-resources pattern to prevent resource leak ([#7039](https://github.com/lablup/backend.ai/issues/7039))
+* Replace assert statements with proper exceptions (Phase 1) ([#7043](https://github.com/lablup/backend.ai/issues/7043))
+* Replace assert statements with proper exceptions (Phase 2) ([#7044](https://github.com/lablup/backend.ai/issues/7044))
+* Replace assert statements with proper exceptions (Phase 3) ([#7056](https://github.com/lablup/backend.ai/issues/7056))
+* Replace AgentError with BackendAIError-based exceptions ([#7058](https://github.com/lablup/backend.ai/issues/7058))
+* Replace exceptions with BackendAIError-based exceptions in storage proxy ([#7060](https://github.com/lablup/backend.ai/issues/7060))
+* Replace assert statements with BackendAIError exceptions in agent ([#7061](https://github.com/lablup/backend.ai/issues/7061))
+* Replace assert statements with BackendAIError exceptions in web ([#7062](https://github.com/lablup/backend.ai/issues/7062))
+* Replace assert statements with proper exceptions in AppProxy ([#7063](https://github.com/lablup/backend.ai/issues/7063))
+
+### External Dependency Updates
+* Fix pycares version to 4.11 because aiohttp does not support pycares 5.0, which introduced breaking changes ([#7231](https://github.com/lablup/backend.ai/issues/7231))
+
+### Miscellaneous
+* Bundle bssh as intrinsic binary in Backend.AI runner package ([#6452](https://github.com/lablup/backend.ai/issues/6452))
+
+
+## 25.17.0 (2025-11-23)
+
+### Features
+
+#### Agent and Multi-Agent Support
+Laid the groundwork for running multiple agent instances on a single host. This is an early-stage effort focusing on configuration structure and runtime architecture refactoring. Full resource isolation between agents is planned for future releases.
+
+* Add support for array of tables syntax in config sample generator ([#6311](https://github.com/lablup/backend.ai/issues/6311))
+* Add support for multiple agents in agent server config ([#6315](https://github.com/lablup/backend.ai/issues/6315))
+* Update Agent server RPC functions to include agent ID for agent runtime with multiple agents ([#6320](https://github.com/lablup/backend.ai/issues/6320))
+* Change agent config field names and serialization aliases to use internal-addr naming ([#6697](https://github.com/lablup/backend.ai/issues/6697))
+* Add AgentEtcdClientView for clean handling of etcd clients for multi agents ([#6721](https://github.com/lablup/backend.ai/issues/6721))
+* Add custom resource allocation in agent server config ([#6724](https://github.com/lablup/backend.ai/issues/6724))
+* Extract agent common resources to AgentRuntime ([#6728](https://github.com/lablup/backend.ai/issues/6728))
+* Move ownership of resources from agent to a separate component in agent runtime ([#6766](https://github.com/lablup/backend.ai/issues/6766))
+* Add resource isolation options for multi-agent setup ([#6770](https://github.com/lablup/backend.ai/issues/6770))
+* Store installed images information to Redis in Agent ([#6834](https://github.com/lablup/backend.ai/issues/6834))
+* Implement pickle based Kernel registry recovery which can replace existing kernel registry load and save functions ([#6489](https://github.com/lablup/backend.ai/issues/6489))
+* Add agent-id label for session Docker containers ([#6870](https://github.com/lablup/backend.ai/issues/6870))
+
+#### Health Check and Dependency Verification
+Added health check endpoints and dependency verification CLI commands across all Backend.AI components. Operators can now diagnose connectivity issues with external services (database, Redis, etcd) before and during runtime.
+
+* Implement health check infrastructure for component monitoring ([#6732](https://github.com/lablup/backend.ai/issues/6732))
+* Add health checker system for all components ([#6736](https://github.com/lablup/backend.ai/issues/6736))
+* Add dependency management system for manager ([#6753](https://github.com/lablup/backend.ai/issues/6753))
+* Add dependency verification system for web component ([#6757](https://github.com/lablup/backend.ai/issues/6757))
+* Add dependency verification for storage proxy ([#6760](https://github.com/lablup/backend.ai/issues/6760))
+* Add dependency verification for App Proxy Coordinator and Worker ([#6767](https://github.com/lablup/backend.ai/issues/6767))
+* Add dependency verification CLI in agent ([#6775](https://github.com/lablup/backend.ai/issues/6775))
+* Add dependency health checking infrastructure ([#6781](https://github.com/lablup/backend.ai/issues/6781))
+* Integrate HealthProbe across all components with real connectivity checks ([#6836](https://github.com/lablup/backend.ai/issues/6836))
+
+#### Artifact and Reservoir Registry
+Enhanced artifact management with verification plugins, real-time download progress tracking via Redis, and support for gated HuggingFace models. Also enabled delegation-based imports when artifacts are unavailable in local reservoir registries.
+
+* Implement `artifact_verifier` type plugin in storage-proxy ([#6258](https://github.com/lablup/backend.ai/issues/6258))
+* Fix `limit`, `search` parameters not working in reservoir registry's `scan_artifact` API ([#6488](https://github.com/lablup/backend.ai/issues/6488))
+* Separate DB source from artifact repository layers ([#6490](https://github.com/lablup/backend.ai/issues/6490))
+* Re-import available artifacts only when necessary based on digest ([#6501](https://github.com/lablup/backend.ai/issues/6501))
+* Add `extra` column to Artifact model to store gated information for `huggingface` models ([#6620](https://github.com/lablup/backend.ai/issues/6620))
+* Collect artifact verification results to `artifact_revisions` table ([#6662](https://github.com/lablup/backend.ai/issues/6662))
+* Track Artifact download progress through redis ([#6663](https://github.com/lablup/backend.ai/issues/6663))
+* Create artifact download progress query REST API ([#6666](https://github.com/lablup/backend.ai/issues/6666))
+* Extend reservoir registry artifact import API to perform import delegation when the artifact is not available in the remote reservoir ([#6672](https://github.com/lablup/backend.ai/issues/6672))
+* Track Reservoir registry artifact download progress ([#6673](https://github.com/lablup/backend.ai/issues/6673))
+* Add `metadata` field to artifact verifier interface ([#6676](https://github.com/lablup/backend.ai/issues/6676))
+* Add missing `id`, `registry_id` fields to `ArtifactRegistry` GQL Node ([#6750](https://github.com/lablup/backend.ai/issues/6750))
+
+#### Notification System
+Introduced a notification center that allows administrators to configure webhook channels and define event-based notification rules. Included REST/GraphQL APIs for channel and rule management, along with CLI tools for validation and delivery testing.
+
+* Implement notification system with channels, rules, and event processing ([#6635](https://github.com/lablup/backend.ai/issues/6635))
+* Implement notification center with REST/GraphQL APIs for managing channels and rules ([#6653](https://github.com/lablup/backend.ai/issues/6653))
+* Add notification validation API and notification CLI ([#6657](https://github.com/lablup/backend.ai/issues/6657))
+* Add notification center with webhook channel support ([#6668](https://github.com/lablup/backend.ai/issues/6668))
+* Implement notification message type system and validation APIs ([#6677](https://github.com/lablup/backend.ai/issues/6677))
+
+#### Background Task Infrastructure
+Began migrating background tasks to a retriable pattern with initial support for image operations and session commits. This is an ongoing effort, and further tasks will be migrated in subsequent releases.
+
+* Add image purge/rescan background tasks and modernize task system ([#6597](https://github.com/lablup/backend.ai/issues/6597))
+* Improve bgtask infrastructure with repository pattern and type adapters ([#6606](https://github.com/lablup/backend.ai/issues/6606))
+* Migrate commit session to retriable background task pattern ([#6625](https://github.com/lablup/backend.ai/issues/6625))
+
+#### Model Service and Routing
+Introduced route health checking with a 3-state model (healthy/unhealthy/degraded) and automatic eviction for unhealthy endpoints. Also added Prometheus integration via service discovery for model service metrics collection.
+
+* Add model service route synchronization to service discovery ([#6832](https://github.com/lablup/backend.ai/issues/6832))
+* Add periodic service discovery sync for model service routes ([#6833](https://github.com/lablup/backend.ai/issues/6833))
+* Implement 3-state route health check with configurable eviction ([#6839](https://github.com/lablup/backend.ai/issues/6839))
+* Add missing and newly introduced fields to service field specifications ([#6714](https://github.com/lablup/backend.ai/issues/6714))
+
+#### Session and Resource Management
+Parallelized session termination for improved performance and added automatic cleanup for sessions associated with lost agents. Also introduced an async file deletion API for vfolders.
+
+* Parallelize session termination and add lost agent cleanup ([#6826](https://github.com/lablup/backend.ai/issues/6826))
+* Implement async file deletion API in vfolder ([#6861](https://github.com/lablup/backend.ai/issues/6861))
+
+#### Infrastructure and Configuration
+Added flexible bind/advertise address configuration for app-proxy components and restructured Valkey client by separating monitor and operation clients for better resource management.
+
+* Add read committed transaction support in `ExtendedAsyncSAEngine`, enabling higher throughput for read-heavy workloads by reducing transaction isolation overhead ([#6665](https://github.com/lablup/backend.ai/issues/6665))
+* Replace time() with Redis TIME command in ValkeyScheduleClient ([#6695](https://github.com/lablup/backend.ai/issues/6695))
+* Support multiple Apollo Router endpoints with load balancing ([#6703](https://github.com/lablup/backend.ai/issues/6703))
+* Support bind, advertised address configuration options for app-proxy coordinator and worker components ([#6631](https://github.com/lablup/backend.ai/issues/6631))
+* Separate monitor and operation clients in Valkey client ([#6829](https://github.com/lablup/backend.ai/issues/6829))
+* Ensure normal URLs are called even if the protocol is included in the host of `HostPortPair`, preventing network error in app-proxy communication ([#6813](https://github.com/lablup/backend.ai/issues/6813))
+* delete-dev.sh now supports interactive confirmation and non-interactive -y/--yes flag ([#6815](https://github.com/lablup/backend.ai/issues/6815))
+
+### Improvements
+* Change Action Processor arguments to immutable types and made them contravariant to prevent memory leaks and improve type safety ([#6596](https://github.com/lablup/backend.ai/issues/6596))
+* Introduce Source-based structure in `AuthRepository` decoupling database access for easier testing ([#6641](https://github.com/lablup/backend.ai/issues/6641))
+* Make `error_code` method in `BackendAIError` as instance method making injection or modification of the error code from outside the class easier, improving flexibility when handling errors ([#6722](https://github.com/lablup/backend.ai/issues/6722))
+* Move kernel registry ownership to agent runtime ([#6730](https://github.com/lablup/backend.ai/issues/6730))
+* Use resources functions directly in AbstractAgent ([#6763](https://github.com/lablup/backend.ai/issues/6763))
+
+### Fixes
+
+#### Session and Resource Management
+Fixed session data loading to prevent SQLAlchemy errors, corrected resource calculation to use kernel-level occupied slots, and added missing cache invalidation for resource presets.
+
+* Eager load kernel when fetch session by its id preventing SQLAlchemy error when attempting to use relationships outside the db session context manager ([#6866](https://github.com/lablup/backend.ai/issues/6866))
+* Use the kernel's occupied slots when calculating the agent's resources ([#6817](https://github.com/lablup/backend.ai/issues/6817))
+* Add missing cache invalidation for resource preset ([#6852](https://github.com/lablup/backend.ai/issues/6852))
+
+#### Artifact and Reservoir Registry
+Resolved blocking behavior in delegation-based imports and improved timeout handling for reservoir download operations.
+
+* Reservoir artifact import API response is blocking when using delegation ([#6683](https://github.com/lablup/backend.ai/issues/6683))
+* Adjust reservoir download API client timeout and add proper connection termination handling ([#6627](https://github.com/lablup/backend.ai/issues/6627))
+* Remove `DoPullReservoirRegistryEvent`, and the event handler ([#6680](https://github.com/lablup/backend.ai/issues/6680))
+
+#### App Proxy and Routing
+Added HTTP client connection pooling to prevent excessive socket creation, fixed redirect URL generation in auth flow, and added missing advertise_address in status responses.
+
+* Apply http client pool in app proxy worker ([#6851](https://github.com/lablup/backend.ai/issues/6851))
+* Fix app proxy to properly handle redirect parameter in HTTP protocol auth flow by appending the redirect path to the generated proxy URL ([#6686](https://github.com/lablup/backend.ai/issues/6686))
+* Add missing advertise_address info in app proxy status response ([#6772](https://github.com/lablup/backend.ai/issues/6772))
+
+#### Storage and Configuration
+Improved error response handling in storage proxy client and corrected VAST cluster cache refresh behavior.
+
+* Fix storage proxy client to handle non-JSON error responses instead of crashing on parse failures ([#6712](https://github.com/lablup/backend.ai/issues/6712))
+* Refresh VAST cluster info cache rather than keep the cache alive forever ([#6428](https://github.com/lablup/backend.ai/issues/6428))
+
+#### Model Service
+Improved error visibility by returning actual error messages from Model Card resolver instead of generic strings. Also fixed auto-scaling behavior where metrics collection and rule comparison were not working correctly for framework-based scaling rules.
+
+* Model Card resolver now returns the actual error message when it fails, instead of showing a generic "Unknown error" string ([#6702](https://github.com/lablup/backend.ai/issues/6702))
+* Support service-definition.toml override with optional fields(image, arch, resource) ([#6751](https://github.com/lablup/backend.ai/issues/6751))
+* Disallow dot('.') usage in model service name ([#6800](https://github.com/lablup/backend.ai/issues/6800))
+* Fix auto-scaling functionality for inference services when using framework-based scaling rules. Metrics collection and rule comparison logic have been corrected to ensure proper scaling behavior ([#6801](https://github.com/lablup/backend.ai/issues/6801))
+
+#### Agent and Image Management
+Fixed Pydantic validation errors in mock plugins and SlotName initialization, and changed image sync to match by canonical name and architecture instead of digest for consistency across container drivers.
+
+* Fix Pydantic validation error from incorrect `slot_type` type in mock plugin ([#6692](https://github.com/lablup/backend.ai/issues/6692))
+* Make agent installed image sync to match by canonical name and architecture instead of digest, preventing digest change by container image driver ([#6838](https://github.com/lablup/backend.ai/issues/6838))
+* Explicitly wrap slot key with `SlotName()` to prevent validation failure when initializing `AgentInfo` ([#6841](https://github.com/lablup/backend.ai/issues/6841))
+
+#### Permission and Access Control
+Corrected permission boundary issues for domain admin users.
+
+* Fix domain admin users seeing vfolder hosts from projects they were not members of. They now only see hosts for projects they belong to ([#6694](https://github.com/lablup/backend.ai/issues/6694))
+
+#### Other Fixes
+Updated GPU allocation metrics to include all accelerator types (CUDA devices/shares, MIG, NPUs) and allowed zero values in DecimalType conversion.
+
+* Update `gpu_allocated` legacy metric fields to consider all accelerator devices, including both `cuda.devices` and `cuda.shares`, but also MIG variants and other NPUs as well (Known issue: all resources visible to each user and group MUST use a consistent fraction mode) ([#2404](https://github.com/lablup/backend.ai/issues/2404))
+* Allow zero values in DecimalType conversion ([#6783](https://github.com/lablup/backend.ai/issues/6783))
+
+### Documentation Updates
+* Add Entry Point, Event, and Background Task architecture documentation ([#6594](https://github.com/lablup/backend.ai/issues/6594))
+* Document adapter and Querier patterns in API/GraphQL/Repository READMEs ([#6656](https://github.com/lablup/backend.ai/issues/6656))
+* Document deployment revision generator in deployment README.md ([#6872](https://github.com/lablup/backend.ai/issues/6872))
+
+### Miscellaneous
+* Move `EndpointLifecycle` enum to a shared common package for improved reusability ([#6637](https://github.com/lablup/backend.ai/issues/6637))
+* Add debug log when app proxy worker got server disconnected error making tracing and diagnosing unexpected disconnections easier ([#6735](https://github.com/lablup/backend.ai/issues/6735))
+
+
+## 25.16.0 (2025-11-01)
+
+### Features
+
+#### Resilience Framework
+* Add resilience framework with Policy interface and Resilience executor for composable fault-tolerance patterns ([#6203](https://github.com/lablup/backend.ai/issues/6203))
+* Applied resilience framework to all Valkey clients with ContextVar-based operation tracking, replacing legacy decorators with composable policies ([#6205](https://github.com/lablup/backend.ai/issues/6205))
+* Apply resilience framework (MetricPolicy + RetryPolicy with exponential backoff) to all manager repositories for improved observability and fault tolerance ([#6210](https://github.com/lablup/backend.ai/issues/6210))
+* Apply Resilience framework to agent client with exponential backoff retry policy for improved reliability in agent RPC communications ([#6211](https://github.com/lablup/backend.ai/issues/6211))
+* Apply Resilience framework to appproxy (wsproxy) client with exponential backoff retry policy for improved reliability in app proxy communications ([#6213](https://github.com/lablup/backend.ai/issues/6213))
+* Apply Resilience framework to storage proxy client with exponential backoff retry policy for improved reliability in storage proxy communications ([#6214](https://github.com/lablup/backend.ai/issues/6214))
+
+#### Artifact and Reservoir Registry
+* Implement `delegate_import` GQL mutation to trigger remote reservoir registry import ([#6221](https://github.com/lablup/backend.ai/issues/6221))
+* Implement periodic polling and synchronization for remote reservoir ([#6222](https://github.com/lablup/backend.ai/issues/6222))
+* Introduce artifact import pipeline to enable customizable storage configuration for each stage ([#6223](https://github.com/lablup/backend.ai/issues/6223))
+* Add `vfs_storages` DB table, and GQL model and mutations ([#6229](https://github.com/lablup/backend.ai/issues/6229))
+* Support artifact download from the reservoir registry's `vfs_storage` ([#6236](https://github.com/lablup/backend.ai/issues/6236))
+
+#### GraphQL and Real-time Updates
+* Replace Apollo Router with Hive Router (MIT License) to enable GQL Subscription support in federated environments without licensing fees, and add GQL Subscription support in webserver and backend for real-time updates ([#6234](https://github.com/lablup/backend.ai/issues/6234))
+* Add GraphQL subscription `schedulingEventsBySession` for real-time session scheduling events ([#6239](https://github.com/lablup/backend.ai/issues/6239))
+* Add GraphQL subscription `backgroundTaskEvents` for real-time background task events ([#6243](https://github.com/lablup/backend.ai/issues/6243))
+* Support project name filter when resolving user nodes ([#6298](https://github.com/lablup/backend.ai/issues/6298))
+
+#### RBAC and Access Control
+* Add Global scope to simplify access control management for superadmin and monitor users ([#6004](https://github.com/lablup/backend.ai/issues/6004))
+* Add superadmin and monitor role fixtures and migrate existing admin and monitor data to RBAC DB ([#6006](https://github.com/lablup/backend.ai/issues/6006))
+
+#### Session Scheduling
+* Implement scaling group filtering with injectable rules for session scheduling. The new ScalingGroupFilter applies configurable filter rules (public/private access, session type support) to determine eligible scaling groups before session creation, replacing the previous validation-only approach. This enables more flexible and extensible scaling group selection logic. ([#6424](https://github.com/lablup/backend.ai/issues/6424))
+* Remove redundant agent count validation for multi-node cluster sessions ([#6276](https://github.com/lablup/backend.ai/issues/6276))
+
+#### Model Service and Runtime
+* Add support for Modular MAX and SGLang runtime variants ([#6237](https://github.com/lablup/backend.ai/issues/6237))
+* Implement API layer for model deployment with pagination and filtering support ([#6394](https://github.com/lablup/backend.ai/issues/6394))
+
+#### Authentication
+* Implement JWT authentication module for GraphQL Federation ([#6410](https://github.com/lablup/backend.ai/issues/6410))
+* Apply JWT authentication to webserver and manager ([#6421](https://github.com/lablup/backend.ai/issues/6421))
+
+#### Configuration Management
+* Add domain-level app configuration GraphQL API ([#6295](https://github.com/lablup/backend.ai/issues/6295))
+* Add domain-level app configuration support for frontend ([#6401](https://github.com/lablup/backend.ai/issues/6401))
+* Add `allow-auto-quota-scope-creation` configuration option to control whether virtual folders can be created in quota scopes that don't yet exist. Administrators can now prevent automatic quota scope creation by disabling this option, requiring quota scopes to be explicitly created before use. ([#6263](https://github.com/lablup/backend.ai/issues/6263))
+* Container commit timeout can now be customized through configuration settings ([#6346](https://github.com/lablup/backend.ai/issues/6346))
+
+#### Web and Proxy
+* Implement WebSocket connectionParams to HTTP headers conversion ([#6379](https://github.com/lablup/backend.ai/issues/6379))
+* Add connection error handling to storage proxy client ([#6319](https://github.com/lablup/backend.ai/issues/6319))
+
+#### Metrics and Monitoring
+* Add error code labels to layer operation metrics ([#6322](https://github.com/lablup/backend.ai/issues/6322))
+
+### Improvements
+* Integrate Pydantic validators with Agent server configuration ([#6172](https://github.com/lablup/backend.ai/issues/6172))
+* Introduce Service, Repository layer pattern in `Image` GQL Object resolvers ([#6238](https://github.com/lablup/backend.ai/issues/6238))
+* Set Image ID as Redis key instead of Canonical when storing installed agents per image ([#6249](https://github.com/lablup/backend.ai/issues/6249))
+* Introduce action-processor pattern to `Image` batch load resolvers for decoupling Redis and DB access in GQL API layer ([#6269](https://github.com/lablup/backend.ai/issues/6269))
+* Remove unused agent life cycle event handler as it is replaced by `handle_agent_terminated` and `handle_agent_started` in `AgentEventHandler` ([#6299](https://github.com/lablup/backend.ai/issues/6299))
+* Replace the use of the `raw_labels` field in the Image GQL object with the existing `labels` field ([#6309](https://github.com/lablup/backend.ai/issues/6309))
+* Introduced separate DTOs for permission groups(`PermissionGroupExtendedData`, `PermissionGroupData`) to conditionally load relationship data and prevent lazy loading errors ([#6451](https://github.com/lablup/backend.ai/issues/6451))
+* Add Kernel registry recovery abstract class for refactor Agent by detaching kernel registry load and save logic ([#6482](https://github.com/lablup/backend.ai/issues/6482))
+
+### Fixes
+
+#### Session Management
+* Raise correct exception in `SessionTransitionData.main_kernel` ([#6202](https://github.com/lablup/backend.ai/issues/6202))
+* Improve the performance of VFolder queries by optimizing group lookups, resulting in faster VFolder detail panel popups and quicker session creation page loading ([#6300](https://github.com/lablup/backend.ai/issues/6300))
+* Session commits now fail immediately with a clear error when attempting to exceed quota limits. This improves user experience by providing faster feedback instead of attempting a commit that would ultimately fail ([#6304](https://github.com/lablup/backend.ai/issues/6304))
+* Prevent re-terminating sessions already in terminal states ([#6353](https://github.com/lablup/backend.ai/issues/6353))
+* Session type validation is now properly enforced when creating sessions within scaling groups ([#6354](https://github.com/lablup/backend.ai/issues/6354))
+* Add missing `PRE_ENQUEUE_HOOK` and `POST_ENQUEUE_HOOK` call in Sokovan scheduler ([#6584](https://github.com/lablup/backend.ai/issues/6584))
+
+#### Agent and Resource Management
+* Align `occupied_slots` values between Agent summary and Agent type queries ([#6257](https://github.com/lablup/backend.ai/issues/6257))
+* Decoupled agent batch loading resolvers that previously depended on the `from_row` function. ([#6280](https://github.com/lablup/backend.ai/issues/6280))
+* Fix GQL agent_summary_list resolver ([#6389](https://github.com/lablup/backend.ai/issues/6389))
+
+#### Storage and Configuration
+* Fix logging directory not auto-generated ([#6225](https://github.com/lablup/backend.ai/issues/6225))
+* Clients can now correctly fetch null quota scopes when a scope does not exist, instead of encountering an error ([#6227](https://github.com/lablup/backend.ai/issues/6227))
+* Fix a permission issue where Storage Proxy would fail to access its glide socket after changing process uid/gid. Users running Storage Proxy with non-root credentials will no longer encounter "Permission Denied" errors during startup. ([#6284](https://github.com/lablup/backend.ai/issues/6284))
+* Fix an issue where the Storage Proxy would unnecessarily attempt to create an XFS backend lockfile at `/tmp/backendai-xfs-file-lock` even when XFS storage was not configured. This could cause permission errors if the Storage Proxy lacked access to the `/tmp` directory, preventing the service from starting properly. ([#6285](https://github.com/lablup/backend.ai/issues/6285))
+* Prevent artifact deletion when download and archive storage are identical ([#6330](https://github.com/lablup/backend.ai/issues/6330))
+* Fixed a timing issue in vfolder deletion by ensuring the DELETE-ONGOING status is set before sending the storage deletion request ([#6486](https://github.com/lablup/backend.ai/issues/6486))
+
+#### Artifact and Reservoir Registry
+* Cleanup previous stages' files in artifact import pipeline ([#6251](https://github.com/lablup/backend.ai/issues/6251))
+* `ReservoirDownloadStep` fails with connection reset error when artifact size is too large in `vfs_storage` type remote reservoir registry ([#6254](https://github.com/lablup/backend.ai/issues/6254))
+* Artifact revision not found error caused by `get_artifact_revision_readme` ([#6485](https://github.com/lablup/backend.ai/issues/6485))
+
+#### App Proxy and Routing
+* Add AppProxy setup and initialization workflow to the TUI installer (replacing WSProxy) ([#6228](https://github.com/lablup/backend.ai/issues/6228))
+* Add timestamp tracking for route health status to enable staleness detection. Route health checks now store both status and check timestamp, automatically marking health data older than 5 minutes as unhealthy. This prevents routing traffic to routes with stale health information and improves overall system reliability. ([#6423](https://github.com/lablup/backend.ai/issues/6423))
+* Fix typo in apollo router config serialization alias (`sapollo-router` -> `apollo-router`) ([#6266](https://github.com/lablup/backend.ai/issues/6266))
+
+#### Model Service
+* Fix model service extra mounts in client SDK to omit unset mount `type` fields, ensuring compatibility with the manager API ([#6347](https://github.com/lablup/backend.ai/issues/6347))
+
+#### User and Permission Management
+* Change keypair query to include keypairs of users with no group membership ([#6455](https://github.com/lablup/backend.ai/issues/6455))
+* Raise error when trying to purge domain with active user, group or kernel instead of returning 204 success response ([#6590](https://github.com/lablup/backend.ai/issues/6590))
+
+#### Image Management
+* Resolve deadlock occurring due to incorrect use of semaphore in specific image rescan scenarios ([#6469](https://github.com/lablup/backend.ai/issues/6469))
+
+#### Other Fixes
+* Upgrade aiotools (1.9.2 -> 2.2.3) for improved structured concurrency and refactor server initialization and shutdown procedures to avoid excessive exception stack traces but display only the exact error cleanly ([#6250](https://github.com/lablup/backend.ai/issues/6250))
+* Fix race conditions in test container port allocation by using dynamic port assignment ([#6207](https://github.com/lablup/backend.ai/issues/6207))
+* fix `VFolderAlreadyExists` HTTP status code from 400 Bad Request to 409 Conflict to match semantic meaning of resource conflicts ([#6465](https://github.com/lablup/backend.ai/issues/6465))
+* Remove useless README not found warning log ([#6473](https://github.com/lablup/backend.ai/issues/6473))
+
+### Documentation Updates
+* Add `Artifact` API descriptions ([#6104](https://github.com/lablup/backend.ai/issues/6104))
+* Add `Artifact` concept documentation ([#6105](https://github.com/lablup/backend.ai/issues/6105))
+* Add English documentation for Sokovan orchestration layer covering session scheduling, deployment management, and routing architecture. ([#6446](https://github.com/lablup/backend.ai/issues/6446))
+* Add comprehensive README documentation for Actions, Services, and Repositories layers in the manager, covering architecture patterns, design principles, resilience patterns with Prometheus metrics, and best practices for each layer. ([#6449](https://github.com/lablup/backend.ai/issues/6449))
+* Add comprehensive architecture and component documentation ([#6466](https://github.com/lablup/backend.ai/issues/6466))
+* Expand CONTRIBUTING.md with comprehensive pull request guidelines including workflow, sizing best practices, and review process. ([#6481](https://github.com/lablup/backend.ai/issues/6481))
+* Update documentation for metrics, session management ([#6586](https://github.com/lablup/backend.ai/issues/6586))
+* Improve README documentation structure and execution guide ([#6588](https://github.com/lablup/backend.ai/issues/6588))
+* Migrate code quality checks to hook-based system ([#6591](https://github.com/lablup/backend.ai/issues/6591))
+
+### Miscellaneous
+* Add warning logs in storage implementations when used or limit bytes are under 0 ([#6359](https://github.com/lablup/backend.ai/issues/6359))
+* Expose `SESSION_PRIORITY_*` constants from the manager package to the common package for consistent priority handling across components ([#6459](https://github.com/lablup/backend.ai/issues/6459))
+
+
+## 25.15.0 (2025-10-02)
+
+### Features
+
+#### Action Processors and RBAC
+* Add Action Processors to handle various types of actions ([#5744](https://github.com/lablup/backend.ai/issues/5744))
+* Add RBAC validators for Action Processors ([#5758](https://github.com/lablup/backend.ai/issues/5758))
+* Add vfolder RBAC validation ([#5759](https://github.com/lablup/backend.ai/issues/5759))
+
+#### Artifact and Reservoir Registry
+* Abstract artifact registry storage types in `storage-proxy` ([#5750](https://github.com/lablup/backend.ai/issues/5750))
+* Add VFS Storage for Artifact Registry ([#5887](https://github.com/lablup/backend.ai/issues/5887))
+* Add `scan`, `import` trigger API schemas on remote reservoir registry ([#6027](https://github.com/lablup/backend.ai/issues/6027))
+* Implement `delegate_scan` GQL mutation on remote reservoir registry ([#6053](https://github.com/lablup/backend.ai/issues/6053))
+* Add the `enable_reservoir` webserver option to enable reservoir-related features in the webui ([#6055](https://github.com/lablup/backend.ai/issues/6055))
+
+#### Background Tasks
+* Implement flexible execution modes (single/batch/parallel) for background task system ([#6058](https://github.com/lablup/backend.ai/issues/6058))
+
+#### Session and Agent Management
+* Prevent the kernel runner (and the user container) being accidentally terminated by user's `pkill -f python` command ([#6085](https://github.com/lablup/backend.ai/issues/6085))
+* Implement node resolver(`get_node`) in `ComputeSessionNode` enabling clients to query nodes via global ID ([#6108](https://github.com/lablup/backend.ai/issues/6108))
+* Implement node resolver(`get_node`) in `AgentNode` enabling clients to query nodes via global ID ([#6109](https://github.com/lablup/backend.ai/issues/6109))
+* Add `AgentStats` GQL type and resolver to get agents' total and used resource slots ([#6116](https://github.com/lablup/backend.ai/issues/6116))
+* Implements periodic monitoring of container host ports to automatically release unused ports back to the port pool, preventing port exhaustion in long-running agents ([#6125](https://github.com/lablup/backend.ai/issues/6125))
+
+#### User Management
+* Add keypairs field to User GQL type and return the created keypairs when creating users ([#6040](https://github.com/lablup/backend.ai/issues/6040))
+
+#### Health Check and Monitoring
+* Implement simple health check endpoints returning component status, version, and name ([#6124](https://github.com/lablup/backend.ai/issues/6124))
+
+### Improvements
+* Introduce Service, Repository layer pattern when handling Agent Heartbeat ([#5794](https://github.com/lablup/backend.ai/issues/5794))
+* Introduce Service, Repository layer pattern in Agent Image remove event handler ([#5898](https://github.com/lablup/backend.ai/issues/5898))
+* Introduce service, repository layer when handling agent status change event ([#5921](https://github.com/lablup/backend.ai/issues/5921))
+* Remove duplicated exception handling in ResourcePresetCacheSource ([#5976](https://github.com/lablup/backend.ai/issues/5976))
+* Refactor GQL Agent resolver functions by applying repository pattern ([#6079](https://github.com/lablup/backend.ai/issues/6079))
+* Raise `AgentNotFound` error explicitly when agent not found by id instead of returning none ([#6103](https://github.com/lablup/backend.ai/issues/6103))
+
+### Fixes
+
+#### Storage and Configuration
+* Rename `object_storage_namespace` table, and GQL schema to `storage_namespace` ([#6001](https://github.com/lablup/backend.ai/issues/6001))
+* Fix `storage-proxy` unified config not pretty printed at bootstrap ([#6008](https://github.com/lablup/backend.ai/issues/6008))
+* Fix silent config validation failure of `storage-proxy` ([#6009](https://github.com/lablup/backend.ai/issues/6009))
+* Introduce `BaseConfigSchema` to the webserver to easily manage common parts of all configuration objects ([#6078](https://github.com/lablup/backend.ai/issues/6078))
+* Introduce `BaseConfigSchema` to the manager to easily manage common parts of all configuration objects ([#6096](https://github.com/lablup/backend.ai/issues/6096))
+* Introduce `BaseConfigSchema` to the agent to easily manage common parts of all configuration objects ([#6097](https://github.com/lablup/backend.ai/issues/6097))
+* Introduce `BaseConfigSchema` to the storage-proxy to easily manage common parts of all configuration objects ([#6098](https://github.com/lablup/backend.ai/issues/6098))
+
+#### Session Management
+* Fix mount permission check during session creation ([#6021](https://github.com/lablup/backend.ai/issues/6021))
+* Add missing `kernel_host` field in `KernelCreationInfo` ([#6050](https://github.com/lablup/backend.ai/issues/6050))
+* Add missing resolver of GQL Compute session node `resource_opts` field ([#6081](https://github.com/lablup/backend.ai/issues/6081))
+* Explicitly load kernel `resource_opts` data in `ComputeSessionNode` using dataloader instead of accessing `self.resource_opts` directly ([#6156](https://github.com/lablup/backend.ai/issues/6156))
+* Restore the wildcard subscription functionality of the session events ([#6111](https://github.com/lablup/backend.ai/issues/6111))
+
+#### Agent and Resource Management
+* Update GQL Agent type `occupied_slots` field resolver ([#6061](https://github.com/lablup/backend.ai/issues/6061))
+* Remove obsolete max slot limit validation from resource calculator ([#6034](https://github.com/lablup/backend.ai/issues/6034))
+* Invalidate resource preset cache properly ([#6161](https://github.com/lablup/backend.ai/issues/6161))
+
+#### App Proxy
+* Improve error handling in the traefik frontend of App Proxy worker ([#6091](https://github.com/lablup/backend.ai/issues/6091))
+* Temporarily revert traefik configuration update delta calculation logic ([#6094](https://github.com/lablup/backend.ai/issues/6094))
+* Fix worker and all related entities removed from database when leaving the AppProxy cluster ([#6095](https://github.com/lablup/backend.ai/issues/6095))
+
+#### RBAC and Permissions
+* Change unique constraint index of `association_scopes_entities` table and handle unique constraint violation in repository layer ([#6014](https://github.com/lablup/backend.ai/issues/6014))
+
+#### Container Registry
+* Validate container registry input in `create`, `update` mutations ([#6160](https://github.com/lablup/backend.ai/issues/6160))
+* Add Harbor registry creation argument validation ([#6128](https://github.com/lablup/backend.ai/issues/6128))
+
+#### Metrics and Monitoring
+* Fix an issue where utilization metrics for destroyed kernels were not properly cleared from Prometheus, preventing users from seeing accumulated metrics from kernels that no longer exist ([#6139](https://github.com/lablup/backend.ai/issues/6139))
+* Add missing null check for batch operation result in `ValkeyStatClient.get_image_distro()` ([#6028](https://github.com/lablup/backend.ai/issues/6028))
+
+#### Scaling Groups
+* Handle scaling group deletion errors by logging details and raising proper exceptions ([#6122](https://github.com/lablup/backend.ai/issues/6122))
+
+#### Other Fixes
+* Wrong error code of `mgr fixture populate` command ([#6049](https://github.com/lablup/backend.ai/issues/6049))
+* Change the installation path to the current location for the installer to operate in development mode ([#6127](https://github.com/lablup/backend.ai/issues/6127))
+
+### External Dependency Updates
+* Added Rover CLI installation to install-dev script for supergraph generation in dev environment ([#5664](https://github.com/lablup/backend.ai/issues/5664))
+* Build missing agent watcher wheel ([#6115](https://github.com/lablup/backend.ai/issues/6115))
+
+### Miscellaneous
+* Add warning log when adding new user with no groups ([#6159](https://github.com/lablup/backend.ai/issues/6159))
+
+
+## 25.14.5 (2025-09-22)
+
+### Features
+* Remove agent count validation for single-node multi-designated sessions ([#5961](https://github.com/lablup/backend.ai/issues/5961))
+
+### External Dependency Updates
+* Revert addition of types-networkx dependency because it depends on numpy ([#5978](https://github.com/lablup/backend.ai/issues/5978))
+
+
+## 25.14.4 (2025-09-19)
+
+### Features
+* Add model definition generators for VLLM, TGI, NIM, and CMD runtime variants to support model service deployments ([#5958](https://github.com/lablup/backend.ai/issues/5958))
+
+### Improvements
+* Introduce ModelDefinitionGenerator pattern to support multiple runtime variant in model service ([#5924](https://github.com/lablup/backend.ai/issues/5924))
+
+### Fixes
+* Change object permission bulk insert to use ORM functions ([#5893](https://github.com/lablup/backend.ai/issues/5893))
+* Add missing RBAC function call in update-shared-vfolder action handler ([#5919](https://github.com/lablup/backend.ai/issues/5919))
+* Read creation configs using correct key ([#5954](https://github.com/lablup/backend.ai/issues/5954))
+* Handle Undefined group IDs when modifying user ([#5955](https://github.com/lablup/backend.ai/issues/5955))
+* Aggregate kernel resources instead of using `AgentNode.occupied_slots` in GQL API ([#5957](https://github.com/lablup/backend.ai/issues/5957))
+* Scheduler tries destroying kernels that have no container ([#5962](https://github.com/lablup/backend.ai/issues/5962))
+* `entrypoint.sh` explicitly runs addgroup to prevent the container's gid setting from being ignored ([#5963](https://github.com/lablup/backend.ai/issues/5963))
+
+
+## 25.14.3 (2025-09-17)
+
+### Features
+* Introduce soft-deletion to `Artifact` model ([#5808](https://github.com/lablup/backend.ai/issues/5808))
+* Add artifact presigned download, upload configs in the `storage-proxy.toml` ([#5870](https://github.com/lablup/backend.ai/issues/5870))
+
+### Improvements
+* Refactor Message queue architecture by decoupling dispatcher components ([#5805](https://github.com/lablup/backend.ai/issues/5805))
+
+### Fixes
+* Fixed missing scaling group filter condition in AgentRow queries that was causing agents to not be properly filtered by scaling group names ([#5894](https://github.com/lablup/backend.ai/issues/5894))
+* Fixed missing kernel_image_config references in ImageRef creation where registry name and is_local parameters were using hardcoded values instead of proper config settings. ([#5895](https://github.com/lablup/backend.ai/issues/5895))
+* Revert format of Resource preset shared-memory value ([#5896](https://github.com/lablup/backend.ai/issues/5896))
+* Fix serialization of Resource preset cache ([#5899](https://github.com/lablup/backend.ai/issues/5899))
+* Modify pending session resource limit validation logic ([#5901](https://github.com/lablup/backend.ai/issues/5901))
+* Set kernel status to terminated when the kernel is missing ([#5903](https://github.com/lablup/backend.ai/issues/5903))
+* Fix Endpoint mutation by querying endpoint records with image objects ([#5905](https://github.com/lablup/backend.ai/issues/5905))
+
+### External Dependency Updates
+* Update aiohttp and its dependencies including multidict ([#5786](https://github.com/lablup/backend.ai/issues/5786))
+
+### Miscellaneous
+* Replace hardcoded resource slot states with `ResourceSlotState` enum ([#5665](https://github.com/lablup/backend.ai/issues/5665))
+
+
+## 25.14.2 (2025-09-15)
+
+### Features
+* Add GQL Viewer type ([#5728](https://github.com/lablup/backend.ai/issues/5728))
+
+
+## 25.14.1 (2025-09-15)
+
+### Fixes
+* Handle empty `supported_accelerators` list correctly in Image, ImageNode ([#5878](https://github.com/lablup/backend.ai/issues/5878))
+
+
+## 25.14.0 (2025-09-15)
+
+### Breaking Changes
+* Implement password hashing system with multiple algorithms including PBKDF2-SHA3-256 ([#5753](https://github.com/lablup/backend.ai/issues/5753), [#5785](https://github.com/lablup/backend.ai/issues/5785))
+
+### Features
+
+#### RBAC Enhancements
+* Add data migration scripts from VFolder to RBAC tables ([#5340](https://github.com/lablup/backend.ai/issues/5340))
+* Migrate existing user/project records to RBAC data ([#5417](https://github.com/lablup/backend.ai/issues/5417))
+* Expand RBAC tables with `permission_groups` table to group permissions with the same target ([#5465](https://github.com/lablup/backend.ai/issues/5465))
+* Add RBAC repository functions to manage scopes and entity DB records ([#5699](https://github.com/lablup/backend.ai/issues/5699))
+
+#### Artifact Management
+* Add `reservoir_registries` DB table, service, and CRUD GQL mutations ([#5644](https://github.com/lablup/backend.ai/issues/5644))
+* Add `artifact_registries` DB table to store common information of various artifact registries ([#5656](https://github.com/lablup/backend.ai/issues/5656))
+* Implement Reservoir registry and Sync APIs between Managers ([#5660](https://github.com/lablup/backend.ai/issues/5660))
+* Add `defaultArtifactRegistry` GQL resolver to fetch default artifact registry information ([#5739](https://github.com/lablup/backend.ai/issues/5739))
+* Add `Artifact`, `ArtifactRegistry` REST API ([#5747](https://github.com/lablup/backend.ai/issues/5747))
+
+#### Background Tasks
+* Add VFolder delete background task ([#5778](https://github.com/lablup/backend.ai/issues/5778))
+* Set expiry to set records of Bgtask metadata IDs ([#5736](https://github.com/lablup/backend.ai/issues/5736))
+
+#### Performance and Resource Management
+* Apply cache layer for resource presets ([#5781](https://github.com/lablup/backend.ai/issues/5781))
+* Align reported agent memory size for consistency in large clusters, preventing inadvertent resource allocation failures ([#5729](https://github.com/lablup/backend.ai/issues/5729))
+
+#### Other Features
+* Allow `__typename` type query for advanced GraphQL features (GQL Federation, `@connection` directive) by introducing custom introspection rule ([#5705](https://github.com/lablup/backend.ai/issues/5705))
+* Add config for GPFS fileset name prefix ([#5684](https://github.com/lablup/backend.ai/issues/5684))
+* Add session mode (Client, Proxy) based error handling in FetchContextManager ([#5774](https://github.com/lablup/backend.ai/issues/5774))
+* Remove obsolete max slot limit validation during session creation ([#5807](https://github.com/lablup/backend.ai/issues/5807))
+* Implement health check functionality for route management ([#5811](https://github.com/lablup/backend.ai/issues/5811))
+* Introduce error code to storage-proxy exceptions ([#5813](https://github.com/lablup/backend.ai/issues/5813))
+* Add config to disable artifact approval process ([#5830](https://github.com/lablup/backend.ai/issues/5830))
+
+### Improvements
+* Migrate legacy redis clients to valkey clients in App Proxy ([#5741](https://github.com/lablup/backend.ai/issues/5741))
+
+### Fixes
+
+#### Session Management
+* Add missing session live stat update ([#5762](https://github.com/lablup/backend.ai/issues/5762))
+* Ensure worker object refresh after DB flush in update_worker ([#5674](https://github.com/lablup/backend.ai/issues/5674))
+* Handle empty `supported_accelerators` list in `Image`, `ImageNode` ([#5869](https://github.com/lablup/backend.ai/issues/5869))
+* Reset pending queue when there are no sessions with scheduling failures ([#5865](https://github.com/lablup/backend.ai/issues/5865))
+
+#### Network and Docker
+* Make overlay network creation idempotent to prevent infinite retry loops ([#5765](https://github.com/lablup/backend.ai/issues/5765))
+* Clean up dangling docker networks ([#5770](https://github.com/lablup/backend.ai/issues/5770))
+* Add missing `restart: unless-stopped` policy to docker compose services ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+
+#### API and Permissions
+* Fix `modify_user` GQL mutation's `project` update due to incorrect condition ([#5850](https://github.com/lablup/backend.ai/issues/5850))
+* Fix wrong syntax in object permission record adder function ([#5849](https://github.com/lablup/backend.ai/issues/5849))
+* Check if vfolder is mounted to any session before deleting ([#5855](https://github.com/lablup/backend.ai/issues/5855))
+* Restrict `limit` parameter in `scan_artifacts` API ([#5801](https://github.com/lablup/backend.ai/issues/5801))
+
+#### Proxy and Health Check
+* Fix JSON parsing error when wsproxy returns HTML error responses ([#5829](https://github.com/lablup/backend.ai/issues/5829))
+* Update kernel host references to current kernel host in proxy and health check logic ([#5834](https://github.com/lablup/backend.ai/issues/5834))
+* Add missing update when app proxy registers endpoint ([#5783](https://github.com/lablup/backend.ai/issues/5783))
+
+#### Other Fixes
+* Fix import paths for `ai.backend.errors.*` in migration script ([#5828](https://github.com/lablup/backend.ai/issues/5828))
+* Mark hint for immediate model-service update ([#5845](https://github.com/lablup/backend.ai/issues/5845))
+* Initialize ResourceSlot with known_slots in resource occupancy calculation ([#5860](https://github.com/lablup/backend.ai/issues/5860))
+* Ensure model service token expiration times are handled consistently in UTC ([#5872](https://github.com/lablup/backend.ai/issues/5872))
+* Update client SDK to reflect UUID-only restriction in session dependencies ([#5809](https://github.com/lablup/backend.ai/issues/5809))
+
+### Miscellaneous
+* Refactor scheduler handlers: Split into individual files and create a base handler class ([#5766](https://github.com/lablup/backend.ai/issues/5766))
+
+
+## 25.13.4 (2025-09-03)
+
+### Fixes
+* Add missing scheduler options to AllowedScalingGroup and update related components ([#5730](https://github.com/lablup/backend.ai/issues/5730))
+
+
+## 25.13.3 (2025-09-03)
+
+### Fixes
+* Improve HTTP request proxying in the webserver to be transparent with content-encoding ([#5709](https://github.com/lablup/backend.ai/issues/5709))
+* Add null-user check in resource usage query ([#5712](https://github.com/lablup/backend.ai/issues/5712))
+* Ensure id parameter of chown function is an int ([#5713](https://github.com/lablup/backend.ai/issues/5713))
+* Refresh agent fields in kernel when rescheduling ([#5717](https://github.com/lablup/backend.ai/issues/5717))
+* Fix issue where App-Proxy failed to query worker circuits due to incorrect variable reference ([#5718](https://github.com/lablup/backend.ai/issues/5718))
+* Add missing network cleanup when creating overlay network ([#5721](https://github.com/lablup/backend.ai/issues/5721))
+
+
+## 25.13.2 (2025-09-02)
+
+### Features
+* The mouse-selected or copy-mode selected texts in the intrinsic ttyd app with tmux are now directly copied to the user-side clipboard, without needing to `set mouse=off` in the tmux session ([#5688](https://github.com/lablup/backend.ai/issues/5688))
+* feat: Improvement redis keys command to scan_iter for manager cli ([#5704](https://github.com/lablup/backend.ai/issues/5704))
+
+### Fixes
+* Add missing all-smi manpage file in the wheel packages ([#5685](https://github.com/lablup/backend.ai/issues/5685))
+* Updated RedisProfileTarget to handle cases where 'addr' is missing or None in the input data, preventing errors during address parsing. ([#5695](https://github.com/lablup/backend.ai/issues/5695))
+* fixes a duplicate joins issue during serialization when using pydantic by removing the join filter from the TOMLStringListField's _transform method. ([#5700](https://github.com/lablup/backend.ai/issues/5700))
+* Fix coordinator not performing health check for all endpoints ([#5702](https://github.com/lablup/backend.ai/issues/5702))
+* Fix session creation failing with `not allowed scaling group` error ([#5706](https://github.com/lablup/backend.ai/issues/5706))
+* Enhance endpoint creation logic to update existing records and handle circuits ([#5707](https://github.com/lablup/backend.ai/issues/5707))
+
+
+## 25.13.1 (2025-08-29)
+
+### Fixes
+* Fix session ordering in session_pending_queue query resolver ([#5682](https://github.com/lablup/backend.ai/issues/5682))
+* fix: Ensure redis address is nullable ([#5683](https://github.com/lablup/backend.ai/issues/5683))
+
+
+## 25.13.0 (2025-08-29)
+
+### Features
+* Introduce `strawberry`, and strawberry-based `ArtifactRegistry` GQL types ([#5232](https://github.com/lablup/backend.ai/issues/5232))
+* Add `ModelDeployment`, `ModelRevision` strawberry GQL types migrated from existing federated graphene schema ([#5249](https://github.com/lablup/backend.ai/issues/5249))
+* Open-source and integrate Backend.AI App Proxy into the main codebase ([#5275](https://github.com/lablup/backend.ai/issues/5275))
+* Add `storages` API to storage proxy ([#5286](https://github.com/lablup/backend.ai/issues/5286))
+* Add OpenTelemetry and service discovery configuration to appproxy ([#5296](https://github.com/lablup/backend.ai/issues/5296))
+* Implement connection monitoring and reconnection logic in ValkeyStandaloneClient ([#5298](https://github.com/lablup/backend.ai/issues/5298))
+* Implement Sokovan orchestrator architecture ([#5361](https://github.com/lablup/backend.ai/issues/5361))
+* Add `HuggingFace` scanner, and API to storage proxy ([#5362](https://github.com/lablup/backend.ai/issues/5362))
+* Split out container log processing to a more concrete `ValkeyContainerLogClient` (based on `ValkeyClient` with default behavior) and use a separate Redis instance dedicated for log streaming ([#5375](https://github.com/lablup/backend.ai/issues/5375))
+* Implement scheduling prioritizers ([#5378](https://github.com/lablup/backend.ai/issues/5378))
+* Add validators for scheduling ([#5380](https://github.com/lablup/backend.ai/issues/5380))
+* Ship [`all-smi`](https://github.com/inureyes/all-smi) so that users can execute it inside any session container ([#5381](https://github.com/lablup/backend.ai/issues/5381))
+* Implement sokovan scheduler agent selectors ([#5383](https://github.com/lablup/backend.ai/issues/5383))
+* Integrate Agent selector with allocator in sokovan orchestrator ([#5393](https://github.com/lablup/backend.ai/issues/5393))
+* Add `UserNode` as a field of `ComputeSessionNode` ([#5403](https://github.com/lablup/backend.ai/issues/5403))
+* Enhance Scheduler allocation logic and add comprehensive tests ([#5404](https://github.com/lablup/backend.ai/issues/5404))
+* Add allocation methods in scheduler repository ([#5406](https://github.com/lablup/backend.ai/issues/5406))
+* Add TTL support to Redis key operations in AppProxy ([#5416](https://github.com/lablup/backend.ai/issues/5416))
+* Unify separate GraphQL subgraph endpoints into single Apollo Router supergraph with web-server proxy integration to enable single endpoint access for clients ([#5419](https://github.com/lablup/backend.ai/issues/5419))
+* Integrate sokovan orchestrator in manager ([#5421](https://github.com/lablup/backend.ai/issues/5421))
+* Add `source` field to roles table to distinguish system-defined roles from custom-defined roles, enabling automatic permission grants for system roles when new entity types or operations are introduced ([#5440](https://github.com/lablup/backend.ai/issues/5440))
+* Add phase tracking in scheduling ([#5441](https://github.com/lablup/backend.ai/issues/5441))
+* Implement scheduler coordinator in sokovan orchestrator ([#5455](https://github.com/lablup/backend.ai/issues/5455))
+* Changed the behavior to terminate "terminating session" in batch processing ([#5467](https://github.com/lablup/backend.ai/issues/5467))
+* Implement session sweeping functionality and related handlers ([#5485](https://github.com/lablup/backend.ai/issues/5485))
+* Inject `storages` config to storage-proxy ([#5491](https://github.com/lablup/backend.ai/issues/5491))
+* Add `object_storages` table to DB ([#5498](https://github.com/lablup/backend.ai/issues/5498))
+* Add request_timeout configuration for Redis clients ([#5502](https://github.com/lablup/backend.ai/issues/5502))
+* Add decrement_keypair_concurrencies method and update session termination logic ([#5504](https://github.com/lablup/backend.ai/issues/5504))
+* Add `hugging_registries` DB table, and GQL schema ([#5508](https://github.com/lablup/backend.ai/issues/5508))
+* Replace the existing `ArtifactGroup` model with `Artifact`, and replace `Artifact` with `ArtifactRevision` ([#5510](https://github.com/lablup/backend.ai/issues/5510))
+* Integrate `Artifact` service to Manager ([#5514](https://github.com/lablup/backend.ai/issues/5514))
+* Add Valkey client for Background Task Manager ([#5519](https://github.com/lablup/backend.ai/issues/5519))
+* Improve `logging.BraceStyleAdapter` to support user-defined kwargs and access to `extra` data including contextual fields. ([#5523](https://github.com/lablup/backend.ai/issues/5523))
+* Add Background Task heartbeat loop to refresh TTL ([#5531](https://github.com/lablup/backend.ai/issues/5531))
+* Modify value reading to avoid cache-based scheduling ([#5533](https://github.com/lablup/backend.ai/issues/5533))
+* Implement scheduling controller ([#5547](https://github.com/lablup/backend.ai/issues/5547))
+* Implement kernel state engine ([#5551](https://github.com/lablup/backend.ai/issues/5551))
+* Add Background Task retry loop ([#5555](https://github.com/lablup/backend.ai/issues/5555))
+* Allow specifying multiple endpoint addresses in the etcd config ([#5564](https://github.com/lablup/backend.ai/issues/5564))
+* Update session limits to allow None and 0 as indicators for unlimited concurrent sessions ([#5567](https://github.com/lablup/backend.ai/issues/5567))
+* Add configuration option for Sokovan orchestrator usage ([#5568](https://github.com/lablup/backend.ai/issues/5568))
+* Implement health monitoring for scheduling operations ([#5569](https://github.com/lablup/backend.ai/issues/5569))
+* Enhance session management by adding checks for truly stuck pulling and creating sessions ([#5570](https://github.com/lablup/backend.ai/issues/5570))
+* Add Valkey Client TLS configuration ([#5573](https://github.com/lablup/backend.ai/issues/5573))
+* Implement Generalized pagination on Strawberry GQL API ([#5575](https://github.com/lablup/backend.ai/issues/5575))
+* Implement session transition hooks for various session types ([#5579](https://github.com/lablup/backend.ai/issues/5579))
+* Implement deployment management with Sokovan integration ([#5580](https://github.com/lablup/backend.ai/issues/5580))
+* Implement batch scheduling events and event propagation through Event Hub ([#5589](https://github.com/lablup/backend.ai/issues/5589))
+* Apply centralized distributed locking for Sokovan scheduling operations ([#5592](https://github.com/lablup/backend.ai/issues/5592))
+* Implement cache-through pattern for keypair concurrency management in SchedulerRepository ([#5594](https://github.com/lablup/backend.ai/issues/5594))
+* Apply READ COMMITTED isolation level for scheduler operations ([#5600](https://github.com/lablup/backend.ai/issues/5600))
+* Add Volume Pool field to `RootContext` of Storage-Proxy ([#5603](https://github.com/lablup/backend.ai/issues/5603))
+* Add Bgtask handler Registry ([#5606](https://github.com/lablup/backend.ai/issues/5606))
+* Implement Valkey-based leader election in manager ([#5607](https://github.com/lablup/backend.ai/issues/5607))
+* Apply retry feature to VFolder clone bgtask ([#5611](https://github.com/lablup/backend.ai/issues/5611))
+* Add `object_storage_meta` DB table for managing buckets ([#5617](https://github.com/lablup/backend.ai/issues/5617))
+* Add operation metrics observer for session termination tracking ([#5623](https://github.com/lablup/backend.ai/issues/5623))
+* Implement EventPropagatorMetricObserver for tracking event propagator metrics ([#5630](https://github.com/lablup/backend.ai/issues/5630))
+* Apply cache propagator when broadcasting scheduling event ([#5638](https://github.com/lablup/backend.ai/issues/5638))
+* Implement deployment controller and integrate with sokovan orchestrator ([#5639](https://github.com/lablup/backend.ai/issues/5639))
+* Added automated GraphQL supergraph generation using rover CLI to CI pipeline for improved schema management ([#5645](https://github.com/lablup/backend.ai/issues/5645))
+* Add `--wait` option to `backend.ai events` command for easier scripting and automation ([#5650](https://github.com/lablup/backend.ai/issues/5650))
+* Implement session wait logic in AgentRegistry for improved scheduling handling ([#5659](https://github.com/lablup/backend.ai/issues/5659))
+* Manage object storage buckets using `storage_namespace` ([#5667](https://github.com/lablup/backend.ai/issues/5667))
+* Add scheduling detail info for pending sessions ([#5676](https://github.com/lablup/backend.ai/issues/5676))
+
+### Fixes
+* Correct the asyncio connection sharing pattern in alembic `env.py` so that we could use `alembic-rebase.py` script and other alembic-based automation seamlessly. ([#5151](https://github.com/lablup/backend.ai/issues/5151))
+* Use persistent `aiohttp.ClientSession` instances per route in App Proxy circuits to benefit from keep-alive connections and resource reuse ([#5287](https://github.com/lablup/backend.ai/issues/5287))
+* Add missing resolver of VFolder permissions field in Compute session node ([#5322](https://github.com/lablup/backend.ai/issues/5322))
+* Let insepct.signature handle stringified types generated by `__future__` annotations by setting the `eval_str` option to True ([#5325](https://github.com/lablup/backend.ai/issues/5325))
+* Handle None user when request context setup in auth middleware ([#5327](https://github.com/lablup/backend.ai/issues/5327))
+* Add missing database transaction retry logic when setting network ID of new sessions ([#5329](https://github.com/lablup/backend.ai/issues/5329))
+* Apply memoization to the scheduler plugin loaders to reduce runtime overheads when running the scheduler loop ([#5342](https://github.com/lablup/backend.ai/issues/5342))
+* Broken Agent, Webserver in HA development environment ([#5343](https://github.com/lablup/backend.ai/issues/5343))
+* Add missing components in HA development environment ([#5345](https://github.com/lablup/backend.ai/issues/5345))
+* Make `--log-level` and `--debug` flag behavior and description consistent across all `start-server` commands ([#5366](https://github.com/lablup/backend.ai/issues/5366))
+* Defer imports in the CLI and server entrypoints to reduce CLI startup times and avoid unnecessary cross-component imports ([#5372](https://github.com/lablup/backend.ai/issues/5372))
+* Fix and improve optimization to glob-based BUILD file scanning when loading CLI entrypoints, improving the CLI command initialization latency for about 15% (e.g., 3.5 sec -> 3.0 sec) ([#5377](https://github.com/lablup/backend.ai/issues/5377))
+* Fix missing `event_logs` table creation when populating the database schema with `mgr schema oneshot`, which may have caused issues in fresh installations ([#5391](https://github.com/lablup/backend.ai/issues/5391))
+* Add Docker image rescan exception handling logic when the image config is `None` ([#5394](https://github.com/lablup/backend.ai/issues/5394))
+* Serialize `ResourceSlot` type values in GQL resolvers ([#5433](https://github.com/lablup/backend.ai/issues/5433))
+* Remove wrong `ImageRef` stringification when push image ([#5434](https://github.com/lablup/backend.ai/issues/5434))
+* Fix wrong image type search logic used in `ImageNode` instance creation ([#5435](https://github.com/lablup/backend.ai/issues/5435))
+* Wrong error handling of `User` CRUD mutations ([#5446](https://github.com/lablup/backend.ai/issues/5446))
+* Fix App Proxy health-check done against sub-kernels due to misgeneration of route information for cluster sessions, which had wrongly included sub-kernel service ports ([#5447](https://github.com/lablup/backend.ai/issues/5447))
+* Change `Circuit` query logic in AppProxy for `Circuit` object's serializability ([#5448](https://github.com/lablup/backend.ai/issues/5448))
+* Wrong request header validation error handling of Webserver ([#5449](https://github.com/lablup/backend.ai/issues/5449))
+* Fix NUMA-aware affinity allocation to find the larged connected component with the most remaining resource capacity when grouping devices per NUMA node ([#5454](https://github.com/lablup/backend.ai/issues/5454))
+* Prevent the Agent from producing error events in the heartbeat loop to avoid loop termination due to Redis connection failures ([#5469](https://github.com/lablup/backend.ai/issues/5469))
+* Fixed session being incorrectly set on failed login attempts and ensured `X-BackendAI-SessionID` header is always included when login succeeds ([#5473](https://github.com/lablup/backend.ai/issues/5473))
+* Respect the inherited ulimits when setting ulimits of new containers ([#5489](https://github.com/lablup/backend.ai/issues/5489))
+* Handle clone tasks through events to avoid clone status hanging caused by potential termination of clone-tracking tasks ([#5493](https://github.com/lablup/backend.ai/issues/5493))
+* Document the internal logic of affinity-aware device allocation and improve error messages ([#5521](https://github.com/lablup/backend.ai/issues/5521))
+* Update all import occurrences of `BraceStyleAdapter` in App Proxy to use the core `ai.backend.logging` package so that the App Proxy codebase is compatible with #5523 ([#5550](https://github.com/lablup/backend.ai/issues/5550))
+* Fix manager.wsproxy's HTTP requests to use relative URLs as the default factory sets `base_url` of `aiohttp.ClientSession` instances ([#5576](https://github.com/lablup/backend.ai/issues/5576))
+* Improve agent idempotency when provisioning kernel resources to better support the new Sokovan scheduler's retry mechanisms ([#5584](https://github.com/lablup/backend.ai/issues/5584))
+* Fix NUMA node alignment of subsequent device allocation ([#5587](https://github.com/lablup/backend.ai/issues/5587))
+* Fix regression of agent's per-package log-level configurations ([#5614](https://github.com/lablup/backend.ai/issues/5614))
+* Enhance kernel status handling for resource occupancy tracking ([#5619](https://github.com/lablup/backend.ai/issues/5619))
+* Fix hanging kernel creation in the new Sokovan scheduler when the host account's UID/GID is not 1000 ([#5626](https://github.com/lablup/backend.ai/issues/5626))
+* Rename `object_storage_meta` table to `object_storage_namespace` ([#5666](https://github.com/lablup/backend.ai/issues/5666))
+
+### External Dependency Updates
+* Upgrade the base CPython version from 3.13.3 to 3.13.7 ([#5536](https://github.com/lablup/backend.ai/issues/5536))
+* Update all-smi binaries to v0.8.0 ([#5588](https://github.com/lablup/backend.ai/issues/5588))
+* Update all-smi binaries to v0.9.0 ([#5677](https://github.com/lablup/backend.ai/issues/5677))
+
+### Miscellaneous
+* Refactor the import structure for `RepositoryArgs` by moving it to a dedicated `ai.backend.manager.repositories.types` module ([#5409](https://github.com/lablup/backend.ai/issues/5409))
+* Upgrade the CI toolchain such as Pantsbuild (2.23.1 -> 2.27.0), Ruff (0.8.5 -> 0.12.9), and Mypy (1.15.0 -> 1.17.1) with merging BUILD files for faster dependency resolution to reduce human mistakes on managing them and cleaning up various lint warnings ([#5529](https://github.com/lablup/backend.ai/issues/5529))
+* Add Strawberry GraphQL mypy plugin to fix mypy compatibility issues with cutom types from Strawberrt GraphQL ([#5574](https://github.com/lablup/backend.ai/issues/5574))
+
+### Test Updates
+* Add Backgroundtask unit tests ([#5625](https://github.com/lablup/backend.ai/issues/5625))
+
+
 ## 25.12.1 (2025-07-25)
 
 ### Features

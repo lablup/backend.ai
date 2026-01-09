@@ -2,16 +2,15 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
-    AsyncContextManager,
-    Callable,
     Optional,
     Protocol,
     Self,
-    Sequence,
     TypeAlias,
 )
 from uuid import UUID
@@ -19,8 +18,9 @@ from uuid import UUID
 import aiohttp_cors
 import attrs
 from prometheus_client import generate_latest
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
 
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
@@ -28,11 +28,13 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitRouteUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
-from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError, ServiceUnavailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.probe import HealthProbe
+from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.lock import AbstractDistributedLock
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -40,6 +42,7 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.types import AgentId, RedisConnectionInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .config import ServerConfig
 from .defs import LockID
@@ -146,7 +149,7 @@ class CircuitManager:
         try:
             async with asyncio.timeout(15.0):
                 await worker_ready_evt.wait()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise ServiceUnavailable(
                 "E10001: Proxy worker not responding", extra_data={"worker": authority}
             )
@@ -169,32 +172,6 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        old = set(
-            RouteInfo(**{
-                **r.model_dump(),
-                "health_status": None,
-                "last_health_check": None,
-                "consecutive_failures": 0,
-            })
-            for r in old_routes
-        )
-        new = set(
-            RouteInfo(**{
-                **r.model_dump(),
-                "health_status": None,
-                "last_health_check": None,
-                "consecutive_failures": 0,
-            })
-            for r in circuit.healthy_routes
-        )
-        intersect = old & new
-        routes_to_delete = old - intersect
-        routes_to_create = new - intersect
-
-        if len(routes_to_delete) == 0 and len(routes_to_create) == 0:
-            # Nothing to update
-            return
-
         # Use health-aware services configuration
         new_route_keys = {
             f"bai_session_{r.session_id}_{circuit.id}" for r in circuit.healthy_routes
@@ -206,7 +183,7 @@ class CircuitManager:
         }
 
         # clear old routes
-        for route in routes_to_delete:
+        for route in old_routes:
             log.debug(
                 "traefik_etcd.delete_prefix {}",
                 f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}",
@@ -279,7 +256,7 @@ class CircuitManager:
         log.debug("unload_traefik_circuit(): end")
 
     async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(lambda: [])
+        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
         for circuit in circuits:
             circuits_by_worker[circuit.worker_row.authority].append(circuit)
 
@@ -301,9 +278,10 @@ class RootContext:
     core_event_dispatcher: EventDispatcher
     core_event_producer: EventProducer
 
-    redis_live: RedisConnectionInfo
+    valkey_live: ValkeyLiveClient
     redis_lock: RedisConnectionInfo
-    core_redis_live: RedisConnectionInfo
+    core_valkey_live: ValkeyLiveClient
+    valkey_schedule: ValkeyScheduleClient
     local_config: ServerConfig
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     traefik_etcd: TraefikEtcd | None
@@ -312,18 +290,72 @@ class RootContext:
     health_engine: HealthCheckEngine
 
     metrics: CoordinatorMetricRegistry
+    health_probe: HealthProbe
+    leader_election: ValkeyLeaderElection
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):
-    session_id: UUID
-    route_id: Annotated[UUID | None, Field(default=None)]
-    kernel_host: str
-    kernel_port: int
-    protocol: Annotated[ProxyProtocol, Field(default=ProxyProtocol.HTTP)]
-    traffic_ratio: Annotated[float, Field(ge=0.0, le=1.0, default=1.0)]
+    session_id: Annotated[
+        UUID,
+        Field(
+            ...,
+            description="ID of the session associated with the inference app.",
+            validation_alias=AliasChoices("session-id", "session_id"),
+            serialization_alias="session-id",
+        ),
+    ]
+    route_id: Annotated[
+        Optional[UUID],
+        Field(
+            default=None,
+            description="ID of the route. This is optional and may not be present for older routes.",
+            validation_alias=AliasChoices("route-id", "route_id"),
+            serialization_alias="route-id",
+        ),
+    ]
+    kernel_host: Annotated[
+        Optional[str],
+        Field(
+            ...,
+            description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",
+            validation_alias=AliasChoices("kernel-host", "kernel_host"),
+            serialization_alias="kernel-host",
+        ),
+    ]
+    kernel_port: Annotated[
+        int,
+        Field(
+            ...,
+            ge=1,
+            le=65535,
+            description="Port number of the kernel. This is the port that the proxy will use to connect to the kernel.",
+            validation_alias=AliasChoices("kernel-port", "kernel_port"),
+            serialization_alias="kernel-port",
+        ),
+    ]
+    protocol: Annotated[
+        ProxyProtocol,
+        Field(
+            default=ProxyProtocol.HTTP,
+            description="Protocol used to connect to the kernel. Supported protocols are HTTP and WebSocket.",
+            validation_alias=AliasChoices("protocol"),
+            serialization_alias="protocol",
+        ),
+    ]
+    traffic_ratio: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            default=1.0,
+            description="Traffic ratio for the inference app. This is used for load balancing between multiple apps.",
+            validation_alias=AliasChoices("traffic-ratio", "traffic_ratio"),
+            serialization_alias="traffic-ratio",
+        ),
+    ]
 
 
 InferenceAppConfigDict = TypeAdapter(dict[str, list[InferenceAppConfig]])

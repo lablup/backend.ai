@@ -3,15 +3,16 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.keypair_resource_policy.actions.base import (
     KeypairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 
 
 @dataclass
 class CreateKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
-    creator: KeyPairResourcePolicyCreator
+    creator: Creator[KeyPairResourcePolicyRow]
 
     @override
     def entity_id(self) -> Optional[str]:

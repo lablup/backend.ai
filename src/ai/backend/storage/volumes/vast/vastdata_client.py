@@ -2,20 +2,26 @@ from __future__ import annotations
 
 import logging
 import ssl
+import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, NewType, Optional, TypedDict
+from typing import Any, NewType, Optional, TypedDict
 
 import aiohttp
 import jwt
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.errors import (
+    ExternalStorageServiceError,
+    QuotaScopeAlreadyExists,
+    VolumeNotInitializedError,
+)
+from ai.backend.storage.types import CapacityUsage
 
-from ...exception import ExternalError, QuotaScopeAlreadyExists
-from ...types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
     VASTAPIError,
@@ -84,8 +90,8 @@ class VASTClusterInfo:
     max_file_size: int = -1
     max_performance: Performance = field(default_factory=default_perf)
 
-    def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+    def __init__(self, **kwargs) -> None:
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
@@ -111,8 +117,8 @@ class VASTQuota:
     used_capacity: int
     percent_capacity: int
 
-    def __init__(self, **kwargs):
-        names = set([f.name for f in fields(self)])
+    def __init__(self, **kwargs) -> None:
+        names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
@@ -124,7 +130,8 @@ class VASTQuota:
 
 @dataclass
 class Cache:
-    cluster_info: VASTClusterInfo | None
+    cluster_info: VASTClusterInfo
+    timestamp: float
 
 
 class VASTAPIClient:
@@ -134,9 +141,9 @@ class VASTAPIClient:
     password: str
     ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
-    cache: Cache
+    _cache: Optional[Cache]
 
-    _auth_token: TokenPair | None
+    _auth_token: Optional[TokenPair]
 
     def __init__(
         self,
@@ -148,13 +155,15 @@ class VASTAPIClient:
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
         force_login: bool = True,
+        cluster_info_cache_ttl: float,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
         self.username = username
         self.password = password
         self.storage_base_dir = Path(storage_base_dir)
-        self.cache = Cache(cluster_info=None)
+        self._cache = None
+        self._cache_ttl = cluster_info_cache_ttl
 
         self._auth_token = None
         self.ssl_context = ssl
@@ -162,7 +171,8 @@ class VASTAPIClient:
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        assert self._auth_token is not None
+        if self._auth_token is None:
+            raise VolumeNotInitializedError("VAST auth token is not initialized")
         return {
             "Authorization": f"Bearer {self._auth_token['access_token']}",
             "Content-Type": "application/json",
@@ -172,7 +182,7 @@ class VASTAPIClient:
         if self.force_login:
             return await self._login()
 
-        current_dt = datetime.now(timezone.utc)
+        current_dt = datetime.now(UTC)
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(
@@ -182,15 +192,15 @@ class VASTAPIClient:
                     "verify_signature": False,
                 },
             )
-            return datetime.fromtimestamp(decoded["exp"])
+            return datetime.fromtimestamp(decoded["exp"], tz=UTC)
 
         if self._auth_token is None:
             return await self._login()
-        elif get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
+        if get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
             return
-        elif get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
+        if get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens
             return await self._refresh()
@@ -200,7 +210,7 @@ class VASTAPIClient:
         try:
             self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
         except KeyError:
-            raise VASTAPIError(f"Cannot parse token with given data (d:{str(data)})")
+            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})")
 
     async def _refresh(self) -> None:
         if self._auth_token is None:
@@ -209,7 +219,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/refresh/",
+                f"/api/{self.api_version!s}/token/refresh/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -224,7 +234,7 @@ class VASTAPIClient:
             base_url=self.api_endpoint,
         ) as sess:
             response = await sess.post(
-                f"/api/{str(self.api_version)}/token/",
+                f"/api/{self.api_version!s}/token/",
                 headers={
                     "Accept": "*/*",
                 },
@@ -275,9 +285,7 @@ class VASTAPIClient:
             VASTInvalidParameterError,
         ) as e:
             log.warning(
-                f"Error occurs during communicating with Vast data API. Login and retry (e:{
-                    repr(e)
-                })"
+                f"Error occurs during communicating with Vast data API. Login and retry (e:{e!r})"
             )
             await self._login()
             return await func(
@@ -312,7 +320,7 @@ class VASTAPIClient:
             response = await self._build_request(
                 sess,
                 GET,
-                f"quotas/{str(vast_quota_id)}/",
+                f"quotas/{vast_quota_id!s}/",
             )
             if response.status == 404:
                 return None
@@ -362,7 +370,7 @@ class VASTAPIClient:
                 case 201 | 200:
                     pass
                 case 400 | 401:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 403:
                     raise VASTUnauthorizedError
                 case 503:
@@ -408,7 +416,7 @@ class VASTAPIClient:
                 case 2:
                     pass
                 case 4:
-                    raise VASTInvalidParameterError(f"Invalid parameter (data:{str(data)})")
+                    raise VASTInvalidParameterError(f"Invalid parameter (data:{data!s})")
                 case 5:
                     err_msg = data.get("detail", "VAST server error")
                     raise VASTUnknownError(err_msg)
@@ -430,9 +438,11 @@ class VASTAPIClient:
             if response.status == 404:
                 raise VASTNotFoundError
 
-    async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
-        if (_cached := self.cache.cluster_info) is not None:
-            return _cached
+    async def get_cluster_info(self, cluster_id: int) -> Optional[VASTClusterInfo]:
+        current_time = time.time()
+        if (cached := self._cache) is not None:
+            if current_time - cached.timestamp < self._cache_ttl:
+                return cached.cluster_info
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -441,9 +451,13 @@ class VASTAPIClient:
                 case 200:
                     data: Mapping[str, Any] = await response.json()
                     result = VASTClusterInfo.from_json(data)
-                    self.cache.cluster_info = result
+                    self._cache = Cache(
+                        cluster_info=result,
+                        timestamp=current_time,
+                    )
                     return result
                 case 404:
+                    log.warning(f"Cluster with id {cluster_id} not found in VAST data.")
                     return None
                 case _:
                     raise VASTUnknownError(
@@ -471,7 +485,9 @@ class VASTAPIClient:
         for path, info in infos:
             if path == root_dir:
                 return _parse(info)
-        raise ExternalError("No capacity data found from vast API")
+        raise ExternalStorageServiceError(
+            f"No capacity data found for root directory '{root_dir}' from VAST API"
+        )
 
 
 # GET /capacity/

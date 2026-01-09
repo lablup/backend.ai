@@ -1,10 +1,11 @@
-from __future__ import with_statement
+from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
@@ -19,7 +20,8 @@ config = context.config
 # This line sets up loggers basically.
 
 if not logging_active.get():
-    assert config.config_file_name is not None
+    if config.config_file_name is None:
+        raise RuntimeError("Alembic config file name is not set")
     fileConfig(config.config_file_name)
 
 # Import the shared metadata and all models.
@@ -53,7 +55,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection) -> None:
+def do_run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
@@ -61,11 +63,8 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    main_section = config.get_section(config.config_ini_section)
-    if main_section is None:
-        raise ValueError("The alembic configuration does not have the main [alembic] section.")
     connectable = async_engine_from_config(
-        main_section,
+        config.get_section(config.config_ini_section) or {},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

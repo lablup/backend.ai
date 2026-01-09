@@ -64,7 +64,7 @@ async def init_sshd_service(child_env):
                 auth_path.parent.chmod(0o700)
             if (auth_path.stat().st_mode & 0o077) != 0:
                 auth_path.chmod(0o600)
-        except IOError:
+        except OSError:
             log.warning("could not set the permission for /home/work/.ssh")
     proc = await asyncio.create_subprocess_exec(
         *[
@@ -162,7 +162,7 @@ async def prepare_ttyd_service(service_info):
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
-    if shell != "ash":  # Currently Alpine-based containers are not supported.
+    cmdargs = ["/opt/kernel/ttyd", "-W", "-p", service_info["port"], f"/bin/{shell}"]
+    if shell != "ash":  # Currently prebuilt tmux in Alpine-based containers is not supported.
         cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
     return cmdargs, {}

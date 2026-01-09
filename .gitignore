@@ -126,6 +126,11 @@ pyrightconfig.json
 /grafana-dashboards
 /grafana-provisioning
 /prometheus.yaml
+/supergraph.graphql
+/gateway.config.ts
+/otel-collector-config.yaml
+/loki-config.yaml
+/tempo-config.yaml
 
 # Local temp and installer-generated directories
 /.tmp/
@@ -154,3 +159,4 @@ docs/manager/rest-reference/openapi.json
 backup.*.json
 /DIST-INFO
 /INSTALL-INFO
+.serena/

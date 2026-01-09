@@ -1,15 +1,16 @@
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.exceptions import ObjectNotFound, UnsupportedProtocol
+from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
@@ -18,6 +19,11 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
 )
 from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.errors import (
+    InvalidCircuitConfigError,
+    InvalidCircuitStateError,
+    MissingTraefikConfigError,
+)
 from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
 
 from .base import (
@@ -25,8 +31,6 @@ from .base import (
     Base,
     BaseMixin,
     EnumType,
-    ForeignKeyIDColumn,
-    IDColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
 )
@@ -48,41 +52,51 @@ class Circuit(Base, BaseMixin):
     port-based TCP and/or websocket proxy server.
     """
 
-    id = IDColumn()
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    app = sa.Column(sa.String(length=255), nullable=True)
-    protocol = sa.Column(EnumType(ProxyProtocol), nullable=False)
+    app: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
+    protocol: Mapped[ProxyProtocol] = mapped_column(EnumType(ProxyProtocol), nullable=False)
 
-    worker = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
+    worker: Mapped[UUID] = mapped_column(GUID, sa.ForeignKey("workers.id"), nullable=False)
 
-    app_mode = sa.Column(EnumType(AppMode), nullable=False)
+    app_mode: Mapped[AppMode] = mapped_column(EnumType(AppMode), nullable=False)
 
-    frontend_mode = sa.Column(EnumType(FrontendMode), nullable=False)
-    port = sa.Column(sa.Integer(), nullable=True)
-    subdomain = sa.Column(sa.String(length=255), nullable=True)
+    frontend_mode: Mapped[FrontendMode] = mapped_column(EnumType(FrontendMode), nullable=False)
+    port: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
+    subdomain: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
 
-    envs = sa.Column(pgsql.JSONB(), nullable=True)
-    arguments = sa.Column(sa.String(length=1000), nullable=True)
+    envs: Mapped[dict[str, Any] | None] = mapped_column(pgsql.JSONB(), nullable=True)
+    arguments: Mapped[str | None] = mapped_column(sa.String(length=1000), nullable=True)
 
-    open_to_public = sa.Column(sa.Boolean(), nullable=False, default=False)
-    allowed_client_ips = sa.Column(sa.String(length=255), nullable=True)
+    open_to_public: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
+    allowed_client_ips: Mapped[str | None] = mapped_column(sa.String(length=255), nullable=True)
 
-    user_id = sa.Column(GUID, nullable=True)  # null if `app_mode` is set to `INFERENCE`
-    endpoint_id = sa.Column(GUID, nullable=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        GUID, nullable=True
+    )  # null if `app_mode` is set to `INFERENCE`
+    endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
-    runtime_variant = sa.Column(
+    runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
         StrEnumType(RuntimeVariant), nullable=True
     )  # null if `app_mode` is set to `INTERACTIVE`
 
-    session_ids = sa.Column(
+    session_ids: Mapped[list[UUID]] = mapped_column(
         pgsql.ARRAY(GUID),
         nullable=False,
         default=[],
     )
-    route_info = sa.Column(StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[])
+    route_info: Mapped[list[RouteInfo]] = mapped_column(
+        StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[]
+    )
 
-    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
 
     worker_row = relationship("Worker", back_populates="circuits")
     endpoint_row = relationship(
@@ -103,7 +117,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.id == circuit_id))
+        query = sa.select(Circuit).where(Circuit.id == circuit_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -121,7 +135,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -178,7 +192,7 @@ class Circuit(Base, BaseMixin):
         load_worker=True,
         load_endpoint=True,
     ) -> "Circuit":
-        query = sa.select(Circuit).where((Circuit.endpoint_id == endpoint_id))
+        query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
             query = query.options(selectinload(Circuit.worker_row))
         if load_endpoint:
@@ -228,15 +242,18 @@ class Circuit(Base, BaseMixin):
         c.session_ids = [r.session_id for r in route_info]
         c.runtime_variant = runtime_variant
 
-        c.created_at = datetime.now()
-        c.updated_at = datetime.now()
+        c.created_at = datetime.now(UTC)
+        c.updated_at = datetime.now(UTC)
 
         return c
 
-    async def get_endpoint_url(self) -> URL:
+    async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
         from .worker import Worker
 
-        worker: Worker = self.worker_row
+        worker: Worker = (
+            await Worker.get(session, self.worker) if session is not None else self.worker_row
+        )
+
         match (worker.use_tls, self.protocol):
             case (True, ProxyProtocol.TCP):
                 scheme = "tls"
@@ -253,14 +270,18 @@ class Circuit(Base, BaseMixin):
 
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                assert self.subdomain and worker.wildcard_domain
+                if not self.subdomain or not worker.wildcard_domain:
+                    raise InvalidCircuitConfigError(
+                        "Subdomain and wildcard domain are required for wildcard domain frontend mode"
+                    )
                 hostname = self.subdomain + worker.wildcard_domain
                 if (scheme == "https" and worker.wildcard_traffic_port != 443) or (
                     scheme == "http" and worker.wildcard_traffic_port != 80
                 ):
                     hostname += f":{worker.wildcard_traffic_port}"
             case FrontendMode.PORT:
-                assert self.port
+                if not self.port:
+                    raise InvalidCircuitConfigError("Port is required for port frontend mode")
                 hostname = f"{worker.hostname}:{self.port}"
 
         url = f"{scheme}://{hostname}"
@@ -282,7 +303,10 @@ class Circuit(Base, BaseMixin):
                     case FrontendMode.PORT:
                         return f"Host(`{self.worker_row.hostname}`)"
                     case FrontendMode.WILDCARD_DOMAIN:
-                        assert self.subdomain
+                        if not self.subdomain:
+                            raise InvalidCircuitConfigError(
+                                "Subdomain is required for wildcard domain frontend mode"
+                            )
                         return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
                     case _:
                         raise ValueError(
@@ -295,7 +319,8 @@ class Circuit(Base, BaseMixin):
             case FrontendMode.WILDCARD_DOMAIN:
                 return "domainproxy"
             case FrontendMode.PORT:
-                assert self.port
+                if not self.port:
+                    raise InvalidCircuitConfigError("Port is required for port frontend mode")
                 return f"portproxy_{self.port}"
             case _:
                 raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
@@ -343,7 +368,8 @@ class Circuit(Base, BaseMixin):
             # No health filtering, return all routes
             return self.route_info
 
-        assert self.endpoint_row
+        if not self.endpoint_row:
+            raise InvalidCircuitStateError("Endpoint row is not loaded for health filtering")
         # Filter routes based on health status stored in JSON
         healthy_routes = []
         for route in self.route_info:
@@ -424,7 +450,9 @@ class Circuit(Base, BaseMixin):
                     base.update({
                         f"bai_session_{r.session_id}_{self.id}": {
                             "loadBalancer": {
-                                "servers": [{"url": f"http://{r.kernel_host}:{r.kernel_port}/"}],
+                                "servers": [
+                                    {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"}
+                                ],
                             }
                         }
                     })
@@ -433,7 +461,9 @@ class Circuit(Base, BaseMixin):
                     base.update({
                         f"bai_session_{r.session_id}_{self.id}": {
                             "loadBalancer": {
-                                "servers": [{"address": f"{r.kernel_host}:{r.kernel_port}"}],
+                                "servers": [
+                                    {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
+                                ],
                             }
                         }
                     })
@@ -443,7 +473,8 @@ class Circuit(Base, BaseMixin):
         match self.protocol:
             case ProxyProtocol.HTTP:
                 traefik_config = local_config.proxy_coordinator.traefik
-                assert traefik_config
+                if not traefik_config:
+                    raise MissingTraefikConfigError("Traefik configuration is required")
 
                 return {
                     "CORSHeaders": {

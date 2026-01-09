@@ -1,8 +1,7 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/appproxy/worker/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/appproxy/worker/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
         ":resources",
     ],
 )
@@ -21,7 +20,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "app-proxy-worker": "ai.backend.appproxy.worker.cli.__main__:main",
-            "app-proxy-worker.start-server": "ai.backend.appproxy.worker.server:main",
+            "app-proxy-worker.start-server": "ai.backend.appproxy.worker.cli.start_server:main",
         },
     },
     generate_setup=True,

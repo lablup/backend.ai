@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from abc import ABC, abstractmethod
+from collections import defaultdict
+from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import MutableMapping
+from typing import Final
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.metrics.metric import EventPropagatorMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+WILDCARD: Final = "*"
 
 
 class EventPropagator(ABC):
@@ -52,25 +59,35 @@ class EventHub:
 
     _propagators: MutableMapping[uuid.UUID, _PropagatorInfo]
     _key_alias: MutableMapping[tuple[EventDomain, str], set[uuid.UUID]]
+    _wildcard_alias: MutableMapping[EventDomain, set[uuid.UUID]]
+    _metric_observer: EventPropagatorMetricObserver
 
     def __init__(self) -> None:
         self._propagators = {}
-        self._key_alias = {}
+        self._key_alias = defaultdict(set)
+        self._wildcard_alias = defaultdict(set)
+        self._metric_observer = EventPropagatorMetricObserver.instance()
 
     def register_event_propagator(
         self,
         event_propagator: EventPropagator,
-        aliases: list[tuple[EventDomain, str]] = [],
+        aliases: list[tuple[EventDomain, str]] | None = None,
     ) -> None:
         """
         Register a new event propagator.
         :param event_propagator: The event propagator instance implementing EventPropagator.
         :param aliases: List of aliases for the propagator.
         """
+        if aliases is None:
+            aliases = []
         propagator_id = event_propagator.id()
         self._propagators[propagator_id] = _PropagatorInfo(event_propagator, aliases)
         for alias in aliases:
             self._add_alias(alias, propagator_id)
+
+        # Track metrics
+        metric_aliases = [(alias[0].value, alias[1]) for alias in aliases]
+        self._metric_observer.observe_propagator_registered(aliases=metric_aliases)
 
     def unregister_event_propagator(self, propagator_id: uuid.UUID) -> None:
         """
@@ -81,10 +98,16 @@ class EventHub:
         if propagator_id not in self._propagators:
             raise ValueError(f"propagator with ID {propagator_id} not found.")
         propagator_info = self._propagators[propagator_id]
+
+        # Collect aliases for metrics
+        metric_aliases = []
         for alias in propagator_info.aliases:
-            if alias in self._key_alias:
-                self._remove_alias(alias, propagator_id)
+            self._remove_alias(alias, propagator_id)
+            metric_aliases.append((alias[0].value, alias[1]))
         del self._propagators[propagator_id]
+
+        # Track metrics
+        self._metric_observer.observe_propagator_unregistered(aliases=metric_aliases)
 
     async def propagate_event(self, event: AbstractEvent) -> None:
         """
@@ -102,43 +125,46 @@ class EventHub:
     async def close_by_alias(
         self,
         alias_domain: EventDomain,
-        alias_id: str,
+        domain_id: str,
     ) -> None:
         """
         Close all propagators associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
-        :raises
-            ValueError: If the alias is not found.
-        :raises
-            RuntimeError: If the propagator is already closed.
+        :param domain_id: The target ID within the alias domain.
+        :raises ValueError: If the alias is not found.
+        :raises RuntimeError: If the propagator is already closed.
         """
-        if (alias_domain, alias_id) not in self._key_alias:
-            log.debug("Propagator not registered with alias {}:{}", alias_domain, alias_id)
-            return
-
-        propagator_set = self._key_alias[(alias_domain, alias_id)]
-        for propagator_id in propagator_set:
-            await self._propagators[propagator_id].propagator.close()
+        propagator_id_set: set[uuid.UUID] = set()
+        if domain_id == WILDCARD:
+            propagator_id_set.update(self._wildcard_alias.get(alias_domain, []))
+        else:
+            propagator_id_set.update(self._key_alias.get((alias_domain, domain_id), []))
+        for propagator_id in propagator_id_set:
+            if (info := self._propagators.get(propagator_id)) is not None:
+                await info.propagator.close()
 
     def _get_propagators_by_alias(
         self,
         alias_domain: EventDomain,
-        alias_id: str,
+        domain_id: str,
     ) -> set[EventPropagator]:
         """
         Get the propagator associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
+        :param domain_id: The target ID within the alias domain.
         :return: The propagator associated with the alias.
         """
-        if (alias_domain, alias_id) not in self._key_alias:
-            return set()
-        propagator_set = self._key_alias[(alias_domain, alias_id)]
-        propagators = set()
-        for propagator_id in propagator_set.copy():
-            if propagator_id in self._propagators:
-                propagators.add(self._propagators[propagator_id].propagator)
+        propagators: set[EventPropagator] = set()
+        propagators.update(
+            info.propagator
+            for propagator_id in self._wildcard_alias.get(alias_domain, [])
+            if (info := self._propagators.get(propagator_id)) is not None
+        )
+        propagators.update(
+            info.propagator
+            for propagator_id in self._key_alias.get((alias_domain, domain_id), [])
+            if (info := self._propagators.get(propagator_id)) is not None
+        )
         return propagators
 
     def _add_alias(
@@ -151,9 +177,10 @@ class EventHub:
         :param alias_key: The key for the alias (e.g., (USER, "user_id")).
         :param propagator_id: Unique identifier for the propagator.
         """
-        if alias_key not in self._key_alias:
-            self._key_alias[alias_key] = set()
-        self._key_alias[alias_key].add(propagator_id)
+        if alias_key[1] == WILDCARD:
+            self._wildcard_alias[alias_key[0]].add(propagator_id)
+        else:
+            self._key_alias[alias_key].add(propagator_id)
 
     def _remove_alias(
         self,
@@ -165,10 +192,17 @@ class EventHub:
         :param alias_key: The key for the alias (e.g., (USER, "user_id")).
         :param propagator_id: Unique identifier for the propagator.
         """
-        if alias_key in self._key_alias:
-            self._key_alias[alias_key].discard(propagator_id)
-            if not self._key_alias[alias_key]:
-                del self._key_alias[alias_key]
+        if alias_key[1] == WILDCARD:
+            domain = alias_key[0]
+            if domain in self._wildcard_alias:
+                self._wildcard_alias[domain].discard(propagator_id)
+                if not self._wildcard_alias[domain]:
+                    del self._wildcard_alias[domain]
+        else:
+            if alias_key in self._key_alias:
+                self._key_alias[alias_key].discard(propagator_id)
+                if not self._key_alias[alias_key]:
+                    del self._key_alias[alias_key]
 
     async def shutdown(self) -> None:
         """

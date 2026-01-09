@@ -2,19 +2,21 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.permission.role import (
-    RoleDeleteInput,
-)
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
 class DeleteRoleAction(RoleAction):
-    input: RoleDeleteInput
+    """Action for soft-deleting a role (status update)."""
+
+    updater: Updater[RoleRow]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.input.id)
+        return str(self.updater.pk_value)
 
     @override
     @classmethod
@@ -24,8 +26,8 @@ class DeleteRoleAction(RoleAction):
 
 @dataclass
 class DeleteRoleActionResult(BaseActionResult):
-    success: bool
+    data: RoleData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id)

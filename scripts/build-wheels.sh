@@ -1,8 +1,10 @@
 #! /bin/bash
 set -e
 
+pants export --resolve=python-default
+
 # Normalize the package version
-PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+PKGVER=$(./py -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
 # Build non-platform-specific wheels
 pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
 # Build x86_64 wheels

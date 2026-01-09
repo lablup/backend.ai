@@ -1,16 +1,15 @@
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Mapping, Optional
+from typing import Any, Literal, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...types import CapacityUsage, FSPerfMetric
-from ...watcher import WatcherClient
-from ..abc import (
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
     CAP_QUOTA,
@@ -20,7 +19,9 @@ from ..abc import (
     QuotaConfig,
     QuotaUsage,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
+
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
@@ -28,17 +29,25 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GPFSQuotaModel(BaseQuotaModel):
+    _fileset_prefix: str
+
     def __init__(
         self,
         mount_path: Path,
         api_client: GPFSAPIClient,
         fs: str,
         gpfs_owner: str,
+        *,
+        fileset_prefix: Optional[str] = None,
     ) -> None:
         super().__init__(mount_path)
         self.api_client = api_client
         self.fs = fs
         self.gpfs_owner = gpfs_owner
+        self._fileset_prefix = fileset_prefix or ""
+
+    def _get_fileset_name(self, quota_scope_id: QuotaScopeID) -> str:
+        return self._fileset_prefix + quota_scope_id.pathname
 
     async def create_quota_scope(
         self,
@@ -49,7 +58,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
             self.fs,
-            quota_scope_id.pathname,
+            self._get_fileset_name(quota_scope_id),
             path=qspath,
             owner=self.gpfs_owner,
         )
@@ -57,28 +66,46 @@ class GPFSQuotaModel(BaseQuotaModel):
             await self.update_quota_scope(quota_scope_id, options)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
-        await self.api_client.set_quota(self.fs, quota_scope_id.pathname, config.limit_bytes)
+        await self.api_client.set_quota(
+            self.fs,
+            self._get_fileset_name(quota_scope_id),
+            config.limit_bytes,
+        )
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
-        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id.pathname)
+        quotas = await self.api_client.list_fileset_quotas(
+            self.fs,
+            self._get_fileset_name(quota_scope_id),
+        )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
+            log.warning("No custom defined quotas found for quota scope {} in GPFS", quota_scope_id)
             return QuotaUsage(-1, -1)
         quota_info = custom_defined_quotas[0]
         # The units are kilobytes (ref: )
+        used_bytes = quota_info.blockUsage * 1024 if quota_info.blockUsage is not None else -1
+        limit_bytes = quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1
+        if used_bytes < 0 or limit_bytes < 0:
+            log.warning(
+                "Data from GPFS API negative values in used_bytes ({}) or limit_bytes ({}) for quota scope {}: response from GPFS API = {}",
+                used_bytes,
+                limit_bytes,
+                quota_scope_id,
+                quota_info.to_json(),
+            )
         return QuotaUsage(
-            used_bytes=quota_info.blockUsage * 1024 if quota_info.blockUsage is not None else -1,
-            limit_bytes=quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1,
+            used_bytes=used_bytes,
+            limit_bytes=limit_bytes,
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
-        await self.api_client.remove_quota(self.fs, quota_scope_id.pathname)
+        await self.api_client.remove_quota(self.fs, self._get_fileset_name(quota_scope_id))
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
-        await self.api_client.remove_fileset(self.fs, quota_scope_id.pathname)
+        await self.api_client.remove_fileset(self.fs, self._get_fileset_name(quota_scope_id))
 
 
 class GPFSOpModel(BaseFSOpModel):
@@ -152,6 +179,7 @@ class GPFSVolume(BaseVolume):
             self.api_client,
             self.fs,
             self.gpfs_owner,
+            fileset_prefix=self.config.get("gpfs_fileset_prefix"),
         )
 
     async def create_fsop_model(self) -> AbstractFSOpModel:
@@ -162,7 +190,7 @@ class GPFSVolume(BaseVolume):
             self.fs,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
@@ -174,10 +202,11 @@ class GPFSVolume(BaseVolume):
             if health_status == "ERROR":
                 break
             node_health_statuses = await self.api_client.get_node_health(node)
-            for status in node_health_statuses:
-                if status.state in invalid_status:
-                    health_status = status
+            for node_health_status in node_health_statuses:
+                if node_health_status.state in invalid_status:
+                    health_status = node_health_status
 
+        status: Literal["healthy", "degraded", "unavailable"]
         match health_status:
             case "HEALTHY":
                 status = "healthy"

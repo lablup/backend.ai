@@ -1,10 +1,24 @@
-schema {
-  query: Queries
-  mutation: Mutations
+extend schema
+	@link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "@shareable"])
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo @shareable {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
 }
 
-"""All available GraphQL queries."""
-type Queries {
+type Query {
   node(
     """The ID of the object"""
     id: ID!
@@ -166,6 +180,9 @@ type Queries {
     first: Int
     last: Int
   ): ImageConnection
+
+  """Added in 25.14.2. Returns information about the current user."""
+  viewer: Viewer
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -270,6 +287,28 @@ type Queries {
     first: Int
     last: Int
   ): ComputeSessionConnection
+
+  """Added in 25.13.0."""
+  session_pending_queue(
+    resource_group_id: String!
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): SessionPendingQueueConnection
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
@@ -345,6 +384,8 @@ type Queries {
 
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
 }
 
 """
@@ -384,23 +425,6 @@ type AuditLogConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
@@ -558,7 +582,7 @@ type ComputeContainer implements Item {
   preopen_ports: [Int]
 }
 
-type ImageNode implements Node {
+type ImageNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -609,7 +633,7 @@ type ImageNode implements Node {
   type: ImageType
 }
 
-type KVPair {
+type KVPair @shareable {
   key: String
   value: String
 }
@@ -620,10 +644,10 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
 
-type ResourceLimit {
+type ResourceLimit @shareable {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 """
@@ -665,7 +689,7 @@ type AgentSummaryList implements PaginatedList {
 }
 
 """Added in 24.12.0."""
-type DomainNode implements Node {
+type DomainNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -678,28 +702,28 @@ type DomainNode implements Node {
   allowed_docker_registries: [String]
   dotfiles: Bytes
   integration_id: String
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
 
 """Added in 24.09.1."""
 scalar Bytes
 
 """Added in 24.12.0."""
-type ScalinGroupConnection {
+type ScalingGroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection."""
-  edges: [ScalinGroupEdge]!
+  edges: [ScalingGroupEdge]!
 
   """Total count of the GQL nodes of the query."""
   count: Int
 }
 
 """
-Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
+Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
 """
-type ScalinGroupEdge {
+type ScalingGroupEdge {
   """The item at the end of the edge"""
   node: ScalingGroupNode
 
@@ -708,7 +732,7 @@ type ScalinGroupEdge {
 }
 
 """Added in 24.12.0."""
-type ScalingGroupNode implements Node {
+type ScalingGroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -896,7 +920,7 @@ type Domain {
   scaling_groups: [String]
 }
 
-type GroupNode implements Node {
+type GroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -946,7 +970,7 @@ type UserEdge {
   cursor: String!
 }
 
-type UserNode implements Node {
+type UserNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1110,6 +1134,13 @@ type ImageEdge {
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 25.14.2."""
+type Viewer {
+  user: UserNode
+  user_id: UUID
+  encoded_user_role: String
 }
 
 type User implements Item {
@@ -1439,7 +1470,7 @@ type StorageVolumeList implements PaginatedList {
 }
 
 """Added in 24.03.4"""
-type VirtualFolderNode implements Node {
+type VirtualFolderNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1510,6 +1541,9 @@ type VirtualFolderPermissionList implements PaginatedList {
   total_count: Int!
 }
 
+"""
+Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum).
+"""
 type VirtualFolderPermission implements Item {
   id: ID
   permission: String
@@ -1520,7 +1554,7 @@ type VirtualFolderPermission implements Item {
 }
 
 """Added in 24.09.0."""
-type ComputeSessionNode implements Node {
+type ComputeSessionNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1538,6 +1572,9 @@ type ComputeSessionNode implements Node {
   domain_name: String
   project_id: UUID
   user_id: UUID
+
+  """Added in 25.13.0."""
+  owner: UserNode
   access_key: String
 
   """
@@ -1552,6 +1589,9 @@ type ComputeSessionNode implements Node {
   terminated_at: DateTime
   starts_at: DateTime
   scheduled_at: DateTime
+
+  """Added in 25.13.0."""
+  queue_position: Int
   startup_command: String
   result: String
   commit_status: String
@@ -1605,6 +1645,29 @@ type ComputeSessionConnection {
 Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
 """
 type ComputeSessionEdge {
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.13.0."""
+type SessionPendingQueueConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [SessionPendingQueueEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.13.0. A Relay edge containing a `SessionPendingQueue` and its cursor.
+"""
+type SessionPendingQueueEdge {
   """The item at the end of the edge"""
   node: ComputeSessionNode
 
@@ -1798,7 +1861,7 @@ type RoutingList implements PaginatedList {
   total_count: Int!
 }
 
-type EndpointToken implements Item {
+type EndpointToken implements Item @key(fields: "token") {
   id: ID
   token: String!
   endpoint_id: UUID!
@@ -2013,7 +2076,7 @@ type NetworkEdge {
 }
 
 """Added in 25.1.0."""
-type EndpointAutoScalingRuleNode implements Node {
+type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   row_id: UUID!
@@ -2193,8 +2256,19 @@ type ServiceConfigEdge {
   cursor: String!
 }
 
-"""All available GraphQL mutations."""
-type Mutations {
+union _Entity = ImageNode | DomainNode | ScalingGroupNode | GroupNode | UserNode | VirtualFolderNode | ComputeSessionNode | EndpointToken | EndpointAutoScalingRuleNode
+
+scalar _Any
+
+type _Service {
+  sdl: String
+}
+
+"""
+All available GraphQL mutations.
+Type name changed from 'Mutations' to 'Mutation' in 25.13.0
+"""
+type Mutation {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
   create_domain(name: String!, props: DomainInput!): CreateDomain
   modify_domain(name: String!, props: ModifyDomainInput!): ModifyDomain
@@ -2380,7 +2454,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    Added in 24.09.0. Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp').
     """
     type: ContainerRegistryTypeField!
 
@@ -2415,7 +2489,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp'). Added in 24.09.0.
     """
     type: ContainerRegistryTypeField
 
@@ -2658,6 +2732,9 @@ type CreateUser {
   ok: Boolean
   msg: String
   user: User
+
+  """Added in 25.15.0."""
+  keypair: KeyPair
 }
 
 input UserInput {
@@ -2852,7 +2929,7 @@ input KVPairInput {
 input ResourceLimitInput {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 """Added in 25.6.0."""
@@ -3623,3 +3700,14 @@ type DeleteNetwork {
   ok: Boolean
   msg: String
 }
+
+"""
+A string-serialized scalar represents a set of fields that's passed to a federated directive, such as @key, @requires, or @provides
+"""
+scalar FieldSet
+
+"""This string-serialized scalar represents a JWT scope"""
+scalar federation__Scope
+
+"""This string-serialized scalar represents an authorization policy."""
+scalar federation__Policy

@@ -3,7 +3,8 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Self, Sequence
+from collections.abc import Sequence
+from typing import Any, Final, Optional, Self
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,10 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 _DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minutes
+
+# Public constants
+MODEL_SERVICE_ROUTE_TTL: Final[int] = 60 * 5  # 5 minutes
+MODEL_SERVICE_GROUP: Final[str] = "model-services"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -25,6 +30,53 @@ class ServiceEndpoint(BaseModel):
     port: int
     protocol: str
     prometheus_address: str
+
+
+class ModelServiceMetadata(BaseModel):
+    """
+    Simplified metadata for model service routes.
+    Used for Prometheus service discovery registration.
+    """
+
+    route_id: uuid.UUID = Field(..., description="Unique identifier for the route")
+    model_service_name: str = Field(..., description="Model service name for the route")
+    host: str = Field(..., description="Host/IP address of the route")
+    port: int = Field(..., description="Port number of the route", ge=1, le=65535)
+    metrics_path: str = Field(
+        default="/metrics", description="Path to metrics endpoint (e.g., /metrics, /stats)"
+    )
+    labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional labels for Prometheus (e.g., deployment_name, runtime_variant)",
+    )
+
+    def to_service_metadata(self) -> "ServiceMetadata":
+        """
+        Convert to ServiceMetadata for service discovery backend storage.
+        """
+        # Build prometheus_address with host:port only (no path)
+        prometheus_address = f"{self.host}:{self.port}"
+
+        # Add route_id and model_service_name to labels
+        labels = {
+            **self.labels,
+            "route_id": str(self.route_id),
+            "model_service_name": self.model_service_name,
+        }
+
+        return ServiceMetadata(
+            id=self.route_id,
+            display_name=self.model_service_name,
+            service_group=MODEL_SERVICE_GROUP,
+            version="1.0",
+            endpoint=ServiceEndpoint(
+                address=self.host,
+                port=self.port,
+                protocol="http",
+                prometheus_address=prometheus_address,
+            ),
+            labels=labels,
+        )
 
 
 class HealthStatus(BaseModel):
@@ -68,6 +120,10 @@ class ServiceMetadata(BaseModel):
     endpoint: ServiceEndpoint = Field(..., description="Endpoint of the service")
     health_status: HealthStatus = Field(
         default_factory=HealthStatus, description="Health status of the service"
+    )
+    labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional labels for service discovery and Prometheus",
     )
 
     @classmethod
@@ -138,6 +194,22 @@ class ServiceDiscovery(ABC):
         :param service_group: Name of the service group.
         :param service_id: UUID of the service.
         :return: Service metadata.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def sync_model_service_routes(
+        self,
+        routes: Sequence["ModelServiceMetadata"],
+    ) -> None:
+        """
+        Synchronize model service routes for Prometheus service discovery.
+
+        Routes are synced with TTL and will automatically expire if not refreshed.
+        This method should be called periodically (every 30-60s) to maintain current state.
+
+        :param routes: Sequence of ModelServiceMetadata representing current model service routes.
+                      These will be converted to ServiceMetadata internally for storage.
         """
         raise NotImplementedError
 

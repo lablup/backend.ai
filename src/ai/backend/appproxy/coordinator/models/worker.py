@@ -1,5 +1,7 @@
 import logging
 import uuid
+from collections.abc import Sequence
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -10,15 +12,14 @@ if TYPE_CHECKING:
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     PortNotAvailable,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     EndpointConfig,
@@ -28,8 +29,10 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
+from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
+from ai.backend.logging import BraceStyleAdapter
 
-from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
+from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -38,8 +41,8 @@ __all__ = [
     "Worker",
     "WorkerAppFilter",
     "WorkerStatus",
-    "pick_worker",
     "add_circuit",
+    "pick_worker",
 ]
 
 
@@ -52,53 +55,67 @@ class WorkerStatus(StrEnum):
 class Worker(Base, BaseMixin):
     __tablename__ = "workers"
 
-    id = IDColumn()
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    authority = sa.Column(
+    authority: Mapped[str] = mapped_column(
         sa.String(length=255), nullable=False, unique=True
     )  # Human-readable identity of each AppProxy worker, must be identical across all AppProxy workers under single VIP when HA is set up
-    frontend_mode = sa.Column(
+    frontend_mode: Mapped[FrontendMode] = mapped_column(
         EnumType(FrontendMode), nullable=False
     )  # will be fixed as `port` when `protocol` is set to `tcp`
-    protocol = sa.Column(EnumType(ProxyProtocol), nullable=False)  # type of traffic to procy
+    protocol: Mapped[ProxyProtocol] = mapped_column(
+        EnumType(ProxyProtocol), nullable=False
+    )  # type of traffic to procy
 
-    hostname = sa.Column(
+    hostname: Mapped[str] = mapped_column(
         sa.String(length=1024), nullable=False
     )  # Hostname which users utilize to access this AppProxy
-    tls_listen = sa.Column(
-        sa.Boolean(), default=False
+    tls_listen: Mapped[bool] = mapped_column(
+        sa.Boolean(), default=False, nullable=False
     )  # Indicates if TLS is required to access the AppProxy
-    tls_advertised = sa.Column(
-        sa.Boolean(), default=False
+    tls_advertised: Mapped[bool] = mapped_column(
+        sa.Boolean(), default=False, nullable=False
     )  # Indicates if TLS is required to access the AppProxy
 
-    api_port = sa.Column(sa.Integer(), nullable=False)  # REST API port
+    api_port: Mapped[int] = mapped_column(sa.Integer(), nullable=False)  # REST API port
 
-    available_slots = sa.Column(
+    available_slots: Mapped[int] = mapped_column(
         sa.Integer(), default=0, nullable=False
     )  # set to -1 when `frontend_mode` is set to `wildcard`
-    occupied_slots = sa.Column(sa.Integer(), default=0, nullable=False)
+    occupied_slots: Mapped[int] = mapped_column(sa.Integer(), default=0, nullable=False)
 
     # Only set if `frontend_mode` is `port`
-    port_range = sa.Column(pgsql.ARRAY(sa.Integer), nullable=True)
+    port_range: Mapped[tuple[int, int] | None] = mapped_column(
+        pgsql.ARRAY(sa.Integer), nullable=True
+    )
 
     # Only set if `frontend_mode` is `wildcard`
     # .example.com
-    wildcard_domain = sa.Column(sa.String(length=1024), nullable=True)
+    wildcard_domain: Mapped[str | None] = mapped_column(sa.String(length=1024), nullable=True)
     # Only set if `frontend_mode` is `wildcard`
-    wildcard_traffic_port = sa.Column(sa.Integer(), nullable=True)
+    wildcard_traffic_port: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
 
-    nodes = sa.Column(sa.Integer(), default=1, nullable=False)
+    nodes: Mapped[int] = mapped_column(sa.Integer(), default=1, nullable=False)
 
-    accepted_traffics = sa.Column(pgsql.ARRAY(EnumType(AppMode)), nullable=False)
-    filtered_apps_only = sa.Column(sa.Boolean(), default=False, nullable=False)
+    accepted_traffics: Mapped[list[AppMode]] = mapped_column(
+        pgsql.ARRAY(EnumType(AppMode)), nullable=False
+    )
+    filtered_apps_only: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
 
-    traefik_last_used_marker_path = sa.Column(sa.String(length=1024), nullable=True)
+    traefik_last_used_marker_path: Mapped[str | None] = mapped_column(
+        sa.String(length=1024), nullable=True
+    )
 
-    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
 
-    status = sa.Column(
+    status: Mapped[WorkerStatus] = mapped_column(
         StrEnumType(WorkerStatus),
         default=WorkerStatus.ALIVE,
         nullable=False,
@@ -204,10 +221,16 @@ class Worker(Base, BaseMixin):
         w.occupied_slots = 0
         match frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                assert wildcard_domain
+                if not wildcard_domain:
+                    raise MissingFrontendConfigError(
+                        "Wildcard domain is required for WILDCARD_DOMAIN frontend mode"
+                    )
                 w.available_slots = -1
             case FrontendMode.PORT:
-                assert port_range
+                if not port_range:
+                    raise MissingFrontendConfigError(
+                        "Port range is required for PORT frontend mode"
+                    )
                 w.available_slots = port_range[1] - port_range[0] + 1
 
         return w
@@ -232,10 +255,13 @@ class Worker(Base, BaseMixin):
         For workers with SUBDOMAIN, this will list occupied slots only - we can't list all available slots since it is infinite
         """
         circuit_list_query = sa.select(Circuit).where(Circuit.worker == self.id)
-        circuits: list[Circuit] = (await session.execute(circuit_list_query)).scalars().all()
+        circuits: Sequence[Circuit] = (await session.execute(circuit_list_query)).scalars().all()
         match self.frontend_mode:
             case FrontendMode.PORT:
-                assert self.port_range
+                if not self.port_range:
+                    raise MissingFrontendConfigError(
+                        "Port range is required for PORT frontend mode"
+                    )
                 occupied_ports: dict[int, UUID] = {c.port: c.id for c in circuits if c.port}
                 slots = [
                     Slot(
@@ -256,7 +282,7 @@ class Worker(Base, BaseMixin):
                         subdomain=c.subdomain,
                         circuit_id=c.id,
                     )
-                    for c in self.circuits
+                    for c in circuits
                 ]
             case _:
                 raise ValueError(f"Invalid frontend mode: {self.frontend_mode}")
@@ -266,11 +292,13 @@ class Worker(Base, BaseMixin):
 class WorkerAppFilter(Base, BaseMixin):
     __tablename__ = "worker_app_filters"
 
-    id = IDColumn()
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    property_name = sa.Column(sa.VARCHAR(96), nullable=False)
-    property_value = sa.Column(sa.VARCHAR(1024), nullable=False)
-    worker = ForeignKeyIDColumn("worker", "workers.id", nullable=False)
+    property_name: Mapped[str] = mapped_column(sa.VARCHAR(96), nullable=False)
+    property_value: Mapped[str] = mapped_column(sa.VARCHAR(1024), nullable=False)
+    worker: Mapped[UUID] = mapped_column(GUID, sa.ForeignKey("workers.id"), nullable=False)
 
     worker_row = relationship("Worker", back_populates="filters")
 
@@ -378,7 +406,7 @@ async def add_circuit(
     mode: AppMode,
     routes: list[RouteInfo],
     *,
-    envs: dict[str, Any] = {},
+    envs: dict[str, Any] | None = None,
     args: str | None = None,
     open_to_public=False,
     allowed_client_ips: str | None = None,
@@ -386,6 +414,8 @@ async def add_circuit(
     preferred_subdomain: str | None = None,
     worker_id: UUID | None = None,
 ) -> tuple[Circuit, Worker]:
+    if envs is None:
+        envs = {}
     if worker_id:
         worker = await Worker.get(session, worker_id, load_circuits=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:
@@ -408,9 +438,10 @@ async def add_circuit(
             subdomain = f"{_requested_subdomain}-{sub_id}"
         circuit_params["subdomain"] = subdomain
     else:
-        acquired_ports = set([c.port for c in worker.circuits])
+        acquired_ports = {c.port for c in worker.circuits}
         port_range = worker.port_range
-        assert port_range
+        if not port_range:
+            raise MissingFrontendConfigError("Port range is required for PORT frontend mode")
         port_pool = set(range(port_range[0], port_range[1] + 1)) - acquired_ports
         if _requested_port := preferred_port:
             if _requested_port not in port_pool:

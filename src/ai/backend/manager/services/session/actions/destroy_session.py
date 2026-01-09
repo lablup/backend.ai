@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
@@ -32,8 +31,6 @@ class DestroySessionAction(SessionAction):
 
 @dataclass
 class DestroySessionActionResult(BaseActionResult):
-    destroyed_sessions: Iterable[SessionData | BaseException]
-
     # TODO: Add proper type
     result: Any
 

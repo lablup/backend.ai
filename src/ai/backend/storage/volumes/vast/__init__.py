@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, FrozenSet, Literal, Optional, cast
+from typing import Any, Final, Literal, Optional, cast
 
 import aiofiles
 import aiofiles.os
@@ -13,17 +13,23 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...exception import (
-    ExternalError,
+from ai.backend.storage.errors import (
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     QuotaScopeNotFoundError,
     StorageProxyError,
 )
-from ...types import CapacityUsage, FSPerfMetric, QuotaUsage
-from ...watcher import WatcherClient
-from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ai.backend.storage.volumes.abc import (
+    CAP_FAST_FS_SIZE,
+    CAP_FAST_SIZE,
+    CAP_METRIC,
+    CAP_QUOTA,
+    CAP_VFOLDER,
+)
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
+
 from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
 from .vastdata_client import VASTAPIClient, VASTQuota, VASTQuotaID
@@ -48,7 +54,7 @@ class VASTQuotaModel(BaseQuotaModel):
 
         def _read():
             try:
-                with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "r") as f:
+                with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
                     return VASTQuotaID(f.read())
             except FileNotFoundError:
                 return None
@@ -89,7 +95,9 @@ class VASTQuotaModel(BaseQuotaModel):
         except VASTInvalidParameterError:
             raise InvalidQuotaConfig
         except VASTUnknownError as e:
-            raise ExternalError(str(e))
+            raise ExternalStorageServiceError(
+                f"VAST API unknown error during quota modification: {e}"
+            )
 
     async def create_quota_scope(
         self,
@@ -118,10 +126,9 @@ class VASTQuotaModel(BaseQuotaModel):
                 else:
                     log.error(
                         "Got invalid parameter error but no quota exists with given quota name"
-                        f" ({quota_name}). Raise error (orig:{str(e)})"
+                        f" ({quota_name}). Raise error (orig:{e!s})"
                     )
-                    raise InvalidQuotaConfig
-                assert existing_quota is not None
+                    raise InvalidQuotaConfig(f"No existing quota found with name {quota_name}")
                 await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
                 await self.api_client.modify_quota(
                     existing_quota.id,
@@ -130,7 +137,9 @@ class VASTQuotaModel(BaseQuotaModel):
                 )
                 return existing_quota
             except VASTUnknownError as e:
-                raise ExternalError(str(e))
+                raise ExternalStorageServiceError(
+                    f"VAST API unknown error during quota creation: {e}"
+                )
             return quota
 
         try:
@@ -169,6 +178,14 @@ class VASTQuotaModel(BaseQuotaModel):
             return None
         if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
             return None
+        if quota.used_capacity < 0 or quota.hard_limit < 0:
+            log.warning(
+                "Data from VAST API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from VAST API = {}",
+                quota.used_capacity,
+                quota.hard_limit,
+                quota_scope_id,
+                quota,
+            )
         return QuotaUsage(
             used_bytes=quota.used_capacity,
             limit_bytes=quota.hard_limit,
@@ -225,15 +242,16 @@ class VASTVolume(BaseVolume):
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
             force_login=self.config["vast_force_login"],
+            cluster_info_cache_ttl=self.config["vast_cluster_info_cache_ttl"],
         )
 
     async def shutdown(self) -> None:
-        self.api_client.cache.cluster_info = None
+        pass
 
     async def create_quota_model(self) -> VASTQuotaModel:
         return VASTQuotaModel(self.mount_path, self.api_client)
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:

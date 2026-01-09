@@ -4,7 +4,7 @@ import inspect
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, cast, get_args, get_type_hints
+from typing import Any, cast, get_args, get_type_hints
 
 import aiohttp_cors
 import click
@@ -56,13 +56,10 @@ def flatten_or(scheme: t.Trafaret) -> list[t.Trafaret]:
 def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Or):
         trafarets = flatten_or(scheme)
-        valid_trafarets = [
-            x for x in trafarets if not (isinstance(x, t.Null) or isinstance(x, UndefChecker))
-        ]
+        valid_trafarets = [x for x in trafarets if not isinstance(x, (t.Null, UndefChecker))]
         if len(valid_trafarets) >= 2:
-            return {"anyOf": list(_traverse(s) for s in valid_trafarets)}
-        else:
-            scheme = valid_trafarets[0]
+            return {"anyOf": [_traverse(s) for s in valid_trafarets]}
+        scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
         return {"type": "string"}
     if isinstance(scheme, t.Bool):
@@ -174,7 +171,7 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
         and len([
             x
             for x in scheme.trafarets  # type: ignore[attr-defined]
-            if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+            if isinstance(x, (t.Null, UndefChecker))
         ])
         > 0
     )
@@ -204,7 +201,7 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict]:
 
             schema["default"] = default_value
         if hasattr(key, "__openapi_desc__"):
-            schema["description"] = getattr(key, "__openapi_desc__")
+            schema["description"] = key.__openapi_desc__
         resp += [{"name": names[0], "schema": schema, "required": not optional}]
     return resp
 
@@ -236,7 +233,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             },
             "schemas": {},
         },
-        "paths": defaultdict(lambda: {}),
+        "paths": defaultdict(dict),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:
@@ -275,7 +272,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 preconds = []
-                handler_attrs = getattr(route.handler, "_backend_attrs")
+                handler_attrs = route.handler._backend_attrs
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"TokenAuth": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):
@@ -309,7 +306,9 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                             raw_examples = handler_attrs.get("request_examples") or []
                             examples = {
                                 f"{operation_id}_Example{i}": {"value": e}
-                                for e, i in zip(raw_examples, range(1, len(raw_examples) + 1))
+                                for e, i in zip(
+                                    raw_examples, range(1, len(raw_examples) + 1), strict=True
+                                )
                             }
                             route_def["requestBody"] = {
                                 "content": {
@@ -346,7 +345,12 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
 
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
-            type_hints = get_type_hints(route.handler)
+            try:
+                type_hints = get_type_hints(route.handler)
+            except (NameError, AttributeError):
+                # Skip type hint extraction for handlers with unresolvable forward references
+                # (e.g., GraphQLView subclasses)
+                type_hints = {}
             if (
                 (ret_type := type_hints.get("return"))
                 and (response_cls := getattr(ret_type, "__origin__", ret_type))
@@ -357,7 +361,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                     arg: type[BaseModel]
                     (arg,) = get_args(ret_type)
                     schema_name = f"{arg.__name__}_List"
-                    response_schema = TypeAdapter(List[arg]).json_schema(  # type: ignore[valid-type]
+                    response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]
                         ref_template="#/components/schemas/{model}"
                     )
                 elif issubclass(response_cls, BaseModel):

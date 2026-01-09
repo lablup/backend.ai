@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Final, Iterable, Tuple
+from collections.abc import Iterable
+from typing import Final
 
 import attrs
 from aiohttp import web
@@ -9,10 +10,9 @@ from aiotools import apartial
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import RateLimitExceeded
 
-from ..errors.api import RateLimitExceeded
 from .context import RootContext
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
@@ -47,13 +47,12 @@ async def rlim_middleware(
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Window"] = str(_rlim_window)
         return response
-    else:
-        # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
-        return response
+    # No checks for rate limiting for non-authorized queries.
+    response = await handler(request)
+    response.headers["X-RateLimit-Limit"] = "1000"
+    response.headers["X-RateLimit-Remaining"] = "1000"
+    response.headers["X-RateLimit-Window"] = str(_rlim_window)
+    return response
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -65,12 +64,10 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
-    redis_target = redis_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
+    valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
     app_ctx.valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-        redis_target=redis_target,
+        valkey_target=valkey_target,
         db_id=REDIS_RATE_LIMIT_DB,
         human_readable_name="ratelimit",
     )
@@ -86,7 +83,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     # default_cors_options is kept for API consistency but not used in rate limiting
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4)

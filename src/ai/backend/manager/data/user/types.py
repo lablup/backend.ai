@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, Self, override
@@ -9,7 +10,14 @@ from uuid import UUID
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey, CIStrEnum
-from ai.backend.manager.types import Creator
+from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
+from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
 class UserStatus(enum.StrEnum):
@@ -25,7 +33,10 @@ class UserStatus(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Optional[UserStatus]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise DataTransformationFailed(
+                f"UserStatus value must be a string, got {type(value).__name__}"
+            )
         match value.upper():
             case "ACTIVE":
                 return cls.ACTIVE
@@ -50,59 +61,6 @@ class UserRole(CIStrEnum):
 
 
 @dataclass
-class UserCreator(Creator):
-    email: str
-    username: str
-    password: str
-    need_password_change: bool
-    domain_name: str
-    full_name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    status: Optional[UserStatus] = None
-    role: Optional[str] = None
-    allowed_client_ip: Optional[list[str]] = None
-    totp_activated: Optional[bool] = None
-    resource_policy: Optional[str] = None
-    sudo_session_enabled: Optional[bool] = None
-    container_uid: Optional[int] = None
-    container_main_gid: Optional[int] = None
-    container_gids: Optional[list[int]] = None
-
-    def fields_to_store(self) -> dict[str, Any]:
-        status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if self.status is None and self.is_active is not None:
-            status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
-        if self.status is not None:
-            status = self.status
-        user_data = {
-            "email": self.email,
-            "username": self.username,
-            "password": self.password,
-            "need_password_change": self.need_password_change,
-            "domain_name": self.domain_name,
-            "full_name": self.full_name,
-            "description": self.description,
-            "status": status,
-            "role": self.role,
-            "allowed_client_ip": self.allowed_client_ip,
-            "totp_activated": self.totp_activated,
-            "resource_policy": self.resource_policy,
-            "sudo_session_enabled": self.sudo_session_enabled,
-            "container_uid": self.container_uid,
-            "container_main_gid": self.container_main_gid,
-            "container_gids": self.container_gids,
-        }
-        if self.container_uid is not None:
-            user_data["container_uid"] = self.container_uid
-        if self.container_main_gid is not None:
-            user_data["container_main_gid"] = self.container_main_gid
-        if self.container_gids is not None:
-            user_data["container_gids"] = self.container_gids
-        return user_data
-
-
-@dataclass
 class UserInfoContext:
     uuid: UUID
     email: str
@@ -113,21 +71,21 @@ class UserInfoContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str
+    username: Optional[str]
     email: str
-    need_password_change: bool
+    need_password_change: Optional[bool]
     full_name: Optional[str]
     description: Optional[str]
     is_active: bool  # legacy
     status: str
     status_info: Optional[str]
-    created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
-    domain_name: str
-    role: UserRole
+    created_at: Optional[datetime] = field(compare=False)
+    modified_at: Optional[datetime] = field(compare=False)
+    domain_name: Optional[str]
+    role: Optional[UserRole]
     resource_policy: str
     allowed_client_ip: Optional[list[str]]
-    totp_activated: bool
+    totp_activated: Optional[bool]
     totp_activated_at: Optional[datetime] = field(compare=False)
     sudo_session_enabled: bool
     main_access_key: Optional[str] = field(compare=False)
@@ -135,8 +93,28 @@ class UserData:
     container_main_gid: Optional[int] = field(compare=False)
     container_gids: Optional[list[int]] = field(compare=False)
 
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.USER,
+            scope_id=str(self.id),
+        )
+
+    def role_name(self) -> str:
+        return f"user-{str(self.id)[:8]}"
+
+    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+        resource_entity_permissions = {
+            entity: OperationType.owner_operations()
+            for entity in EntityType.owner_accessible_entity_types_in_user()
+        }
+        user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
+        return {EntityType.USER: user_permissions, **resource_entity_permissions}
+
     @classmethod
     def from_row(cls, row: Row) -> Self:
+        """
+        Deprecated: Use `UserRow.to_data()` method instead.
+        """
         return cls(
             id=row.uuid,
             uuid=row.uuid,
@@ -145,7 +123,7 @@ class UserData:
             need_password_change=row.need_password_change,
             full_name=row.full_name,
             description=row.description,
-            is_active=True if row.status == UserStatus.ACTIVE else False,
+            is_active=row.status == UserStatus.ACTIVE,
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
@@ -162,3 +140,9 @@ class UserData:
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
         )
+
+
+@dataclass
+class UserCreateResultData:
+    user: UserData
+    keypair: KeyPairData

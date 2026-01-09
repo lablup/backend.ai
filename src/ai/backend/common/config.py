@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
+from typing import Any, Optional, cast
 
 import humps
 import tomli
@@ -22,19 +23,32 @@ from .types import RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
+    "check",
     "etcd_config_iv",
+    "merge",
+    "model_definition_iv",
+    "override_key",
+    "override_with_env",
+    "read_from_etcd",
+    "read_from_file",
     "redis_config_iv",
     "redis_helper_config_iv",
     "redis_helper_default_config",
     "vfolder_config_iv",
-    "model_definition_iv",
-    "read_from_file",
-    "read_from_etcd",
-    "override_key",
-    "override_with_env",
-    "check",
-    "merge",
 )
+
+
+class BaseConfigSchema(BaseModel):
+    @staticmethod
+    def snake_to_kebab_case(string: str) -> str:
+        return string.replace("_", "-")
+
+    model_config = ConfigDict(
+        validate_by_name=True,
+        from_attributes=True,
+        alias_generator=snake_to_kebab_case,
+        validate_default=True,
+    )
 
 
 class BaseConfigModel(BaseModel):
@@ -45,7 +59,6 @@ class BaseConfigModel(BaseModel):
     model_config = ConfigDict(
         validate_by_name=True,
         from_attributes=True,
-        use_enum_values=True,
         extra="allow",
         alias_generator=snake_to_kebab_case,
     )
@@ -54,7 +67,7 @@ class BaseConfigModel(BaseModel):
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
-        t.Key("addr", ("127.0.0.1", 2379)): tx.HostPortPair,
+        t.Key("addr", default=("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
     }).allow_extra("*"),
@@ -78,6 +91,8 @@ redis_default_config = {
     "service_name": None,
     "password": None,
     "redis_helper_config": redis_helper_default_config,
+    "use_tls": False,
+    "tls_skip_verify": False,
 }
 
 redis_config_iv = t.Dict({
@@ -87,6 +102,8 @@ redis_config_iv = t.Dict({
     ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
     t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
     t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+    t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+    t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
     t.Key(
         "redis_helper_config",
         default=redis_helper_default_config,
@@ -101,6 +118,8 @@ redis_config_iv = t.Dict({
             ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
             t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
             t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+            t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+            t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
             t.Key(
                 "redis_helper_config",
                 default=redis_helper_default_config,
@@ -150,6 +169,7 @@ model_definition_iv = t.Dict({
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
                     t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
+                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
                 }),
             }),
             t.Key("metadata", default=None): t.Null
@@ -180,7 +200,7 @@ class PreStartAction(BaseConfigModel):
         description="The name of the pre-start action to execute.",
         examples=["action_name"],
     )
-    args: Dict[str, Any] = Field(
+    args: dict[str, Any] = Field(
         default_factory=dict,
         description="Arguments for the pre-start action.",
         examples=[{"arg1": "value1", "arg2": "value2"}],
@@ -188,7 +208,7 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
-    interval: Optional[float] = Field(
+    interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
         examples=[10.0],
@@ -197,21 +217,27 @@ class ModelHealthCheck(BaseConfigModel):
         description="Path to check for health status.",
         examples=["/health"],
     )
-    max_retries: Optional[int] = Field(
+    max_retries: int = Field(
         default=10,
         description="Maximum number of retries for health check.",
         examples=[10],
     )
-    max_wait_time: Optional[float] = Field(
+    max_wait_time: float = Field(
         default=15.0,
         description="Maximum time in seconds to wait for a health check response.",
         examples=[15.0],
     )
-    expected_status_code: Optional[int] = Field(
+    expected_status_code: int = Field(
         default=200,
         description="Expected HTTP status code for a healthy response.",
         examples=[200],
         gt=100,
+    )
+    initial_delay: float = Field(
+        default=60.0,
+        description="Initial delay in seconds before the first health check.",
+        examples=[60.0],
+        ge=0,
     )
 
 
@@ -282,7 +308,7 @@ class ModelMetadata(BaseConfigModel):
     license: Optional[str] = Field(
         default=None,
     )
-    min_resource: Optional[Dict[str, Any]] = Field(
+    min_resource: Optional[dict[str, Any]] = Field(
         default=None,
         description="Minimum resource requirements for the model.",
     )
@@ -312,6 +338,13 @@ class ModelDefinition(BaseConfigModel):
         default_factory=list,
         description="List of models in the model definition.",
     )
+
+    def health_check_config(self) -> Optional[ModelHealthCheck]:
+        for model in self.models:
+            if model.service and model.service.health_check:
+                if model.service.health_check is not None:
+                    return model.service.health_check
+        return None
 
 
 def find_config_file(daemon_name: str) -> Path:
@@ -349,17 +382,17 @@ def find_config_file(daemon_name: str) -> Path:
 
 
 def read_from_file(
-    toml_path: Optional[Union[Path, str]], daemon_name: str
-) -> Tuple[Dict[str, Any], Path]:
-    config: Dict[str, Any]
+    toml_path: Optional[Path | str], daemon_name: str
+) -> tuple[dict[str, Any], Path]:
+    config: dict[str, Any]
     discovered_path: Path
     if toml_path is None:
         discovered_path = find_config_file(daemon_name)
     else:
         discovered_path = Path(toml_path)
     try:
-        config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
-    except IOError:
+        config = cast(dict[str, Any], tomli.loads(discovered_path.read_text()))
+    except OSError:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
         })
@@ -369,17 +402,17 @@ def read_from_file(
 
 async def read_from_etcd(
     etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     etcd = AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map)
     raw_value = await etcd.get("daemon/config")
     if raw_value is None:
         return None
-    config: Dict[str, Any]
-    config = cast(Dict[str, Any], tomli.loads(raw_value))
+    config: dict[str, Any]
+    config = cast(dict[str, Any], tomli.loads(raw_value))
     return config
 
 
-def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any):
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any):
     for k in key_path[:-1]:
         if k not in table:
             table[k] = {}
@@ -387,7 +420,7 @@ def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], val
     table[key_path[-1]] = value
 
 
-def override_with_env(table: MutableMapping[str, Any], key_path: Tuple[str, ...], env_key: str):
+def override_with_env(table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str):
     val = os.environ.get(env_key, None)
     if val is None:
         return
@@ -415,7 +448,7 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
     return result
 
 
-def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+def set_if_not_set(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             return

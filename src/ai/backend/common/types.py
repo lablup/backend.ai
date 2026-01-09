@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import enum
 import ipaddress
@@ -8,12 +9,13 @@ import math
 import numbers
 import textwrap
 import uuid
-from abc import ABCMeta, abstractmethod
-from collections import UserDict, defaultdict, namedtuple
-from collections.abc import Iterable
+from abc import ABC, ABCMeta, abstractmethod
+from collections import UserDict, UserString, defaultdict, namedtuple
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
 from ssl import SSLContext
@@ -21,133 +23,135 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Dict,
     Generic,
-    List,
     Literal,
-    Mapping,
     NewType,
     NotRequired,
     Optional,
     Self,
-    Sequence,
-    Tuple,
-    Type,
     TypeAlias,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
     override,
 )
 from uuid import UUID
+from warnings import deprecated
 
 import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainValidator,
+    TypeAdapter,
+)
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
-from .exception import InvalidIpAddressValue
+from .exception import GenericNotImplementedError, InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
-    "aobject",
-    "Sentinel",
-    "QueueSentinel",
+    "MODEL_SERVICE_RUNTIME_PROFILES",
+    "PID",
+    "AbstractPermission",
+    "AbuseReport",
+    "AbuseReportValue",
+    "AcceleratorMetadata",
+    "AcceleratorNumberFormat",
+    "AccessKey",
+    "AgentId",
+    "AgentSelectionStrategy",
+    "AutoPullBehavior",
+    "AutoScalingMetricComparator",
+    "AutoScalingMetricSource",
+    "BinarySize",
     "CIStrEnum",
     "CIStrEnumTrafaret",
-    "JSONSerializableMixin",
-    "check_typed_tuple",
-    "check_typed_dict",
-    "DeviceId",
-    "ContainerId",
-    "EndpointId",
-    "SessionId",
-    "KernelId",
-    "SessionTypes",
-    "SessionResult",
-    "ResourceGroupID",
-    "AgentId",
-    "DeviceName",
-    "AccessKey",
-    "SecretKey",
-    "MetricKey",
-    "MetricValue",
-    "MovingStatValue",
-    "Quantum",
-    "PID",
-    "HostPID",
-    "ContainerPID",
-    "BinarySize",
-    "HostPortPair",
-    "ImageRegistry",
-    "ImageConfig",
-    "AutoPullBehavior",
-    "ServicePort",
-    "ResourceSlot",
-    "ResourceGroupType",
-    "SlotName",
-    "SlotTypes",
-    "IntrinsicSlotNames",
-    "DefaultForUnspecified",
-    "HandlerForUnknownSlotName",
-    "HardwareMetadata",
-    "AcceleratorNumberFormat",
-    "AcceleratorMetadata",
-    "DeviceModelInfo",
-    "ComputedDeviceCapacity",
-    "AbstractPermission",
-    "MountExpression",
-    "MountPermission",
-    "MountPermissionLiteral",
-    "MountTypes",
-    "MountPoint",
-    "VFolderID",
-    "QuotaScopeID",
-    "VFolderUsageMode",
-    "VFolderMount",
-    "VFolderHostPermission",
-    "VolumeMountableNodeType",
-    "QuotaScopeType",
-    "QuotaConfig",
-    "SessionEnqueueingConfig",
-    "KernelCreationConfig",
-    "KernelEnqueueingConfig",
-    "KernelCreationResult",
-    "ServicePortProtocols",
     "ClusterInfo",
     "ClusterMode",
     "ClusterSSHKeyPair",
     "ClusterSSHPortMapping",
-    "RedisProfileTarget",
-    "ReadableCIDR",
-    "RedisConnectionInfo",
-    "RedisHelperConfig",
-    "AgentSelectionStrategy",
-    "SchedulerStatus",
-    "AbuseReportValue",
-    "AbuseReport",
-    "ModelServiceStatus",
+    "ComputedDeviceCapacity",
+    "ContainerId",
+    "ContainerPID",
+    "DefaultForUnspecified",
+    "DeviceId",
+    "DeviceModelInfo",
+    "DeviceName",
+    "EndpointId",
+    "HandlerForUnknownSlotName",
+    "HardwareMetadata",
+    "HostPID",
+    "HostPortPair",
+    "ImageConfig",
+    "ImageRegistry",
+    "IntrinsicSlotNames",
+    "ItemResult",
+    "JSONSerializableMixin",
+    "KernelCreationConfig",
+    "KernelCreationResult",
+    "KernelEnqueueingConfig",
+    "KernelId",
+    "MetricKey",
+    "MetricValue",
     "ModelServiceProfile",
-    "RuntimeVariant",
+    "ModelServiceStatus",
+    "MountExpression",
+    "MountPermission",
+    "MountPermissionLiteral",
+    "MountPoint",
+    "MountTypes",
+    "MovingStatValue",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
-    "AutoScalingMetricSource",
-    "AutoScalingMetricComparator",
-    "MODEL_SERVICE_RUNTIME_PROFILES",
-    "ItemResult",
+    "Quantum",
+    "QueueSentinel",
+    "QuotaConfig",
+    "QuotaScopeID",
+    "QuotaScopeType",
+    "ReadableCIDR",
+    "RedisConnectionInfo",
+    "RedisHelperConfig",
+    "RedisProfileTarget",
+    "ResourceGroupID",
+    "ResourceGroupType",
+    "ResourceSlot",
     "ResultSet",
-    "safe_print_redis_target",
+    "RuntimeVariant",
+    "SchedulerStatus",
+    "SecretKey",
+    "Sentinel",
+    "ServicePort",
+    "ServicePortProtocols",
+    "SessionEnqueueingConfig",
+    "SessionId",
+    "SessionResult",
+    "SessionTypes",
+    "SlotName",
+    "SlotNameField",
+    "SlotTypes",
+    "VFolderHostPermission",
+    "VFolderID",
+    "VFolderMount",
+    "VFolderUsageMode",
+    "VolumeMountableNodeType",
+    "aobject",
+    "check_typed_dict",
+    "check_typed_tuple",
+    "safe_print_redis_config",
 )
 
 
 if TYPE_CHECKING:
+    from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
 
     from .docker import ImageRef
@@ -158,7 +162,7 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
 )
 
 
-class aobject(object):
+class aobject:
     """
     An "asynchronous" object which guarantees to invoke both ``def __init__(self, ...)`` and
     ``async def __ainit(self)__`` to ensure asynchronous initialization of the object.
@@ -171,7 +175,7 @@ class aobject(object):
     """
 
     @classmethod
-    async def new(cls: Type[Self], *args, **kwargs) -> Self:
+    async def new(cls: type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -256,33 +260,33 @@ T4 = TypeVar("T4")
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any],
-    types: Tuple[Type[T1]],
-) -> Tuple[T1]: ...
+    value: tuple[Any],
+    types: tuple[type[T1]],
+) -> tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any],
-    types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]: ...
+    value: tuple[Any, Any],
+    types: tuple[type[T1], type[T2]],
+) -> tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]: ...
+    value: tuple[Any, Any, Any],
+    types: tuple[type[T1], type[T2], type[T3]],
+) -> tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]: ...
+    value: tuple[Any, Any, Any, Any],
+    types: tuple[type[T1], type[T2], type[T3], type[T4]],
+) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -309,13 +313,70 @@ AGENTID_MANAGER = AgentId("manager")
 AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
-SlotName = NewType("SlotName", str)
+
+
+class SlotName(UserString):
+    __slots__ = ("_device_name", "_major_type", "_minor_type", "_parsed")
+
+    def __init__(self, value: str | SlotName) -> None:
+        self._parsed = False
+        self._device_name = ""
+        self._major_type = ""
+        self._minor_type = ""
+        super().__init__(value)
+
+    def _parse(self) -> None:
+        # Do lazy-parsing for when required only because SlotName is used
+        # very frequently in certain code paths to represent subtypes,
+        # without actually needing to access parsed attributes.
+        if self._parsed:
+            return
+        name, _, type_ = self.data.partition(".")
+        major_type, _, minor_type = type_.partition(":")
+        self._device_name = name
+        self._major_type = major_type
+        self._minor_type = minor_type
+        self._parsed = True
+
+    @property
+    def device_name(self) -> str:
+        self._parse()
+        return self._device_name
+
+    @property
+    def major_type(self) -> str:
+        self._parse()
+        return self._major_type
+
+    @property
+    def minor_type(self) -> str:
+        self._parse()
+        return self._minor_type
+
+    def is_accelerator(self) -> bool:
+        return self.major_type in ("device", "devices", "share", "shares")
+
+
+def _validate_slot_name(v: Any) -> SlotName:
+    """Validator for SlotName fields."""
+    if isinstance(v, SlotName):
+        return v
+    return SlotName(v)
+
+
+# Create a custom type annotation for SlotName fields
+SlotNameField = Annotated[SlotName, PlainValidator(_validate_slot_name)]
+
+
 MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
+
+ImageID = NewType("ImageID", UUID)
+ImageCanonical = NewType("ImageCanonical", str)
 
 
 class ContainerStatus(enum.StrEnum):
@@ -391,12 +452,13 @@ class SlotTypes(enum.StrEnum):
     COUNT = "count"
     BYTES = "bytes"
     UNIQUE = "unique"
+    UNIFIED = "unified"
 
 
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
     status_info: Optional[str]
-    metadata: Dict[str, str]
+    metadata: dict[str, str]
 
 
 class AutoPullBehavior(enum.StrEnum):
@@ -417,6 +479,21 @@ class SessionTypes(CIStrEnum):
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def private_types(cls) -> tuple[SessionTypes]:
+        """
+        Returns a set of private session types.
+        """
+        return (cls.SYSTEM,)
+
+    def is_private(self) -> bool:
+        """
+        Returns True if the session type is private.
+        Private session types are INTERACTIVE and BATCH.
+        """
+        return self in self.private_types()
 
 
 class SessionResult(CIStrEnum):
@@ -577,7 +654,7 @@ class MountExpression:
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
-    def as_sockaddr(self) -> Tuple[str, int]:
+    def as_sockaddr(self) -> tuple[str, int]:
         return str(self.host), self.port
 
     def __str__(self) -> str:
@@ -586,7 +663,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         return f"{self.host}:{self.port}"
 
 
-_Address = TypeVar("_Address", bound=Union[ipaddress.IPv4Network, ipaddress.IPv6Network])
+_Address = TypeVar("_Address", bound=ipaddress.IPv4Network | ipaddress.IPv6Network)
 
 
 class ReadableCIDR(Generic[_Address]):
@@ -663,7 +740,7 @@ class BinarySize(int):
     endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
 
     @classmethod
-    def _parse_str(cls, expr: str) -> Union[BinarySize, Decimal]:
+    def _parse_str(cls, expr: str) -> BinarySize | Decimal:
         if expr.lower() in ("inf", "infinite", "infinity"):
             return Decimal("Infinity")
         orig_expr = expr
@@ -700,7 +777,7 @@ class BinarySize(int):
     @classmethod
     def finite_from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
+        expr: str | Decimal | numbers.Integral,
     ) -> BinarySize:
         if isinstance(expr, Decimal):
             if expr.is_infinite():
@@ -716,8 +793,8 @@ class BinarySize(int):
     @classmethod
     def from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
-    ) -> Union[BinarySize, Decimal]:
+        expr: str | Decimal | numbers.Integral,
+    ) -> BinarySize | Decimal:
         if isinstance(expr, Decimal):
             return cls(expr)
         if isinstance(expr, numbers.Integral):
@@ -741,20 +818,18 @@ class BinarySize(int):
             value = d.quantize(Decimal(".00")).normalize()
         return value
 
-    def __str__(self):
+    def __str__(self) -> str:
         suffix_idx = self._preformat()
         if suffix_idx == 0:
             if self == 1:
                 return f"{int(self)} byte"
-            else:
-                return f"{int(self)} bytes"
-        else:
-            suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix.lower()]
-            value = self._quantize(self, multiplier)
-            return f"{value:f} {suffix.upper()}iB"
+            return f"{int(self)} bytes"
+        suffix = type(self).suffices[suffix_idx]
+        multiplier = type(self).suffix_map[suffix.lower()]
+        value = self._quantize(self, multiplier)
+        return f"{value:f} {suffix.upper()}iB"
 
-    def __format__(self, format_spec):
+    def __format__(self, format_spec) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
@@ -766,14 +841,13 @@ class BinarySize(int):
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value:f}{suffix.lower()}"
-        else:
-            # use the given scale
-            suffix = format_spec.lower()
-            multiplier = type(self).suffix_map.get(suffix)
-            if multiplier is None:
-                raise ValueError("Unsupported scale unit.", suffix)
-            value = self._quantize(self, multiplier)
-            return f"{value:f}{suffix.lower()}".strip()
+        # use the given scale
+        suffix = format_spec.lower()
+        maybe_multiplier = type(self).suffix_map.get(suffix)
+        if maybe_multiplier is None:
+            raise ValueError("Unsupported scale unit.", suffix)
+        value = self._quantize(self, maybe_multiplier)
+        return f"{value:f}{suffix.lower()}".strip()
 
 
 def _validate_binary_size(v: Any) -> BinarySize:
@@ -786,17 +860,63 @@ def _validate_binary_size(v: Any) -> BinarySize:
 # Create a custom type annotation for BinarySize fields
 BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
+type RawResourceValue = int | float | str | Decimal | BinarySize
 
-class ResourceSlot(UserDict):
+
+class ResourceSlot(UserDict[str, Decimal]):
     """
     key: `str` type slot name.
-    value: `str` or `Decimal` type value. Do not convert this to `float` or `int`.
+    value: `Decimal` type value. Do not convert this to `float` or `int` for calculation accuracy.
     """
 
     __slots__ = ("data",)
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        data: Mapping[SlotName, RawResourceValue | None]
+        | Mapping[str, RawResourceValue | None]
+        | None = None,
+        **kwargs: RawResourceValue | None,  # for legacy codes (TODO: update all kwarg-based init)
+    ) -> None:
+        if data is None:
+            data = {}
+        normalized: dict[str, Decimal] = {}
+        for kwargs_key, v in kwargs.items():
+            if v is None:
+                continue
+            normalized[kwargs_key] = self._process_raw_value(kwargs_key, v)
+        for raw_data_key, v in data.items():
+            if v is None:
+                continue
+            data_key = str(raw_data_key)
+            normalized[data_key] = self._process_raw_value(data_key, v)
+        super().__init__(normalized)
+
+    @classmethod
+    def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
+        return cls({k: Decimal(0) for k in known_slots.keys()})
+
+    @classmethod
+    def _process_raw_value(cls, key: str, value: RawResourceValue) -> Decimal:
+        if cls._guess_slot_type(str(key)) == SlotTypes.BYTES and isinstance(value, str):
+            v = Decimal(BinarySize.from_str(value))
+        else:
+            v = Decimal(value)
+        return v
+
+    def __setitem__(self, key: str | SlotName, value: RawResourceValue | None) -> None:
+        normalized_key = str(key)
+        if value is None:
+            self.data.pop(normalized_key, None)
+            return
+        self.data[normalized_key] = self._process_raw_value(normalized_key, value)
+
+    def __getitem__(self, key: str | SlotName) -> Decimal:
+        normalized_key = str(key)
+        return self.data[normalized_key]
+
+    def copy(self) -> Self:
+        return type(self)(self.data.copy())
 
     def sync_keys(self, other: ResourceSlot) -> None:
         self_only_keys = self.data.keys() - other.data.keys()
@@ -818,7 +938,7 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
-    def __neg__(self):
+    def __neg__(self) -> ResourceSlot:
         return type(self)({k: -v for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:
@@ -856,14 +976,14 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
-        return not any(s > o for s, o in zip(self_values, other_values))
+        return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
     def __lt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
-        return not any(s > o for s, o in zip(self_values, other_values)) and not (
+        return not any(s > o for s, o in zip(self_values, other_values, strict=True)) and not (
             self_values == other_values
         )
 
@@ -872,14 +992,14 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
-        return not any(s < o for s, o in zip(self_values, other_values))
+        return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
     def __gt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
-        return not any(s < o for s, o in zip(self_values, other_values)) and not (
+        return not any(s < o for s, o in zip(self_values, other_values, strict=True)) and not (
             self_values == other_values
         )
 
@@ -890,16 +1010,16 @@ class ResourceSlot(UserDict):
             raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
-            data[k] = Decimal(0)
+            data[str(k)] = Decimal(0)
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
+    def _normalize_value(cls, key: str, value: RawResourceValue, unit: SlotTypes) -> Decimal:
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
-                    return Decimal(value) if value.is_finite() else value
-                if isinstance(value, int):
+                    return value
+                if isinstance(value, (int, float)):
                     return Decimal(value)
                 value = Decimal(BinarySize.from_str(value))
             else:
@@ -917,7 +1037,7 @@ class ResourceSlot(UserDict):
     def _humanize_value(cls, value: Decimal, unit: str) -> str:
         if unit == "bytes":
             try:
-                result = "{:s}".format(BinarySize(value))
+                result = f"{BinarySize(value):s}"
             except (OverflowError, ValueError):
                 result = _stringify_number(value)
         else:
@@ -931,7 +1051,7 @@ class ResourceSlot(UserDict):
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> ResourceSlot:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])
@@ -954,7 +1074,7 @@ class ResourceSlot(UserDict):
         cls,
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
-    ) -> "ResourceSlot":
+    ) -> ResourceSlot:
         pruned_obj = {k: v for k, v in obj.items() if v != 0}
 
         try:
@@ -973,7 +1093,7 @@ class ResourceSlot(UserDict):
                 # fill missing
                 for k in slot_types.keys():
                     if k not in data:
-                        data[k] = Decimal(0)
+                        data[str(k)] = Decimal(0)
         except KeyError as e:
             extra_guide = ""
             if e.args[0] == "shmem":
@@ -984,7 +1104,7 @@ class ResourceSlot(UserDict):
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
         try:
             return {
-                k: type(self)._humanize_value(v, slot_types[k])
+                k: type(self)._humanize_value(Decimal(v), slot_types[k])
                 for k, v in self.data.items()
                 if v is not None
             }
@@ -992,7 +1112,7 @@ class ResourceSlot(UserDict):
             raise ValueError(f"Unknown slot type: {e.args[0]!r}")
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
+    def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
         data = {k: Decimal(v) for k, v in obj.items() if v is not None}
         return cls(data)
 
@@ -1001,6 +1121,17 @@ class ResourceSlot(UserDict):
 
     def has_intrinsic_slots(self) -> bool:
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
+
+class ResourceSlotState(enum.StrEnum):
+    OCCUPIED = "occupied"
+    AVAILABLE = "available"
+
+
+@deprecated("Use `ResourceSlotState` instead.")
+class LegacyResourceSlotState(enum.StrEnum):
+    OCCUPIED = "using"
+    AVAILABLE = "remaining"
 
 
 class JSONSerializableMixin(metaclass=ABCMeta):
@@ -1038,7 +1169,7 @@ class QuotaScopeID:
     def __str__(self) -> str:
         match self.scope_id:
             case UUID():
-                return f"{self.scope_type}:{str(self.scope_id)}"
+                return f"{self.scope_type}:{self.scope_id!s}"
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
@@ -1067,8 +1198,7 @@ class VFolderID:
         first, _, second = val.partition("/")
         if second:
             return cls(QuotaScopeID.parse(first), UUID(hex=second))
-        else:
-            return cls(None, UUID(hex=first))
+        return cls(None, UUID(hex=first))
 
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
@@ -1181,7 +1311,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: Dict[str, set] = defaultdict(set)
+        union_map: dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
@@ -1255,7 +1385,7 @@ class ServicePort(TypedDict):
     is_inference: bool
 
 
-ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, tuple[str, int]])
 
 
 class ClusterInfo(TypedDict):
@@ -1386,6 +1516,10 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    kernel_id: str  # the kernel's ID
+    session_id: str  # the session's ID
+    owner_user_id: str  # the owner user's ID
+    owner_project_id: Optional[str]  # the owner project's ID (for project-owned sessions)
     network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
@@ -1393,6 +1527,7 @@ class KernelCreationConfig(TypedDict):
     cluster_role: str  # the kernel's role in the cluster
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
+    local_rank: int  # the kernel's local rank in the cluster
     uid: Optional[int]
     main_gid: Optional[int]
     supplementary_gids: list[int]
@@ -1405,8 +1540,8 @@ class KernelCreationConfig(TypedDict):
     bootstrap_script: Optional[str]
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
-    preopen_ports: List[int]
-    allocated_host_ports: List[int]
+    preopen_ports: list[int]
+    allocated_host_ports: list[int]
     scaling_group: str
     agent_addr: str
     endpoint_id: Optional[str]
@@ -1414,7 +1549,7 @@ class KernelCreationConfig(TypedDict):
 
 class SessionEnqueueingConfig(TypedDict):
     creation_config: dict
-    kernel_configs: List[KernelEnqueueingConfig]
+    kernel_configs: list[KernelEnqueueingConfig]
 
 
 class KernelEnqueueingConfig(TypedDict):
@@ -1431,7 +1566,7 @@ class KernelEnqueueingConfig(TypedDict):
     supplementary_gids: list[int]
 
 
-def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
+def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
     """
     Stringify a number, preventing unwanted scientific notations.
     """
@@ -1441,23 +1576,48 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = "{:f}".format(v)
+            result = f"{v:f}"
     elif isinstance(v, BinarySize):
-        result = "{:d}".format(int(v))
+        result = f"{int(v):d}"
     elif isinstance(v, int):
-        result = "{:d}".format(v)
+        result = f"{v:d}"
     else:
         result = str(v)
     return result
 
 
 @dataclass
+class ValkeyTarget:
+    addr: Optional[str] = None
+    sentinel: Optional[list[str]] = None
+    service_name: Optional[str] = None
+    password: Optional[str] = None
+    request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+
+@dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
-    sentinel: Optional[Union[str, List[HostPortPair]]] = None
+    sentinel: Optional[str | list[HostPortPair]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1478,9 +1638,65 @@ class RedisTarget:
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
+        )
+
+    def to_valkey_target(self) -> ValkeyTarget:
+        addr = str(self.addr) if self.addr else None
+        sentinel_addrs: Optional[list[str]] = None
+        if self.sentinel:
+            sentinel_addrs = None
+            if isinstance(self.sentinel, list):
+                sentinel_addrs = [str(s) for s in self.sentinel]
+            else:
+                from ai.backend.common.typed_validators import CommaSeparatedStrList
+
+                adapter = TypeAdapter(CommaSeparatedStrList)
+                sentinel_addrs = adapter.validate_python(self.sentinel)
+
+        return ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel_addrs,
+            service_name=self.service_name,
+            password=self.password,
+            request_timeout=None,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
         )
 
 
+@dataclass
+class ValkeyProfileTarget:
+    _base_target: ValkeyTarget
+    _override_targets: Optional[Mapping[str, ValkeyTarget]]
+
+    def __init__(
+        self,
+        *,
+        addr: Optional[str] = None,
+        sentinel: Optional[list[str]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        request_timeout: Optional[int] = None,
+        override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
+    ) -> None:
+        self._base_target = ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel,
+            service_name=service_name,
+            password=password,
+            request_timeout=request_timeout,
+        )
+        self._override_targets = override_targets
+
+    def profile_target(self, role: RedisRole) -> ValkeyTarget:
+        if self._override_targets and (role in self._override_targets):
+            return self._override_targets[role]
+        return self._base_target
+
+
+# TODO: Remove this type
 @dataclass
 class RedisProfileTarget:
     _base_target: RedisTarget
@@ -1490,11 +1706,13 @@ class RedisProfileTarget:
         self,
         *,
         addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        sentinel: Optional[str | list[HostPortPair]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
         override_targets: Optional[Mapping[str, RedisTarget]] = None,
+        use_tls: bool = False,
+        tls_skip_verify: bool = False,
     ) -> None:
         self._base_target = RedisTarget(
             addr=addr,
@@ -1502,6 +1720,8 @@ class RedisProfileTarget:
             service_name=service_name,
             password=password,
             redis_helper_config=redis_helper_config,
+            use_tls=use_tls,
+            tls_skip_verify=tls_skip_verify,
         )
         self._override_targets = override_targets
 
@@ -1509,6 +1729,19 @@ class RedisProfileTarget:
         if self._override_targets and (role in self._override_targets):
             return self._override_targets[role]
         return self._base_target
+
+    @staticmethod
+    def _parse_addr(addr_data) -> HostPortPair:
+        match addr_data:
+            case HostPortPair(host=host, port=port):
+                return HostPortPair(host, port)
+            case {"host": host, "port": port}:
+                return HostPortPair(host, port)
+            case (host, port):
+                return HostPortPair(host, port)
+            case _:
+                addr_data_parts = addr_data.split(":")
+                return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -1518,19 +1751,22 @@ class RedisProfileTarget:
                 target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
             }
 
+            for key in override_targets.keys():
+                target = override_targets[key]
+                target.addr = RedisProfileTarget._parse_addr(target.addr)
+
         addr = None
-        # TODO: Remove this match statement after pydantic migration done.
-        if addr_data := data.get("addr"):
-            if isinstance(addr_data, HostPortPair):
-                addr = HostPortPair(addr_data.host, addr_data.port)
-            elif isinstance(addr_data, Mapping):
-                addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
-                addr_data = addr_data.split(":")
-                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+        if data.get("addr"):
+            addr = RedisProfileTarget._parse_addr(data.get("addr"))
+
+        sentinel = data.get("sentinel")
+        if sentinel:
+            if isinstance(sentinel, list):
+                sentinel = [HostPortPair(s["host"], s["port"]) for s in sentinel]
+
         return cls(
             addr=addr,
-            sentinel=data.get("sentinel"),
+            sentinel=sentinel,
             service_name=data.get("service_name"),
             password=data.get("password"),
             redis_helper_config=data.get("redis_helper_config"),
@@ -1538,10 +1774,10 @@ class RedisProfileTarget:
         )
 
 
-def safe_print_redis_target(config: RedisTarget) -> str:
-    safe_config = config.copy()
-    if "password" in safe_config:
-        safe_config["password"] = "********"
+def safe_print_redis_config(config: RedisConfig) -> str:
+    safe_config = copy.deepcopy(config)
+    if config.password:
+        safe_config.password = "********"
     return str(safe_config)
 
 
@@ -1621,6 +1857,8 @@ class RuntimeVariant(enum.StrEnum):
     NIM = "nim"
     CMD = "cmd"
     HUGGINGFACE_TGI = "huggingface-tgi"
+    SGLANG = "sglang"
+    MODULAR_MAX = "modular-max"
     CUSTOM = "custom"
 
 
@@ -1634,6 +1872,12 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
         name="Huggingface TGI", health_check_endpoint="/info", port=3000
+    ),
+    RuntimeVariant.SGLANG: ModelServiceProfile(
+        name="SGLang", health_check_endpoint="/health", port=9001
+    ),
+    RuntimeVariant.MODULAR_MAX: ModelServiceProfile(
+        name="Modular MAX", health_check_endpoint="/health", port=8000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
@@ -1727,9 +1971,8 @@ class DispatchResult(Generic[ResultType]):
         if self.is_success():
             return str(self.result)
         if self.result is not None:
-            return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
-        else:
-            return "errors: " + "\n".join(self.errors)
+            return f"result: {self.result!s}\nerrors: " + "\n".join(self.errors)
+        return "errors: " + "\n".join(self.errors)
 
     @classmethod
     def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:
@@ -1766,3 +2009,13 @@ class SessionExecutionStatus(enum.StrEnum):
     FINISHED = "finished"
     CANCELED = "canceled"
     TIMEOUT = "timeout"
+
+
+class StreamReader(ABC):
+    @abstractmethod
+    def read(self) -> AsyncIterator[bytes]:
+        raise GenericNotImplementedError
+
+    @abstractmethod
+    def content_type(self) -> Optional[str]:
+        raise GenericNotImplementedError

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import click
 import graphene
 
-from ..models.gql import Mutations, Queries
+from ai.backend.manager.api.gql_legacy.schema import Mutation, Query
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -27,6 +27,6 @@ def show(cli_ctx: CLIContext) -> None:
         "The 'gql' subcommand is deprecated. Use the 'api' subcommand.",
         DeprecationWarning,
     )
-    schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
+    schema = graphene.Schema(query=Query, mutation=Mutation, auto_camelcase=False)
     log.info("======== GraphQL API Schema ========")
     print(str(schema))

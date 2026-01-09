@@ -3,6 +3,7 @@ import uuid
 from pathlib import PurePosixPath
 from typing import (
     Optional,
+    cast,
 )
 
 import aiohttp
@@ -52,8 +53,8 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.base import (
+from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
     CreateVFolderAction,
@@ -75,7 +76,11 @@ from ..actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -159,7 +164,7 @@ class VFolderService:
                     group_id_or_name, domain_name
                 )
                 if not group_info:
-                    raise ProjectNotFound(group_id_or_name)
+                    raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
                 group_uuid, max_vfolder_count, max_quota_scope_size, group_type = group_info
                 container_uid = None
             case None:
@@ -170,7 +175,7 @@ class VFolderService:
                 group_uuid = None
                 group_type = None
             case _:
-                raise ProjectNotFound(group_id_or_name)
+                raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
 
         vfolder_permission_mode = (
             VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
@@ -178,7 +183,7 @@ class VFolderService:
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
-            raise ProjectNotFound(group_id_or_name)
+            raise ProjectNotFound(f"Project with {group_id_or_name} not found.")
 
         # Determine the ownership type and the quota scope ID.
         if group_uuid is not None:
@@ -198,10 +203,6 @@ class VFolderService:
             )
 
         if group_type == ProjectType.MODEL_STORE:
-            if action.mount_permission != VFolderPermission.READ_WRITE:
-                raise VFolderInvalidParameter(
-                    "Setting custom permission is not supported for model store vfolder"
-                )
             if action.usage_mode != VFolderUsageMode.MODEL:
                 raise VFolderInvalidParameter(
                     "Only Model VFolder can be created under the model store project"
@@ -223,7 +224,8 @@ class VFolderService:
             if ownership_type == "user":
                 current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
             else:
-                assert group_uuid is not None
+                if group_uuid is None:
+                    raise VFolderInvalidParameter("Group UUID is required for group-owned vfolders")
                 current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
 
             if current_count >= max_vfolder_count:
@@ -311,7 +313,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        modifier = action.modifier
+        spec = cast(VFolderAttributeUpdaterSpec, action.updater.spec)
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -335,7 +337,7 @@ class VFolderService:
 
         # Check for name conflicts if name is being updated
         try:
-            new_name = modifier.name.value()
+            new_name = spec.name.value()
         except ValueError:
             pass
         else:
@@ -346,8 +348,7 @@ class VFolderService:
                     )
 
         # Update the vfolder using repository
-        to_update = modifier.fields_to_update()
-        await self._vfolder_repository.update_vfolder_attribute(action.vfolder_uuid, to_update)
+        await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -467,6 +468,8 @@ class VFolderService:
         return ListVFolderActionResult(
             user_uuid=action.user_uuid,
             vfolders=vfolders,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
         )
 
     async def move_to_trash(
@@ -475,6 +478,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -487,6 +492,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -516,11 +523,13 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._remove_vfolder_from_storage(vfolder_data)
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
@@ -529,11 +538,13 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._remove_vfolder_from_storage(vfolder_data)
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        await self._remove_vfolder_from_storage(vfolder_data)
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
@@ -574,13 +585,15 @@ class VFolderService:
                     raise VFolderAlreadyExists
 
         # Get target host
-        target_folder_host = action.target_host or source_vfolder_data.host
+        target_folder_host = (
+            action.target_host
+            or source_vfolder_data.host
+            or self._config_provider.config.volumes.default_host
+        )
         if not target_folder_host:
-            target_folder_host = self._config_provider.config.volumes.default_host
-            if not target_folder_host:
-                raise VFolderInvalidParameter(
-                    "You must specify the vfolder host because the default host is not configured."
-                )
+            raise VFolderInvalidParameter(
+                "You must specify the vfolder host because the default host is not configured."
+            )
 
         # Verify target vfolder name
         if not verify_vfolder_name(action.target_name):

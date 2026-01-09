@@ -11,13 +11,13 @@ from tabulate import tabulate
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import rescan_images as rescan_images_func
+from ai.backend.manager.models.utils import connect_database
 
-from ..data.image.types import ImageStatus
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
-from ..models.image import rescan_images as rescan_images_func
-from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -25,8 +25,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 async def list_images(cli_ctx: CLIContext, short, installed_only):
     # Connect to postgreSQL DB
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
@@ -37,23 +38,23 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
-                image_canonicals = [item.name for item in items]
-                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(
-                    image_canonicals
-                )
-                installed_items = []
+                image_ids = [ImageID(item.id) for item in items]
+                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(image_ids)
+                installed_items: list[ImageRow] = []
 
-                for item, installed_count in zip(items, installed_counts):
+                for item, installed_count in zip(items, installed_counts, strict=True):
                     if installed_count > 0:
                         installed_items.append(item)
 
-                installed_canonicals = [item.name for item in installed_items]
+                installed_image_ids: list[ImageID] = [ImageID(item.id) for item in installed_items]
                 agents_per_installed_items = await redis_conn_set.image.get_agents_for_images(
-                    installed_canonicals
+                    installed_image_ids
                 )
 
-                for item, installed_agents in zip(installed_items, agents_per_installed_items):
-                    formatted_installed_agents = " ".join(installed_agents)
+                for item, installed_agents in zip(
+                    installed_items, agents_per_installed_items.values(), strict=True
+                ):
+                    formatted_installed_agents = " ".join(str(installed_agents))
                     if short:
                         displayed_items.append((
                             item.image_ref.canonical,
@@ -75,8 +76,9 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -117,8 +119,9 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -148,8 +151,9 @@ async def set_image_resource_limit(
     range_value,
     architecture,
 ):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -172,8 +176,9 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
     ):
         try:
             result = await rescan_images_func(db, registry_or_image, project)
@@ -184,8 +189,9 @@ async def rescan_images(
 
 
 async def alias(cli_ctx: CLIContext, alias, target, architecture):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -203,8 +209,9 @@ async def alias(cli_ctx: CLIContext, alias, target, architecture):
 
 
 async def dealias(cli_ctx: CLIContext, alias):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         alias_row = await session.scalar(
@@ -217,8 +224,9 @@ async def dealias(cli_ctx: CLIContext, alias):
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -247,8 +255,9 @@ def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.get_bootstrap_config().db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:

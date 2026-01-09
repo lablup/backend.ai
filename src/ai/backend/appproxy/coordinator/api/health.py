@@ -1,8 +1,9 @@
 """Health monitoring API endpoints"""
 
 import logging
-from datetime import datetime
-from typing import Iterable, Literal
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 import aiohttp_cors
@@ -10,14 +11,20 @@ import sqlalchemy as sa
 from aiohttp import web
 from pydantic import BaseModel
 
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
-from ai.backend.appproxy.common.types import AppMode, CORSOptions, PydanticResponse, WebMiddleware
+from ai.backend.appproxy.common.types import (
+    AppMode,
+    CORSOptions,
+    PydanticResponse,
+    WebMiddleware,
+)
 from ai.backend.appproxy.common.utils import pydantic_api_response_handler
+from ai.backend.appproxy.coordinator import __version__
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import ModelServiceStatus
+from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__
-from ..models import Circuit, Endpoint, Worker
-from ..types import RootContext
 from .utils import auth_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -28,14 +35,14 @@ class RouteHealthStatusModel(BaseModel):
 
     route_id: UUID
     session_id: UUID
-    kernel_host: str
+    kernel_host: str | None
     kernel_port: int
     protocol: str
     health_status: ModelServiceStatus | None
     last_health_check: float | None
     consecutive_failures: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None
+    updated_at: datetime | None
 
 
 class EndpointHealthStatusModel(BaseModel):
@@ -293,9 +300,17 @@ async def get_circuit_health(
 
 
 async def hello(request: web.Request) -> web.Response:
+    """Health check endpoint with dependency connectivity status"""
     request["do_not_print_access_log"] = True
-
-    return web.Response()
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="appproxy-coordinator",
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 @auth_required("manager")
@@ -321,7 +336,7 @@ async def status(request: web.Request) -> PydanticResponse[StatusResponseModel]:
                     ha_setup=w.nodes > 1,
                 )
                 for w in workers
-                if (w.updated_at.timestamp() - datetime.now().timestamp()) <= 30
+                if w.updated_at and (w.updated_at.timestamp() - datetime.now(UTC).timestamp()) <= 30
             ],
         )
     )

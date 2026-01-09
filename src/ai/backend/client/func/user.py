@@ -2,25 +2,26 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, Mapping, Sequence, Union
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.auth import AuthTokenTypes
+from ai.backend.client.output.fields import user_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
 from ai.backend.common.dto.manager.auth.field import AuthResponse, parse_auth_response
 
-from ...cli.types import Undefined, undefined
-from ..auth import AuthTokenTypes
-from ..output.fields import user_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
-    "UserStatus",
     "UserRole",
+    "UserStatus",
 )
 
 
@@ -217,7 +218,7 @@ class User(BaseFunction):
     @classmethod
     async def detail_by_uuid(
         cls,
-        user_uuid: Union[str, uuid.UUID] | None = None,
+        user_uuid: str | uuid.UUID | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
         """

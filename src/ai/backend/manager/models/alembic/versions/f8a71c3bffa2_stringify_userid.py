@@ -54,11 +54,11 @@ def upgrade():
         # query all unique user ids
         q = sa.select([keypairs.c.user_id]).group_by(keypairs.c.user_id)
         rows = op.get_bind().execute(q)
-        user_ids = set(int(row.user_id) for row in rows)
+        user_ids = {int(row.user_id) for row in rows}
         print(f"There are {len(user_ids)} unique user IDs.")
 
         user_id_map = {}
-        with open("user_id_map.txt", "r") as f:
+        with open("user_id_map.txt") as f:
             for line in f:
                 num_id, str_id = line.split(maxsplit=1)
                 assert len(str_id) <= 256, f"Too long target user ID! ({num_id} -> {str_id!r})"

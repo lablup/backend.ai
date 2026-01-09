@@ -7,18 +7,14 @@ import secrets
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from typing import (
     Any,
-    Callable,
-    Coroutine,
     Generic,
     Optional,
     Protocol,
-    Type,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     override,
 )
@@ -33,16 +29,17 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,
+    BroadcastPayload,
     MessageId,
     MessageMetadata,
     MessagePayload,
     MQMessage,
 )
-from ai.backend.logging import BraceStyleAdapter
-
-from ..types import (
+from ai.backend.common.types import (
     AgentId,
 )
+from ai.backend.logging import BraceStyleAdapter
+
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
 from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 
@@ -67,10 +64,10 @@ TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent)
 TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
 TContext = TypeVar("TContext")
 
-EventCallback = Union[
-    Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
-    Callable[[TContext, AgentId, TEvent], None],
-]
+EventCallback = (
+    Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]]
+    | Callable[[TContext, AgentId, TEvent], None]
+)
 
 
 class EventHandlerType(enum.Enum):
@@ -80,7 +77,7 @@ class EventHandlerType(enum.Enum):
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
 class EventHandler(Generic[TContext, TEvent]):
-    event_cls: Type[TEvent]
+    event_cls: type[TEvent]
     name: str
     context: TContext
     callback: EventCallback[TContext, TEvent]
@@ -212,7 +209,7 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -225,7 +222,7 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -268,7 +265,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -290,7 +287,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -348,14 +345,14 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
-        event_observer: EventObserver = NopEventObserver(),
+        event_observer: EventObserver | None = None,
     ) -> None:
         self._log_events = log_events
         self._closed = False
         self._consumers = defaultdict(set)
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
-        self._metric_observer = event_observer
+        self._metric_observer = event_observer if event_observer is not None else NopEventObserver()
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -406,7 +403,7 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TConsumedEvent],
+        event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -453,7 +450,7 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TSubscirbedEvent],
+        event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
@@ -562,7 +559,7 @@ class EventDispatcher(EventDispatcherGroup):
                 duration=time.perf_counter() - start,
                 exception=e,
             )
-            log.exception(f"EventDispatcher.{evh_type}(): unexpected-error, {repr(e)}")
+            log.exception(f"EventDispatcher.{evh_type}(): unexpected-error, {e!r}")
             raise
         except BaseException as e:
             self._metric_observer.observe_event_failure(
@@ -763,6 +760,45 @@ class EventProducer:
             cache_id,
             raw_event,
         )
+
+    async def broadcast_events_batch(
+        self,
+        events: Sequence[AbstractBroadcastEvent],
+    ) -> None:
+        """
+        Broadcast multiple events in a batch with optional caching.
+        Cache ID is obtained from each event's cache_id() method.
+        """
+        if self._closed:
+            return
+        if not events:
+            return
+
+        # Capture current request_id and other metadata
+        request_id = current_request_id()
+        user = current_user()
+        metadata = MessageMetadata(
+            request_id=request_id,
+            user=user,
+        )
+
+        # Convert events to BroadcastPayload objects
+        broadcast_payloads: list[BroadcastPayload] = []
+        for event in events:
+            raw_event = MessagePayload(
+                name=event.event_name(),
+                source=str(self._source),
+                args=event.serialize(),
+                metadata=metadata,
+            ).serialize_broadcast()
+            broadcast_payloads.append(
+                BroadcastPayload(
+                    payload=raw_event,
+                    cache_id=event.cache_id(),  # Get cache_id from event
+                )
+            )
+
+        await self._msg_queue.broadcast_batch(broadcast_payloads)
 
     async def anycast_and_broadcast_event(
         self,

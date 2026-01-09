@@ -24,17 +24,17 @@ class AuthorizationResult:
 @dataclass
 class UserData:
     uuid: uuid.UUID
-    username: str
+    username: Optional[str]
     email: str
-    password: str
+    password: Optional[str]
     need_password_change: bool
-    full_name: str
-    description: str
+    full_name: Optional[str]
+    description: Optional[str]
     is_active: bool
     status: UserStatus
     status_info: Optional[str]
-    created_at: datetime
-    modified_at: datetime
+    created_at: Optional[datetime]
+    modified_at: Optional[datetime]
     password_changed_at: Optional[datetime]
     domain_name: str
     role: UserRole

@@ -6,18 +6,18 @@ from typing import Final
 
 import aiotools
 
-from ai.backend.appproxy.common.exceptions import WorkerNotAvailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
+from ai.backend.appproxy.common.errors import WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractBackend
+from .base import BaseBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
 
-class TCPBackend(AbstractBackend):
+class TCPBackend(BaseBackend):
     routes: list[RouteInfo]
 
     def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
@@ -28,7 +28,7 @@ class TCPBackend(AbstractBackend):
     def selected_route(self) -> RouteInfo:
         if len(self.routes) == 0:
             raise WorkerNotAvailable
-        elif len(self.routes) == 1:
+        if len(self.routes) == 1:
             selected_route = self.routes[0]
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable
@@ -77,7 +77,7 @@ class TCPBackend(AbstractBackend):
         route = self.selected_route
         log.debug(
             "Proxying TCP Request to {}:{}",
-            route.kernel_host,
+            route.current_kernel_host,
             route.kernel_port,
         )
 
@@ -89,13 +89,13 @@ class TCPBackend(AbstractBackend):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             await asyncio.get_running_loop().run_in_executor(
-                None, sock.connect, (route.kernel_host, route.kernel_port)
+                None, sock.connect, (route.current_kernel_host, route.kernel_port)
             )
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
             log.debug(
                 "Connected to {}:{}",
-                route.kernel_host,
+                route.current_kernel_host,
                 route.kernel_port,
             )
             async with asyncio.TaskGroup() as group:

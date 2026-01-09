@@ -1,48 +1,48 @@
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager as actxmgr
+from collections.abc import AsyncIterator, Mapping, MutableMapping
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
-    AsyncIterator,
     Final,
-    Mapping,
-    Optional,
-    Type,
 )
 
 import aiohttp_cors
-from aiohttp import web
-from aiohttp.typedefs import Middleware
 
-from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
-from .api.client import init_client_app
-from .api.manager import init_internal_app, init_manager_app
+from .client.manager import ManagerHTTPClientPool
 from .config.unified import StorageProxyUnifiedConfig
-from .exception import InvalidVolumeError
+from .context_types import ArtifactVerifierContext
+from .errors import InvalidVolumeError
 from .plugin import (
-    BasePluginContext,
-    StorageClientWebappPluginContext,
-    StorageManagerWebappPluginContext,
-    StoragePluginContext,
+    StorageArtifactVerifierPluginContext,
 )
 from .services.service import VolumeService
+from .storages.storage_pool import StoragePool
 from .types import VolumeInfo
 from .volumes.abc import AbstractVolume
 from .volumes.cephfs import CephFSVolume
 from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
+from .volumes.hammerspace.volume.base import BaseHammerspaceVolume
+from .volumes.hammerspace.volume.extended import HammerspaceVolume
 from .volumes.netapp import NetAppVolume
-from .volumes.noop import NoopVolume, init_noop_volume
+from .volumes.noop import NoopVolume
 from .volumes.pool import VolumePool
 from .volumes.purestorage import FlashBladeVolume
 from .volumes.vast import VASTVolume
@@ -55,7 +55,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
-DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
+DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     FlashBladeVolume.name: FlashBladeVolume,
     BaseVolume.name: BaseVolume,
     XfsVolume.name: XfsVolume,
@@ -70,33 +70,9 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
     NoopVolume.name: NoopVolume,
+    HammerspaceVolume.name: HammerspaceVolume,
+    BaseHammerspaceVolume.name: BaseHammerspaceVolume,
 }
-
-
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
-    response.headers["Server"] = "BackendAI"
-
-
-def _init_subapp(
-    pkg_name: str,
-    root_app: web.Application,
-    subapp: web.Application,
-    global_middlewares: list[Middleware],
-) -> None:
-    subapp.on_response_prepare.append(on_prepare)
-
-    async def _set_root_ctx(subapp: web.Application):
-        # Allow subapp's access to the root app properties.
-        # These are the public APIs exposed to plugins as well.
-        subapp["ctx"] = root_app["ctx"]
-
-    # We must copy the public interface prior to all user-defined startup signal handlers.
-    subapp.on_startup.insert(0, _set_root_ctx)
-    if "prefix" not in subapp:
-        subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
-    prefix = subapp["prefix"]
-    root_app.add_subapp("/" + prefix, subapp)
-    root_app.middlewares.extend(global_middlewares)
 
 
 class ServiceContext:
@@ -104,122 +80,51 @@ class ServiceContext:
 
     def __init__(
         self,
-        local_config: StorageProxyUnifiedConfig,
-        etcd: AsyncEtcd,
-        event_dispatcher: EventDispatcher,
-        event_producer: EventProducer,
+        service: VolumeService,
     ) -> None:
-        volume_pool = VolumePool(
-            local_config=local_config,
-            etcd=etcd,
-            event_dispatcher=event_dispatcher,
-            event_producer=event_producer,
-        )
-        self.volume_service = VolumeService(volume_pool)
+        self.volume_service = service
 
 
+@dataclass(slots=True)
 class RootContext:
-    volumes: dict[str, AbstractVolume]
+    # configuration context
     pid: int
-    etcd: AsyncEtcd
+    pidx: int
+    node_id: str
     local_config: StorageProxyUnifiedConfig
-    dsn: str | None
+    etcd: AsyncEtcd
+
+    # internal services
+    volume_pool: VolumePool
+    storage_pool: StoragePool
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
-    service_context: ServiceContext
     metric_registry: CommonMetricRegistry
+    background_task_manager: BackgroundTaskManager
+    cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
+    manager_client_pool: ManagerHTTPClientPool
+    valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    health_probe: HealthProbe
 
-    def __init__(
-        self,
-        pid: int,
-        pidx: int,
-        node_id: str,
-        local_config: StorageProxyUnifiedConfig,
-        etcd: AsyncEtcd,
-        *,
-        event_producer: EventProducer,
-        event_dispatcher: EventDispatcher,
-        watcher: WatcherClient | None,
-        dsn: Optional[str] = None,
-        metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
-    ) -> None:
-        self.volumes = {
-            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
-        }
-        self.pid = pid
-        self.pidx = pidx
-        self.node_id = node_id
-        self.etcd = etcd
-        self.local_config = local_config
-        self.dsn = dsn
-        self.event_producer = event_producer
-        self.event_dispatcher = event_dispatcher
-        self.watcher = watcher
-        self.cors_options = {
-            "*": aiohttp_cors.ResourceOptions(
-                allow_credentials=False, expose_headers="*", allow_headers="*"
-            ),
-        }
-        self.service_context = ServiceContext(
-            local_config=self.local_config,
-            etcd=self.etcd,
-            event_dispatcher=self.event_dispatcher,
-            event_producer=self.event_producer,
-        )
-        self.metric_registry = metric_registry
+    # volume backend states
+    backends: MutableMapping[str, type[AbstractVolume]]
+    volumes: MutableMapping[str, AbstractVolume]
+    artifact_verifier_ctx: ArtifactVerifierContext
 
-    async def __aenter__(self) -> None:
-        # TODO: Setup the apps outside of the context.
-        self.client_api_app = await init_client_app(self)
-        self.manager_api_app = await init_manager_app(self)
-        self.internal_api_app = init_internal_app()
-        self.backends = {
-            **DEFAULT_BACKENDS,
-        }
-        await self.init_storage_plugin()
-        self.manager_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
-            StorageManagerWebappPluginContext(self.etcd, self.local_config.model_dump()),
-            self.manager_api_app,
-        )
-        self.client_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
-            StorageClientWebappPluginContext(self.etcd, self.local_config.model_dump()),
-            self.client_api_app,
-        )
-
-    async def init_storage_plugin(self) -> None:
-        plugin_ctx = StoragePluginContext(self.etcd, self.local_config.model_dump())
+    async def init_storage_artifact_verifier_plugin(self) -> None:
+        plugin_ctx = StorageArtifactVerifierPluginContext(self.etcd, self.local_config.model_dump())
         await plugin_ctx.init()
-        self.storage_plugin_ctx = plugin_ctx
+        plugins = {}
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading storage plugin: {0}", plugin_name)
-            volume_cls = plugin_instance.get_volume_class()
-            self.backends[plugin_name] = volume_cls
-
-    async def init_storage_webapp_plugin(
-        self, plugin_ctx: BasePluginContext, root_app: web.Application
-    ) -> BasePluginContext:
-        await plugin_ctx.init()
-        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            if self.pid == 0:
-                log.info("Loading storage webapp plugin: {0}", plugin_name)
-            subapp, global_middlewares = await plugin_instance.create_app(self.cors_options)
-            _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-        return plugin_ctx
+            log.info("Loading artifact verifier storage plugin: {0}", plugin_name)
+            plugins[plugin_name] = plugin_instance
+        self.artifact_verifier_ctx.load_verifiers(plugins)
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
 
-    async def __aexit__(self, *exc_info) -> Optional[bool]:
-        for volume in self.volumes.values():
-            await volume.shutdown()
-
-        await self.storage_plugin_ctx.cleanup()
-        await self.manager_webapp_plugin_ctx.cleanup()
-        await self.client_webapp_plugin_ctx.cleanup()
-        return None
-
-    @actxmgr
+    @asynccontextmanager
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
         if name in self.volumes:
             yield self.volumes[name]
@@ -228,7 +133,7 @@ class RootContext:
                 volume_config = self.local_config.volume[name]
             except KeyError:
                 raise InvalidVolumeError(name)
-            volume_cls: Type[AbstractVolume] = self.backends[volume_config.backend]
+            volume_cls: type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),
                 mount_path=Path(volume_config.path),
@@ -243,3 +148,11 @@ class RootContext:
             self.volumes[name] = volume_obj
 
             yield volume_obj
+
+    async def shutdown_volumes(self) -> None:
+        for volume in self.volumes.values():
+            await volume.shutdown()
+
+    async def shutdown_manager_http_clients(self) -> None:
+        """Close all manager HTTP client sessions."""
+        await self.manager_client_pool.cleanup()

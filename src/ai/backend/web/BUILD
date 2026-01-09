@@ -1,8 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#coloredlogs",  # indirectly referred by logging config string
     ],
 )
@@ -35,7 +35,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "web": "ai.backend.web.cli.__main__:main",
-            "web.start-server": "ai.backend.web.server:main",
+            "web.start-server": "ai.backend.web.cli.start_server:main",
         },
     },
     generate_setup=True,

@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, Iterable, Mapping, Set, TypeVar
+from typing import Any, Generic, TypeVar
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -23,7 +24,7 @@ class ContainerNetworkInfo:
 
 class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+    async def get_capabilities(self) -> set[ContainerNetworkCapability]:
         """
         Returns set of ContainerNetworkCapability enum items. Each enum should represent
         feathre each network plugin is capable of.

@@ -1,9 +1,9 @@
 import asyncio
 from asyncio import Future
 from pathlib import Path
-from typing import Set, Tuple
 
 import attrs
+from pydantic import BaseModel
 
 from ai.backend.common.utils import current_loop
 
@@ -13,6 +13,11 @@ class DomainSocketProxy:
     host_sock_path: Path
     host_proxy_path: Path
     proxy_server: asyncio.AbstractServer
+
+
+class DomainSocketPathPair(BaseModel):
+    host_sock_path: Path
+    host_proxy_path: Path
 
 
 async def proxy_connection(
@@ -61,7 +66,7 @@ async def proxy_connection(
     # long-running streaming commands are disconnected by the server first when the server-side
     # processing finishes.
     try:
-        task_results: Tuple[Set[Future], Set[Future]] = await asyncio.wait(
+        task_results: tuple[set[Future], set[Future]] = await asyncio.wait(
             tasks, return_when=asyncio.FIRST_COMPLETED
         )
         done, pending = task_results

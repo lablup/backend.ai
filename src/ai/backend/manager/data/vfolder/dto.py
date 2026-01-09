@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Self
+from typing import Any, Optional, Self
 
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
 from ai.backend.common.dto.manager.field import (
@@ -8,7 +9,7 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.models import (
+from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -56,7 +57,7 @@ class VFolderItemToCreate:
     unmanaged_path: Optional[str]
 
     @classmethod
-    def from_request(cls, request: VFolderCreateReq) -> Self:
+    async def from_request(cls, request: VFolderCreateReq) -> Self:
         return cls(
             name=request.name,
             folder_host=request.folder_host,

@@ -12,14 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from pathlib import Path
-from typing import (
-    Any,
-    Literal,
-    Optional,
-    Self,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -27,33 +20,33 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.compat import current_loop
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionTypes
-
-from ...cli.types import Undefined, undefined
-from ..compat import current_loop
-from ..config import DEFAULT_CHUNK_SIZE
-from ..exceptions import BackendClientError
-from ..pagination import fetch_paginated_result
-from ..request import (
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import (
     AttachedFile,
     Request,
     SSEContextManager,
     WebSocketContextManager,
     WebSocketResponse,
 )
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import (
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import (
     ProgressReportingReader,
     create_connection_field,
     flatten_connection,
     to_global_id,
 )
-from ..utils import dedent as _d
-from ..versioning import get_id_or_name, get_naming
+from ai.backend.client.utils import dedent as _d
+from ai.backend.client.versioning import get_id_or_name, get_naming
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, SessionTypes
+
 from .base import BaseFunction, api_function
 
 __all__ = ("ComputeSession", "InferenceSession")
@@ -101,7 +94,7 @@ _default_session_node_detail_fields = (
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
     modified: dict[str, Any] = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             modified[k] = drop(v, value_to_drop)
         elif v != value_to_drop:
             modified[k] = v
@@ -210,7 +203,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[str]] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
         mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
@@ -415,7 +408,7 @@ class ComputeSession(BaseFunction):
         starts_at: str | None = None,  # not included in templates
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Sequence[str] | None = None,  # cannot be stored in templates
+        dependencies: Sequence[UUID] | None = None,  # cannot be stored in templates
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
@@ -665,6 +658,7 @@ class ComputeSession(BaseFunction):
         async with rqst.fetch() as resp:
             if resp.status == 200:
                 return await resp.json()
+        return None
 
     @api_function
     async def restart(self):
@@ -992,7 +986,7 @@ class ComputeSession(BaseFunction):
                 },
             })
         else:
-            raise BackendClientError("Invalid execution mode: {0}".format(mode))
+            raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
             return (await resp.json())["result"]
 
@@ -1049,9 +1043,7 @@ class ComputeSession(BaseFunction):
                         )
                     )
                 except ValueError:
-                    msg = 'File "{0}" is outside of the base directory "{1}".'.format(
-                        file_path, base_path
-                    )
+                    msg = f'File "{file_path}" is outside of the base directory "{base_path}".'
                     raise ValueError(msg) from None
             rqst = Request(
                 "POST",
@@ -1121,7 +1113,7 @@ class ComputeSession(BaseFunction):
                         pbar.update(len(chunk))
                     fp.close()
                     with tarfile.open(fp.name) as tarf:
-                        tarf.extractall(path=dest)
+                        tarf.extractall(path=dest, filter=tarfile.data_filter)
                         file_names.extend(tarf.getnames())
                     os.unlink(fp.name)
         return {"file_names": file_names}
@@ -1215,7 +1207,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     # only supported in AsyncAPISession
-    def listen_events(self, scope: Literal["*", "session", "kernel"] = "*") -> SSEContextManager:
+    def listen_events(self, scope: str = "*") -> SSEContextManager:
         """
         Opens the stream of the kernel lifecycle events.
         Only the master kernel of each session is monitored.
@@ -1287,13 +1279,13 @@ class ComputeSession(BaseFunction):
             opts = {}
         elif mode == "batch":
             opts = {
-                "clean": opts.get("clean", None),
-                "build": opts.get("build", None),
+                "clean": opts.get("clean"),
+                "build": opts.get("build"),
                 "buildLog": bool(opts.get("buildLog", False)),
-                "exec": opts.get("exec", None),
+                "exec": opts.get("exec"),
             }
         else:
-            msg = "Invalid stream-execution mode: {0}".format(mode)
+            msg = f"Invalid stream-execution mode: {mode}"
             raise BackendClientError(msg)
         request = Request(
             "GET",
@@ -1382,7 +1374,7 @@ class InferenceSession(BaseFunction):
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[str]] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
         mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
@@ -1392,7 +1384,7 @@ class InferenceSession(BaseFunction):
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
         resources: Optional[Mapping[str, str]] = None,
-        resource_opts: Optional[Mapping[str, Union[str, int, bool]]] = None,
+        resource_opts: Optional[Mapping[str, str | int | bool]] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         domain_name: Optional[str] = None,
@@ -1421,7 +1413,7 @@ class InferenceSession(BaseFunction):
         starts_at: Optional[str] = None,
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
+        dependencies: Optional[Sequence[UUID]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: list[str] | Undefined = undefined,
@@ -1429,7 +1421,7 @@ class InferenceSession(BaseFunction):
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         resources: Mapping[str, int] | Undefined = undefined,
-        resource_opts: Mapping[str, Union[str, int, bool]] | Undefined = undefined,
+        resource_opts: Mapping[str, str | int | bool] | Undefined = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: ClusterMode | Undefined = undefined,
         domain_name: str | Undefined = undefined,

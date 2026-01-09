@@ -38,7 +38,7 @@ if batch_enabled:
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 sock.connect("/tmp/bai-user-input.sock")
                 userdata = sock.recv(1024)
-            except socket.error:
+            except OSError:
                 userdata = b"<user-input-unavailable>"
             finally:
                 sock.close()

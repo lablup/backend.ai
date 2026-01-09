@@ -208,8 +208,14 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
-For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff``.
+
+As of Pantsbuild 2.24, self-contained tool binaries are auto-exported into ``dist/export/bin/``
+when executing ``pants export`` command with whatever arguments.
+For example, the Ruff executable is exported as ``dist/export/bin/ruff``.
+Other tools that require Python virtualenv (e.g., Mypy) are still exported as virtualenvs.
+
+For Pantsbuild 2.23 or older, the tool binaries are exported as regular Python virtualenvs like
+``dist/export/python/virtualenvs/ruff/3.13.7/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -249,23 +255,21 @@ Install the following extensions:
      *disable* them for the Backend.AI workspace only to prevent interference
      with Ruff's own linting, fixing and formatting.
 
-Set the workspace settings for the Python extension for code navigation and auto-completion:
+Set the workspace settings for the Python extension for automatic linting and formatting:
 
-.. list-table::
-   :header-rows: 1
+.. code-block:: json
 
-   * - Setting ID
-     - Recommended value
-   * - ``python.analysis.autoSearchPaths``
-     - true
-   * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.13.3/lib/python3.12/site-packages"]``
-   * - ``python.analysis.importFormat``
-     - ``"relative"``
-   * - ``editor.formatOnSave``
-     - ``true``
-   * - ``editor.codeActionsOnSave``
-     - ``{"source.fixAll": true}``
+   "[python]": {
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+         "source.fixAll": "explicit",
+         "source.organizeImports": "explicit"
+      },
+      "editor.defaultFormatter": "charliermarsh.ruff"
+   }
+
+Note that the main Python interpreter configuration for code navigation and auto-completion
+is auto-detected from ``pyproject.toml``.
 
 Set the following keys in the workspace settings to configure Python tools:
 
@@ -275,13 +279,13 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["dist/export/python/virtualenvs/mypy/3.13.3/bin/python"]``
+     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.13.7/bin/python"]`` (use the absolute path)
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
-   * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.13.3/bin/python"]``
-   * - ``ruff.importStrategy``
-     - ``"fromEnvironment"``
+   * - ``ruff.path``
+     - ``["/abs/path/to/dist/export/bin/python"]`` (use the absolute path)
+   * - ``ruff.nativeServer``
+     - ``true``
 
 .. note:: **Changed in July 2023**
 
@@ -309,34 +313,52 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
 
-When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
-in the local working copy to initialize Pyright functionalities.
+When using CoC, run ``:CocInstall coc-basedpyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
+in the local working copy to initialize basedpyright functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
-just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_).
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_,
+as basedpyright shares most configurations with pyright).
 
-.. code-block:: json
+.. code-block:: json5
 
    {
-     "coc.preferences.formatOnType": false,
-     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.linting.mypyEnabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.ruffEnabled": true,
+     "python.linting.ruffPath": "dist/export/bin/ruff",
+     "python.formatting.provider": "ruff",
+     "python.formatting.ruffPath": "dist/export/bin/ruff",
+   }
+
+.. code-block:: json5
+
+   {
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.linting.mypyEnabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.ruffEnabled": false,  // delegate to coc-ruff
+     "python.formatting.provider": "none",  // delegate to coc-ruff
+     "pyright.organizeimports.provider": "none",  // delegate to coc-ruff
+     // configuration for @yaegassy/coc-ruff extension
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.3/bin/python",
-     "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy",
+     "ruff.path": "/abs/path/to/dist/export/bin/ruff",  // absolute path
+     "ruff.nativeServer": true,
    }
-
-To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
-after opening any Python source file to install the ``ruff-lsp`` server.
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -703,7 +725,7 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``LOCKSET=towncrier/3.13.3 ./py -m towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=towncrier/3.13.7 ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
     actually modifying the filesystem.

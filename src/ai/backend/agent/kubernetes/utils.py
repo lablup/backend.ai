@@ -2,17 +2,18 @@ import asyncio
 import gzip
 import logging
 import subprocess
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Final, Mapping, Optional, Tuple
+from typing import Any, Final, Optional
 
 import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.errors import SubprocessStreamError
+from ai.backend.agent.utils import update_nested_dict
 from ai.backend.logging import BraceStyleAdapter
-
-from ..utils import update_nested_dict
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -52,15 +53,14 @@ class PersistentServiceContainer:
             )
         )
 
-    async def get_container_version_and_status(self) -> Tuple[int, bool]:
+    async def get_container_version_and_status(self) -> tuple[int, bool]:
         try:
             c = self.docker.containers.container(self.container_name)
             await c.show()
         except DockerError as e:
             if e.status == 404:
                 return 0, False
-            else:
-                raise
+            raise
         if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
             raise RuntimeError(
                 f'An existing container named "{c["Name"].lstrip("/")}" is not a system container'
@@ -77,8 +77,7 @@ class PersistentServiceContainer:
         except DockerError as e:
             if e.status == 404:
                 return 0
-            else:
-                raise
+            raise
         return int(img["Config"].get("Labels", {}).get("ai.backend.version", "0"))
 
     async def ensure_running_latest(self) -> None:
@@ -110,7 +109,8 @@ class PersistentServiceContainer:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
-            assert proc.stdin is not None
+            if proc.stdin is None:
+                raise SubprocessStreamError("Subprocess stdin is not available.")
             with closing(proc.stdin):
                 while True:
                     chunk = reader.read(IMAGE_CHUNK_SIZE)
@@ -133,9 +133,7 @@ class PersistentServiceContainer:
             await c.stop()
             await c.delete(force=True)
         except DockerError as e:
-            if e.status == 409 and "is not running" in e.message:
-                pass
-            elif e.status == 404:
+            if (e.status == 409 and "is not running" in e.message) or e.status == 404:
                 pass
             else:
                 raise

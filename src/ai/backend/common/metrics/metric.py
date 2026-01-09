@@ -396,35 +396,73 @@ class DomainType(enum.StrEnum):
     VALKEY = "valkey"
     REPOSITORY = "repository"
     CLIENT = "client"
+    DB_SOURCE = "db_source"
+    CACHE_SOURCE = "cache_source"
 
 
 class LayerType(enum.StrEnum):
-    # Repository layers
-    AGENT = "agent"
-    AUTH = "auth"
-    CONTAINER_REGISTRY = "container_registry"
-    DOMAIN = "domain"
-    GROUP = "group"
-    IMAGE = "image"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    METRIC = "metric"
-    MODEL_SERVING = "model_serving"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    RESOURCE_PRESET = "resource_preset"
-    SCHEDULE = "schedule"
-    SESSION = "session"
-    USER = "user"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    VFOLDER = "vfolder"
-    PERMISSION_CONTROL = "permission_control"
+    # Repository layers with _REPOSITORY suffix
+    AGENT_REPOSITORY = "agent_repository"
+    AUTH_REPOSITORY = "auth_repository"
+    ARTIFACT_REPOSITORY = "artifact_repository"
+    ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
+    AUDIT_LOG_REPOSITORY = "audit_log_repository"
+    CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
+    DEPLOYMENT_REPOSITORY = "deployment_repository"
+    DOMAIN_REPOSITORY = "domain_repository"
+    GROUP_REPOSITORY = "group_repository"
+    HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
+    IMAGE_REPOSITORY = "image_repository"
+    KEYPAIR_RESOURCE_POLICY_REPOSITORY = "keypair_resource_policy_repository"
+    METRIC_REPOSITORY = "metric_repository"
+    MODEL_SERVING_REPOSITORY = "model_serving_repository"
+    NOTIFICATION_REPOSITORY = "notification_repository"
+    OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
+    PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
+    PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
+    RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
+    RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
+    SCALING_GROUP_REPOSITORY = "scaling_group_repository"
+    SCHEDULE_REPOSITORY = "schedule_repository"
+    SCHEDULER_REPOSITORY = "scheduler_repository"
+    SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
+    SESSION_REPOSITORY = "session_repository"
+    STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
+    USER_REPOSITORY = "user_repository"
+    USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
+    VFOLDER_REPOSITORY = "vfolder_repository"
+    VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
+
+    # DB Source layers
+    AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
+    AUTH_DB_SOURCE = "auth_db_source"
+    AGENT_DB_SOURCE = "agent_db_source"
+    DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
+    RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
+    SCHEDULE_DB_SOURCE = "schedule_db_source"
+    SCHEDULER_DB_SOURCE = "scheduler_db_source"
+    USER_RESOURCE_POLICY_DB_SOURCE = "user_resource_policy_db_source"
+    KEYPAIR_RESOURCE_POLICY_DB_SOURCE = "keypair_resource_policy_db_source"
+
+    # Cache Source layers
+    AGENT_CACHE_SOURCE = "agent_cache_source"
+    RESOURCE_PRESET_CACHE_SOURCE = "resource_preset_cache_source"
+    SCHEDULE_CACHE_SOURCE = "schedule_cache_source"
+    SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 
     # Valkey client layers
+    VALKEY_ARTIFACT = "valkey_artifact"
+    VALKEY_ARTIFACT_REGISTRIES = "valkey_artifact_registries"
+    VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"
     VALKEY_RATE_LIMIT = "valkey_rate_limit"
+    VALKEY_SCHEDULE = "valkey_schedule"
     VALKEY_SESSION = "valkey_session"
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
+    VALKEY_BGTASK = "valkey_bgtask"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -441,6 +479,7 @@ class LayerMetricObserver:
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
+    _layer_operation_error_count: Counter
     _layer_retry_count: Counter
     _layer_operation_duration_sec: Histogram
 
@@ -454,6 +493,11 @@ class LayerMetricObserver:
             name="backendai_layer_operation_count",
             documentation="Total number of layer operations",
             labelnames=["domain", "layer", "operation", "success"],
+        )
+        self._layer_operation_error_count = Counter(
+            name="backendai_layer_operation_error_count",
+            documentation="Total number of layer operation errors",
+            labelnames=["domain", "layer", "operation", "error_code"],
         )
         self._layer_retry_count = Counter(
             name="backendai_layer_retry_count",
@@ -505,9 +549,10 @@ class LayerMetricObserver:
         domain: DomainType,
         layer: LayerType,
         operation: str,
-        success: bool,
         duration: float,
+        exception: Optional[BaseException] = None,
     ) -> None:
+        success = exception is None
         self._layer_operation_triggered_count.labels(
             domain=domain,
             layer=layer,
@@ -519,6 +564,17 @@ class LayerMetricObserver:
             operation=operation,
             success=str(success),
         ).inc()
+        if not success:
+            self._layer_operation_error_count.labels(
+                domain=domain,
+                layer=layer,
+                operation=operation,
+                error_code=(
+                    exception.error_code()
+                    if isinstance(exception, BackendAIError)
+                    else "internal_error"
+                ),
+            ).inc()
         self._layer_operation_duration_sec.labels(
             domain=domain,
             layer=layer,
@@ -598,6 +654,52 @@ class SweeperMetricObserver:
         self._kernel_sweep_count.labels(success=success).inc()
 
 
+class EventPropagatorMetricObserver:
+    _instance: Optional[Self] = None
+
+    _propagator_count: Gauge
+    _propagator_alias_count: Gauge
+    _propagator_registration_count: Counter
+    _propagator_unregistration_count: Counter
+
+    def __init__(self) -> None:
+        self._propagator_count = Gauge(
+            name="backendai_event_propagator_count",
+            documentation="Current number of active event propagators",
+        )
+        self._propagator_alias_count = Gauge(
+            name="backendai_event_propagator_alias_count",
+            documentation="Current number of event propagator aliases",
+            labelnames=["domain", "alias_id"],
+        )
+        self._propagator_registration_count = Counter(
+            name="backendai_event_propagator_registration_count",
+            documentation="Total number of event propagator registrations",
+        )
+        self._propagator_unregistration_count = Counter(
+            name="backendai_event_propagator_unregistration_count",
+            documentation="Total number of event propagator unregistrations",
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_propagator_registered(self, *, aliases: list[tuple[str, str]]) -> None:
+        self._propagator_count.inc()
+        self._propagator_registration_count.inc()
+        for domain, alias_id in aliases:
+            self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).inc()
+
+    def observe_propagator_unregistered(self, *, aliases: list[tuple[str, str]]) -> None:
+        self._propagator_count.dec()
+        self._propagator_unregistration_count.inc()
+        for domain, alias_id in aliases:
+            self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).dec()
+
+
 class CommonMetricRegistry:
     _instance: Optional[Self] = None
 
@@ -607,6 +709,7 @@ class CommonMetricRegistry:
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
     sweeper: SweeperMetricObserver
+    event_propagator_observer: EventPropagatorMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
@@ -615,6 +718,7 @@ class CommonMetricRegistry:
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
         self.sweeper = SweeperMetricObserver.instance()
+        self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
     def instance(cls):

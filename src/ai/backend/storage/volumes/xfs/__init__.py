@@ -1,45 +1,46 @@
 import asyncio
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-)
+from typing import Any
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...exception import InvalidQuotaScopeError, NotEmptyError
-from ...subproc import run
-from ...types import (
+from ai.backend.storage.errors import (
+    InvalidQuotaFormatError,
+    InvalidQuotaScopeError,
+    QuotaDirectoryNotEmptyError,
+    QuotaTreeNotFoundError,
+)
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ...volumes.abc import CAP_QUOTA, CAP_VFOLDER
-from ..abc import AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
-Path(LOCK_FILE).touch()
+DEFAULT_LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
 
 
 class XfsProjectRegistry:
     file_projects: Path = Path("/etc/projects")
     file_projid: Path = Path("/etc/projid")
     backend: BaseVolume
-    name_id_map: Dict[str, int] = dict()
-    project_id_pool: List[int] = list()
+    name_id_map: dict[str, int] = dict()
+    project_id_pool: list[int] = list()
 
     async def init(self, backend: BaseVolume) -> None:
         self.backend = backend
@@ -70,7 +71,7 @@ class XfsProjectRegistry:
         quota_scope_id: QuotaScopeID,
         qspath: Path,
         *,
-        project_id: Optional[int] = None,
+        project_id: int | None = None,
     ) -> None:
         if project_id is None:
             project_id = self.get_free_project_id()
@@ -149,17 +150,19 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         self,
         mount_path: Path,
         project_registry: XfsProjectRegistry,
+        lock_path: Path,
     ) -> None:
         super().__init__(mount_path)
         self.project_registry = project_registry
         stat_vfs = os.statvfs(mount_path)
         self.block_size = stat_vfs.f_bsize
+        self._lock_path = lock_path
 
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
@@ -167,7 +170,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 # Set the limit as the filesystem size
                 vfs_stat = os.statvfs(self.mount_path)
                 options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
-            async with FileLock(LOCK_FILE):
+            async with FileLock(self._lock_path):
                 log.info(
                     "creating project quota (qs:{}, q:{})",
                     quota_scope_id,
@@ -177,7 +180,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 await self.project_registry.read_project_info()
                 await self.project_registry.add_project_entry(quota_scope_id, qspath)
                 await self.project_registry.read_project_info()
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             log.exception("quota-scope creation timeout")
             raise
         except Exception:
@@ -189,7 +192,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
         full_report = await run(
@@ -198,19 +201,26 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             # -N: without header
             ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
         )
-        print(full_report)
         for line in full_report.splitlines():
             if quota_scope_id.pathname in line:
                 report = line
                 break
         else:
-            raise RuntimeError(f"unknown xfs project ID: {quota_scope_id.pathname}")
+            raise QuotaTreeNotFoundError(f"unknown xfs project ID: {quota_scope_id.pathname}")
         if len(report.split()) != 6:
-            raise ValueError("unexpected format for xfs_quota report")
+            raise InvalidQuotaFormatError("unexpected format for xfs_quota report")
         _, used_kbs, _, hard_limit_kbs, _, _ = report.split()
         # By default, report command displays the sizes in the 1 KiB unit.
         used_bytes = int(used_kbs) * 1024
         hard_limit_bytes = int(hard_limit_kbs) * 1024
+        if used_bytes < 0 or hard_limit_bytes < 0:
+            log.warning(
+                "Negative values in used_bytes({}) or limit_bytes({}) for quota scope {} in XFS: report line = {}",
+                used_bytes,
+                hard_limit_bytes,
+                quota_scope_id,
+                report,
+            )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
     async def update_quota_scope(
@@ -257,8 +267,10 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
-        async with FileLock(LOCK_FILE):
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
+        async with FileLock(self._lock_path):
             await self.project_registry.read_project_info()
             await self.project_registry.remove_project_entry(quota_scope_id)
             await self.project_registry.read_project_info()
@@ -279,6 +291,39 @@ class XfsVolume(BaseVolume):
 
     project_registry: XfsProjectRegistry
 
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            watcher=watcher,
+            options=options,
+        )
+        self._lock_path = Path(self.config.get("lock_file_path", DEFAULT_LOCK_FILE))
+        try:
+            self._lock_path.touch()
+        except OSError as e:
+            log.exception(
+                "Failed to create XFS backend lock file at {}: (Error: {})",
+                self._lock_path,
+                e,
+            )
+            raise InvalidConfigError(
+                f"Cannot create XFS backend lock file at {self._lock_path}"
+            ) from e
+
     async def init(self) -> None:
         self.project_registry = XfsProjectRegistry()
         await self.project_registry.init(self)
@@ -288,7 +333,8 @@ class XfsVolume(BaseVolume):
         return XFSProjectQuotaModel(
             self.mount_path,
             self.project_registry,
+            self._lock_path,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

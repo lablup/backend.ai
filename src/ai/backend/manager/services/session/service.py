@@ -4,44 +4,32 @@ import functools
 import logging
 import secrets
 import uuid
+from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Iterable, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
 import aiohttp
 import aiotools
 import multidict
 import trafaret as t
+from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.common.events.event_types.bgtask.broadcast import (
-    BaseBgtaskDoneEvent,
-    BaseBgtaskEvent,
-)
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
-from ai.backend.common.events.types import (
-    EventCacheDomain,
-    EventDomain,
-)
 from ai.backend.common.exception import (
     BackendAIError,
-    BgtaskCancelledError,
-    BgtaskFailedError,
     InvalidAPIParameters,
     UnknownImageReference,
 )
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
-    DispatchResult,
     ImageAlias,
-    ImageRegistry,
     SessionId,
     SessionTypes,
 )
@@ -53,13 +41,17 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
+from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
-    GenericForbidden,
     InternalServerError,
     ServiceUnavailable,
 )
 from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.errors.kernel import (
+    InvalidSessionData,
     KernelNotReady,
     QuotaExceeded,
     SessionAlreadyExists,
@@ -68,22 +60,22 @@ from ai.backend.manager.errors.kernel import (
 )
 from ai.backend.manager.errors.resource import (
     AppNotFound,
+    NoCurrentTaskContext,
     TaskTemplateNotFound,
 )
+from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
-    SessionRow,
-    SessionStatus,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -195,6 +187,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -210,6 +203,7 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     admin_session_repository: AdminSessionRepository
+    scheduling_controller: SchedulingController
 
 
 class SessionService:
@@ -221,6 +215,7 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _admin_session_repository: AdminSessionRepository
+    _scheduling_controller: SchedulingController
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -236,6 +231,7 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._admin_session_repository = args.admin_session_repository
+        self._scheduling_controller = args.scheduling_controller
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
@@ -246,7 +242,8 @@ class SessionService:
         filename = action.filename
 
         myself = asyncio.current_task()
-        assert myself is not None
+        if myself is None:
+            raise NoCurrentTaskContext("No current asyncio task context available")
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -296,10 +293,28 @@ class SessionService:
         image_owner_id = action.image_owner_id
 
         myself = asyncio.current_task()
-        assert myself is not None
+        if myself is None:
+            raise NoCurrentTaskContext("No current asyncio task context available")
 
         if image_visibility != CustomizedImageVisibilityScope.USER:
             raise InvalidAPIParameters(f"Unsupported visibility scope {image_visibility}")
+
+        # check if user has passed its limit of customized image count
+        existing_image_count = await self._session_repository.get_customized_image_count(
+            image_visibility.value, str(image_owner_id)
+        )
+        customized_image_count_limit = action.max_customized_image_count
+        if customized_image_count_limit <= existing_image_count:
+            raise QuotaExceeded(
+                extra_msg=(
+                    "You have reached your customized image count quota. "
+                    f"(current: {existing_image_count}, limit: {customized_image_count_limit})"
+                ),
+                extra_data={
+                    "limit": customized_image_count_limit,
+                    "current": existing_image_count,
+                },
+            )
 
         session = await self._session_repository.get_session_with_group(
             session_name,
@@ -324,186 +339,27 @@ class SessionService:
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-        image_row = await self._session_repository.resolve_image([
-            ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
-        ])
+        # Validate image exists
+        if session.main_kernel.image and session.main_kernel.architecture:
+            await self._session_repository.resolve_image([
+                ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
+            ])
 
-        base_image_ref = image_row.image_ref
+        # Create manifest for background task
+        manifest = CommitSessionManifest(
+            session_id=session.id,
+            registry_hostname=registry_hostname,
+            registry_project=registry_project,
+            image_name=image_name,
+            image_visibility=image_visibility,
+            image_owner_id=str(image_owner_id),
+            user_email=action.user_email,
+        )
 
-        async def _commit_and_upload(
-            reporter: ProgressReporter,
-        ) -> DispatchResult[uuid.UUID]:
-            reporter.total_progress = 3
-            await reporter.update(message="Commit started")
-            # remove any existing customized related tag from base canonical
-            filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
-            ]
-
-            if base_image_ref.name == "":
-                new_name = base_image_ref.project
-            else:
-                new_name = base_image_ref.name
-
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
-
-            # check if user has passed its limit of customized image count
-            existing_image_count = await self._session_repository.get_customized_image_count(
-                image_visibility.value, str(image_owner_id)
-            )
-
-            customized_image_count_limit = action.max_customized_image_count
-            if customized_image_count_limit <= existing_image_count:
-                raise QuotaExceeded(
-                    extra_msg="You have reached your customized image count quota",
-                    extra_data={
-                        "limit": customized_image_count_limit,
-                        "current": existing_image_count,
-                    },
-                )
-
-            # check if image with same name exists and reuse ID it if is
-            existing_row = await self._session_repository.get_existing_customized_image(
-                new_canonical, image_visibility.value, str(image_owner_id), image_name
-            )
-
-            customized_image_id: str
-            kern_features: list[str]
-            if existing_row is not None:
-                from ai.backend.manager.models.image import ImageRow
-
-                existing_image: ImageRow = existing_row
-                labels = existing_image.labels or {}
-                kern_features_str = labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE)
-                kern_features = (
-                    kern_features_str.split() if kern_features_str else [DEFAULT_KERNEL_FEATURE]
-                )
-                customized_image_id = labels.get(LabelName.CUSTOMIZED_ID, str(uuid.uuid4()))
-                log.debug("reusing existing customized image ID {}", customized_image_id)
-            else:
-                kern_features = [DEFAULT_KERNEL_FEATURE]
-                customized_image_id = str(uuid.uuid4())
-                # Remove PRIVATE label for customized images
-                kern_features = [
-                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                ]
-
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref = ImageRef.from_image_str(
-                new_canonical,
-                None,
-                registry_hostname,
-                architecture=base_image_ref.architecture,
-                is_local=base_image_ref.is_local,
-            )
-
-            image_labels: dict[str | LabelName, str] = {
-                LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
-                LabelName.CUSTOMIZED_NAME: image_name,
-                LabelName.CUSTOMIZED_ID: customized_image_id,
-                LabelName.FEATURES: " ".join(kern_features),
-            }
-            match image_visibility:
-                case CustomizedImageVisibilityScope.USER:
-                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
-
-            # commit image with new tag set
-            resp = await self._agent_registry.commit_session(
-                session,
-                new_image_ref,
-                extra_labels=image_labels,
-            )
-            bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-            propagator = WithCachePropagator(self._event_fetcher)
-            self._event_hub.register_event_propagator(
-                propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-            )
-            try:
-                cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
-                async for event in propagator.receive(cache_id):
-                    if not isinstance(event, BaseBgtaskEvent):
-                        log.warning("unexpected event: {}", event)
-                        continue
-                    match event.status():
-                        case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                            # TODO: PARTIAL_SUCCESS should be handled
-                            await reporter.update(increment=1, message="Committed image")
-                            break
-                        case BgtaskStatus.FAILED:
-                            raise BgtaskFailedError(
-                                extra_msg=cast(BaseBgtaskDoneEvent, event).message
-                            )
-                        case BgtaskStatus.CANCELLED:
-                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                        case BgtaskStatus.UPDATED:
-                            continue
-                        case _:
-                            log.warning("unexpected bgtask done event: {}", event)
-            finally:
-                self._event_hub.unregister_event_propagator(propagator.id())
-
-            if not new_image_ref.is_local:
-                # push image to registry from local agent
-                image_registry = ImageRegistry(
-                    name=registry_hostname,
-                    url=str(registry_conf.url),
-                    username=registry_conf.username,
-                    password=registry_conf.password,
-                )
-                resp = await self._agent_registry.push_image(
-                    session.main_kernel.agent,
-                    new_image_ref,
-                    image_registry,
-                )
-                bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                propagator = WithCachePropagator(self._event_fetcher)
-                self._event_hub.register_event_propagator(
-                    propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-                )
-                try:
-                    cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
-                    async for event in propagator.receive(cache_id):
-                        if not isinstance(event, BaseBgtaskEvent):
-                            log.warning("unexpected event: {}", event)
-                            continue
-                        match event.status():
-                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                                break
-                            case BgtaskStatus.FAILED:
-                                raise BgtaskFailedError(
-                                    extra_msg=cast(BaseBgtaskDoneEvent, event).message
-                                )
-                            case BgtaskStatus.CANCELLED:
-                                raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                            case BgtaskStatus.UPDATED:
-                                continue
-                            case _:
-                                log.warning("unexpected bgtask done event: {}", event)
-                finally:
-                    self._event_hub.unregister_event_propagator(propagator.id())
-
-            await reporter.update(increment=1, message="Pushed image to registry")
-            # rescan updated image only
-            rescan_result = await self._session_repository.rescan_images(
-                new_image_ref.canonical,
-                registry_project,
-                reporter=reporter,
-            )
-            await reporter.update(increment=1, message="Completed")
-            if len(rescan_result.images) == 0:
-                rescan_errors = ",".join(rescan_result.errors)
-                return DispatchResult.error(
-                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
-                )
-            elif len(rescan_result.images) > 1:
-                log.warning(
-                    f"More than two images were rescanned unexpectedly. Rescanned Images: {rescan_result.images}"
-                )
-            return DispatchResult.success(rescan_result.images[0].id)
-
-        task_id = await self._background_task_manager.start(_commit_and_upload)
+        task_id = await self._background_task_manager.start_retriable(
+            ManagerBgtaskName.COMMIT_SESSION,
+            manifest,
+        )
 
         return ConvertSessionToImageActionResult(
             task_id=task_id, session_data=session.to_dataclass()
@@ -865,80 +721,41 @@ class SessionService:
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
-        user_role = action.user_role
         session_name = action.session_name
         owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
-        if recursive:
-            dependent_session_ids = await self._session_repository.find_dependent_sessions(
-                session_name,
-                owner_access_key,
-                allow_stale=True,
-            )
+        # Get session IDs to terminate (based on recursive flag)
+        session_ids = await self._session_repository.get_target_session_ids(
+            session_name,
+            owner_access_key,
+            recursive=recursive,
+        )
 
-            target_session_references: list[str | uuid.UUID] = [
-                *dependent_session_ids,
-                session_name,
-            ]
-
-            async def get_session_safe(name_or_id):
-                try:
-                    return await self._session_repository.get_session_validated(
-                        name_or_id,
-                        owner_access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                        allow_stale=True,
-                    )
-                except Exception as e:
-                    return e
-
-            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
-                *[get_session_safe(name_or_id) for name_or_id in target_session_references],
-                return_exceptions=True,
-            )
-
-            last_stats = await asyncio.gather(
-                *[
-                    self._agent_registry.destroy_session(sess, forced=forced, user_role=user_role)
-                    for sess in sessions
-                    if isinstance(sess, SessionRow)
-                ],
-                return_exceptions=True,
-            )
-
-            # Consider not found sessions already terminated.
-            # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
-            last_stats = [
-                *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
-            ]
-
-            # Convert SessionRows to SessionData
-            destroyed_sessions = [
-                sess.to_dataclass() if isinstance(sess, SessionRow) else sess for sess in sessions
-            ]
-            return DestroySessionActionResult(
-                result=last_stats, destroyed_sessions=destroyed_sessions
-            )
+        # Determine termination reason based on forced flag
+        if forced:
+            reason = KernelLifecycleEventReason.FORCE_TERMINATED
         else:
-            session = await self._session_repository.get_session_validated(
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            )
-            last_stat = await self._agent_registry.destroy_session(
-                session,
-                forced=forced,
-                user_role=user_role,
-            )
-            resp = {
-                "stats": last_stat,
-            }
+            reason = KernelLifecycleEventReason.USER_REQUESTED
 
-            return DestroySessionActionResult(
-                result=resp, destroyed_sessions=[session.to_dataclass()]
-            )
+        # Mark sessions for termination
+        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+            session_ids,
+            reason=reason.value,
+        )
+
+        # Build stats for response - prioritize cancelled over terminating
+        if mark_result.cancelled_sessions:
+            last_stat = {"status": "cancelled"}
+        elif mark_result.terminating_sessions:
+            last_stat = {"status": "terminated"}
+        else:
+            last_stat = {}
+
+        # Return response - same format for both recursive and non-recursive
+        resp = {"stats": last_stat}
+        return DestroySessionActionResult(result=resp)
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
@@ -977,7 +794,8 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
-            assert len(files) <= 5, "Too many files"
+            if len(files) > 5:
+                raise VFolderBadRequest("Too many files (maximum 5 files allowed)")
             await self._agent_registry.increment_session_usage(session)
             # TODO: Read all download file contents. Need to fix by using chuncking, etc.
             results = await asyncio.gather(
@@ -1035,27 +853,21 @@ class SessionService:
                 mode = action.params.mode
 
                 if mode is None:
-                    # TODO: Create new exception
-                    raise RuntimeError("runId or mode is missing!")
+                    raise InvalidSessionData("runId or mode is missing")
 
-                assert mode in {
-                    "query",
-                    "batch",
-                    "complete",
-                    "continue",
-                    "input",
-                }, "mode has an invalid value."
-                if mode in {"continue", "input"}:
-                    assert run_id is not None, "continuation requires explicit run ID"
+                if mode not in {"query", "batch", "complete", "continue", "input"}:
+                    raise InvalidSessionData(f"mode has an invalid value: {mode}")
+                if mode in {"continue", "input"} and run_id is None:
+                    raise InvalidSessionData("continuation requires explicit run ID")
                 code = action.params.code
                 opts = action.params.options
             else:
                 raise RuntimeError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
-                code = ""  # noqa
+                code = ""
             if opts is None:
-                opts = {}  # noqa
+                opts = {}
             if mode == "complete":
                 # For legacy
                 completion_resp = await self._agent_registry.get_completions(session, code, opts)
@@ -1230,6 +1042,10 @@ class SessionService:
         resp = {}
         sess_type = cast(SessionTypes, sess.session_type)
         if sess_type in PRIVATE_SESSION_TYPES:
+            if sess.main_kernel.agent_row is None:
+                raise KernelNotReady(
+                    f"Kernel of the session has no agent info yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
+                )
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
             service_ports = cast(Optional[list[dict[str, Any]]], sess.main_kernel.service_ports)
@@ -1262,30 +1078,33 @@ class SessionService:
         )
         await self._agent_registry.increment_session_usage(sess)
 
-        age = datetime.now(tzutc()) - sess.created_at
+        created_at = sess.created_at or datetime.now(tzutc())
+        age = datetime.now(tzutc()) - created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
             user_id=sess.user_uuid,
-            lang=sess.main_kernel.image,  # legacy
-            image=sess.main_kernel.image,
-            architecture=sess.main_kernel.architecture,
+            lang=sess.main_kernel.image or "",  # legacy
+            image=sess.main_kernel.image or "",
+            architecture=sess.main_kernel.architecture or "",
             registry=sess.main_kernel.registry,
             tag=sess.tag,
-            container_id=sess.main_kernel.container_id,
+            container_id=uuid.UUID(sess.main_kernel.container_id)
+            if sess.main_kernel.container_id
+            else uuid.uuid4(),
             occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
             occupying_slots=str(sess.occupying_slots),
             requested_slots=str(sess.requested_slots),
             occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
             environ=str(sess.environ),
             resource_opts=str(sess.resource_opts),
-            status=sess.status.name,
+            status=sess.status,
             status_info=str(sess.status_info) if sess.status_info else None,
             status_data=sess.status_data,
             age_ms=int(age.total_seconds() * 1000),
-            creation_time=sess.created_at,
+            creation_time=created_at,
             termination_time=sess.terminated_at,
-            num_queries_executed=sess.num_queries,
+            num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,
             idle_checks=await self._idle_checker_host.get_idle_check_report(sess.id),
         )
@@ -1307,7 +1126,7 @@ class SessionService:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.NONE,
         )
-        result = session_row.status_history
+        result = session_row.status_history or {}
 
         return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
 
@@ -1437,6 +1256,8 @@ class SessionService:
             )
         )
 
+        if session.scaling_group_name is None:
+            raise ServiceUnavailable("Session has no scaling group assigned")
         wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
             session.scaling_group_name
         )
@@ -1452,7 +1273,11 @@ class SessionService:
             kernel_host = urlparse(session.main_kernel.agent_addr).hostname
         else:
             kernel_host = session.main_kernel.kernel_host
-        for sport in session.main_kernel.service_ports:
+        service_ports: list[dict[str, Any]] = cast(
+            list[dict[str, Any]], session.main_kernel.service_ports or []
+        )
+        sport: dict[str, Any] = {}
+        for sport in service_ports:
             if sport["name"] == service:
                 if sport["is_inference"]:
                     raise InvalidAPIParameters(
@@ -1484,7 +1309,7 @@ class SessionService:
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, list[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if arguments is not None:
             opts["arguments"] = load_json(arguments)
         if envs is not None:
@@ -1513,26 +1338,26 @@ class SessionService:
             },
         }
 
-        async with aiohttp.ClientSession() as req:
-            async with req.post(
+        async with (
+            aiohttp.ClientSession() as req,
+            req.post(
                 f"{wsproxy_addr}/v2/conf",
                 json=body,
-            ) as resp:
-                token_json = await resp.json()
+            ) as resp,
+        ):
+            token_json = await resp.json()
 
-                return StartServiceActionResult(
-                    result=None,
-                    session_data=session.to_dataclass(),
-                    token=token_json["token"],
-                    wsproxy_addr=wsproxy_advertise_addr,
-                )
+            return StartServiceActionResult(
+                result=None,
+                session_data=session.to_dataclass(),
+                token=token_json["token"],
+                wsproxy_addr=wsproxy_advertise_addr,
+            )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
         reader = action.reader
-
-        loop = asyncio.get_event_loop()
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1542,43 +1367,48 @@ class SessionService:
 
         await self._agent_registry.increment_session_usage(session)
         file_count = 0
-        upload_tasks = []
-        async for file in aiotools.aiter(reader.next, None):
-            if file_count == 20:
-                raise InvalidAPIParameters("Too many files")
-            file_count += 1
-            # This API handles only small files, so let's read it at once.
-            chunks = []
-            recv_size = 0
-            while True:
-                chunk = await file.read_chunk(size=1048576)
-                if not chunk:
+
+        async with aiotools.TaskScope() as ts:
+            async for file in aiotools.aiter(reader.next, None):
+                if file_count == 20:
+                    raise InvalidAPIParameters("Too many files")
+                if file is None:
                     break
-                chunk_size = len(chunk)
-                if recv_size + chunk_size >= 1048576:
-                    raise InvalidAPIParameters("Too large file")
-                chunks.append(chunk)
-                recv_size += chunk_size
-            data = file.decode(b"".join(chunks))
-            log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
-            t = loop.create_task(self._agent_registry.upload_file(session, file.filename, data))
-            upload_tasks.append(t)
-        await asyncio.gather(*upload_tasks)
+                if not isinstance(file, BodyPartReader):
+                    raise InvalidAPIParameters("Nested multipart upload is not supported")
+                file_name = file.filename or f"upload-{secrets.token_hex(12)}"
+                file_count += 1
+                # This API handles only small files, so let's read it at once.
+                chunks = []
+                recv_size = 0
+                while True:
+                    chunk = await file.read_chunk(size=1048576)
+                    if not chunk:
+                        break
+                    chunk_size = len(chunk)
+                    if recv_size + chunk_size >= 1048576:
+                        raise InvalidAPIParameters("Too large file")
+                    chunks.append(chunk)
+                    recv_size += chunk_size
+                data = await file.decode(b"".join(chunks))
+                log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
+                ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
-        props = action.modifier
-        session_name = action.modifier.name.optional_value()
+        spec = cast(SessionUpdaterSpec, action.updater.spec)
+        session_name = spec.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(
-            str(session_id), props.fields_to_update(), session_name
-        )
+        session_row = await self._session_repository.modify_session(action.updater, session_name)
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
+        session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
-        return ModifySessionActionResult(session_data=session_row.to_dataclass())
+        return ModifySessionActionResult(
+            session_data=session_row.to_dataclass(owner=session_owner_data)
+        )
 
     async def check_and_transit_status(
         self, action: CheckAndTransitStatusAction
@@ -1610,10 +1440,11 @@ class SessionService:
         await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
             row.id for row, is_transited in session_rows if is_transited
         ])
+        session_owner_data = await self._session_repository.get_session_owner(session_id)
 
         result = {row.id: row.status.name for row, _ in session_rows}
         return CheckAndTransitStatusActionResult(
-            result=result, session_data=session_row.to_dataclass()
+            result=result, session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
     async def check_and_transit_status_multi(

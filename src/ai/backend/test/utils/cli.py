@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Protocol
 
 import pexpect
 
@@ -25,10 +26,15 @@ def run(
     default_timeout: int = 5,
     **kwargs,
 ) -> pexpect.spawn:
-    p = pexpect.spawn(
+    return pexpect.spawn(
         str(args[0]),
         [str(arg) for arg in args[1:]],
         timeout=default_timeout,
         **kwargs,
     )
-    return p
+
+
+def decode(pexpect_capture: bytes | None) -> str:
+    if pexpect_capture is None:
+        return ""
+    return pexpect_capture.decode()

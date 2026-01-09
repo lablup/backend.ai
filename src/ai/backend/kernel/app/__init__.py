@@ -4,20 +4,19 @@ which do not provide query/batch-mode code execution.
 """
 
 import logging
-from typing import List
 
-from .. import BaseRunner
+from ai.backend.kernel import BaseRunner
 
 log = logging.getLogger()
 
-DEFAULT_PYFLAGS: List[str] = []
+DEFAULT_PYFLAGS: list[str] = []
 
 
 class Runner(BaseRunner):
     log_prefix = "app-kernel"
     default_runtime_path = "/opt/backend.ai/bin/python"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
     async def init_with_loop(self):

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import logging.config
 import os
 import re
@@ -10,15 +9,16 @@ import ssl
 import sys
 import time
 import traceback
-from collections.abc import MutableMapping, Sequence
-from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime, timezone
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, MutableMapping, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from typing import Any, Optional, cast
 from uuid import uuid4
 
+import aiohttp
 import aiohttp_cors
 import aiotools
 import click
@@ -31,17 +31,20 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.dto.manager.auth.field import (
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
@@ -51,12 +54,19 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.web.config.unified import ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
-from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
+from .errors import InvalidAPIConfigurationError
+from .proxy import (
+    decrypt_payload,
+    web_handler,
+    web_handler_with_jwt,
+    web_plugin_handler,
+    websocket_handler,
+)
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
@@ -219,7 +229,10 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             result = await api_session.Auth.update_password_no_auth(
@@ -284,7 +297,7 @@ async def login_handler(request: web.Request) -> web.Response:
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-bad-request",
                 "title": "You have already logged in.",
@@ -305,7 +318,7 @@ async def login_handler(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the username field.",
@@ -313,7 +326,7 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     if "password" not in creds or not creds["password"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the password field.",
@@ -371,7 +384,7 @@ async def login_handler(request: web.Request) -> web.Response:
             client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
-        return web.HTTPTooManyRequests(
+        raise web.HTTPTooManyRequests(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/too-many-requests",
                 "title": "Too many failed login attempts",
@@ -388,7 +401,10 @@ async def login_handler(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             extra_args = {}
@@ -486,10 +502,26 @@ async def extend_login_session(request: web.Request) -> web.Response:
     session = await get_session(request)
 
     session.expiration_dt = current + login_session_extension_sec
-    expires = datetime.fromtimestamp(session.expiration_dt, tz=timezone.utc).isoformat()
+    expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
 
     result = {"status": 201, "expires": expires}
     return web.json_response(result)
+
+
+async def check_health(request: web.Request) -> web.Response:
+    """Health check endpoint with dependency connectivity status"""
+    request["do_not_print_access_log"] = True
+
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="webserver",
+        connectivity=connectivity,
+    )
+
+    return web.json_response(response.model_dump(mode="json"))
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
@@ -549,7 +581,10 @@ async def token_login_handler(request: web.Request) -> web.Response:
             user_agent=user_agent,
             skip_sslcert_validation=not config.api.ssl_verify,
         )
-        assert anon_api_config.is_anonymous
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             # Instead of email and password, token will be used for user auth.
@@ -622,16 +657,6 @@ async def token_login_handler(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
-async def server_shutdown(app) -> None:
-    pass
-
-
-async def server_cleanup(app) -> None:
-    await app["redis"].close()
-    client_pool: ClientPool = app["client_pool"]
-    await client_pool.close()
-
-
 @aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
@@ -639,7 +664,7 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
-    config = cast(WebServerUnifiedConfig, _args[0])
+    config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
         config.logging,
@@ -655,31 +680,91 @@ async def server_main_logwrapper(
             async with server_main(loop, pidx, _args):
                 yield
     except Exception:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
 
 
-@actxmgr
-async def server_main(
-    loop: asyncio.AbstractEventLoop,
+@asynccontextmanager
+async def redis_ctx(
+    config: WebServerUnifiedConfig,
+    app: web.Application,
     pidx: int,
-    args: Sequence[Any],
-) -> AsyncIterator[Any]:
-    config = cast(WebServerUnifiedConfig, args[0])
-    app = web.Application(
-        middlewares=[
-            decrypt_payload,
-            track_active_handlers,
-            security_policy_middleware,
-            general_exception_middleware,
-        ],
+) -> AsyncGenerator[None]:
+    # This is the desired keepalive configuration,
+    # but valkey-glide does not provide explicit option to set them.
+    keepalive_options = {}
+    if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
+        keepalive_options[_TCP_KEEPIDLE] = 20
+    if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
+        keepalive_options[_TCP_KEEPINTVL] = 5
+    if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
+        keepalive_options[_TCP_KEEPCNT] = 3
+
+    valkey_profile_target = config.session.redis.to_valkey_profile_target()
+    valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
+
+    # Create ValkeySessionClient for session management
+    valkey_session_client = await ValkeySessionClient.create(
+        valkey_target=valkey_target,
+        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+        human_readable_name="web.session",
     )
-    app["config"] = config
-    app["client_pool"] = ClientPool(
-        ClientConfig(
-            ssl=config.api.ssl_verify,
-            limit=config.api.connection_limit,
+    # Keep app["redis"] key for compatibility
+    app["redis"] = valkey_session_client
+
+    if pidx == 0 and config.session.flush_on_startup:
+        await valkey_session_client.flush_all_sessions()
+        log.info("flushed session storage.")
+
+    if config.session.login_session_extension_sec is None:
+        config.session.login_session_extension_sec = config.session.max_age
+    redis_storage = RedisStorage(
+        valkey_session_client,
+        max_age=config.session.max_age,
+    )
+    setup_session(app, redis_storage)
+    try:
+        yield
+    finally:
+        await valkey_session_client.close()
+
+
+@asynccontextmanager
+async def client_ctx(
+    config: WebServerUnifiedConfig,
+    app: web.Application,
+) -> AsyncGenerator[ClientPool]:
+    client_pool = ClientPool(
+        lambda key: aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=config.api.ssl_verify,
+                limit=config.api.connection_limit,
+            ),
+            base_url=key.endpoint,
+            auto_decompress=False,
         )
     )
+
+    async def _shutdown(app: web.Application) -> None:
+        await client_pool.close()
+
+    # NOTE: on_shutdown handlers are invoked before other cleanups.
+    app.on_shutdown.append(_shutdown)
+    yield client_pool
+
+
+@asynccontextmanager
+async def webapp_ctx(
+    config: WebServerUnifiedConfig,
+    app: web.Application,
+) -> AsyncGenerator[web.Application]:
+    ssl_ctx = None
+    if config.service.ssl_enabled:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(
+            str(config.service.ssl_cert),
+            str(config.service.ssl_privkey),
+        )
+
     request_policy_config: list[str] = config.security.request_policies
     response_policy_config: list[str] = config.security.response_policies
     csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = (
@@ -697,49 +782,6 @@ async def server_main(
     )
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
-
-    keepalive_options = {}
-    if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
-        keepalive_options[_TCP_KEEPIDLE] = 20
-    if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
-        keepalive_options[_TCP_KEEPINTVL] = 5
-    if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
-        keepalive_options[_TCP_KEEPCNT] = 3
-
-    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config.session.redis.model_dump(by_alias=True)
-    )
-    redis_target = etcd_redis_config.profile_target(RedisRole.STATISTICS)
-
-    # Create ValkeySessionClient for session management
-    valkey_session_client = await ValkeySessionClient.create(
-        redis_target=redis_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
-        human_readable_name="web.session",
-    )
-    # Keep app["redis"] key for compatibility
-    app["redis"] = valkey_session_client
-
-    if pidx == 0 and config.session.flush_on_startup:
-        await valkey_session_client.flush_all_sessions()
-        log.info("flushed session storage.")
-
-    if config.session.login_session_extension_sec is None:
-        config.session.login_session_extension_sec = config.session.max_age
-    redis_storage = RedisStorage(
-        valkey_session_client,
-        max_age=config.session.max_age,
-    )
-
-    setup_session(app, redis_storage)
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
-        ),
-    }
-    cors = aiohttp_cors.setup(app, defaults=cors_options)
-
-    app["stats"] = WebStats()
 
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
@@ -761,6 +803,12 @@ async def server_main(
         api_endpoint=pipeline_api_ws_endpoint,
     )
 
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
+        ),
+    }
+    cors = aiohttp_cors.setup(app, defaults=cors_options)
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -775,6 +823,7 @@ async def server_main(
     )
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
+    cors.add(app.router.add_route("GET", "/health", check_health))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -790,6 +839,16 @@ async def server_main(
     cors.add(app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", websocket_handler))
     cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+
+    # Feature flag for using Apollo Router(Graphql Federation)
+    if config.apollo_router.enabled:
+        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
+        supergraph_handler = partial(
+            web_handler_with_jwt, api_endpoints=list(config.apollo_router.endpoints)
+        )
+        cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
+        cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
+
     cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PUT", "/func/{path:.*$}", web_handler))
@@ -813,23 +872,11 @@ async def server_main(
         raise ValueError("Unrecognized service.mode", config.service.mode)
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
 
-    app.on_shutdown.append(server_shutdown)
-    app.on_cleanup.append(server_cleanup)
-
     async def on_prepare(request, response):
         # Remove "Server" header for a security reason.
         response.headers.popall("Server", None)
 
     app.on_response_prepare.append(on_prepare)
-
-    ssl_ctx = None
-    if config.service.ssl_enabled:
-        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_ctx.load_cert_chain(
-            str(config.service.ssl_cert),
-            str(config.service.ssl_privkey),
-        )
-
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(
@@ -841,7 +888,14 @@ async def server_main(
         ssl_context=ssl_ctx,
     )
     await site.start()
+    try:
+        yield app
+    finally:
+        await runner.cleanup()
 
+
+@asynccontextmanager
+async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerator[None]:
     if config.otel.enabled:
         otel_spec = OpenTelemetrySpec(
             service_id=uuid4(),
@@ -851,14 +905,56 @@ async def server_main(
             endpoint=config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+    yield
 
-    log.info("started.")
 
+@asynccontextmanager
+async def server_main(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    args: Sequence[Any],
+) -> AsyncIterator[Any]:
+    config: WebServerUnifiedConfig = args[0]
+    web_init_stack = AsyncExitStack()
+    await web_init_stack.__aenter__()
+    try:
+        app = web.Application(
+            middlewares=[
+                decrypt_payload,
+                track_active_handlers,
+                security_policy_middleware,
+                general_exception_middleware,
+            ],
+        )
+        app["config"] = config
+        app["stats"] = WebStats()
+        app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
+        await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
+
+        # Initialize health probe
+        health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+        await health_probe.register(
+            ValkeyHealthChecker(
+                clients={
+                    ComponentId("session"): app["redis"],
+                }
+            )
+        )
+        await health_probe.start()
+        web_init_stack.push_async_callback(health_probe.stop)
+        app["health_probe"] = health_probe
+
+        await web_init_stack.enter_async_context(webapp_ctx(config, app))
+        await web_init_stack.enter_async_context(service_discovery_ctx(config))
+        log.info("Started the web gateway service.")
+    except Exception:
+        log.exception("Server initialization failure; triggering shutdown...")
+        loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
         log.info("shutting down...")
-        await runner.cleanup()
+        await web_init_stack.__aexit__(None, None, None)
 
 
 @click.command()
@@ -874,7 +970,7 @@ async def server_main(
     "--debug",
     is_flag=True,
     default=False,
-    help="Set the logging level to DEBUG",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
@@ -900,20 +996,19 @@ def main(
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    cfg = WebServerUnifiedConfig.model_validate(raw_cfg)
-    if cfg.pipeline.frontend_endpoint is None:
-        cfg.pipeline.frontend_endpoint = str(cfg.pipeline.endpoint)
+    server_config = WebServerUnifiedConfig.model_validate(raw_cfg)
+    if server_config.pipeline.frontend_endpoint is None:
+        server_config.pipeline.frontend_endpoint = str(server_config.pipeline.endpoint)
 
     if ctx.invoked_subcommand is None:
-        cfg.webserver.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.webserver.ipc_base_path
+        server_config.webserver.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.webserver.ipc_base_path
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                cfg.logging,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -922,7 +1017,9 @@ def main(
                 },
             )
             with logger:
-                setproctitle(f"backend.ai: webserver {cfg.service.ip}:{cfg.service.port}")
+                setproctitle(
+                    f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
+                )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
@@ -930,25 +1027,29 @@ def main(
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
-                    pprint(cfg.model_dump())
-                log.info("serving at {0}:{1}", cfg.service.ip, cfg.service.port)
-                if cfg.webserver.event_loop == "uvloop":
-                    import uvloop
+                    pprint(server_config.model_dump())
+                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                match server_config.webserver.event_loop:
+                    case EventLoopType.UVLOOP:
+                        import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                        runner = uvloop.run
+                        log.info("Using uvloop as the event loop backend")
+                    case EventLoopType.ASYNCIO:
+                        runner = asyncio.run
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=min(4, os.cpu_count() or 1),
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
+                        runner=runner,
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.webserver.pid_file.is_file():
+            if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.webserver.pid_file.unlink()
+                server_config.webserver.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

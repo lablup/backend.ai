@@ -15,21 +15,21 @@ import functools
 import logging
 from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
-from types import TracebackType
-from typing import (
+from collections.abc import (
     AsyncGenerator,
     Callable,
     Iterable,
-    List,
     Mapping,
     MutableMapping,
+    Sequence,
+)
+from types import TracebackType
+from typing import (
     Optional,
     ParamSpec,
     Self,
-    Tuple,
     TypeAlias,
     TypeVar,
-    Union,
     cast,
 )
 from urllib.parse import quote as _quote
@@ -62,9 +62,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
+    "AsyncEtcd",
     "quote",
     "unquote",
-    "AsyncEtcd",
 )
 
 Event = namedtuple("Event", "key event value")
@@ -232,7 +232,7 @@ class AbstractKVStore(ABC):
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    ) -> AsyncGenerator[QueueSentinel | Event, None]:
         pass
 
     @abstractmethod
@@ -246,7 +246,7 @@ class AbstractKVStore(ABC):
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    ) -> AsyncGenerator[QueueSentinel | Event, None]:
         pass
 
 
@@ -256,7 +256,7 @@ class AsyncEtcd(AbstractKVStore):
 
     def __init__(
         self,
-        addr: HostPortPair,
+        addrs: HostPortPair | Sequence[HostPortPair],
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
@@ -278,18 +278,24 @@ class AsyncEtcd(AbstractKVStore):
             self._connect_options = None
 
         self.ns = namespace
-        log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
+        if isinstance(addrs, HostPortPair):
+            # Make it plural.
+            addrs = [addrs]
+        log.debug(
+            'using etcd cluster at [{}] with namespace "{}"',
+            ", ".join(str(addr) for addr in addrs),
+            namespace,
+        )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
-
         self.etcd = EtcdClient(
-            [f"http://{addr.host}:{addr.port}"],
+            [f"http://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
 
     @classmethod
     def initialize(cls, etcd_config: EtcdConfigData) -> Self:
-        etcd_addr = etcd_config.addr.to_legacy()
+        etcd_addrs = [addr.to_legacy() for addr in etcd_config.addrs]
         namespace = etcd_config.namespace
         etcd_user = etcd_config.user
         etcd_password = etcd_config.password
@@ -308,7 +314,7 @@ class AsyncEtcd(AbstractKVStore):
             # TODO: provide a way to specify other scope prefixes
         }
 
-        return cls(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+        return cls(etcd_addrs, namespace, scope_prefix_map, credentials=credentials)
 
     async def open(self) -> None:
         await self.etcd.__aenter__()
@@ -328,18 +334,27 @@ class AsyncEtcd(AbstractKVStore):
     ) -> Optional[bool]:
         return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[func-returns-value]
 
+    async def ping(self) -> None:
+        """
+        Ping the etcd server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        # Attempt a simple get operation to test the connection
+        # Even if the key doesn't exist, a successful query means the connection works
+        # Connection errors will raise exceptions
+        await self.get("_")
+
     def _mangle_key(self, k: str) -> str:
-        if k.startswith("/"):
-            k = k[1:]
+        k = k.removeprefix("/")
         return f"/sorna/{self.ns}/{k}"
 
-    def _demangle_key(self, k: Union[bytes, str]) -> str:
+    def _demangle_key(self, k: bytes | str) -> str:
         if isinstance(k, bytes):
             k = k.decode(self.encoding)
         prefix = f"/sorna/{self.ns}/"
-        if k.startswith(prefix):
-            k = k[len(prefix) :]
-        return k
+        return k.removeprefix(prefix)
 
     def _merge_scope_prefix_map(
         self,
@@ -559,7 +574,7 @@ class AsyncEtcd(AbstractKVStore):
             scope_prefixes = [_scope_prefix_map[ConfigScopes.GLOBAL]]
         else:
             raise ValueError("Invalid scope prefix value")
-        pair_sets: List[List[Mapping | Tuple]] = []
+        pair_sets: list[list[Mapping | tuple]] = []
         async with self.etcd.connect() as communicator:
             for scope_prefix in scope_prefixes:
                 mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
@@ -576,7 +591,7 @@ class AsyncEtcd(AbstractKVStore):
 
         configs = [
             make_dict_from_pairs(f"{_slash(scope_prefix)}{key_prefix}", pairs, "/")
-            for scope_prefix, pairs in zip(scope_prefixes, pair_sets)
+            for scope_prefix, pairs in zip(scope_prefixes, pair_sets, strict=True)
         ]
         return ChainMap(*configs)
 
@@ -662,7 +677,7 @@ class AsyncEtcd(AbstractKVStore):
         once: bool,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    ) -> AsyncGenerator[QueueSentinel | Event, None]:
         try:
             async with self.etcd.connect() as communicator:
                 iterator = iterator_factory(communicator)
@@ -671,7 +686,7 @@ class AsyncEtcd(AbstractKVStore):
                     if wait_timeout is not None:
                         try:
                             ev = await asyncio.wait_for(iterator.__anext__(), wait_timeout)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             pass
                     yield Event(
                         bytes(ev.key).decode(self.encoding)[scope_prefix_len:],
@@ -694,7 +709,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -734,7 +749,7 @@ class AsyncEtcd(AbstractKVStore):
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")

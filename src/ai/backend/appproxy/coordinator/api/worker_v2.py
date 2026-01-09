@@ -4,8 +4,9 @@ import dataclasses
 import logging
 import textwrap
 import uuid
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -14,9 +15,9 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import BaseModel, Field
 
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
-from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
@@ -30,19 +31,18 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
-from ai.backend.appproxy.coordinator.defs import LockID
-from ai.backend.common import redis_helper
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.appproxy.coordinator.models import Token, Worker, WorkerAppFilter, WorkerStatus
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:
+    pass
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -212,7 +212,7 @@ async def update_worker(
             worker.wildcard_traffic_port = params.wildcard_traffic_port
             worker.filtered_apps_only = params.filtered_apps_only
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
-            worker.updated_at = datetime.now()
+            worker.updated_at = datetime.now(UTC)
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE
         except ObjectNotFound:
@@ -235,6 +235,7 @@ async def update_worker(
             )
             sess.add(worker)
             await sess.flush()
+            await sess.refresh(worker)
 
         for filter in params.app_filters:
             try:
@@ -273,7 +274,7 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
         worker = await Worker.get(sess, worker_id)
         worker.nodes -= 1
         if worker.nodes == 0:
-            await sess.delete(worker)
+            worker.status = WorkerStatus.LOST
 
     async with root_ctx.db.connect() as db_conn:
         await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
@@ -289,16 +290,19 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
 
     async def _update(sess: SASession) -> dict:
         worker = await Worker.get(sess, worker_id)
-        worker.updated_at = datetime.now()
+        worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE
         result = dict(worker.dump_model())
         result["slots"] = [
             SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots(sess))
         ]
+
         # Update "last seen" timestamp for liveness tracking
-        await redis_helper.execute(
-            root_ctx.redis_live,
-            lambda r: r.hset("proxy-worker.last_seen", worker.authority, now.timestamp()),
+        ttl = get_default_redis_key_ttl()
+        await root_ctx.valkey_live.hset_with_expiry(
+            "proxy-worker.last_seen",
+            {worker.authority: str(now.timestamp())},
+            ttl,
         )
         return result
 
@@ -333,17 +337,14 @@ async def check_worker_lost(
             seconds=root_ctx.local_config.proxy_coordinator.worker_heartbeat_timeout
         )
 
-        _, msg_data = await redis_helper.execute(
-            root_ctx.redis_live, lambda r: r.hscan("proxy-worker.last_seen")
-        )
+        msg_data = await root_ctx.valkey_live.hgetall_str("proxy-worker.last_seen")
 
         async with root_ctx.db.begin_readonly_session() as sess:
             workers = await Worker.list_workers(sess)
             worker_map = {w.authority: w for w in workers}
 
-        for worker_id, prev in msg_data.items():
-            prev = datetime.fromtimestamp(float(prev), tzutc())
-            worker_id_str = worker_id.decode()
+        for worker_id_str, prev_str in msg_data.items():
+            prev = datetime.fromtimestamp(float(prev_str), tzutc())
             if (
                 (now - prev) > timeout
                 and worker_id_str in worker_map
@@ -358,7 +359,6 @@ async def check_worker_lost(
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    worker_lost_check_timer: GlobalTimer
     worker_lost_check_evh: EventHandler[web.Application, DoCheckWorkerLostEvent]
 
 
@@ -366,27 +366,17 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["worker.context"]
 
-    # Scan ALIVE workers
+    # Scan ALIVE workers (timer is managed by LeaderCron in leader_election_ctx)
     app_ctx.worker_lost_check_evh = root_ctx.event_dispatcher.consume(
         DoCheckWorkerLostEvent,
         app,
         check_worker_lost,
     )
-    app_ctx.worker_lost_check_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_WORKER_LOST, 15.0),
-        root_ctx.event_producer,
-        lambda: DoCheckWorkerLostEvent(),
-        15.0,
-        initial_delay=10.0,
-        task_name="check_worker_lost_task",
-    )
-    await app_ctx.worker_lost_check_timer.join()
 
 
 async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["worker.context"]
-    await app_ctx.worker_lost_check_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.worker_lost_check_evh)
 
 

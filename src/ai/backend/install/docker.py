@@ -48,7 +48,7 @@ def get_build_root() -> Path:
 
 
 def simple_hash(data: bytes) -> str:
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(data)
     # generate a filesystem-safe base64 string
     return base64.b64encode(h.digest()[:12], altchars=b"._").decode()
@@ -66,6 +66,7 @@ async def detect_snap_docker():
         for pkg_data in response_data["result"]:
             if pkg_data["name"] == "docker":
                 return pkg_data["version"]
+    return None
 
 
 async def detect_system_docker(ctx: Context) -> str:
@@ -90,7 +91,7 @@ async def detect_system_docker(ctx: Context) -> str:
     try:
         async with asyncio.timeout(0.5):
             await proc.communicate()
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         raise PrerequisiteError(
@@ -155,9 +156,8 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
     if docker_version is not None:
         # For Snap-based Docker, use a home directory path
         return str(Path.home() / f".cache/{build_root_name}-{build_root_hash}-pants")
-    else:
-        # Otherwise, use the standard tmp directory
-        return f"/tmp/{build_root_name}-{build_root_hash}-pants"
+    # Otherwise, use the standard tmp directory
+    return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
 async def determine_docker_sudo() -> bool:
@@ -203,11 +203,10 @@ async def check_docker(ctx: Context) -> None:
     m = re.search(r"\d+\.\d+\.\d+", stdout.decode())
     if m is None:
         raise PrerequisiteError("Failed to retrieve the docker-compose version!")
-    else:
-        compose_version = m.group(0)
-        ctx.log.write(f"Detected docker-compose installation ({compose_version})")
-        if parse_version(compose_version) < (2, 0, 0):
-            fail_with_compose_install_request()
+    compose_version = m.group(0)
+    ctx.log.write(f"Detected docker-compose installation ({compose_version})")
+    if parse_version(compose_version) < (2, 0, 0):
+        fail_with_compose_install_request()
 
 
 async def check_docker_desktop_mount(ctx: Context) -> None:

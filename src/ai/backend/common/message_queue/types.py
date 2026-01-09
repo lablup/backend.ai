@@ -1,7 +1,8 @@
 import base64
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping, Optional, Self, cast
+from typing import Optional, Self, cast
 
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
@@ -14,6 +15,14 @@ _DEFAULT_RETRY_FIELD = b"_retry_count"
 _DEFAULT_MAX_RETRIES = 3
 
 type MessageId = bytes
+
+
+@dataclass
+class BroadcastPayload:
+    """Payload data for broadcasting with optional cache."""
+
+    payload: Mapping[str, str]
+    cache_id: Optional[str] = None
 
 
 @dataclass

@@ -2,11 +2,13 @@ import asyncio
 import logging
 import uuid
 import weakref
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 from aiohttp import web
 
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
@@ -14,19 +16,19 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..exception import (
-    ExternalError,
+from ai.backend.storage.errors import (
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidQuotaScopeError,
     InvalidSubpathError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
+    ServiceNotInitializedError,
     VFolderNotFoundError,
 )
-from ..utils import log_manager_api_entry_new
-from ..volumes.pool import VolumePool
-from ..volumes.types import (
+from ai.backend.storage.utils import log_manager_api_entry_new
+from ai.backend.storage.volumes.pool import VolumePool
+from ai.backend.storage.volumes.types import (
     QuotaScopeKey,
     QuotaScopeMeta,
     VFolderKey,
@@ -39,13 +41,16 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class VolumeService:
     _volume_pool: VolumePool
+    _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
 
     def __init__(
         self,
         volume_pool: VolumePool,
+        event_producer: EventProducer,
     ) -> None:
         self._volume_pool = volume_pool
+        self._event_producer = event_producer
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task]()
 
     async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
@@ -56,7 +61,7 @@ class VolumeService:
     async def _handle_external_errors(self) -> AsyncIterator[None]:
         try:
             yield
-        except ExternalError as e:
+        except ExternalStorageServiceError as e:
             log.exception("An external error occurred: %s", str(e))
             # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
@@ -74,7 +79,8 @@ class VolumeService:
         vfolder_id = vfolder_key.vfolder_id
 
         current_task = asyncio.current_task()
-        assert current_task is not None
+        if current_task is None:
+            raise ServiceNotInitializedError("No current asyncio task available")
         self._deletion_tasks[vfolder_id] = current_task
 
         try:
@@ -84,15 +90,15 @@ class VolumeService:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
             log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{msg})")
-            await self._volume_pool._event_producer.anycast_event(
+            await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=msg,
                 )
             )
         except Exception as e:
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{str(e)})")
-            await self._volume_pool._event_producer.anycast_event(
+            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{e!s})")
+            await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=str(e),
@@ -102,9 +108,7 @@ class VolumeService:
             log.warning(f"Vfolder deletion task cancelled. (vfolder_id:{vfolder_id})")
         else:
             log.info(f"VFolder deletion task successed. (vfolder_id:{vfolder_id})")
-            await self._volume_pool._event_producer.anycast_event(
-                VFolderDeletionSuccessEvent(vfolder_id)
-            )
+            await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
         await log_manager_api_entry_new(log, "get_volume", volume_id)
@@ -171,7 +175,8 @@ class VolumeService:
                         quota_scope_id=quota_scope_id, options=options, extra_args=None
                     )
                 else:
-                    assert options is not None
+                    if options is None:
+                        raise InvalidQuotaConfig("options is required for updating quota scope")
                     try:
                         await volume.quota_model.update_quota_scope(
                             quota_scope_id=quota_scope_id,
@@ -205,7 +210,9 @@ class VolumeService:
                 try:
                     await volume.create_vfolder(vfolder_id)
                 except QuotaScopeNotFoundError:
-                    raise ExternalError("Failed to create vfolder due to quota scope not found")
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found"
+                    )
 
     async def clone_vfolder(self, vfolder_key: VFolderKey, dst_vfolder_id: VFolderID) -> None:
         await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)
@@ -248,4 +255,4 @@ class VolumeService:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None and ongoing_task.done():
                 asyncio.create_task(self._delete_vfolder(vfolder_key))
-        return None
+        return

@@ -1,18 +1,33 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
+    EventProducer,
 )
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
+)
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelImportDoneEvent,
+    ModelMetadataFetchDoneEvent,
+    ModelVerifyingEvent,
+)
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
@@ -42,10 +57,19 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.notification.anycast import (
+    NotificationTriggeredEvent,
+)
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
+    DoDeploymentLifecycleEvent,
+    DoDeploymentLifecycleIfNeededEvent,
+    DoRouteLifecycleEvent,
+    DoRouteLifecycleIfNeededEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
@@ -66,24 +90,43 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionTerminatedAnycastEvent,
     SessionTerminatingAnycastEvent,
 )
+from ai.backend.common.events.event_types.session.broadcast import (
+    SchedulingBroadcastEvent,
+)
 from ai.backend.common.events.event_types.vfolder.anycast import (
+    VFolderCloneFailureEvent,
+    VFolderCloneSuccessEvent,
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
+from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
+    ArtifactRegistryEventHandler,
+)
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.repositories import Repositories
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
+from .handlers.notification import NotificationEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -91,13 +134,26 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    valkey_container_log: ValkeyContainerLogClient
+    valkey_stat: ValkeyStatClient
     valkey_stream: ValkeyStreamClient
     scheduler_dispatcher: SchedulerDispatcher
+    schedule_coordinator: ScheduleCoordinator
+    scheduling_controller: SchedulingController
+    deployment_coordinator: DeploymentCoordinator
+    route_coordinator: RouteCoordinator
+    scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    repositories: Repositories
+    processors_factory: Callable[[], Processors]
+    storage_manager: StorageSessionManager
+    config_provider: ManagerConfigProvider
+    event_producer: EventProducer
+    use_sokovan: bool = True
 
 
 class Dispatchers:
@@ -111,6 +167,9 @@ class Dispatchers:
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
+    _notification_event_handler: NotificationEventHandler
+    _artifact_event_handler: ArtifactEventHandler
+    _artifact_registry_event_handler: ArtifactRegistryEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -119,13 +178,33 @@ class Dispatchers:
         self._db = args.db
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(
-            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx, args.processors_factory
         )
-        self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
+        self._image_event_handler = ImageEventHandler(
+            args.agent_registry,
+            args.db,
+            args.use_sokovan,
+            args.schedule_coordinator,
+        )
+
         self._kernel_event_handler = KernelEventHandler(
-            args.valkey_stream, args.agent_registry, args.db
+            args.valkey_container_log,
+            args.valkey_stat,
+            args.valkey_stream,
+            args.agent_registry,
+            args.db,
+            args.schedule_coordinator,
+            args.use_sokovan,
         )
-        self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
+        self._schedule_event_handler = ScheduleEventHandler(
+            args.scheduler_dispatcher,
+            args.schedule_coordinator,
+            args.scheduling_controller,
+            args.deployment_coordinator,
+            args.route_coordinator,
+            args.event_hub,
+            args.use_sokovan,
+        )
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,
@@ -135,6 +214,24 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
+        self._notification_event_handler = NotificationEventHandler(args.processors_factory)
+        self._artifact_event_handler = ArtifactEventHandler(
+            args.repositories.artifact.repository,
+            args.repositories.huggingface_registry.repository,
+            args.repositories.reservoir_registry.repository,
+            args.config_provider,
+            args.event_producer,
+        )
+        self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
+            args.processors_factory,
+            args.repositories.artifact.repository,
+            args.repositories.artifact_registry.repository,
+            args.repositories.reservoir_registry.repository,
+            args.repositories.object_storage.repository,
+            args.repositories.vfs_storage.repository,
+            args.storage_manager,
+            args.config_provider,
+        )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -149,6 +246,9 @@ class Dispatchers:
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
+        self._dispatch_notification_events(event_dispatcher)
+        self._dispatch_artifact_events(event_dispatcher)
+        self._dispatch_artifact_registry_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -197,6 +297,11 @@ class Dispatchers:
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
+        )
+        evd.consume(
+            AgentInstalledImagesRemoveEvent,
+            None,
+            self._agent_event_handler.handle_agent_installed_images_remove,
         )
         evd.consume(
             AgentErrorEvent,
@@ -335,6 +440,51 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_do_update_session_status,
         )
+        # Sokovan scheduler events
+        event_dispatcher.consume(
+            DoSokovanProcessIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_if_needed,
+            name="sokovan.process_if_needed",
+        )
+        event_dispatcher.consume(
+            DoSokovanProcessScheduleEvent,
+            None,
+            self._schedule_event_handler.handle_do_sokovan_process_schedule,
+            name="sokovan.process_schedule",
+        )
+        # Subscribe to SchedulingBroadcastEvent to propagate individual events
+        event_dispatcher.subscribe(
+            SchedulingBroadcastEvent,
+            None,
+            self._schedule_event_handler.handle_scheduling_broadcast,
+        )
+        # Deployment lifecycle events
+        event_dispatcher.consume(
+            DoDeploymentLifecycleIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_deployment_lifecycle_if_needed,
+            name="deployment.lifecycle_if_needed",
+        )
+        event_dispatcher.consume(
+            DoDeploymentLifecycleEvent,
+            None,
+            self._schedule_event_handler.handle_do_deployment_lifecycle,
+            name="deployment.lifecycle",
+        )
+        # Route lifecycle events
+        event_dispatcher.consume(
+            DoRouteLifecycleIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_route_lifecycle_if_needed,
+            name="route.lifecycle_if_needed",
+        )
+        event_dispatcher.consume(
+            DoRouteLifecycleEvent,
+            None,
+            self._schedule_event_handler.handle_do_route_lifecycle,
+            name="route.lifecycle",
+        )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:
         # action-trigerring events
@@ -427,6 +577,42 @@ class Dispatchers:
             None,
             self._vfolder_event_handler.handle_vfolder_deletion_failure,
         )
+        evd.consume(
+            VFolderCloneSuccessEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_clone_success,
+        )
+        evd.consume(
+            VFolderCloneFailureEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_clone_failure,
+        )
+
+    def _dispatch_artifact_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            ModelMetadataFetchDoneEvent,
+            None,
+            self._artifact_event_handler.handle_model_metadata_fetch_done,
+        )
+        evd.consume(
+            ModelVerifyingEvent,
+            None,
+            self._artifact_event_handler.handle_model_verifying,
+        )
+        evd.consume(
+            ModelImportDoneEvent,
+            None,
+            self._artifact_event_handler.handle_model_import_done,
+        )
+
+    def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            DoScanReservoirRegistryEvent,
+            None,
+            self._artifact_registry_event_handler.handle_artifact_registry_scan,
+        )
 
     def _dispatch_idle_check_events(
         self,
@@ -437,4 +623,15 @@ class Dispatchers:
             None,
             self._idle_check_event_handler.handle_do_idle_check,
             name="idle_check",
+        )
+
+    def _dispatch_notification_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            NotificationTriggeredEvent,
+            None,
+            self._notification_event_handler.handle_notification_triggered,
+            name="notification.triggered",
         )

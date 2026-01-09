@@ -7,11 +7,11 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client import __version__
+from ai.backend.client.config import get_config, local_state_path
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.session import Session
 
-from .. import __version__
-from ..config import get_config, local_state_path
-from ..exceptions import BackendClientError
-from ..session import Session
 from .pretty import print_done, print_error, print_fail, print_warn
 
 
@@ -28,10 +28,7 @@ def config():
         )
     )
     click.echo(
-        "Client version: {0} (API: {1})".format(
-            click.style(__version__, bold=True),
-            click.style(config.version, bold=True),
-        )
+        f"Client version: {click.style(__version__, bold=True)} (API: {click.style(config.version, bold=True)})"
     )
     if sys.stdout.isatty():
         click.echo("Server version: ...")
@@ -49,13 +46,13 @@ def config():
                         versions["version"],
                     )
                 )
-            click.echo("Negotiated API version: {0}".format(sess.api_version))
+            click.echo(f"Negotiated API version: {sess.api_version}")
     nrows = 1
     if config.domain:
-        click.echo('Domain name: "{0}"'.format(click.style(config.domain, bold=True)))
+        click.echo(f'Domain name: "{click.style(config.domain, bold=True)}"')
         nrows += 1
     if config.group:
-        click.echo('Group name: "{0}"'.format(click.style(config.group, bold=True)))
+        click.echo(f'Group name: "{click.style(config.group, bold=True)}"')
         nrows += 1
     if config.is_anonymous:
         click.echo("Access key: (this is an anonymous session)")
@@ -72,23 +69,21 @@ def config():
             )
             nrows += 1
     else:
-        click.echo('Access key: "{0}"'.format(click.style(config.access_key, bold=True)))
+        click.echo(f'Access key: "{click.style(config.access_key, bold=True)}"')
         nrows += 1
         masked_skey = config.secret_key[:6] + ("*" * 24) + config.secret_key[-10:]
-        click.echo('Secret key: "{0}"'.format(click.style(masked_skey, bold=True)))
+        click.echo(f'Secret key: "{click.style(masked_skey, bold=True)}"')
         nrows += 1
-    click.echo("Signature hash type: {0}".format(click.style(config.hash_type, bold=True)))
+    click.echo(f"Signature hash type: {click.style(config.hash_type, bold=True)}")
     nrows += 1
     click.echo(
-        "Skip SSL certificate validation? {0}".format(
-            click.style(str(config.skip_sslcert_validation), bold=True)
-        )
+        f"Skip SSL certificate validation? {click.style(str(config.skip_sslcert_validation), bold=True)}"
     )
     nrows += 1
     if sys.stdout.isatty():
         sys.stdout.flush()
         with warnings.catch_warnings(record=True) as captured_warnings, Session() as sess:
-            click.echo("\u001b[{0}A\u001b[2K".format(nrows + 1), nl=False)
+            click.echo(f"\u001b[{nrows + 1}A\u001b[2K", nl=False)
             try:
                 versions = sess.System.get_versions()
             except BackendClientError:
@@ -107,10 +102,10 @@ def config():
             click.echo("\u001b[2K", nl=False)
             click.echo(
                 "Negotiated API version: {0}".format(
-                    click.style("v{0[0]}.{0[1]}".format(sess.api_version), bold=True),
+                    click.style(f"v{sess.api_version[0]}.{sess.api_version[1]}", bold=True),
                 )
             )
-            click.echo("\u001b[{0}B".format(nrows), nl=False)
+            click.echo(f"\u001b[{nrows}B", nl=False)
             sys.stdout.flush()
         for w in captured_warnings:
             warnings.showwarning(w.message, w.category, w.filename, w.lineno, w.line)
@@ -172,7 +167,7 @@ def logout():
             try:
                 (local_state_path / "cookie.dat").unlink()
                 (local_state_path / "config.json").unlink()
-            except (IOError, PermissionError):
+            except (OSError, PermissionError):
                 pass
         except Exception as e:
             print_error(e)

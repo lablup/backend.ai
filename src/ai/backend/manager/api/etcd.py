@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import collections
 import logging
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    Iterable,
-    Mapping,
     cast,
 )
 
@@ -21,9 +19,9 @@ from ai.backend.common.json import load_json
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_container_registries
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.agent import AgentRow, AgentStatus
 
-from ..errors.api import InvalidAPIParameters
-from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
@@ -90,7 +88,7 @@ async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-    return web.json_response(known_slots, status=HTTPStatus.OK)
+    return web.json_response({str(k): v for k, v in known_slots.items()}, status=HTTPStatus.OK)
 
 
 @check_api_params(
@@ -121,7 +119,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 
     # Optionally filter by the slots reported by the given resource group's agents
     if params["sgroup"] is not None:
-        available_slot_keys = set()
+        available_slot_keys: set[str] = set()
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).where(
                 (AgentRow.status == AgentStatus.ALIVE)
@@ -132,7 +130,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
             for agent in result.scalars().all():
                 available_slot_keys.update(agent.available_slots.keys())
         accelerator_metadata = {
-            k: v
+            str(k): v
             for k, v in accelerator_metadata.items()
             if k in {"cpu", "mem", *available_slot_keys}
         }
@@ -188,9 +186,8 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
         # Flatten the returned ChainMap object for JSON serialization
         tree_value = dict(await root_ctx.etcd.get_prefix_dict(params["key"]))
         return web.json_response({"result": tree_value})
-    else:
-        scalar_value = await root_ctx.etcd.get(params["key"])
-        return web.json_response({"result": scalar_value})
+    scalar_value = await root_ctx.etcd.get(params["key"])
+    return web.json_response({"result": scalar_value})
 
 
 @superadmin_required

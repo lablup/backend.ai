@@ -1,8 +1,9 @@
 import shutil
 import tempfile
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator, Optional, override
+from typing import Optional, override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
@@ -49,8 +50,7 @@ class LoginTemplate(WrapperTestTemplate):
 
 def _get_test_temp_dir(test_id: str) -> Path:
     temp_base = Path(tempfile.gettempdir()) / "backend_ai_tests"
-    temp_dir = temp_base / test_id
-    return temp_dir
+    return temp_base / test_id
 
 
 async def _login(

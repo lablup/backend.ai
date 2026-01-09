@@ -18,7 +18,6 @@ from functools import partial
 from typing import (
     Any,
     Optional,
-    Union,
     cast,
 )
 
@@ -73,32 +72,29 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-from ai.backend.manager.types import DistributedLockFactory
-from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
-from ..errors.common import (
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
+from ai.backend.manager.errors.common import (
     GenericBadRequest,
     GenericForbidden,
 )
-from ..errors.kernel import SessionNotFound
-from ..errors.resource import InstanceNotAvailable
-from ..exceptions import convert_to_status_data
-from ..models import (
-    AgentRow,
-    EndpointRow,
-    KernelRow,
-    RouteStatus,
-    ScalingGroupOpts,
-    SessionRow,
-)
-from ..models.utils import (
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.resource import InstanceNotAvailable
+from ai.backend.manager.exceptions import convert_to_status_data
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import (
     execute_with_retry,
     retry_txn,
 )
-from ..registry import AgentRegistry
-from ..repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.plugin.entrypoint import scan_entrypoints
+
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -116,6 +112,7 @@ from .types import (
     AbstractScheduler,
     AgentAllocationContext,
     DefaultResourceGroupStateStore,
+    InvalidSchedulerState,
     KernelAgentBinding,
     PredicateResult,
     SchedulingContext,
@@ -123,10 +120,14 @@ from .types import (
 )
 
 __all__ = (
-    "load_scheduler",
-    "load_agent_selector",
     "SchedulerDispatcher",
+    "load_agent_selector",
+    "load_scheduler",
 )
+
+# Memoization cache for scheduler and agent selector classes
+_scheduler_class_cache: dict[str, type[AbstractScheduler]] = {}
+_agent_selector_class_cache: dict[str, type[AbstractAgentSelector]] = {}
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -134,18 +135,41 @@ _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[tuple[Any, ...]] = ContextVar("_log_args")
 
 
+def _load_scheduler_class(name: str) -> type[AbstractScheduler]:
+    """Load and memoize scheduler class by name."""
+    if name not in _scheduler_class_cache:
+        entry_prefix = "backendai_scheduler_v10"
+        for entrypoint in scan_entrypoints(entry_prefix):
+            if entrypoint.name == name:
+                log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
+                scheduler_cls = entrypoint.load()
+                _scheduler_class_cache[name] = scheduler_cls
+                return scheduler_cls
+        raise ImportError("Cannot load the scheduler plugin", name)
+    return _scheduler_class_cache[name]
+
+
 def load_scheduler(
     name: str,
     sgroup_opts: ScalingGroupOpts,
     scheduler_config: Mapping[str, Any],
 ) -> AbstractScheduler:
-    entry_prefix = "backendai_scheduler_v10"
-    for entrypoint in scan_entrypoints(entry_prefix):
-        if entrypoint.name == name:
-            log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
-            scheduler_cls = entrypoint.load()
-            return scheduler_cls(sgroup_opts, scheduler_config)
-    raise ImportError("Cannot load the scheduler plugin", name)
+    scheduler_cls = _load_scheduler_class(name)
+    return scheduler_cls(sgroup_opts, scheduler_config)
+
+
+def _load_agent_selector_class(name: str) -> type[AbstractAgentSelector]:
+    """Load and memoize agent selector class by name."""
+    if name not in _agent_selector_class_cache:
+        entry_prefix = "backendai_agentselector_v10"
+        for entrypoint in scan_entrypoints(entry_prefix):
+            if entrypoint.name == name:
+                log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
+                selector_cls = entrypoint.load()
+                _agent_selector_class_cache[name] = selector_cls
+                return selector_cls
+        raise ImportError("Cannot load the agent-selector plugin", name)
+    return _agent_selector_class_cache[name]
 
 
 def load_agent_selector(
@@ -168,13 +192,8 @@ def load_agent_selector(
             state_store=state_store,
         )
 
-    entry_prefix = "backendai_agentselector_v10"
-    for entrypoint in scan_entrypoints(entry_prefix):
-        if entrypoint.name == name:
-            log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
-            selector_cls = entrypoint.load()
-            return create_agent_selector(selector_cls)
-    raise ImportError("Cannot load the agent-selector plugin", name)
+    selector_cls = _load_agent_selector_class(name)
+    return create_agent_selector(selector_cls)
 
 
 @dataclass
@@ -577,12 +596,12 @@ class SchedulerDispatcher(aobject):
                     await self.event_producer.anycast_and_broadcast_event(
                         SessionCancelledAnycastEvent(
                             pending_sess.id,
-                            pending_sess.creation_id,
+                            pending_sess.creation_id or "",
                             reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                         ),
                         SessionCancelledBroadcastEvent(
                             pending_sess.id,
-                            pending_sess.creation_id,
+                            pending_sess.creation_id or "",
                             reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                         ),
                     )
@@ -672,7 +691,7 @@ class SchedulerDispatcher(aobject):
         def _check(cnt: int) -> bool:
             return max_container_count > cnt
 
-        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
+        return [ag for ag, count in zip(candidate_agents, raw_counts, strict=True) if _check(count)]
 
     async def _schedule_single_node_session(
         self,
@@ -681,7 +700,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns an agent having resources enough to host the entire session.
@@ -690,7 +709,7 @@ class SchedulerDispatcher(aobject):
         log_args = _log_args.get(tuple())
 
         try:
-            requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+            requested_architectures = {k.architecture for k in sess_ctx.kernels}
             if len(requested_architectures) > 1:
                 raise GenericBadRequest(
                     "Cannot assign multiple kernels with different architectures' single node session",
@@ -729,7 +748,7 @@ class SchedulerDispatcher(aobject):
             agent = sess_ctx.main_kernel.agent_row
             agent_id: AgentId | None = None
             if agent is not None:
-                agent_id = agent.id
+                agent_id = AgentId(agent.id)
 
                 if agent_id is not None:
                     (
@@ -805,8 +824,8 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.anycast_and_broadcast_event(
-            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
-            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
         )
 
     async def _schedule_multi_node_session(
@@ -816,7 +835,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Exception | PredicateResult]],
     ) -> None:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
@@ -840,7 +859,7 @@ class SchedulerDispatcher(aobject):
                     (
                         available_slots,
                         occupied_slots,
-                    ) = await self.schedule_repository.get_agent_available_slots(agent.id)
+                    ) = await self.schedule_repository.get_agent_available_slots(AgentId(agent.id))
 
                     for key in available_slots.keys():
                         if (
@@ -857,7 +876,7 @@ class SchedulerDispatcher(aobject):
                                     f"remaining: {available_slots[key] - occupied_slots[key]})."
                                 ),
                             )
-                    agent_id = agent.id
+                    agent_id = AgentId(agent.id)
                 else:
                     # Each kernel may have different images and different architectures
                     compatible_candidate_agents = [
@@ -898,7 +917,6 @@ class SchedulerDispatcher(aobject):
                                 f" resource group: {sess_ctx.scaling_group_name})"
                             ),
                         )
-                assert agent_id is not None
 
                 agent_alloc_ctx = await self.schedule_repository.reserve_agent(
                     sgroup_name,
@@ -913,7 +931,7 @@ class SchedulerDispatcher(aobject):
 
                 async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                     await self.schedule_repository.update_kernel_scheduling_failure(
-                        sched_ctx, sess_ctx, kernel.id, exc.extra_msg
+                        sched_ctx, sess_ctx, str(kernel.id), exc.extra_msg
                     )
 
                 await execute_with_retry(partial(_update_sched_failure, sched_failure))
@@ -927,16 +945,23 @@ class SchedulerDispatcher(aobject):
 
                 async def _update_generic_failure() -> None:
                     await self.schedule_repository.update_multinode_kernel_generic_failure(
-                        sched_ctx, sess_ctx, kernel.id, exc_data
+                        sched_ctx, sess_ctx, str(kernel.id), exc_data
                     )
 
                 await execute_with_retry(_update_generic_failure)
                 raise
             else:
-                assert agent_alloc_ctx is not None
+                if agent_alloc_ctx is None:
+                    raise InvalidSchedulerState(
+                        "Agent allocation context is not available after successful reservation"
+                    )
                 kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
-        assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
+        if len(kernel_agent_bindings) != len(sess_ctx.kernels):
+            raise InvalidSchedulerState(
+                f"Kernel-agent binding count mismatch: {len(kernel_agent_bindings)} bindings"
+                f" for {len(sess_ctx.kernels)} kernels"
+            )
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
@@ -946,8 +971,8 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.anycast_and_broadcast_event(
-            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
-            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
         )
 
     async def check_precond(
@@ -978,7 +1003,9 @@ class SchedulerDispatcher(aobject):
                             KernelAgentBinding(
                                 kernel=kernel,
                                 agent_alloc_ctx=AgentAllocationContext(
-                                    kernel.agent, kernel.agent_addr, kernel.scaling_group
+                                    AgentId(kernel.agent) if kernel.agent else None,
+                                    kernel.agent_addr or "",
+                                    kernel.scaling_group or "",
                                 ),
                                 allocated_host_ports=set(),
                             )
@@ -986,7 +1013,7 @@ class SchedulerDispatcher(aobject):
                     await self.registry.event_producer.anycast_event(
                         SessionCheckingPrecondAnycastEvent(
                             scheduled_session.id,
-                            scheduled_session.creation_id,
+                            scheduled_session.creation_id or "",
                         ),
                     )
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
@@ -1006,7 +1033,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("check_precond(): timeout while executing start_session()")
 
     async def start(
@@ -1043,11 +1070,11 @@ class SchedulerDispatcher(aobject):
                         await self.registry.event_producer.anycast_and_broadcast_event(
                             SessionPreparingAnycastEvent(
                                 scheduled_session.id,
-                                scheduled_session.creation_id,
+                                scheduled_session.creation_id or "",
                             ),
                             SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
-                                scheduled_session.creation_id,
+                                scheduled_session.creation_id or "",
                             ),
                         )
                         tg.create_task(
@@ -1071,7 +1098,7 @@ class SchedulerDispatcher(aobject):
                 )
                 raise asyncio.CancelledError()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
     async def scale_services(
@@ -1109,15 +1136,13 @@ class SchedulerDispatcher(aobject):
                 # we do not expect sessions to be spawned when the endpoint is about to be destroyed
                 # so also delete routes in provisioning status
 
-                routes_to_destroy += list(
-                    sorted(
-                        [
-                            route
-                            for route in active_routings
-                            if route.status in endpoint.terminatable_route_statuses
-                        ],
-                        key=lambda r: r.status == RouteStatus.UNHEALTHY,
-                    )
+                routes_to_destroy += sorted(
+                    [
+                        route
+                        for route in active_routings
+                        if route.status in endpoint.terminatable_route_statuses
+                    ],
+                    key=lambda r: r.status == RouteStatus.UNHEALTHY,
                 )[:destroy_count]
                 log.debug(
                     "Shrinking {} from {} to {}",
@@ -1174,7 +1199,7 @@ class SchedulerDispatcher(aobject):
         await self._update_scheduler_mark(
             ScheduleType.SCALE_SERVICES,
             {
-                "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
+                "up": dump_json_str([str(e.id) for e in endpoints_to_expand]),
                 "finish_time": datetime.now(tzutc()).isoformat(),
             },
         )
@@ -1208,7 +1233,8 @@ class SchedulerDispatcher(aobject):
         log_args = (session,)
         log.debug(log_fmt + "try-starting", *log_args)
         try:
-            assert len(session.kernels) > 0
+            if len(session.kernels) == 0:
+                raise InvalidSchedulerState(f"Session {session.id} has no kernels to start")
             await self.registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
             status_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
@@ -1227,12 +1253,12 @@ class SchedulerDispatcher(aobject):
                 await self.registry.event_producer.anycast_and_broadcast_event(
                     SessionCancelledAnycastEvent(
                         session.id,
-                        session.creation_id,
+                        session.creation_id or "",
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                     SessionCancelledBroadcastEvent(
                         session.id,
-                        session.creation_id,
+                        session.creation_id or "",
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
@@ -1270,12 +1296,12 @@ class SchedulerDispatcher(aobject):
             await self.event_producer.anycast_and_broadcast_event(
                 SessionCancelledAnycastEvent(
                     item.id,
-                    item.creation_id,
+                    item.creation_id or "",
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                 ),
                 SessionCancelledBroadcastEvent(
                     item.id,
-                    item.creation_id,
+                    item.creation_id or "",
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                 ),
             )
@@ -1286,8 +1312,8 @@ class SchedulerDispatcher(aobject):
         pending_sess: SessionRow,
         *,
         exc_handler: Callable[[Exception], None] | None = None,
-    ) -> list[tuple[str, Union[Exception, PredicateResult]]]:
-        check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
+    ) -> list[tuple[str, Exception | PredicateResult]]:
+        check_results: list[tuple[str, Exception | PredicateResult]] = []
         async with self.registry.db.begin_session() as db_sess:
             predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
                 (
@@ -1355,7 +1381,7 @@ class SchedulerDispatcher(aobject):
         Returns the Redis key for the given schedule type.
         """
         manager_id = self.config_provider.config.manager.id
-        return f"manager.{manager_id}.{str(schedule_type)}"
+        return f"manager.{manager_id}.{schedule_type!s}"
 
     async def _mark_scheduler_start(
         self,

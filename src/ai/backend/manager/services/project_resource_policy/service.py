@@ -32,16 +32,13 @@ class ProjectResourcePolicyService:
     async def create_project_resource_policy(
         self, action: CreateProjectResourcePolicyAction
     ) -> CreateProjectResourcePolicyActionResult:
-        fields = action.creator.fields_to_store()
-        result = await self._project_resource_policy_repository.create(fields)
+        result = await self._project_resource_policy_repository.create(action.creator)
         return CreateProjectResourcePolicyActionResult(project_resource_policy=result)
 
     async def modify_project_resource_policy(
         self, action: ModifyProjectResourcePolicyAction
     ) -> ModifyProjectResourcePolicyActionResult:
-        name = action.name
-        to_update = action.modifier.fields_to_update()
-        result = await self._project_resource_policy_repository.update(name, to_update)
+        result = await self._project_resource_policy_repository.update(action.updater)
         return ModifyProjectResourcePolicyActionResult(project_resource_policy=result)
 
     async def delete_project_resource_policy(

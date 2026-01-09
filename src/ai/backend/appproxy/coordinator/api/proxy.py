@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Annotated, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated, Optional
 from uuid import UUID
 
 import jwt
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
 
-from ai.backend.appproxy.common.exceptions import (
+from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
     ObjectNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
@@ -25,10 +25,11 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-
-from ..models import Circuit, Token, Worker, add_circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
+from ai.backend.appproxy.coordinator.errors import CircuitCreationError
+from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -78,11 +79,7 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
     root_ctx: RootContext = request.app["_root.context"]
 
     coordinator_config = root_ctx.local_config.proxy_coordinator
-    if coordinator_config.advertised_addr:
-        connection_info = coordinator_config.advertised_addr
-    else:
-        connection_info = coordinator_config.bind_addr
-    base_url = f"{'https' if coordinator_config.tls_advertised or coordinator_config.tls_listen else 'http'}://{connection_info.host}:{connection_info.port}"
+    base_url = coordinator_config.advertise_base_url
     qdict = {
         **params.model_dump(mode="json", exclude_defaults=True),
         "token": request.match_info["token"],
@@ -106,7 +103,7 @@ async def proxy(
     otherwise coordinator will try to automatically redirect callee via `Location: ` response header.
     """
 
-    existing_circuit: Circuit | None = None
+    existing_circuit: Optional[Circuit] = None
     reuse = False
 
     root_ctx: RootContext = request.app["_root.context"]
@@ -122,7 +119,7 @@ async def proxy(
             session_id,
             token.session_id,
         )
-        raise InvalidCredentials
+        raise InvalidCredentials("E20007: Session ID mismatch")
 
     if not params.no_reuse:
         async with root_ctx.db.begin_readonly_session() as sess:
@@ -195,11 +192,10 @@ async def proxy(
             )
         log.debug("created new circuit {}", circuit.id)
 
-    assert circuit and worker
+    if not circuit or not worker:
+        raise CircuitCreationError("Failed to create circuit and worker.")
 
     await root_ctx.circuit_manager.initialize_circuits([circuit])
-
-    assert circuit
     log.debug("Circuit is set (id:{})", str(circuit.id))
     token_to_generate_body = {
         "id": str(token.id),
@@ -225,8 +221,7 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    else:
-        return web.HTTPPermanentRedirect(app_url)
+    return web.HTTPPermanentRedirect(app_url)
 
 
 async def init(app: web.Application) -> None:

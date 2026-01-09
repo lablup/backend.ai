@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -140,10 +141,6 @@ class KernelTerminationEvent(BaseKernelEvent):
             reason=value[2],
             exit_code=value[3],
         )
-
-    @override
-    def domain_id(self) -> Optional[str]:
-        return None
 
     @override
     def user_event(self) -> Optional[UserEvent]:
