@@ -109,6 +109,13 @@ class ImageDBSource:
         """
         Private method to get an image and validate ownership using an existing session.
         Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
+
+        Note: This validation logic lives in the repository layer (not service layer) because
+        image ownership is a simple user_id comparison that doesn't require role-based access
+        control (RBAC). Unlike model_serving domain where SUPERADMIN/ADMIN/USER have different
+        access rules based on domain and owner roles, image ownership is binary: either you
+        own it or you don't. This keeps the validation close to the data access layer where
+        the ownership information is retrieved.
         """
         image_row = await self._get_image_by_id(session, image_id, load_aliases)
         if not image_row.is_owned_by(user_id):
