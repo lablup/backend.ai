@@ -11,7 +11,10 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.types import BinarySize
-from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
+from ai.backend.manager.data.error_log.types import (
+    ErrorLogData,
+    ErrorLogSeverity,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -214,35 +217,35 @@ class TestErrorLogRepository:
         assert len(created_logs) == 3
 
         # Verify first log (CRITICAL)
-        assert created_logs[0].severity == ErrorLogSeverity.CRITICAL
-        assert created_logs[0].source == "manager"
-        assert created_logs[0].user == test_user_id
-        assert created_logs[0].message == "Critical error occurred"
-        assert created_logs[0].context_lang == "en"
-        assert created_logs[0].context_env == {"version": "1.0.0"}
-        assert created_logs[0].request_url == "/api/v1/test"
-        assert created_logs[0].request_status == 500
-        assert created_logs[0].traceback == "Traceback: ..."
-        assert created_logs[0].is_read is False
-        assert created_logs[0].is_cleared is False
+        assert created_logs[0].content.severity == ErrorLogSeverity.CRITICAL
+        assert created_logs[0].meta.source == "manager"
+        assert created_logs[0].meta.user == test_user_id
+        assert created_logs[0].content.message == "Critical error occurred"
+        assert created_logs[0].meta.context_lang == "en"
+        assert created_logs[0].meta.context_env == {"version": "1.0.0"}
+        assert created_logs[0].meta.request_url == "/api/v1/test"
+        assert created_logs[0].meta.request_status == 500
+        assert created_logs[0].content.traceback == "Traceback: ..."
+        assert created_logs[0].meta.is_read is False
+        assert created_logs[0].meta.is_cleared is False
         assert created_logs[0].id is not None
-        assert created_logs[0].created_at is not None
+        assert created_logs[0].meta.created_at is not None
 
         # Verify second log (ERROR)
-        assert created_logs[1].severity == ErrorLogSeverity.ERROR
-        assert created_logs[1].source == "agent"
-        assert created_logs[1].user == test_user_id
-        assert created_logs[1].message == "Error in agent"
-        assert created_logs[1].request_url is None
-        assert created_logs[1].request_status is None
-        assert created_logs[1].traceback is None
+        assert created_logs[1].content.severity == ErrorLogSeverity.ERROR
+        assert created_logs[1].meta.source == "agent"
+        assert created_logs[1].meta.user == test_user_id
+        assert created_logs[1].content.message == "Error in agent"
+        assert created_logs[1].meta.request_url is None
+        assert created_logs[1].meta.request_status is None
+        assert created_logs[1].content.traceback is None
 
         # Verify third log (WARNING, no user)
-        assert created_logs[2].severity == ErrorLogSeverity.WARNING
-        assert created_logs[2].source == "storage"
-        assert created_logs[2].user is None
-        assert created_logs[2].message == "Storage warning"
-        assert created_logs[2].context_lang == "ko"
+        assert created_logs[2].content.severity == ErrorLogSeverity.WARNING
+        assert created_logs[2].meta.source == "storage"
+        assert created_logs[2].meta.user is None
+        assert created_logs[2].content.message == "Storage warning"
+        assert created_logs[2].meta.context_lang == "ko"
 
         # Verify all IDs are unique
         ids = [log.id for log in created_logs]

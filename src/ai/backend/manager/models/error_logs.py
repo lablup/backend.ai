@@ -7,7 +7,12 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
+from ai.backend.manager.data.error_log.types import (
+    ErrorLogContent,
+    ErrorLogData,
+    ErrorLogMeta,
+    ErrorLogSeverity,
+)
 
 from .base import GUID, Base, IDColumn, mapper_registry
 
@@ -72,16 +77,20 @@ class ErrorLogRow(Base):
     def to_dataclass(self) -> ErrorLogData:
         return ErrorLogData(
             id=self.id,
-            created_at=self.created_at,
-            severity=ErrorLogSeverity(self.severity),
-            source=self.source,
-            user=self.user,
-            is_read=self.is_read,
-            is_cleared=self.is_cleared,
-            message=self.message,
-            context_lang=self.context_lang,
-            context_env=self.context_env,
-            request_url=self.request_url,
-            request_status=self.request_status,
-            traceback=self.traceback,
+            meta=ErrorLogMeta(
+                created_at=self.created_at,
+                user=self.user,
+                source=self.source,
+                is_read=self.is_read,
+                is_cleared=self.is_cleared,
+                context_lang=self.context_lang,
+                context_env=self.context_env,
+                request_url=self.request_url,
+                request_status=self.request_status,
+            ),
+            content=ErrorLogContent(
+                severity=ErrorLogSeverity(self.severity),
+                message=self.message,
+                traceback=self.traceback,
+            ),
         )
