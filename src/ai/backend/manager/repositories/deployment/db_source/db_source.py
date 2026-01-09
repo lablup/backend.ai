@@ -5,13 +5,15 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
@@ -174,9 +176,8 @@ class DeploymentDBSource:
             )
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -192,9 +193,8 @@ class DeploymentDBSource:
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -426,7 +426,7 @@ class DeploymentDBSource:
             )
         )
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def list_endpoints_by_name(
         self,
@@ -467,7 +467,7 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=lifecycle)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def get_modified_endpoint(
         self,
@@ -631,7 +631,7 @@ class DeploymentDBSource:
                 EndpointAutoScalingRuleRow.id == rule_id
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     # New Model Deployment Auto-scaling Rule methods (using new types)
 
@@ -733,7 +733,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=UTC),
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -752,7 +752,7 @@ class DeploymentDBSource:
                 .values(session=session_id, status=RouteStatus.PROVISIONING)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route(
         self,
@@ -781,7 +781,7 @@ class DeploymentDBSource:
 
             query = sa.update(RoutingRow).where(RoutingRow.id == route_id).values(**values)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route_traffic_ratio(
         self,
@@ -796,7 +796,7 @@ class DeploymentDBSource:
                 .values(traffic_ratio=traffic_ratio)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def delete_route(
         self,
@@ -806,7 +806,7 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             query = sa.delete(RoutingRow).where(RoutingRow.id == route_id)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def search_routes(
         self,
@@ -999,7 +999,7 @@ class DeploymentDBSource:
         # Then delete the endpoint itself
         endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)
         result = await db_sess.execute(endpoint_query)
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def _fetch_endpoint_and_routes(
         self,
@@ -1022,7 +1022,7 @@ class DeploymentDBSource:
 
         return EndpointWithRoutesRawData(
             endpoint_row=endpoint_row,
-            route_rows=route_rows,
+            route_rows=list(route_rows),
         )
 
     # Additional methods for DeploymentExecutor
@@ -1111,7 +1111,7 @@ class DeploymentDBSource:
                 .values(last_triggered_at=triggered_at)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def fetch_kernels_by_session_ids(
         self,
@@ -1188,11 +1188,11 @@ class DeploymentDBSource:
     ) -> Mapping[str, Optional[ScalingGroupProxyTarget]]:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa.select([
+                sa.select(
                     scaling_groups.c.name,
                     scaling_groups.c.wsproxy_addr,
                     scaling_groups.c.wsproxy_api_token,
-                ])
+                )
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name.in_(scaling_group))
             )
@@ -1302,7 +1302,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=UTC),
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)
@@ -1608,6 +1608,8 @@ class DeploymentDBSource:
                 raise EndpointNotFound(str(endpoint_id))
 
             # Get model vfolder for health check config
+            if endpoint.model is None:
+                return None
             model = await VFolderRow.get(db_sess, endpoint.model)
             if not model:
                 return None

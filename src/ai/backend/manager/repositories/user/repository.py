@@ -8,6 +8,7 @@ from uuid import UUID
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
@@ -161,9 +162,10 @@ class UserRepository:
             created_user.main_access_key = kp_data.access_key
 
             # Add user to groups including model store project
-            await self._add_user_to_groups(
-                db_session, created_user.uuid, created_user.domain_name, group_ids or []
-            )
+            if created_user.domain_name:
+                await self._add_user_to_groups(
+                    db_session, created_user.uuid, created_user.domain_name, group_ids or []
+                )
 
             role = await self._role_manager.create_system_role(db_session, created_user)
             user_role_creator = Creator(
@@ -276,13 +278,17 @@ class UserRepository:
                 .where(users.c.email == email)
             )
 
-    async def _check_domain_exists(self, session: SASession, domain_name: str) -> bool:
+    async def _check_domain_exists(
+        self, session: SASession | AsyncConnection, domain_name: str
+    ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
         result = cast(Optional[str], result)
         return result is not None
 
-    async def _check_resource_policy_exists(self, session: SASession, policy_name: str) -> bool:
+    async def _check_resource_policy_exists(
+        self, session: SASession | AsyncConnection, policy_name: str
+    ) -> bool:
         """Check if the resource policy exists."""
         query = sa.select(UserResourcePolicyRow.name).where(
             UserResourcePolicyRow.name == policy_name
@@ -302,7 +308,7 @@ class UserRepository:
         return result is not None
 
     async def _check_username_exists_for_other_user(
-        self, conn: SASession, *, username: str, exclude_email: str
+        self, conn: AsyncConnection, *, username: str, exclude_email: str
     ) -> bool:
         """Check if the username is already taken by another user."""
         query = sa.select(UserRow.uuid).where(
@@ -349,7 +355,7 @@ class UserRepository:
 
         gids_to_join = list(group_ids)
         if model_store_project:
-            gids_to_join.append(model_store_project["id"])
+            gids_to_join.append(model_store_project.id)
 
         if gids_to_join:
             query = (
@@ -398,12 +404,12 @@ class UserRepository:
         from sqlalchemy.sql.expression import bindparam
 
         result = await conn.execute(
-            sa.select([
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.is_active,
                 keypairs.c.is_admin,
                 keypairs.c.access_key,
-            ])
+            )
             .select_from(keypairs)
             .where(keypairs.c.user == user_uuid)
             .order_by(sa.desc(keypairs.c.is_admin))
@@ -468,7 +474,7 @@ class UserRepository:
 
         # Add to new groups
         result = await conn.execute(
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(groups.c.domain_name == domain_name)
             .where(groups.c.id.in_(group_ids))
@@ -505,12 +511,12 @@ class UserRepository:
 
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([
+                sa.select(
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
                     kernels.c.occupied_slots,
-                ])
+                )
                 .select_from(kernels)
                 .where(
                     (kernels.c.terminated_at >= start_date)
@@ -560,7 +566,7 @@ class UserRepository:
             for idx in range(stat_length)
         ]
 
-        kernel_ids = [str(row["id"]) for row in rows]
+        kernel_ids = [str(row.id) for row in rows]
         raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         for row, raw_stat in zip(rows, raw_stats, strict=True):

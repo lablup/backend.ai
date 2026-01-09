@@ -253,7 +253,7 @@ class DomainRepository:
         Private method to check if domain has active kernels.
         """
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(kernels)
             .where(
                 (kernels.c.domain_name == domain_name)
@@ -261,21 +261,21 @@ class DomainRepository:
             )
         )
         active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
+        return (active_kernel_count or 0) > 0
 
     async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get user count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(users.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(users.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get group count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(groups.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(

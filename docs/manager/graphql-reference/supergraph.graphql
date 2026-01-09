@@ -3892,7 +3892,7 @@ type ModelRevision implements Node
   modelRuntimeConfig: ModelRuntimeConfig!
 
   """Model data mount configuration."""
-  modelMountConfig: ModelMountConfig!
+  modelMountConfig: ModelMountConfig
 
   """Additional volume folder mounts."""
   extraMounts: ExtraVFolderMountConnection!
@@ -6379,7 +6379,7 @@ type Route implements Node
   trafficRatio: Float!
 
   """The timestamp when the route was created."""
-  createdAt: DateTime!
+  createdAt: DateTime
 
   """Error data if the route is in a failed state."""
   errorData: JSONString

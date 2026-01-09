@@ -215,6 +215,7 @@ class TestModifyGroup:
         mock_group_repository.modify_validated = AsyncMock(return_value=modified_group_data)
         assert modified_group_data.description is not None
 
+        assert modified_group_data.is_active is not None
         action = ModifyGroupAction(
             updater=Updater(
                 spec=GroupUpdaterSpec(

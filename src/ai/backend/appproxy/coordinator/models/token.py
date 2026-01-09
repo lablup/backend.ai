@@ -2,10 +2,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.appproxy.common.errors import ObjectNotFound
 
-from .base import GUID, Base, BaseMixin, IDColumn
+from .base import GUID, Base, BaseMixin
 
 __all__ = [
     "Token",
@@ -15,15 +16,17 @@ __all__ = [
 class Token(Base, BaseMixin):
     __tablename__ = "tokens"
 
-    id = IDColumn()
-    login_session_token = sa.Column(sa.VARCHAR(127), nullable=True)
-    kernel_host = sa.Column(sa.VARCHAR(255), nullable=False)
-    kernel_port = sa.Column(sa.INTEGER, nullable=False)
-    session_id = sa.Column(GUID, nullable=False)
-    user_uuid = sa.Column(GUID, nullable=False)
-    group_id = sa.Column(GUID, nullable=False)
-    access_key = sa.Column(sa.TEXT, nullable=False)
-    domain_name = sa.Column(sa.TEXT, nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    login_session_token: Mapped[str | None] = mapped_column(sa.VARCHAR(127), nullable=True)
+    kernel_host: Mapped[str] = mapped_column(sa.VARCHAR(255), nullable=False)
+    kernel_port: Mapped[int] = mapped_column(sa.INTEGER, nullable=False)
+    session_id: Mapped[UUID] = mapped_column(GUID, nullable=False)
+    user_uuid: Mapped[UUID] = mapped_column(GUID, nullable=False)
+    group_id: Mapped[UUID] = mapped_column(GUID, nullable=False)
+    access_key: Mapped[str] = mapped_column(sa.TEXT, nullable=False)
+    domain_name: Mapped[str] = mapped_column(sa.TEXT, nullable=False)
 
     @classmethod
     async def get(

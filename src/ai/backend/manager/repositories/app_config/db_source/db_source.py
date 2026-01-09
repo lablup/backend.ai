@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.data.app_config.types import (
     AppConfigData,
@@ -160,7 +161,7 @@ class AppConfigDBSource:
                 .values(**fields_to_update)
             )
 
-            if result.rowcount > 0:
+            if cast(CursorResult, result).rowcount > 0:
                 # Fetch updated row
                 fetch_result = await db_sess.execute(
                     sa.select(AppConfigRow).where(
@@ -200,4 +201,4 @@ class AppConfigDBSource:
                     )
                 )
             )
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0

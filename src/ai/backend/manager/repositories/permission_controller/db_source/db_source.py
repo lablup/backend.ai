@@ -627,18 +627,18 @@ class PermissionDBSource:
             )
 
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def get_entity_mapped_scopes(
         self, target_object_id: ObjectId
     ) -> list[AssociationScopesEntitiesRow]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            stmt = sa.select(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
                 AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
             )
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def check_scope_permission_exist(
         self,
@@ -671,7 +671,8 @@ class PermissionDBSource:
             )
         )
         async with self._db.begin_readonly_session() as db_session:
-            return await db_session.scalar(role_query)
+            result = await db_session.scalar(role_query)
+            return result or False
 
     def _make_query_statement_for_object_permission(
         self,
@@ -783,8 +784,8 @@ class PermissionDBSource:
             user_id, object_ids, operation
         )
         async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
+            role_rows_result = await db_session.scalars(role_query)
+            role_rows = list(role_rows_result.all())
 
             for role in role_rows:
                 for op in role.object_permission_rows:

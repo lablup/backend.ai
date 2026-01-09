@@ -534,6 +534,8 @@ class DeploymentOrderBy(GQLOrderBy):
                 return DeploymentOrders.name(ascending)
             case DeploymentOrderField.CREATED_AT:
                 return DeploymentOrders.created_at(ascending)
+            case DeploymentOrderField.UPDATED_AT:
+                return DeploymentOrders.updated_at(ascending)
 
 
 # Payload Types

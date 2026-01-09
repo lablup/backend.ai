@@ -10,6 +10,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
@@ -33,10 +34,10 @@ class UpdaterTestRowInt(Base):
     __tablename__ = "test_updater_int_pk"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String(50), nullable=False)
-    status = sa.Column(sa.String(20), nullable=False, default="pending")
-    value = sa.Column(sa.Integer, nullable=True)
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
+    value: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
 
 
 class UpdaterTestRowUUID(Base):
@@ -45,9 +46,9 @@ class UpdaterTestRowUUID(Base):
     __tablename__ = "test_updater_uuid_pk"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = sa.Column(sa.String(50), nullable=False)
-    status = sa.Column(sa.String(20), nullable=False, default="pending")
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
 class UpdaterTestRowStr(Base):
@@ -56,9 +57,9 @@ class UpdaterTestRowStr(Base):
     __tablename__ = "test_updater_str_pk"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(sa.String(50), primary_key=True)
-    name = sa.Column(sa.String(50), nullable=False)
-    status = sa.Column(sa.String(20), nullable=False, default="pending")
+    id: Mapped[str] = mapped_column(sa.String(50), primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
 # Single Updater Specs for each row type

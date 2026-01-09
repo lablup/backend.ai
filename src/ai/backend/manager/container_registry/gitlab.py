@@ -22,7 +22,8 @@ class GitLabRegistry(BaseContainerRegistry):
             raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
         access_token = self.registry_info.password
-        api_endpoint = self.registry_info.extra.get("api_endpoint", None)
+        extra = self.registry_info.extra or {}
+        api_endpoint = extra.get("api_endpoint", None)
 
         if api_endpoint is None:
             raise RuntimeError('"api_endpoint" is not provided for GitLab registry!')
@@ -30,10 +31,11 @@ class GitLabRegistry(BaseContainerRegistry):
         encoded_project_id = urllib.parse.quote(self.registry_info.project, safe="")
         repo_list_url = f"{api_endpoint}/api/v4/projects/{encoded_project_id}/registry/repositories"
 
-        headers = {
+        headers: dict[str, str] = {
             "Accept": "application/json",
-            "PRIVATE-TOKEN": access_token,
         }
+        if access_token:
+            headers["PRIVATE-TOKEN"] = access_token
         page = 1
 
         while True:

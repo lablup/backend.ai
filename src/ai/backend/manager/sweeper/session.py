@@ -60,9 +60,9 @@ class SessionSweeper(AbstractSweeper):
                 )
             )
 
-            async with self._db.begin_readonly() as conn:
-                result = await conn.execute(query)
-                sessions = result.fetchall()
+            async with self._db.begin_readonly_session() as db_sess:
+                result = await db_sess.execute(query)
+                sessions = list(result.scalars().all())
 
             async def _destroy_session(session: SessionRow) -> None:
                 try:

@@ -32,7 +32,7 @@ class SlotResponseModel(BaseModel):
     subdomain: Annotated[str | None, Field(default=None, description="Subdomain for the circuit.")]
     wsproxy_version: Annotated[str, Field(description="AppProxy version.")]
     worker__authority: Annotated[str, Field(description="Authority name of the worker.")]
-    circuit__app: Annotated[str, Field(description="App name.")]
+    circuit__app: Annotated[str | None, Field(default=None, description="App name.")]
     circuit__session_id: Annotated[
         UUID | None, Field(default=None, description="Session ID of the circuit.")
     ]
@@ -48,9 +48,11 @@ class SlotResponseModel(BaseModel):
     circuit__arguments: Annotated[
         str | None, Field(default=None, description="Arguments for the circuit.")
     ]
-    circuit__created: Annotated[datetime, Field(description="Creation time of the circuit.")]
+    circuit__created: Annotated[
+        datetime | None, Field(default=None, description="Creation time of the circuit.")
+    ]
     circuit__modified: Annotated[
-        datetime, Field(description="Last modification time of the circuit.")
+        datetime | None, Field(default=None, description="Last modification time of the circuit.")
     ]
 
 

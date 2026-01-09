@@ -37,5 +37,5 @@ class KeyPairData:
     rate_limit: int
     ssh_public_key: Optional[str]
     ssh_private_key: Optional[str]
-    dotfiles: str
+    dotfiles: bytes
     bootstrap_script: str

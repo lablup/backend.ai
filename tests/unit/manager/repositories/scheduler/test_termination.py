@@ -763,6 +763,7 @@ class TestKernelTermination:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             stmt = sa.select(KernelRow).where(KernelRow.id == test_terminating_kernel_id)
             updated_kernel = await db_sess.scalar(stmt)
+            assert updated_kernel is not None
             assert updated_kernel.status == KernelStatus.TERMINATED
             assert updated_kernel.status_info == "test-swept"
             assert updated_kernel.terminated_at is not None

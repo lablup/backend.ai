@@ -103,7 +103,7 @@ async def patch_container_registry(
 
 async def _get_registry_row_matching_url(
     db_sess: AsyncSession, registry_url: str, project: str
-) -> ContainerRegistryRow:
+) -> ContainerRegistryRow | None:
     query = sa.select(ContainerRegistryRow).where(
         (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
         & (ContainerRegistryRow.url.like(f"%{registry_url}%"))

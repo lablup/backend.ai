@@ -112,7 +112,7 @@ async def test_select_queries(virtual_user_db) -> None:
     parser = QueryFilterParser()
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'full_name == "tester1"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -120,7 +120,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'name == "test\'er"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -128,7 +128,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'name == "test\\"er"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -136,7 +136,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         '(full_name == "tester1")',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -144,7 +144,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'full_name in ["tester1", "tester3", "tester9"]',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -152,14 +152,14 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'type in ["USER", "ADMIN"]',
     )
     actual_ret = list(await conn.execute(sa_query))
     assert len(actual_ret) == 4
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'full_name == "tester1" & age == 20',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -167,7 +167,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         '(full_name == "tester1") & (age == 20)',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -175,7 +175,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         '(full_name == "tester1") | (age == 20)',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -183,7 +183,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         '(name contains "test") & (age > 30) & (is_active is true)',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -191,7 +191,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         "value isnot null",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -199,7 +199,7 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         "value is null",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -207,14 +207,14 @@ async def test_select_queries(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         "value is null | value isnot null",
     )
     actual_ret = list(await conn.execute(sa_query))
     assert len(actual_ret) == 4  # all rows
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         "value < 9.4",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -224,27 +224,27 @@ async def test_select_queries(virtual_user_db) -> None:
     # invalid syntax
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             "",
         )
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             "!!!",
         )
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             "123",
         )
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             '"abc"',
         )
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             "name =",
         )
 
@@ -254,14 +254,14 @@ async def test_select_queries(virtual_user_db) -> None:
     #    So it is the out of scope issue.
     # with pytest.raises(ValueError):
     #     parser.append_filter(
-    #         sa.select([users.c.name, users.c.age]).select_from(users),
+    #         sa.select(users.c.name, users.c.age).select_from(users),
     #         "full_name == 123",
     #     )
 
     # non-existent column
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             "xyz == 123",
         )
 
@@ -278,11 +278,11 @@ async def test_modification_queries(virtual_user_db) -> None:
     result = await conn.execute(sa_query)
     assert result.rowcount == 1
 
-    sa_query = parser.append_filter(
+    delete_query = parser.append_filter(
         sa.delete(users),
         'full_name like "tester%"',
     )
-    result = await conn.execute(sa_query)
+    result = await conn.execute(delete_query)
     assert result.rowcount == 4
 
 
@@ -298,7 +298,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     })
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'n1 == "tester"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -306,7 +306,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'n2 == "TESTER1"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -314,7 +314,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'n2 in ["TESTER2", "TESTER4"]',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -322,7 +322,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         't1 in ["USER", "ADMIN"]',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -330,7 +330,7 @@ async def test_fieldspec(virtual_user_db) -> None:
 
     # A fieldspec to match against a field in a JSON object column
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'hobby == "piano"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -338,7 +338,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'tag == "bbb"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -346,7 +346,7 @@ async def test_fieldspec(virtual_user_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_filter(
-        sa.select([users.c.name, users.c.age]).select_from(users),
+        sa.select(users.c.name, users.c.age).select_from(users),
         'tag like "%b%"',
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -356,13 +356,13 @@ async def test_fieldspec(virtual_user_db) -> None:
     # non-existent column in fieldspec
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             'full_name == "TESTER1"',
         )
 
     # non-existent enum value
     with pytest.raises(ValueError):
         parser.append_filter(
-            sa.select([users.c.name, users.c.age]).select_from(users),
+            sa.select(users.c.name, users.c.age).select_from(users),
             't1 == "XYZ"',
         )

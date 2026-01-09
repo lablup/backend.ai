@@ -173,6 +173,7 @@ class NetworkNode(graphene.ObjectType):
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
+            additional_cond: sa.ColumnElement[bool]
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
                     additional_cond = sa.true()
@@ -249,7 +250,7 @@ class CreateNetwork(graphene.Mutation):
                 and project.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
-            query = sa.select([sa.func.count("*")]).where(NetworkRow.project == project.id)
+            query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
             project_network_count = await db_session.scalar(query)
             if (
                 project_network_count >= 0

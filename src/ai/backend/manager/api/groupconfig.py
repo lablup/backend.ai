@@ -62,7 +62,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
 
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -125,7 +125,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -146,7 +146,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             else:
                 # check if user (non-admin) is in the group
                 query = (
-                    sa.select([agus.c.group_id])
+                    sa.select(agus.c.group_id)
                     .select_from(agus)
                     .where(agus.c.user_id == request["user"]["uuid"])
                 )
@@ -197,7 +197,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -251,7 +251,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)

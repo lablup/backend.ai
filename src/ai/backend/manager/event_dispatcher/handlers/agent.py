@@ -173,15 +173,13 @@ class AgentEventHandler:
     ) -> None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([agents.c.occupied_slots])
-                .select_from(agents)
-                .where(agents.c.id == source)
+                sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
             )
             result = await conn.execute(query)
             row = result.first()
             if not row:
                 raise InstanceNotFound(source)
-            log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
+            log.info("agent@{0} occupied slots: {1}", source, row.occupied_slots.to_json())
 
     async def handle_agent_error(
         self,
