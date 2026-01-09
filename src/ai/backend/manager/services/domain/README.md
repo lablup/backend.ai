@@ -27,7 +27,7 @@ When creating a new domain, the service:
 1. Accepts domain configuration through `CreateDomainAction`
 2. Validates user permissions and role (superadmin vs regular user)
 3. Uses `DomainCreator` to specify domain properties
-4. Persists the domain through appropriate repository (admin or regular)
+4. Persists the domain through the repository
 5. Returns success/failure status with domain data
 
 ### Modifying a Domain
@@ -188,19 +188,12 @@ result = await domain_service.modify_domain_node(action)
 
 ### Repository Layer
 
-The service integrates with two repository types:
+The service integrates with the repository:
 
-#### DomainRepository (Regular Operations)
-- Validated operations with permission checks
-- Standard domain CRUD operations
+#### DomainRepository
+- All domain CRUD operations
 - Scaling group permission management
 - Located at: `src/ai/backend/manager/repositories/domain/repository.py`
-
-#### AdminDomainRepository (Superadmin Operations)
-- Force operations bypassing some validations
-- Administrative domain management
-- Enhanced permissions for system administration
-- Located at: `src/ai/backend/manager/repositories/domain/admin_repository.py`
 
 ### Database Models
 
