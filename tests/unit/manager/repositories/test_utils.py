@@ -412,13 +412,16 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     # Insert more kernel data
     result = await conn.execute(sa.select(kernels).where(kernels.c.session_id == session_id))
     orig_kernel = result.first()
+    assert orig_kernel is not None
+    orig_mapping = orig_kernel._mapping
     kernel_data = {
         "session_id": session_id,
-        "domain_name": orig_kernel["domain_name"],
-        "group_id": orig_kernel["group_id"],
-        "user_uuid": orig_kernel["user_uuid"],
+        "domain_name": orig_mapping["domain_name"],
+        "group_id": orig_mapping["group_id"],
+        "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
         "occupied_slots": {},
+        "requested_slots": {},
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
@@ -447,7 +450,8 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     )
     result = await conn.execute(query)
     session = result.first()
-    assert session["kernels_tag"] == expected
+    assert session is not None
+    assert session._mapping["kernels_tag"] == expected
 
     # Delete test kernel data explicitly
     await conn.execute(
@@ -471,13 +475,16 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
     # Insert more kernel data
     result = await conn.execute(sa.select(kernels).where(kernels.c.session_id == session_id))
     orig_kernel = result.first()
+    assert orig_kernel is not None
+    orig_mapping = orig_kernel._mapping
     kernel_data = {
         "session_id": session_id,
-        "domain_name": orig_kernel["domain_name"],
-        "group_id": orig_kernel["group_id"],
-        "user_uuid": orig_kernel["user_uuid"],
+        "domain_name": orig_mapping["domain_name"],
+        "group_id": orig_mapping["group_id"],
+        "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
         "occupied_slots": {},
+        "requested_slots": {},
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
@@ -506,7 +513,8 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
     )
     result = await conn.execute(query)
     session = result.first()
-    assert session["kernels_tag"] == expected
+    assert session is not None
+    assert session._mapping["kernels_tag"] == expected
 
     # Delete test kernel data explicitly
     await conn.execute(
