@@ -27,7 +27,7 @@ import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -139,6 +139,14 @@ __all__: Sequence[str] = (
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _get_user_row_join_condition():
+    return UserRow.uuid == foreign(VFolderRow.user)
+
+
+def _get_group_row_join_condition():
+    return GroupRow.id == foreign(VFolderRow.group)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -360,17 +368,17 @@ class VFolderRow(Base):
         "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
     )
 
-    # Relationships (defined with string-based join conditions to avoid circular imports)
+    # Relationships
     endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         back_populates="vfolder_rows",
-        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+        primaryjoin=_get_user_row_join_condition,
     )
     group_row: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         back_populates="vfolder_rows",
-        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+        primaryjoin=_get_group_row_join_condition,
     )
     permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
         "VFolderPermissionRow", back_populates="vfolder_row"

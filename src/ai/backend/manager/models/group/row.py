@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
+    foreign,
     joinedload,
     load_only,
     mapped_column,
@@ -82,6 +83,22 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _get_networks_join_condition():
+    from ai.backend.manager.models.network import NetworkRow
+
+    return GroupRow.id == foreign(NetworkRow.project)
+
+
+def _get_vfolder_rows_join_condition():
+    from ai.backend.manager.models.vfolder import VFolderRow
+
+    return GroupRow.id == foreign(VFolderRow.group)
+
+
+def _get_association_container_registries_groups_join_condition():
+    return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
 __all__: Sequence[str] = (
@@ -219,19 +236,19 @@ class GroupRow(Base):
     networks: Mapped[list[NetworkRow]] = relationship(
         "NetworkRow",
         back_populates="project_row",
-        primaryjoin="GroupRow.id == foreign(NetworkRow.project)",
+        primaryjoin=_get_networks_join_condition,
     )
     vfolder_rows: Mapped[list[VFolderRow]] = relationship(
         "VFolderRow",
         back_populates="group_row",
-        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+        primaryjoin=_get_vfolder_rows_join_condition,
     )
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="group_row",
-        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
+        primaryjoin=_get_association_container_registries_groups_join_condition,
     )
 
     def to_data(self) -> GroupData:

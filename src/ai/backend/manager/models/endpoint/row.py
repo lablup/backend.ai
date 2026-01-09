@@ -152,6 +152,28 @@ def _get_endpoint_deployment_policy_join_condition():
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
+def _get_image_row_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return foreign(EndpointRow.image) == ImageRow.id
+
+
+def _get_created_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(EndpointRow.created_user) == UserRow.uuid
+
+
+def _get_session_owner_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(EndpointRow.session_owner) == UserRow.uuid
+
+
+def _get_endpoint_token_endpoint_row_join_condition():
+    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
+
+
 class EndpointRow(Base):
     __tablename__ = "endpoints"
 
@@ -310,7 +332,7 @@ class EndpointRow(Base):
     )
     image_row = relationship(
         "ImageRow",
-        primaryjoin="foreign(EndpointRow.image) == ImageRow.id",
+        primaryjoin=_get_image_row_join_condition,
         back_populates="endpoints",
     )
 
@@ -319,13 +341,13 @@ class EndpointRow(Base):
         "UserRow",
         back_populates="created_endpoints",
         foreign_keys=[created_user],
-        primaryjoin="foreign(EndpointRow.created_user) == UserRow.uuid",
+        primaryjoin=_get_created_user_row_join_condition,
     )
     session_owner_row = relationship(
         "UserRow",
         back_populates="owned_endpoints",
         foreign_keys=[session_owner],
-        primaryjoin="foreign(EndpointRow.session_owner) == UserRow.uuid",
+        primaryjoin=_get_session_owner_row_join_condition,
     )
 
     revisions = relationship(
@@ -914,7 +936,7 @@ class EndpointTokenRow(Base):
         "EndpointRow",
         back_populates="tokens",
         foreign_keys=[endpoint],
-        primaryjoin="foreign(EndpointTokenRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_token_endpoint_row_join_condition,
     )
 
     def __init__(
