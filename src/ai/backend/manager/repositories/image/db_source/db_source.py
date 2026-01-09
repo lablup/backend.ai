@@ -209,11 +209,21 @@ class ImageDBSource:
             await image_row.mark_as_deleted(session)
             return image_row.to_dataclass()
 
-    async def validate_and_fetch_image_ownership(
+    async def validate_image_ownership(
+        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
+    ) -> None:
+        """
+        Validates that user owns the image.
+        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
+        """
+        async with self._db.begin_session() as session:
+            await self._validate_image_ownership(session, image_id, user_id, load_aliases)
+
+    async def fetch_image_by_id_with_ownership(
         self, image_id: UUID, user_id: UUID, load_aliases: bool = False
     ) -> ImageData:
         """
-        Validates ownership and fetches an image from database by ID in a single operation.
+        Fetches an image from database by ID after validating ownership.
         Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
         """
         async with self._db.begin_session() as session:

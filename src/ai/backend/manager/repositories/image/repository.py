@@ -219,14 +219,12 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def validate_image_ownership(
         self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageData:
+    ) -> None:
         """
         Validates that user owns the image.
         Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
         """
-        return await self._db_source.validate_and_fetch_image_ownership(
-            image_id, user_id, load_aliases
-        )
+        await self._db_source.validate_image_ownership(image_id, user_id, load_aliases)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
