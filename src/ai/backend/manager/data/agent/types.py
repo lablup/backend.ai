@@ -62,7 +62,7 @@ class AgentDataForHeartbeatUpdate:
 
 @dataclass
 class AgentData:
-    id: AgentId | str
+    id: AgentId
     status: AgentStatus
     status_changed: Optional[datetime]
     region: str
