@@ -4,7 +4,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import aiohttp
 import tomli
@@ -58,7 +58,6 @@ from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseErro
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator
@@ -121,13 +120,11 @@ from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
 )
+from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.model_serving.types import EndpointData
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -182,26 +179,6 @@ class ModelServingService:
             SessionStatus.CANCELLED: "session_cancelled",
             SessionStatus.ERROR: "session_cancelled",
         }
-
-    def _validate_endpoint_access(
-        self,
-        endpoint_data: EndpointData,
-        ctx: RequesterCtx,
-    ) -> bool:
-        """Validate user access to endpoint based on role."""
-        if endpoint_data.session_owner_id is None:
-            return True
-
-        match ctx.user_role:
-            case UserRole.SUPERADMIN:
-                return True
-            case UserRole.ADMIN:
-                # ADMIN cannot access SUPERADMIN's resources
-                if endpoint_data.session_owner_role == UserRole.SUPERADMIN:
-                    return False
-                return endpoint_data.domain == ctx.domain_name
-            case _:
-                return endpoint_data.session_owner_id == ctx.user_id
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -414,7 +391,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Determine lifecycle stage based on routes
@@ -577,7 +554,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         return GetModelServiceInfoActionResult(
@@ -614,7 +591,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         error_routes = (
@@ -642,7 +619,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Clear errors
@@ -662,7 +639,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Update route traffic
@@ -687,7 +664,7 @@ class ModelServingService:
             raise ModelServiceNotFound
 
         # Validate access
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Get route
@@ -722,7 +699,7 @@ class ModelServingService:
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Get scaling group info
@@ -788,7 +765,7 @@ class ModelServingService:
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
