@@ -63,26 +63,22 @@ Backend.AI의 각 엔티티 타입은 자체 권한 검사 로직을 구현합�
 
 ### 엔티티 타입
 
-RBAC 시스템은 다음 엔티티 타입에 대한 권한을 관리합니다:
+RBAC 시스템은 리소스(VFolder, Compute Session, Image 등), 스코프(Domain, Project, User), 메타 엔티티(Role, assignment) 등 다양한 엔티티 타입에 대한 권한을 관리합니다.
 
-| 엔티티 타입 | 설명 | 이중 역할 |
-|-------------|------|----------|
-| Compute Session | 계산 워크로드 및 컨테이너 | 엔티티만 |
-| VFolder | 데이터 저장을 위한 가상 폴더 | 엔티티만 |
-| Image | 세션용 컨테이너 이미지 | 엔티티만 |
-| Model Service | 모델 서빙 배포 | 엔티티만 |
-| Model Artifact | 학습된 모델 파일 및 메타데이터 | 엔티티만 |
-| Agent | 컴퓨팅 리소스를 제공하는 에이전트 노드 | 엔티티만 |
-| Resource Group | 에이전트들의 논리적 그룹 | 엔티티만 |
-| Storage Host | 스토리지 백엔드 호스트 | 엔티티만 |
-| App Config | 애플리케이션 설정 항목 | 엔티티만 |
-| Notification | 시스템 알림 메시지 (어드민 전용) | 엔티티만 |
-| Domain | 관리 도메인 그룹핑 | 엔티티 & 스코프 |
-| Project | 도메인 내 프로젝트 그룹핑 | 엔티티 & 스코프 |
-| User | 사용자 계정 | 엔티티 & 스코프 |
-| Role | 권한 집합 정의 | 엔티티만 |
-| {Entity}:assignment | 특정 엔티티를 다른 사용자에게 공유하는 매핑 (예: role:assignment, vfolder:assignment, compute_session:assignment) | 엔티티만 |
+엔티티 타입의 전체 목록과 상세 내용은 [BEP-1012 RBAC 엔티티 및 필드 타입](./entity-types.md)을 참조하세요.
 
+### 필드 타입
+
+필드 타입은 자체 권한 검사를 수행하지 않고, 속해 있는 엔티티에 권한 검사를 위임하는 객체입니다. 독립적인 권한 대신, 연관된 엔티티의 권한 검사 결과를 상속받습니다.
+
+**주요 특징**:
+- 필드 객체는 자체 권한 항목을 갖지 않음
+- 권한 검사는 연관된 엔티티로 리다이렉트됨
+- 작업 타입은 동일하게 유지됨 (예: `kernel:read` → `session:read`)
+
+**예시**: Kernel은 Compute Session에 연관된 필드 타입입니다. 사용자가 Kernel X를 읽을 수 있는지 검사할 때, 시스템은 실제로 해당 Kernel이 속한 Session을 읽을 수 있는지를 검사합니다.
+
+필드 타입의 전체 목록과 연관 엔티티는 [BEP-1012 RBAC 엔티티 및 필드 타입](./entity-types.md)을 참조하세요.
 
 ### 작업
 
@@ -504,4 +500,5 @@ Project Admin은 자신의 필요에 맞는 사용자 정의 역할을 생성할
 ## 참고 자료
 
 - [BEP-1008: Backend.AI 역할 기반 접근 제어 (RBAC)](./BEP-1008-RBAC.md) - 기술 구현 세부사항 및 아키텍처
-- [BEP-1012 RBAC 설계 결정 사항](../refs/kr/BEP-1012-RBAC-design-decision.md) - 명세 개발 중 내린 주요 설계 결정
+- [BEP-1012 RBAC 설계 결정 사항](./design-decision.md) - 명세 개발 중 내린 주요 설계 결정
+- [BEP-1012 RBAC 테이블 관계](./table-relations.md) - 데이터베이스 테이블 구조 및 관계

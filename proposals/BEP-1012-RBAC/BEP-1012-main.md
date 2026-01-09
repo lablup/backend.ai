@@ -63,27 +63,22 @@ Each entity type in Backend.AI implements its own permission checking logic:
 
 ### Entity Types
 
-The RBAC system will manage permissions for the following entity types:
+The RBAC system manages permissions for various entity types including resources (VFolder, Compute Session, Image, etc.), scopes (Domain, Project, User), and meta-entities (Role, assignments).
 
-| Entity Type | Description | Dual Role |
-|-------------|-------------|-----------|
-| Compute Session | Computational workloads and containers | Entity only |
-| VFolder | Virtual folders for data storage | Entity only |
-| Image | Container images for sessions | Entity only |
-| Model Service | Model serving deployments | Entity only |
-| Model Artifact | Trained model files and metadata | Entity only |
-| Agent | Agent nodes providing computing resources | Entity only |
-| Resource Group | Logical groups of agents | Entity only |
-| Storage Host | Storage backend hosts | Entity only |
-| App Config | Application configuration items | Entity only |
-| Notification | System notification messages (admin-only) | Entity only |
-| Domain | Administrative domain grouping | Entity & Scope |
-| Project | Project grouping within domains | Entity & Scope |
-| User | User accounts | Entity & Scope |
-| Role | Permission set definitions | Entity only |
-| {Entity}:assignment | Mappings for sharing specific entities with other users (e.g., role:assignment vfolder:assignment, compute_session:assignment) | Entity only |
+For the complete list of entity types and their details, see [BEP-1012 RBAC Entity and Field Types](./entity-types.md).
 
-**Note**: Domain, Project, and User serve dual roles as both manageable entities and permission scopes. Role defines what permissions are available, while Role Assignment maps users to roles within specific scopes.
+### Field Types
+
+Field types are objects that delegate their permission checks to the entity they belong to. Instead of having independent permissions, a field object inherits the permission check result from its associated entity.
+
+**Key Characteristics**:
+- Field objects do not have their own permission entries
+- Permission checks are redirected to the associated entity
+- The operation type remains the same (e.g., `kernel:read` → `session:read`)
+
+**Example**: Kernel is a field type associated with Compute Session. When checking if a user can read Kernel X, the system actually checks if the user can read the Session that contains Kernel X.
+
+For the complete list of field types and their associated entities, see [BEP-1012 RBAC Entity and Field Types](./entity-types.md).
 
 ### Operations
 
@@ -160,6 +155,14 @@ When a Role bound to Project-A scope includes Object Permissions for entities in
 - Sharing a personal VFolder with project team members
 - Granting access to a specific session across projects
 - Collaborative workflows spanning multiple scopes
+
+**Guest Permission Groups**:
+Cross-scope sharing requires visibility into the target scope. This is achieved through "guest" permission groups:
+- A guest permission group provides scope visibility without granting type-level permissions
+- When User A shares a resource with User B, a guest permission group for User A's scope is added to User B's role
+- The guest permission group has no type-level permissions; actual access is granted via Object Permissions
+- Only one guest permission group per scope is maintained per role
+- Guest permission groups are automatically removed when the last Object Permission referencing that scope is deleted
 
 ### Role Structure
 
@@ -402,9 +405,9 @@ When User A shares their VFolder with User B:
 
 **Sharing Process**:
 1. User A creates a `vfolder:assignment` entity
-2. System automatically adds Object Permissions to User B's "User Owner" System Sourced Role:
-   - `vfolder:{folder_id}:read`
-   - `vfolder:{folder_id}:update` (if write permission included)
+2. System automatically updates User B's "User Owner" System Sourced Role:
+   - Adds Object Permissions: `vfolder:{folder_id}:read`, `vfolder:{folder_id}:update` (if write permission included)
+   - Creates a guest permission group for User A's scope (if not already exists)
 3. User B can immediately access the VFolder
 
 ```mermaid
@@ -419,6 +422,7 @@ sequenceDiagram
     Note over System,Assignment: Target: User B, VFolder: X
     System->>Assignment: Create assignment entity
     System->>RoleB: Add Object Permissions<br/>(vfolder:X:read, update)
+    System->>RoleB: Add Guest Permission Group<br/>(scope: User A, guest: true)
     System->>UserB: Grant access
     UserB->>System: Access VFolder X ✓
 ```
@@ -426,6 +430,7 @@ sequenceDiagram
 **Revoking Share**:
 - User A deletes the `vfolder:assignment` entity
 - System automatically removes the VFolder's Object Permissions from User B's System Sourced Role
+- If no other Object Permissions reference User A's scope, the guest permission group is also removed
 
 **Backward Compatibility**: Existing share/invite API continues to work, internally using this RBAC mechanism.
 
@@ -508,4 +513,6 @@ Predefined, reusable role definitions that can be instantiated across different 
 ## References
 
 - [BEP-1008: Backend.AI Role-Based Access Control (RBAC)](./BEP-1008-RBAC.md) - Technical implementation details and architecture
-- [BEP-1012 RBAC Design Decisions](../refs/BEP-1012-RBAC-design-decision.md) - Key design decisions made during specification development
+- [BEP-1012 RBAC Entity and Field Types](./entity-types.md) - Complete list of entity types and field types
+- [BEP-1012 RBAC Design Decisions](./design-decision.md) - Key design decisions made during specification development
+- [BEP-1012 RBAC Table Relations](./table-relations.md) - Database table structure and relationships

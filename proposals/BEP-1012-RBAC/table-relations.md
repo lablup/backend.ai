@@ -2,7 +2,7 @@
 
 ## Overview
 
-RBAC (Role-Based Access Control) 시스템의 테이블 관계도입니다.
+This document describes the table relationships for the RBAC (Role-Based Access Control) system.
 
 ## Entity Relationship Diagram
 
@@ -48,6 +48,7 @@ erDiagram
         uuid role_id FK
         enum scope_type "GLOBAL | DOMAIN | PROJECT | USER"
         string scope_id
+        boolean guest "default: false"
     }
 
     permissions {
@@ -97,7 +98,7 @@ erDiagram
 |-------|-------------|
 | `roles` | Role definitions with name, source (SYSTEM/CUSTOM), and status |
 | `user_roles` | Many-to-many mapping between users and roles |
-| `permission_groups` | Groups permissions by scope (domain, project, user) |
+| `permission_groups` | Groups permissions by scope (domain, project, user). `guest=true` indicates cross-scope visibility without type-level permissions |
 | `permissions` | Type-level permissions (entity_type + operation) |
 | `object_permissions` | Object-level permissions for specific entity instances |
 
@@ -106,28 +107,56 @@ erDiagram
 | Table | Description |
 |-------|-------------|
 | `association_scopes_entities` | Maps entities to their owning scopes |
-| `entity_fields` | Maps field-level entities to their parent entities |
+| `entity_fields` | Maps field-level objects to their associated entities |
 
 ## Permission Types
 
 ### Type-Level Permissions (`permissions`)
 
-Scope 내의 모든 entity에 대한 권한을 부여합니다.
+Grants permissions for all entities within a scope.
 
 ```
 PermissionGroup (scope: project-A)
   └── Permission (entity_type: VFOLDER, operation: READ)
-      → project-A 내 모든 VFolder에 READ 권한
+      → READ permission for all VFolders in project-A
 ```
 
 ### Object-Level Permissions (`object_permissions`)
 
-특정 entity instance에 대한 권한을 부여합니다.
+Grants permissions for a specific entity instance.
 
 ```
 ObjectPermission (entity_type: VFOLDER, entity_id: "vf-123", operation: READ)
-  → vf-123 VFolder에만 READ 권한
+  → READ permission only for vf-123 VFolder
 ```
+
+### Guest Permission Groups
+
+Provides scope visibility for cross-scope permission sharing, allowing roles to see other scopes.
+
+**Characteristics**:
+- Permission group with `guest=true`
+- Provides scope visibility only, without type-level permissions
+- Actual permissions are granted via object_permissions
+- Only one guest permission group per scope is maintained
+
+**Example: User A invites User B to vfolderA**:
+
+```
+1. Items added to User B's system role:
+   - ObjectPermission (entity_type: VFOLDER, entity_id: "vfolderA", operation: READ)
+   - PermissionGroup (scope_type: USER, scope_id: "userA", guest: true)
+     └── permissions: none
+
+2. Result:
+   - User B can see User A's scope (guest permission group)
+   - User B has READ permission on vfolderA (object permission)
+```
+
+**Deletion Conditions**:
+- When a share is revoked, the guest permission group is only deleted if the removed object permission was the only entity in that scope for the role
+- Example: If User B's system role has only vfolderA as an object permission in User A's scope → revoking the share also deletes the guest permission group
+- Example: If User B's system role has both vfolderA and vfolderB as object permissions in User A's scope → revoking vfolderA share keeps the guest permission group
 
 ## Relationship Details
 
@@ -169,14 +198,14 @@ flowchart TD
 
 ## Composite Relationships (No FK)
 
-다음 관계들은 FK 없이 composite key로 연결됩니다:
+The following relationships are connected via composite keys without foreign keys:
 
 | From | To | Join Condition |
 |------|----|----------------|
 | `object_permissions` | `association_scopes_entities` | `entity_type = entity_type AND entity_id = entity_id` |
 | `permission_groups` | `association_scopes_entities` | `scope_id = scope_id` |
 
-SQLAlchemy에서는 `viewonly=True`와 `foreign()` 마커를 사용하여 구현합니다.
+In SQLAlchemy, these are implemented using `viewonly=True` and `foreign()` markers.
 
 ## Indexes
 
