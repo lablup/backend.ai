@@ -346,6 +346,15 @@ def _get_user_row_join_condition():
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
+def _get_image_row_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return sa.and_(
+        KernelRow.image == ImageRow.name,
+        KernelRow.architecture == ImageRow.architecture,
+    )
+
+
 class KernelRow(Base):
     __tablename__ = "kernels"
 
@@ -544,7 +553,7 @@ class KernelRow(Base):
     image_row = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image",
-        primaryjoin="and_(KernelRow.image == ImageRow.name, KernelRow.architecture == ImageRow.architecture)",
+        primaryjoin=_get_image_row_join_condition,
     )
     agent_row = relationship("AgentRow", back_populates="kernels")
     group_row = relationship("GroupRow", back_populates="kernels")

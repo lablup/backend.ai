@@ -1,9 +1,10 @@
-"""Tests for AdminGroupRepository._delete_group_endpoints functionality"""
+"""Tests for GroupRepository._delete_group_endpoints functionality"""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -38,12 +39,12 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
+from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.testutils.db import with_tables
 
 
-class TestAdminGroupRepositoryDeleteEndpoints:
-    """Test cases for AdminGroupRepository._delete_group_endpoints"""
+class TestGroupRepositoryDeleteEndpoints:
+    """Test cases for GroupRepository._delete_group_endpoints"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -196,19 +197,19 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     @pytest.fixture
     async def storage_manager_mock(self) -> StorageSessionManager:
         """Create a mock StorageSessionManager"""
-        from unittest.mock import Mock
-
-        return Mock(spec=StorageSessionManager)
+        return MagicMock(spec=StorageSessionManager)
 
     @pytest.fixture
-    async def admin_group_repository(
+    async def group_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         storage_manager_mock: StorageSessionManager,
-    ) -> AdminGroupRepository:
-        """Create AdminGroupRepository instance"""
-        return AdminGroupRepository(
+    ) -> GroupRepository:
+        """Create GroupRepository instance"""
+        return GroupRepository(
             db=db_with_cleanup,
+            config_provider=MagicMock(),
+            valkey_stat_client=MagicMock(),
             storage_manager=storage_manager_mock,
         )
 
@@ -496,14 +497,14 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        admin_group_repository: AdminGroupRepository,
+        group_repository: GroupRepository,
         test_group: uuid.UUID,
         inactive_endpoints_with_routings: list[uuid.UUID],
     ) -> None:
         """Test successful deletion of endpoints with routing entries"""
         # Call _delete_group_endpoints
         async with db_with_cleanup.begin_session() as session:
-            await admin_group_repository._delete_group_endpoints(session, test_group)
+            await group_repository._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted
@@ -524,7 +525,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_with_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        admin_group_repository: AdminGroupRepository,
+        group_repository: GroupRepository,
         test_group: uuid.UUID,
         inactive_endpoint_with_session_and_routing: dict[str, uuid.UUID],
     ) -> None:
@@ -534,7 +535,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
 
         # Call _delete_group_endpoints
         async with db_with_cleanup.begin_session() as session:
-            await admin_group_repository._delete_group_endpoints(session, test_group)
+            await group_repository._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted
@@ -561,7 +562,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_with_active_endpoints(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        admin_group_repository: AdminGroupRepository,
+        group_repository: GroupRepository,
         test_group: uuid.UUID,
         active_endpoint: uuid.UUID,
     ) -> None:
@@ -569,7 +570,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
         # Call _delete_group_endpoints and expect exception
         with pytest.raises(ProjectHasActiveEndpointsError):
             async with db_with_cleanup.begin_session() as session:
-                await admin_group_repository._delete_group_endpoints(session, test_group)
+                await group_repository._delete_group_endpoints(session, test_group)
 
         # Verify endpoint is NOT deleted
         async with db_with_cleanup.begin_session() as session:
@@ -582,14 +583,14 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_empty(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        admin_group_repository: AdminGroupRepository,
+        group_repository: GroupRepository,
         test_group: uuid.UUID,
     ) -> None:
         """Test deletion with no endpoints (should complete without errors)"""
         # Call _delete_group_endpoints on group with no endpoints
         async with db_with_cleanup.begin_session() as session:
             # Should not raise any exception
-            await admin_group_repository._delete_group_endpoints(session, test_group)
+            await group_repository._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify no errors occurred (test passes if no exception raised)
@@ -598,7 +599,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_no_synchronize_session_error(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        admin_group_repository: AdminGroupRepository,
+        group_repository: GroupRepository,
         test_group: uuid.UUID,
         multiple_endpoints_with_sessions: dict[str, list[uuid.UUID]],
     ) -> None:
@@ -613,7 +614,7 @@ class TestAdminGroupRepositoryDeleteEndpoints:
 
         # This should NOT raise synchronize_session errors thanks to the fix
         async with db_with_cleanup.begin_session() as session:
-            await admin_group_repository._delete_group_endpoints(session, test_group)
+            await group_repository._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted

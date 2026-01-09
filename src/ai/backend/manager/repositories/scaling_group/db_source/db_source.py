@@ -11,11 +11,21 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurger,
+    Purger,
+    execute_batch_purger,
+    execute_purger,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
@@ -143,3 +153,39 @@ class ScalingGroupDBSource:
             if result is None:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{updater.pk_value})")
             return result.row.to_dataclass()
+
+    async def associate_scaling_group_with_domains(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForDomainRow],
+    ) -> None:
+        """Associates a scaling group with multiple domains."""
+        async with self._db.begin_session() as session:
+            await execute_bulk_creator(session, bulk_creator)
+
+    async def disassociate_scaling_group_with_domains(
+        self,
+        purger: BatchPurger[ScalingGroupForDomainRow],
+    ) -> None:
+        """Disassociates a scaling group from multiple domains."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)
+
+    async def check_scaling_group_domain_association_exists(
+        self,
+        scaling_group: str,
+        domain: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a domain."""
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(ScalingGroupForDomainRow)
+                .where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group == scaling_group,
+                        ScalingGroupForDomainRow.domain == domain,
+                    )
+                )
+            )
+            result = await session.scalar(query)
+            return (result or 0) > 0

@@ -16,6 +16,8 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+
 from .errors import (
     GroupNotFoundError,
     InvalidGIDTypeError,
@@ -39,19 +41,44 @@ class BaseSchema(BaseModel):
 class PermitHashConfig(BaseSchema):
     secret: Annotated[
         bytes,
-        Field(
+        Field(),
+        BackendAIConfigMeta(
             description="Secret string used for creating permit hash.",
-            examples=["50M3G00DL00KING53CR3T"],
+            added_version="25.13.0",
+            secret=True,
+            example=ConfigExample(local="PERMIT_HASH_SECRET", prod="PERMIT_HASH_SECRET"),
         ),
     ]
     digest_mod: Annotated[
-        DigestModType, Field(description="Hash digest method to use.", default=DigestModType.SHA256)
+        DigestModType,
+        Field(default=DigestModType.SHA256),
+        BackendAIConfigMeta(
+            description="Hash digest method to use.",
+            added_version="25.13.0",
+            example=ConfigExample(local="SHA256", prod="SHA256"),
+        ),
     ]
 
 
 class HostPortPair(BaseSchema):
-    host: Annotated[str, Field(examples=["127.0.0.1"])]
-    port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
+    host: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description="Hostname or IP address.",
+            added_version="25.13.0",
+            example=ConfigExample(local="127.0.0.1", prod="server.example.com"),
+        ),
+    ]
+    port: Annotated[
+        int,
+        Field(gt=0, lt=65536),
+        BackendAIConfigMeta(
+            description="Port number.",
+            added_version="25.13.0",
+            example=ConfigExample(local="8201", prod="8201"),
+        ),
+    ]
 
     @property
     def host_set_with_protocol(self) -> bool:
@@ -75,42 +102,84 @@ class HostPortPair(BaseSchema):
 
 
 class RedisHelperConfig(BaseSchema):
-    socket_timeout: Annotated[float, Field(default=5.0)]
-    socket_connect_timeout: Annotated[float, Field(default=2.0)]
-    reconnect_poll_timeout: Annotated[float, Field(default=0.3)]
+    socket_timeout: Annotated[
+        float,
+        Field(default=5.0),
+        BackendAIConfigMeta(
+            description="Timeout in seconds for Redis socket operations.",
+            added_version="25.13.0",
+            example=ConfigExample(local="5.0", prod="10.0"),
+        ),
+    ]
+    socket_connect_timeout: Annotated[
+        float,
+        Field(default=2.0),
+        BackendAIConfigMeta(
+            description="Timeout in seconds for establishing Redis connections.",
+            added_version="25.13.0",
+            example=ConfigExample(local="2.0", prod="5.0"),
+        ),
+    ]
+    reconnect_poll_timeout: Annotated[
+        float,
+        Field(default=0.3),
+        BackendAIConfigMeta(
+            description="Time in seconds to wait between reconnection attempts.",
+            added_version="25.13.0",
+            example=ConfigExample(local="0.3", prod="1.0"),
+        ),
+    ]
 
 
 class RedisConfig(BaseSchema):
     addr: Annotated[
         HostPortPair | None,
-        Field(
-            default=None,
+        Field(default=None),
+        BackendAIConfigMeta(
             description="Address and port number of redis server.",
-            examples=[HostPortPair(host="127.0.0.1", port=8111)],
+            added_version="25.13.0",
+            example=ConfigExample(local="127.0.0.1:6379", prod="redis-server:6379"),
         ),
     ]
     sentinel: Annotated[
         list[HostPortPair] | None,
-        Field(
-            default=None,
+        Field(default=None),
+        BackendAIConfigMeta(
             description="List of address/port pair of sentinel servers.",
-            examples=[
-                [
-                    HostPortPair(host="127.0.0.1", port=9503),
-                    HostPortPair(host="127.0.0.1", port=9504),
-                    HostPortPair(host="127.0.0.1", port=9505),
-                ]
-            ],
+            added_version="25.13.0",
+            example=ConfigExample(
+                local="",
+                prod="redis-sentinel:26379,redis-sentinel:26380",
+            ),
         ),
     ]
     service_name: Annotated[
-        str | None, Field(default=None, description="Redis service name.", examples=["bai-service"])
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Redis service name.",
+            added_version="25.13.0",
+            example=ConfigExample(local="mymaster", prod="bai-service"),
+        ),
     ]
     password: Annotated[
-        str | None, Field(default=None, description="Redis password.", examples=["P@ssw0rd!"])
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Redis password.",
+            added_version="25.13.0",
+            secret=True,
+            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
+        ),
     ]
     redis_helper_config: Annotated[
-        RedisHelperConfig, Field(default_factory=lambda: RedisHelperConfig())
+        RedisHelperConfig,
+        Field(default_factory=lambda: RedisHelperConfig()),
+        BackendAIConfigMeta(
+            description="Configuration for Redis helper library.",
+            added_version="25.13.0",
+            composite=CompositeType.FIELD,
+        ),
     ]
 
     def to_dict(self) -> dict[str, Any]:
@@ -243,26 +312,78 @@ class GroupIDValidator:
 
 
 class DebugConfig(BaseSchema):
-    enabled: Annotated[bool, Field(default=False)]
-    asyncio: Annotated[bool, Field(default=False)]
-    enhanced_aiomonitor_task_info: Annotated[bool, Field(default=False)]
-    log_events: Annotated[bool, Field(default=False)]
-    log_stats: Annotated[bool, Field(default=False)]
+    enabled: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Enable debug mode.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    asyncio: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Enable asyncio debug mode.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    enhanced_aiomonitor_task_info: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Enable enhanced aiomonitor task info.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    log_events: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Enable event logging.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    log_stats: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Enable statistics logging.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
 
 
 class SecretConfig(BaseSchema):
     jwt_secret: Annotated[
         str,
-        Field(
-            description="String used for creating JWT signature. Must be identical across every nodes across single AppProxy cluster.",
-            examples=["50M3V3RY53CR3T5TR1NG"],
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "String used for creating JWT signature. "
+                "Must be identical across every nodes across single AppProxy cluster."
+            ),
+            added_version="25.13.0",
+            secret=True,
+            example=ConfigExample(local="JWT_SECRET", prod="JWT_SECRET"),
         ),
     ]
     api_secret: Annotated[
         str,
-        Field(
-            description="API token used for validating requests from AppProxy worker and Backend.AI manager.",
-            examples=["50M3TRULY53CR3T5TR1NG"],
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "API token used for validating requests from AppProxy worker "
+                "and Backend.AI manager."
+            ),
+            added_version="25.13.0",
+            secret=True,
+            example=ConfigExample(local="API_SECRET", prod="API_SECRET"),
         ),
     ]
 
@@ -300,127 +421,297 @@ default_pkg_ns = {"": "WARNING", "ai.backend": "DEBUG", "tests": "DEBUG", "aioht
 
 class ConsoleLogConfig(BaseSchema):
     colored: Annotated[
-        bool | None, Field(default=None, description="Opt to print colorized log.", examples=[True])
+        bool | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Opt to print colorized log.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
     ]
     format: Annotated[
-        LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
+        LogFormat,
+        Field(default=LogFormat.VERBOSE),
+        BackendAIConfigMeta(
+            description="Determine verbosity of log.",
+            added_version="25.13.0",
+            example=ConfigExample(local="verbose", prod="simple"),
+        ),
     ]
 
 
 class FileLogConfig(BaseSchema):
-    path: Annotated[Path, Field(description="Path to store log.", examples=["/var/log/backend.ai"])]
-    filename: Annotated[str, Field(description="Log file name.", examples=["coordinator.log"])]
+    path: Annotated[
+        Path,
+        Field(),
+        BackendAIConfigMeta(
+            description="Path to store log.",
+            added_version="25.13.0",
+            example=ConfigExample(local="./logs", prod="/var/log/backend.ai"),
+        ),
+    ]
+    filename: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description="Log file name.",
+            added_version="25.13.0",
+            example=ConfigExample(local="coordinator.log", prod="coordinator.log"),
+        ),
+    ]
     backup_count: Annotated[
-        int, Field(description="Number of outdated log files to retain.", default=5)
+        int,
+        Field(default=5),
+        BackendAIConfigMeta(
+            description="Number of outdated log files to retain.",
+            added_version="25.13.0",
+            example=ConfigExample(local="5", prod="10"),
+        ),
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize,
+        Field(default="10M"),
+        BackendAIConfigMeta(
+            description="Maximum size for a single log file.",
+            added_version="25.13.0",
+            example=ConfigExample(local="10M", prod="100M"),
+        ),
     ]
     format: Annotated[
-        LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
+        LogFormat,
+        Field(default=LogFormat.VERBOSE),
+        BackendAIConfigMeta(
+            description="Determine verbosity of log.",
+            added_version="25.13.0",
+            example=ConfigExample(local="verbose", prod="simple"),
+        ),
     ]
 
 
 class LogstashConfig(BaseSchema):
     endpoint: Annotated[
         HostPortPair,
-        Field(
+        Field(),
+        BackendAIConfigMeta(
             description="Connection information of logstash node.",
-            examples=[HostPortPair(host="127.0.0.1", port=8001)],
+            added_version="25.13.0",
+            example=ConfigExample(local="127.0.0.1:5000", prod="logstash:5000"),
         ),
     ]
     protocol: Annotated[
         LogstashProtocol,
-        Field(
+        Field(default=LogstashProtocol.TCP),
+        BackendAIConfigMeta(
             description="Protocol to communicate with logstash server.",
-            default=LogstashProtocol.TCP,
+            added_version="25.13.0",
+            example=ConfigExample(local="tcp", prod="tcp"),
         ),
     ]
     ssl_enabled: Annotated[
-        bool, Field(description="Use TLS to communicate with logstash server.", default=True)
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Use TLS to communicate with logstash server.",
+            added_version="25.13.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
     ]
     ssl_verify: Annotated[
         bool,
-        Field(
+        Field(default=True),
+        BackendAIConfigMeta(
             description="Verify validity of TLS certificate when communicating with logstash.",
-            default=True,
+            added_version="25.13.0",
+            example=ConfigExample(local="false", prod="true"),
         ),
     ]
 
 
 class GraylogConfig(BaseSchema):
-    host: Annotated[str, Field(description="Graylog hostname.", examples=["127.0.0.1"])]
-    port: Annotated[int, Field(description="Graylog server port number.", examples=[8000])]
-    level: Annotated[LogLevel, Field(description="Log level.", default=LogLevel.INFO)]
+    host: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description="Graylog hostname.",
+            added_version="25.13.0",
+            example=ConfigExample(local="127.0.0.1", prod="graylog.example.com"),
+        ),
+    ]
+    port: Annotated[
+        int,
+        Field(),
+        BackendAIConfigMeta(
+            description="Graylog server port number.",
+            added_version="25.13.0",
+            example=ConfigExample(local="12201", prod="12201"),
+        ),
+    ]
+    level: Annotated[
+        LogLevel,
+        Field(default=LogLevel.INFO),
+        BackendAIConfigMeta(
+            description="Log level.",
+            added_version="25.13.0",
+            example=ConfigExample(local="DEBUG", prod="INFO"),
+        ),
+    ]
     ssl_verify: Annotated[
         bool,
-        Field(
-            description="Verify validity of TLS certificate when communicating with logstash.",
-            default=True,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Verify validity of TLS certificate when communicating with graylog.",
+            added_version="25.13.0",
+            example=ConfigExample(local="false", prod="true"),
         ),
     ]
     ca_certs: Annotated[
         str | None,
-        Field(
+        Field(default=None),
+        BackendAIConfigMeta(
             description="Path to Root CA certificate file.",
-            examples=["/etc/ssl/ca.pem"],
-            default=None,
+            added_version="25.13.0",
+            example=ConfigExample(local="", prod="/etc/ssl/ca.pem"),
         ),
     ]
     keyfile: Annotated[
         str | None,
-        Field(
+        Field(default=None),
+        BackendAIConfigMeta(
             description="Path to TLS private key file.",
-            examples=["/etc/backend.ai/graylog/privkey.pem"],
-            default=None,
+            added_version="25.13.0",
+            example=ConfigExample(local="", prod="/etc/backend.ai/graylog/privkey.pem"),
+            secret=True,
         ),
     ]
     certfile: Annotated[
         str | None,
-        Field(
+        Field(default=None),
+        BackendAIConfigMeta(
             description="Path to TLS certificate file.",
-            examples=["/etc/backend.ai/graylog/cert.pem"],
-            default=None,
+            added_version="25.13.0",
+            example=ConfigExample(local="", prod="/etc/backend.ai/graylog/cert.pem"),
         ),
     ]
 
 
 class PyroscopeConfig(BaseSchema):
-    application_name: str | None = Field(
-        description="Pyroscope application name", default=None, examples=["proxy-worker-dev"]
-    )
-    server_address: str = Field(
-        description="Pyroscope server endpoint", examples=["http://localhost:4040"]
-    )
-    sample_rate: int = Field(default=100, description="Pyroscope sample rate")
-    detect_subprocesses: bool = Field(
-        default=True,
-        description="detect subprocesses started by the main process; default is False",
-    )
-    oncpu: bool = Field(default=True, description="report cpu time only; default is True")
-    gil_only: bool = Field(
-        default=True,
-        description="only include traces for threads that are holding on to the Global Interpreter Lock; default is True",
-    )
-    enable_logging: bool = Field(
-        default=True, description="does enable logging facility; default is False"
-    )
-    tags: dict[str, str] = Field(
-        default={}, description="Pyroscope tags", examples=[{"environment": "dev"}]
-    )
+    application_name: Annotated[
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Pyroscope application name.",
+            added_version="25.13.0",
+            example=ConfigExample(local="proxy-worker-dev", prod="proxy-worker-prod"),
+        ),
+    ]
+    server_address: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description="Pyroscope server endpoint.",
+            added_version="25.13.0",
+            example=ConfigExample(local="http://localhost:4040", prod="http://pyroscope:4040"),
+        ),
+    ]
+    sample_rate: Annotated[
+        int,
+        Field(default=100),
+        BackendAIConfigMeta(
+            description="Pyroscope sample rate.",
+            added_version="25.13.0",
+            example=ConfigExample(local="100", prod="100"),
+        ),
+    ]
+    detect_subprocesses: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Detect subprocesses started by the main process.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    oncpu: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Report cpu time only.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    gil_only: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Only include traces for threads that are holding on to "
+                "the Global Interpreter Lock."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    enable_logging: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Enable logging facility.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    tags: Annotated[
+        dict[str, str],
+        Field(default={}),
+        BackendAIConfigMeta(
+            description="Pyroscope tags.",
+            added_version="25.13.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
 
 class ProfilingConfig(BaseSchema):
-    enable_memray: bool = Field(default=False, description="Starts a memray live server.")
-    memray_output_destination: Path = Field(
-        default=Path("./memray-output.bin"),
-        description="Path to store memray allocation captures.",
-        examples=["/home/bai/proxy-worker/profiles/memray/proxy-worker.bin"],
-    )
-    enable_pyroscope: bool = Field(
-        default=False, description="Allows sending pyroscope telemetry to pyroscope server."
-    )
-    pyroscope_config: PyroscopeConfig | None = Field(default=None)
+    enable_memray: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Starts a memray live server.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    memray_output_destination: Annotated[
+        Path,
+        Field(default=Path("./memray-output.bin")),
+        BackendAIConfigMeta(
+            description="Path to store memray allocation captures.",
+            added_version="25.13.0",
+            example=ConfigExample(
+                local="./memray-output.bin",
+                prod="/var/log/backend.ai/memray/proxy-worker.bin",
+            ),
+        ),
+    ]
+    enable_pyroscope: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Allows sending pyroscope telemetry to pyroscope server.",
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    pyroscope_config: Annotated[
+        PyroscopeConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Pyroscope configuration.",
+            added_version="25.13.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
 
 class Undefined:

@@ -200,7 +200,6 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
-            repositories.container_registry.admin_repository,
         )
         vfolder_service = VFolderService(
             args.config_provider,

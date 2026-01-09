@@ -47,9 +47,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.admin_repository import (
-    AdminContainerRegistryRepository,
-)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -136,13 +133,6 @@ class TestContainerRegistryRepository:
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
         return ContainerRegistryRepository(db=db_with_cleanup)
-
-    @pytest.fixture
-    def admin_repository(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AdminContainerRegistryRepository:
-        """Create AdminContainerRegistryRepository instance with real database"""
-        return AdminContainerRegistryRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:

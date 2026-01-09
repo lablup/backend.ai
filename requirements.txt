@@ -2,7 +2,7 @@ aioboto3~=15.0.0
 aiodataloader~=0.4.2
 aiodocker==0.24.0
 aiofiles~=24.1.0
-aiohttp~=3.13.0
+aiohttp~=3.13.3
 aiohttp_cors~=0.8.1
 aiohttp_jinja2~=1.6
 aiohttp_sse>=2.2
@@ -92,7 +92,7 @@ tomlkit~=0.13.2
 tqdm~=4.67.1
 trafaret~=2.1
 treelib~=1.7.0
-tt-smi~=3.0.36
+tt-smi~=3.0.36; sys_platform == 'linux' and platform_machine == 'x86_64'
 typeguard~=4.3
 typing_extensions~=4.11
 textual~=0.79.1

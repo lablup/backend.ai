@@ -7,7 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -36,6 +36,12 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 QueryOption = Callable[[Any], Callable[[QueryStatement], QueryStatement]]
 
 
+def _get_scaling_group_join_condition():
+    from ai.backend.manager.models.scaling_group import ScalingGroupRow
+
+    return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
+
+
 class ResourcePresetRow(Base):
     __tablename__ = "resource_presets"
     id = IDColumn()
@@ -50,7 +56,7 @@ class ResourcePresetRow(Base):
     scaling_group_row = relationship(
         "ScalingGroupRow",
         back_populates="resource_preset_rows",
-        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
+        primaryjoin=_get_scaling_group_join_condition,
     )
 
     __table_args__ = (

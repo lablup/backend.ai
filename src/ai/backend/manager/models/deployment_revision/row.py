@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.common.types import (
     ClusterMode,
@@ -37,6 +37,24 @@ if TYPE_CHECKING:
 __all__ = ("DeploymentRevisionRow",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def _get_endpoint_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return foreign(DeploymentRevisionRow.endpoint) == EndpointRow.id
+
+
+def _get_image_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return foreign(DeploymentRevisionRow.image) == ImageRow.id
+
+
+def _get_routings_join_condition():
+    from ai.backend.manager.models.routing import RoutingRow
+
+    return DeploymentRevisionRow.id == foreign(RoutingRow.revision)
 
 
 class DeploymentRevisionRow(Base):
@@ -130,15 +148,15 @@ class DeploymentRevisionRow(Base):
     endpoint_row = relationship(
         "EndpointRow",
         back_populates="revisions",
-        primaryjoin="foreign(DeploymentRevisionRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_join_condition,
     )
     image_row = relationship(
         "ImageRow",
-        primaryjoin="foreign(DeploymentRevisionRow.image) == ImageRow.id",
+        primaryjoin=_get_image_join_condition,
     )
     routings: list[RoutingRow] = relationship(
         "RoutingRow",
-        primaryjoin="DeploymentRevisionRow.id == foreign(RoutingRow.revision)",
+        primaryjoin=_get_routings_join_condition,
         viewonly=True,
     )
 
