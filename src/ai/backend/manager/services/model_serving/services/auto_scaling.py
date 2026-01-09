@@ -29,6 +29,7 @@ from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules
     SearchAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.model_serving.exceptions import (
+    EndpointAccessForbiddenError,
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
     GenericForbidden,
@@ -62,7 +63,7 @@ class AutoScalingService:
         if not endpoint_data:
             raise ModelServiceNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Update replicas (access already validated)
         success = await self._repository.update_endpoint_replicas(action.service_id, action.to)
@@ -87,7 +88,7 @@ class AutoScalingService:
         if not endpoint_data:
             raise EndpointNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointNotFound
+            raise EndpointAccessForbiddenError
 
         # Create auto scaling rule (access already validated)
         created_rule = await self._repository.create_auto_scaling_rule(
@@ -123,7 +124,7 @@ class AutoScalingService:
         if not endpoint_data:
             raise EndpointNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAutoScalingRuleNotFound
+            raise EndpointAccessForbiddenError
 
         # Update auto scaling rule (access already validated)
         updated_rule = await self._repository.update_auto_scaling_rule(action.updater)
@@ -148,7 +149,7 @@ class AutoScalingService:
         if not endpoint_data:
             raise EndpointNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAutoScalingRuleNotFound
+            raise EndpointAccessForbiddenError
 
         # Delete auto scaling rule (access already validated)
         success = await self._repository.delete_auto_scaling_rule(action.id)
