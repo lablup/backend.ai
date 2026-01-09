@@ -1,41 +1,50 @@
+from datetime import datetime
+from uuid import UUID
+
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.account_manager.types import UserRole, UserStatus
 from ai.backend.account_manager.utils import verify_password
 
-from .base import GUID, Base, IDColumn, PasswordColumn, StrEnumType
+from .base import GUID, Base, PasswordColumn, StrEnumType
 
 __all__: tuple[str, ...] = ("UserProfileRow",)
 
 
 class UserProfileRow(Base):
     __tablename__ = "user_profiles"
-    id = IDColumn()
-    user_id = sa.Column("user_id", GUID, nullable=False)
-    username = sa.Column("username", sa.String(length=64), index=True, nullable=False, unique=True)
-    email = sa.Column("email", sa.String(length=64), index=True, nullable=False)
-    password = sa.Column("password", PasswordColumn(), nullable=False)
-    need_password_change = sa.Column("need_password_change", sa.Boolean, server_default=sa.false())
-    password_changed_at = sa.Column(
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    user_id: Mapped[UUID] = mapped_column("user_id", GUID, nullable=False)
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), index=True, nullable=False, unique=True
+    )
+    email: Mapped[str] = mapped_column("email", sa.String(length=64), index=True, nullable=False)
+    password: Mapped[str] = mapped_column("password", PasswordColumn(), nullable=False)
+    need_password_change: Mapped[bool | None] = mapped_column(
+        "need_password_change", sa.Boolean, server_default=sa.false()
+    )
+    password_changed_at: Mapped[datetime | None] = mapped_column(
         "password_changed_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
     )
-    full_name = sa.Column("full_name", sa.String(length=64))
-    description = sa.Column("description", sa.String(length=500))
+    full_name: Mapped[str | None] = mapped_column("full_name", sa.String(length=64))
+    description: Mapped[str | None] = mapped_column("description", sa.String(length=500))
 
-    role = sa.Column(
+    role: Mapped[UserRole] = mapped_column(
         "role",
         StrEnumType(UserRole),
         default=UserRole.USER,
         server_default=UserRole.USER.value,
         nullable=False,
     )
-    status = sa.Column(
+    status: Mapped[UserStatus] = mapped_column(
         "status", StrEnumType(UserStatus), server_default=UserStatus.ACTIVE.value, nullable=False
     )
-    status_info = sa.Column("status_info", sa.Unicode(), nullable=True)
+    status_info: Mapped[str | None] = mapped_column("status_info", sa.Unicode(), nullable=True)
 
     created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
     modified_at = sa.Column(

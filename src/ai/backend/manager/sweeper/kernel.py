@@ -42,9 +42,9 @@ class KernelSweeper(AbstractSweeper):
             )
         )
 
-        async with self._db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            kernels = result.fetchall()
+        async with self._db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(query)
+            kernels = list(result.scalars().all())
 
         kernels_per_session = defaultdict(list)
         for kernel in kernels:

@@ -91,7 +91,9 @@ class ModelMountConfig:
         return VFolder(id=ID(vfolder_global_id))
 
     @classmethod
-    def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig:
+    def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig | None:
+        if data.vfolder_id is None or data.mount_destination is None:
+            return None
         return cls(
             _vfolder_id=data.vfolder_id,
             mount_destination=data.mount_destination,
@@ -209,7 +211,7 @@ class ModelRevision(Node):
     model_runtime_config: ModelRuntimeConfig = strawberry.field(
         description="Runtime configuration for the inference framework."
     )
-    model_mount_config: ModelMountConfig = strawberry.field(
+    model_mount_config: Optional[ModelMountConfig] = strawberry.field(
         description="Model data mount configuration."
     )
     extra_mounts: ExtraVFolderMountConnection = strawberry.field(

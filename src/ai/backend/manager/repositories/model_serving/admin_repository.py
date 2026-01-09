@@ -124,17 +124,17 @@ class AdminModelServingRepository:
                 return False
 
             # Delete failed routes
-            query = sa.delete(RoutingRow).where(
+            delete_query = sa.delete(RoutingRow).where(
                 (RoutingRow.endpoint == endpoint_id)
                 & (RoutingRow.status == RouteStatus.FAILED_TO_START)
             )
-            await session.execute(query)
+            await session.execute(delete_query)
 
             # Reset retry count
-            query = (
+            update_query = (
                 sa.update(EndpointRow).values({"retries": 0}).where(EndpointRow.id == endpoint_id)
             )
-            await session.execute(query)
+            await session.execute(update_query)
         return True
 
     @model_serving_repository_resilience.apply()

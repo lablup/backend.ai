@@ -434,12 +434,11 @@ class TestCheckScalingGroup:
     ) -> None:
         """Test that check_scaling_group raises ScalingGroupSessionTypeNotAllowed (422)
         when requesting BATCH session on INTERACTIVE-only scaling group"""
-        mock_sgroup = {
-            "name": "test-sgroup",
-            "scheduler_opts": ScalingGroupOpts(
-                allowed_session_types=[SessionTypes.INTERACTIVE],
-            ),
-        }
+        mock_sgroup = MagicMock()
+        mock_sgroup.name = "test-sgroup"
+        mock_sgroup.scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE],
+        )
 
         with patch(
             "ai.backend.manager.registry.query_allowed_sgroups",
@@ -462,12 +461,11 @@ class TestCheckScalingGroup:
         mock_conn: MagicMock,
     ) -> None:
         """Test that check_scaling_group succeeds when session type is allowed"""
-        mock_sgroup = {
-            "name": "test-sgroup",
-            "scheduler_opts": ScalingGroupOpts(
-                allowed_session_types=[SessionTypes.INTERACTIVE],
-            ),
-        }
+        mock_sgroup = MagicMock()
+        mock_sgroup.name = "test-sgroup"
+        mock_sgroup.scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE],
+        )
 
         with patch(
             "ai.backend.manager.registry.query_allowed_sgroups",

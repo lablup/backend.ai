@@ -24,7 +24,7 @@ class ObjectStorageData:
     access_key: str
     secret_key: str
     endpoint: str
-    region: str
+    region: str | None
 
     def to_dto(self) -> ObjectStorageResponse:
         return ObjectStorageResponse(
@@ -34,5 +34,5 @@ class ObjectStorageData:
             access_key=self.access_key,
             secret_key=self.secret_key,
             endpoint=self.endpoint,
-            region=self.region,
+            region=self.region or "",
         )

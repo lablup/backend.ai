@@ -50,7 +50,7 @@ class AgentDBSource:
                 .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
                 .options(selectinload(ImageRow.aliases))
             )
-            image_rows: list[ImageRow] = (await db_session.scalars(query)).all()
+            image_rows = list((await db_session.scalars(query)).all())
             images_data: dict[ImageID, ImageDataWithDetails] = {}
             for image_row in image_rows:
                 images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
@@ -63,7 +63,7 @@ class AgentDBSource:
                 .where(ImageRow.config_digest.in_(digests))
                 .options(selectinload(ImageRow.aliases))
             )
-            results: list[ImageRow] = (await db_session.scalars(query)).all()
+            results = list((await db_session.scalars(query)).all())
             images_data: dict[ImageID, ImageDataWithDetails] = {}
             for image_row in results:
                 images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()

@@ -483,7 +483,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([sa.func.count()]).select_from(agents)
+        query = sa.select(sa.func.count()).select_from(agents)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -511,7 +511,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
+        query = sa.select(agents).select_from(agents).limit(limit).offset(offset)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -622,16 +622,19 @@ async def _query_domain_groups_by_ak(
     domain_name: str | None,
 ) -> tuple[str, list[uuid.UUID]]:
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+    group_join: sa.FromClause
     if domain_name is None:
         domain_query = (
-            sa.select([users.c.uuid, users.c.domain_name])
+            sa.select(users.c.uuid, users.c.domain_name)
             .select_from(kp_user_join)
             .where(keypairs.c.access_key == access_key)
         )
         row = (await db_conn.execute(domain_query)).first()
+        if row is None:
+            raise ValueError(f"No user found for access_key: {access_key}")
         user_domain = row.domain_name
         user_id = row.uuid
-        group_join = AssocGroupUserRow
+        group_join = AssocGroupUserRow.__table__
         group_cond = AssocGroupUserRow.user_id == user_id
     else:
         user_domain = domain_name
@@ -661,7 +664,7 @@ async def _append_sgroup_from_clause(
         async with graph_ctx.db.begin_readonly() as conn:
             domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
-            names = [sgroup["name"] for sgroup in sgroups]
+            names = [sgroup.name for sgroup in sgroups]
         query = query.where(AgentRow.scaling_group.in_(names))
     return query
 

@@ -129,6 +129,7 @@ async def test_default_value_types_correctly_processed(
         await session.execute(sa.insert(GroupRow).values(minimum_required_data))
 
         result = await session.scalar(sa.select(GroupRow).where(GroupRow.name == group_name))
+        assert result is not None
 
         assert result.description is None
         assert result.is_active is True
@@ -171,6 +172,7 @@ async def test_db_data_insertion(
         await session.execute(sa.insert(GroupRow).values(data))
 
         result = await session.scalar(sa.select(GroupRow).where(GroupRow.name == group_name))
+        assert result is not None
         assert result.description == data["description"]
         assert result.is_active == data["is_active"]
         assert result.created_at is not None

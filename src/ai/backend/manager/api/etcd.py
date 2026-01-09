@@ -119,7 +119,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 
     # Optionally filter by the slots reported by the given resource group's agents
     if params["sgroup"] is not None:
-        available_slot_keys = set()
+        available_slot_keys: set[str] = set()
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).where(
                 (AgentRow.status == AgentStatus.ALIVE)

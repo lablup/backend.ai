@@ -145,13 +145,13 @@ class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self):
@@ -186,17 +186,17 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumValueType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_Enum:
-        return self._enum_class
+    def python_type(self) -> type[T_Enum]:
+        return self._enum_cls
 
 
 class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
@@ -237,8 +237,8 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, self._use_name, **self._opts)
+    def copy(self, **kw) -> Self:
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self) -> type[T_StrEnum]:
@@ -353,7 +353,7 @@ class StructuredJSONColumn(TypeDecorator):
 
     def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON)
+            return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
     def process_bind_param(
@@ -381,8 +381,8 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectColumn(TypeDecorator):
@@ -403,8 +403,8 @@ class StructuredJSONObjectColumn(TypeDecorator):
     def process_result_value(self, value, dialect):
         return self._schema.from_json(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectListColumn(TypeDecorator):
@@ -431,8 +431,8 @@ class StructuredJSONObjectListColumn(TypeDecorator):
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectListColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
 class URLColumn(TypeDecorator):
@@ -537,7 +537,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return {}
         return {
-            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_bind_param(perms, dialect) for host, perms in value.items()
         }
 
     def process_result_value(
@@ -548,7 +548,8 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_result_value(perms, dialect)
+            for host, perms in value.items()
         })
 
 
@@ -575,7 +576,7 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: TUUIDSubType | uuid.UUID, dialect):
+    def process_bind_param(self, value: Any | None, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -596,6 +597,10 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
         cls = type(self)
         if isinstance(value, bytes):
             return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+        # Handle asyncpg's UUID type (asyncpg.pgproto.pgproto.UUID) and standard uuid.UUID
+        # Both have a 'bytes' attribute, so we can use it to construct a standard uuid.UUID
+        if hasattr(value, "bytes"):
+            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value.bytes)))
         return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
@@ -626,7 +631,9 @@ class SlugType(TypeDecorator):
     def coerce_compared_value(self, op, value):
         return Unicode()
 
-    def process_bind_param(self, value: str, dialect) -> str:
+    def process_bind_param(self, value: Any | None, dialect) -> str | None:
+        if value is None:
+            return value
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
@@ -690,7 +697,7 @@ async def populate_fixture(
                 f"Invalid fixture data for table {table_name}: expected sequence, got string"
             )
 
-        table: sa.Table = metadata.tables.get(table_name)
+        table = metadata.tables.get(table_name)
 
         if not isinstance(table, sa.Table):
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
@@ -744,13 +751,15 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
-                    await conn.execute(stmt)
+                    insert_stmt = (
+                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
+                    )
+                    await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
-                    stmt = sa.update(table)
+                    update_stmt = sa.update(table)
                     pkcols = []
                     for pkidx, pkcol in enumerate(table.primary_key):
-                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        update_stmt = update_stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
                         pkcols.append(pkcol)
                     update_data = []
                     # Extract the data column names from the FIRST row
@@ -766,7 +775,7 @@ async def populate_fixture(
                             f"fixture for table {table_name!r} has an invalid column name: "
                             f"{e.args[0]!r}"
                         )
-                    stmt = stmt.values({
+                    update_stmt = update_stmt.values({
                         datacol.name: sa.bindparam(datacol.name) for datacol in datacols
                     })
                     for row in rows:
@@ -788,7 +797,7 @@ async def populate_fixture(
                                     f"query: {datacol.name!r}"
                                 )
                         update_data.append(update_row)
-                    await conn.execute(stmt, update_data)
+                    await conn.execute(update_stmt, update_data)
 
 
 class DecimalType(TypeDecorator, Decimal):
@@ -808,7 +817,7 @@ class DecimalType(TypeDecorator, Decimal):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[Decimal]:
         return Decimal(value) if value is not None else None

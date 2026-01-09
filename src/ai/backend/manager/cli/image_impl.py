@@ -38,7 +38,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
-                image_ids = [item.id for item in items]
+                image_ids = [ImageID(item.id) for item in items]
                 installed_counts = await redis_conn_set.image.get_agent_counts_for_images(image_ids)
                 installed_items: list[ImageRow] = []
 

@@ -389,7 +389,7 @@ class TestGetStatusHistory:
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
-        """Test getting empty status history"""
+        """Test getting empty status history returns empty dict when None"""
         mock_session = MagicMock()
         mock_session.id = sample_session_id
         mock_session.status_history = None
@@ -402,7 +402,7 @@ class TestGetStatusHistory:
         result = await session_service.get_status_history(action)
 
         assert result.session_id == sample_session_id
-        assert result.status_history is None
+        assert result.status_history == {}
 
 
 # ==================== DestroySession Tests ====================
@@ -624,7 +624,7 @@ class TestGetSessionInfo:
         mock_kernel.image = "cr.backend.ai/stable/python:latest"
         mock_kernel.architecture = "x86_64"
         mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = uuid4()
+        mock_kernel.container_id = str(uuid4())
         mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
         mock_kernel.occupied_shares = {}
 

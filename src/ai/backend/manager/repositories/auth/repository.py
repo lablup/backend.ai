@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
@@ -76,7 +78,7 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> dict:
+    ) -> sa.RowMapping:
         return await self._db_source.verify_credential_with_migration(
             domain_name, email, target_password_info
         )
@@ -87,7 +89,7 @@ class AuthRepository:
         domain_name: str,
         email: str,
         password: str,
-    ) -> dict:
+    ) -> sa.RowMapping:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
             domain_name, email, password

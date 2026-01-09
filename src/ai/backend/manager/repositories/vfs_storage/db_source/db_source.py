@@ -30,7 +30,7 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.name == storage_name)
             result = await db_session.execute(query)
-            row: VFSStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with name {storage_name} not found.")
             return row.to_dataclass()
@@ -42,7 +42,7 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
             result = await db_session.execute(query)
-            row: VFSStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
             return row.to_dataclass()
@@ -76,7 +76,10 @@ class VFSStorageDBSource:
                 .returning(VFSStorageRow.id)
             )
             result = await db_session.execute(delete_query)
-            return result.scalar()
+            deleted_id = result.scalar()
+            if deleted_id is None:
+                raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
+            return deleted_id
 
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         """
@@ -85,7 +88,7 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow)
             result = await db_session.execute(query)
-            rows: list[VFSStorageRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def search(

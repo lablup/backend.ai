@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy import Row
 
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
@@ -50,7 +51,7 @@ class TestOffsetPagination:
         pagination = OffsetPagination(limit=10, offset=10)
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(rows, total_count=30)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=30)
 
         assert isinstance(result, PageInfoResult)
         assert result.rows == rows
@@ -62,7 +63,7 @@ class TestOffsetPagination:
         pagination = OffsetPagination(limit=10, offset=0)
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(rows, total_count=20)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=20)
 
         assert result.has_previous_page is False  # offset is 0
         assert result.has_next_page is True  # 0 + 10 < 20
@@ -72,7 +73,7 @@ class TestOffsetPagination:
         pagination = OffsetPagination(limit=10, offset=20)
         rows = [MagicMock() for _ in range(5)]
 
-        result = pagination.compute_page_info(rows, total_count=25)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=25)
 
         assert result.has_previous_page is True  # offset > 0
         assert result.has_next_page is False  # 20 + 5 >= 25
@@ -136,7 +137,7 @@ class TestCursorForwardPagination:
         # 11 rows returned means there's a next page
         rows = [MagicMock() for _ in range(11)]
 
-        result = pagination.compute_page_info(rows, total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
 
         assert result.has_next_page is True
         assert result.has_previous_page is True  # cursor exists = has previous
@@ -157,7 +158,7 @@ class TestCursorForwardPagination:
         # Exactly 10 rows means no next page
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(rows, total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
 
         assert result.has_next_page is False
         assert result.has_previous_page is True  # cursor exists = has previous
@@ -176,7 +177,7 @@ class TestCursorForwardPagination:
         )
         rows = [MagicMock() for _ in range(5)]
 
-        result = pagination.compute_page_info(rows, total_count=5)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=5)
 
         # When using cursor, there's always a previous page (we came from somewhere)
         assert result.has_previous_page is True
@@ -240,7 +241,7 @@ class TestCursorBackwardPagination:
         # 11 rows returned means there's a previous page
         rows = [MagicMock() for _ in range(11)]
 
-        result = pagination.compute_page_info(rows, total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
 
         assert result.has_previous_page is True
         assert result.has_next_page is True  # cursor exists = has next
@@ -261,7 +262,7 @@ class TestCursorBackwardPagination:
         # Exactly 10 rows means no previous page
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(rows, total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
 
         assert result.has_previous_page is False
         assert result.has_next_page is True  # cursor exists = has next
@@ -280,7 +281,7 @@ class TestCursorBackwardPagination:
         )
         rows = [MagicMock() for _ in range(5)]
 
-        result = pagination.compute_page_info(rows, total_count=5)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=5)
 
         # When using backward cursor, there's always a next page (we came from somewhere ahead)
         assert result.has_next_page is True

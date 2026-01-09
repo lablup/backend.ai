@@ -129,8 +129,10 @@ async def is_user_allowed_to_access_resource(
         query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
         result = await db_sess.execute(query)
         user = result.scalar()
+        if user is None:
+            return False
         return user.domain_name == request["user"]["domain_name"]
-    return request["user"]["uyud"] == resource_owner
+    return request["user"]["uuid"] == resource_owner
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -624,7 +626,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         owner_uuid, group_id, resource_policy = await query_userinfo(
             request, params.model_dump(by_alias=True), conn
         )
-        query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
+        query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
         if not owner_role:
             raise InvalidAuthParameters("Owner role is required to create a model service")

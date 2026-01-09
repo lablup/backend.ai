@@ -707,11 +707,12 @@ class ModelServingService:
         if not route_row:
             raise RouteNotFound
 
-        await self._agent_registry.destroy_session(
-            route_row.session_row,
-            forced=False,
-            reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
-        )
+        if route_row.session_row:
+            await self._agent_registry.destroy_session(
+                route_row.session_row,
+                forced=False,
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+            )
 
         # Decrease endpoint replicas
         await self.check_requester_access(action.requester_ctx)

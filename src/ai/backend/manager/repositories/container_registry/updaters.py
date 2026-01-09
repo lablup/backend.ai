@@ -5,9 +5,10 @@ from __future__ import annotations
 import builtins
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
@@ -64,7 +65,7 @@ async def handle_allowed_groups_update(
             )
         )
         result = await session.execute(delete_query)
-        if result.rowcount == 0:
+        if cast(CursorResult, result).rowcount == 0:
             raise ContainerRegistryGroupsAssociationNotFound(
                 f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
             )
