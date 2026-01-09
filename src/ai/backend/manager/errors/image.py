@@ -97,10 +97,10 @@ class UnknownImageReferenceError(ObjectNotFound):
 
 
 class ImageAccessForbiddenError(BackendAIError):
-    """Raised when a user tries to access an image they don't own."""
+    """Raised when a user tries to access an image they do not have permission to access."""
 
     error_type = "https://api.backend.ai/probs/generic-forbidden"
-    error_title = "Access to this image is forbidden."
+    error_title = "User does not have permission to access this image."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -112,7 +112,7 @@ class ImageAccessForbiddenError(BackendAIError):
 
 class ForgetImageForbiddenError(BackendAIError):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
-    error_title = "Access to this resource is forbidden."
+    error_title = "User does not have permission to delete this image"
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
