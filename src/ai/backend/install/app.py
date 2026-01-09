@@ -61,7 +61,6 @@ class DevSetup(Static):
                 yield SetupLog(
                     wrap=True,
                     classes="log",
-                    non_interactive=self._non_interactive,
                 )
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
@@ -122,7 +121,6 @@ class PackageSetup(Static):
                 yield SetupLog(
                     wrap=True,
                     classes="log",
-                    non_interactive=self._non_interactive,
                 )
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")

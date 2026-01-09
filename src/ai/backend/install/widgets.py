@@ -48,14 +48,14 @@ class SetupLog(RichLog):
     def __init__(
         self,
         *args,
-        non_interactive: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._continue = asyncio.Event()
-        self._non_interactive = non_interactive
         self._stdout_console: Console | None = None
-        if self._non_interactive:
+
+    def on_mount(self) -> None:
+        if self.app.is_headless:
             self._stdout_console = Console(force_terminal=True)
 
     def _write_to_stdout(self, content: object) -> None:
@@ -85,8 +85,8 @@ class SetupLog(RichLog):
         # Always write to the RichLog widget
         super().write(content, width=width, expand=expand, shrink=shrink, scroll_end=scroll_end)
 
-        # Write to stdout if non-interactive mode
-        if self._non_interactive:
+        # Write to stdout if headless mode
+        if self._stdout_console is not None:
             self._write_to_stdout(content)
 
         return self
