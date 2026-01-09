@@ -14,7 +14,15 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import CredentialData, GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import (
+    CredentialData,
+    GroupMembershipData,
+    KeypairDataForCredential,
+    KeypairResourcePolicyDataForCredential,
+    UserData,
+    UserDataForCredential,
+    UserResourcePolicyDataForCredential,
+)
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -325,9 +333,85 @@ class AuthDBSource:
             if user_row is None:
                 return None
 
-            return CredentialData(
-                user=user_row.to_data(),
-                user_resource_policy=user_row.resource_policy_row.to_dataclass(),
-                keypair=keypair_row.to_data(),
-                keypair_resource_policy=keypair_row.resource_policy_row.to_dataclass(),
-            )
+            return self._convert_to_credential_data(keypair_row, user_row)
+
+    def _convert_to_credential_data(
+        self,
+        keypair_row: KeyPairRow,
+        user_row: UserRow,
+    ) -> CredentialData:
+        """Convert ORM Row objects to pure CredentialData dataclass."""
+        keypair_rp_row = keypair_row.resource_policy_row
+        user_rp_row = user_row.resource_policy_row
+
+        keypair_rp_data = KeypairResourcePolicyDataForCredential(
+            name=keypair_rp_row.name,
+            created_at=keypair_rp_row.created_at,
+            default_for_unspecified=keypair_rp_row.default_for_unspecified,
+            total_resource_slots=keypair_rp_row.total_resource_slots,
+            max_session_lifetime=keypair_rp_row.max_session_lifetime,
+            max_concurrent_sessions=keypair_rp_row.max_concurrent_sessions,
+            max_pending_session_count=keypair_rp_row.max_pending_session_count,
+            max_pending_session_resource_slots=keypair_rp_row.max_pending_session_resource_slots,
+            max_concurrent_sftp_sessions=keypair_rp_row.max_concurrent_sftp_sessions,
+            max_containers_per_session=keypair_rp_row.max_containers_per_session,
+            idle_timeout=keypair_rp_row.idle_timeout,
+            allowed_vfolder_hosts=keypair_rp_row.allowed_vfolder_hosts,
+        )
+
+        user_rp_data = UserResourcePolicyDataForCredential(
+            name=user_rp_row.name,
+            created_at=user_rp_row.created_at,
+            max_vfolder_count=user_rp_row.max_vfolder_count,
+            max_quota_scope_size=user_rp_row.max_quota_scope_size,
+            max_session_count_per_model_session=user_rp_row.max_session_count_per_model_session,
+            max_customized_image_count=user_rp_row.max_customized_image_count,
+        )
+
+        keypair_data = KeypairDataForCredential(
+            user_id=keypair_row.user_id,
+            access_key=keypair_row.access_key,
+            secret_key=keypair_row.secret_key or "",
+            is_active=keypair_row.is_active or False,
+            is_admin=keypair_row.is_admin or False,
+            created_at=keypair_row.created_at,
+            modified_at=keypair_row.modified_at,
+            last_used=keypair_row.last_used,
+            rate_limit=keypair_row.rate_limit,
+            num_queries=keypair_row.num_queries,
+            ssh_public_key=keypair_row.ssh_public_key,
+            ssh_private_key=keypair_row.ssh_private_key,
+            user=keypair_row.user,
+            resource_policy_name=keypair_row.resource_policy,
+            dotfiles=keypair_row.dotfiles,
+            bootstrap_script=keypair_row.bootstrap_script,
+            resource_policy=keypair_rp_data,
+        )
+
+        user_data = UserDataForCredential(
+            uuid=user_row.uuid,
+            username=user_row.username,
+            email=user_row.email,
+            need_password_change=user_row.need_password_change,
+            password_changed_at=user_row.password_changed_at,
+            full_name=user_row.full_name,
+            status=user_row.status,
+            status_info=user_row.status_info,
+            modified_at=user_row.modified_at,
+            domain_name=user_row.domain_name,
+            role=user_row.role,
+            allowed_client_ip=user_row.allowed_client_ip,
+            totp_key=user_row.totp_key,
+            totp_activated=user_row.totp_activated,
+            totp_activated_at=user_row.totp_activated_at,
+            resource_policy_name=user_row.resource_policy,
+            sudo_session_enabled=user_row.sudo_session_enabled,
+            main_access_key=user_row.main_access_key,
+            integration_id=user_row.integration_id,
+            container_uid=user_row.container_uid,
+            container_main_gid=user_row.container_main_gid,
+            container_gids=user_row.container_gids,
+            resource_policy=user_rp_data,
+        )
+
+        return CredentialData(user=user_data, keypair=keypair_data)

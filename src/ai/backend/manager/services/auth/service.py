@@ -49,6 +49,10 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
     GenerateSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.get_credential import (
+    GetCredentialAction,
+    GetCredentialActionResult,
+)
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
@@ -90,6 +94,16 @@ class AuthService:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
+
+    async def get_credential(self, action: GetCredentialAction) -> GetCredentialActionResult:
+        """
+        Get credential data by access key for authentication middleware.
+
+        This method is used by the authentication middleware to fetch
+        user and keypair data for request context population.
+        """
+        credential = await self._auth_repository.get_credential_by_access_key(action.access_key)
+        return GetCredentialActionResult(credential=credential)
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
