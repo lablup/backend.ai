@@ -12,7 +12,11 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
@@ -113,4 +117,28 @@ class ScalingGroupRepository:
         return await self._db_source.check_scaling_group_domain_association_exists(
             scaling_group=scaling_group,
             domain=domain,
+        )
+
+    async def associate_scaling_group_with_keypairs(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Associates a scaling group with multiple keypairs."""
+        await self._db_source.associate_scaling_group_with_keypairs(bulk_creator)
+
+    async def disassociate_scaling_group_with_keypairs(
+        self,
+        purger: BatchPurger[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Disassociates a scaling group from multiple keypairs."""
+        await self._db_source.disassociate_scaling_group_with_keypairs(purger)
+
+    async def check_scaling_group_keypair_association_exists(
+        self,
+        scaling_group_name: str,
+        access_key: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a keypair."""
+        return await self._db_source.check_scaling_group_keypair_association_exists(
+            scaling_group_name, access_key
         )
