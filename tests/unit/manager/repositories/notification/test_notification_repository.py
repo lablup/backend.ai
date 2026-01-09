@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 import pytest
 
 from ai.backend.common.data.notification import NotificationRuleType
+from ai.backend.common.data.notification.types import NotificationChannelType, WebhookConfig
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
@@ -29,9 +30,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
-    NotificationChannelType,
     NotificationRuleRow,
-    WebhookConfig,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (

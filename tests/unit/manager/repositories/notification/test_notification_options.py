@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
+from ai.backend.common.data.notification.types import WebhookConfig
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
@@ -28,7 +29,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
-    WebhookConfig,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
