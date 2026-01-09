@@ -57,18 +57,6 @@ class EndpointNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
-class EndpointAccessForbiddenError(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/endpoint-access-forbidden"
-    error_title = "Access to this endpoint is forbidden."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ENDPOINT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class EndpointAutoScalingRuleNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/endpoint-auto-scaling-rule-not-found"
     error_title = "Endpoint auto scaling rule not found."

@@ -455,7 +455,6 @@ class ModelServingRepository:
             case _:
                 return owner.uuid == user_id
 
-
     @model_serving_repository_resilience.apply()
     async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderRow]:
         """
