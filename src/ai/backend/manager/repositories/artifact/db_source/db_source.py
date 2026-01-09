@@ -647,11 +647,7 @@ class ArtifactDBSource:
             )
 
             result = await db_sess.execute(update_stmt)
-            updated_id = result.scalar_one_or_none()
-            if updated_id is None:
-                raise ArtifactUpdateError()
-
-            updated_row = await db_sess.get(ArtifactRevisionRow, updated_id)
+            updated_row = result.scalars().one_or_none()
             if updated_row is None:
                 raise ArtifactUpdateError()
 
@@ -674,11 +670,7 @@ class ArtifactDBSource:
             )
 
             result = await db_sess.execute(update_stmt)
-            updated_id = result.scalar_one_or_none()
-            if updated_id is None:
-                raise ArtifactUpdateError()
-
-            updated_row = await db_sess.get(ArtifactRevisionRow, updated_id)
+            updated_row = result.scalars().one_or_none()
             if updated_row is None:
                 raise ArtifactUpdateError()
 

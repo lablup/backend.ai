@@ -175,7 +175,7 @@ class KeyPairRow(Base):
             rate_limit=self.rate_limit if self.rate_limit is not None else 0,
             ssh_public_key=self.ssh_public_key,
             ssh_private_key=self.ssh_private_key,
-            dotfiles=self.dotfiles.decode("utf-8") if self.dotfiles else "",
+            dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
         )
 
