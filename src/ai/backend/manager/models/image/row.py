@@ -882,6 +882,15 @@ class ImageRow(Base):
             return False
         return self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
 
+    def _get_owner_id(self) -> UUID | None:
+        """Extract owner_id from customized image labels."""
+        if not self.customized:
+            return None
+        owner_label = self.labels.get("ai.backend.customized-image.owner")
+        if owner_label:
+            return UUID(owner_label.split(":")[1])
+        return None
+
     def to_dataclass(self) -> ImageData:
         from ai.backend.manager.data.image.types import ImageData
 
@@ -903,6 +912,7 @@ class ImageRow(Base):
             labels=ImageLabelsData(label_data=self.labels),
             resources=ImageResourcesData(resources_data=self.resources),
             status=self.status,
+            owner_id=self._get_owner_id(),
         )
 
     def to_detailed_dataclass(self) -> ImageDataWithDetails:

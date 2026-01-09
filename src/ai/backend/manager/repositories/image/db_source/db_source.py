@@ -22,7 +22,6 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
-    ImageAccessForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
     ModifyImageActionValueError,
@@ -102,25 +101,6 @@ class ImageDBSource:
         if row is None:
             raise ImageNotFound()
         return row
-
-    async def _validate_image_ownership(
-        self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageRow:
-        """
-        Private method to get an image and validate ownership using an existing session.
-        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
-
-        Note: This validation logic lives in the repository layer (not service layer) because
-        image ownership is a simple user_id comparison that doesn't require role-based access
-        control (RBAC). Unlike model_serving domain where SUPERADMIN/ADMIN/USER have different
-        access rules based on domain and owner roles, image ownership is binary: either you
-        own it or you don't. This keeps the validation close to the data access layer where
-        the ownership information is retrieved.
-        """
-        image_row = await self._get_image_by_id(session, image_id, load_aliases)
-        if not image_row.is_owned_by(user_id):
-            raise ImageAccessForbiddenError()
-        return image_row
 
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
@@ -216,27 +196,13 @@ class ImageDBSource:
             await image_row.mark_as_deleted(session)
             return image_row.to_dataclass()
 
-    async def validate_image_ownership(
-        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> None:
+    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
-        Validates that user owns the image.
-        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
+        Fetches an image from database by ID.
+        Raises ImageNotFound if image doesn't exist.
         """
         async with self._db.begin_session() as session:
-            await self._validate_image_ownership(session, image_id, user_id, load_aliases)
-
-    async def fetch_image_by_id_with_ownership(
-        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageData:
-        """
-        Fetches an image from database by ID after validating ownership.
-        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
-        """
-        async with self._db.begin_session() as session:
-            image_row = await self._validate_image_ownership(
-                session, image_id, user_id, load_aliases
-            )
+            image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
 
     async def insert_image_alias(

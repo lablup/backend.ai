@@ -173,9 +173,9 @@ class TestForgetImage:
     ) -> None:
         """Regular user can forget image they own."""
         user_id = uuid.uuid4()
-        deleted_image = replace(image_data, status=ImageStatus.DELETED)
-        mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
-        mock_image_repository.validate_image_ownership = AsyncMock(return_value=image_data)
+        owned_image = replace(image_data, owner_id=user_id)
+        deleted_image = replace(owned_image, status=ImageStatus.DELETED)
+        mock_image_repository.resolve_image = AsyncMock(return_value=owned_image)
         mock_image_repository.soft_delete_image = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageAction(
@@ -189,9 +189,6 @@ class TestForgetImage:
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.resolve_image.assert_called_once()
-        mock_image_repository.validate_image_ownership.assert_called_once_with(
-            image_data.id, user_id
-        )
         mock_image_repository.soft_delete_image.assert_called_once()
 
     async def test_forget_image_as_user_forbidden(
@@ -201,10 +198,8 @@ class TestForgetImage:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot forget image they don't own."""
+        # image_data has owner_id=None by default, so ownership validation will fail
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
-        mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ImageAccessForbiddenError()
-        )
 
         action = ForgetImageAction(
             user_id=uuid.uuid4(),
@@ -267,8 +262,9 @@ class TestForgetImageById:
     ) -> None:
         """Regular user can forget image they own by ID."""
         user_id = uuid.uuid4()
-        deleted_image = replace(image_data, status=ImageStatus.DELETED)
-        mock_image_repository.validate_image_ownership = AsyncMock(return_value=image_data)
+        owned_image = replace(image_data, owner_id=user_id)
+        deleted_image = replace(owned_image, status=ImageStatus.DELETED)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image)
         mock_image_repository.soft_delete_image_by_id = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageByIdAction(
@@ -280,9 +276,7 @@ class TestForgetImageById:
         result = await processors.forget_image_by_id.wait_for_complete(action)
 
         assert result.image.status == ImageStatus.DELETED
-        mock_image_repository.validate_image_ownership.assert_called_once_with(
-            image_data.id, user_id
-        )
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(image_data.id)
         mock_image_repository.soft_delete_image_by_id.assert_called_once_with(image_data.id)
 
     async def test_forget_image_by_id_as_user_forbidden(
@@ -292,9 +286,8 @@ class TestForgetImageById:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot forget image they don't own."""
-        mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ImageAccessForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
@@ -471,8 +464,9 @@ class TestPurgeImageById:
     ) -> None:
         """Regular user can purge image they own by ID."""
         user_id = uuid.uuid4()
-        mock_image_repository.validate_image_ownership = AsyncMock(return_value=image_data)
-        mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=image_data)
+        owned_image_data = replace(image_data, owner_id=user_id)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image_data)
+        mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=owned_image_data)
 
         action = PurgeImageByIdAction(
             user_id=user_id,
@@ -482,9 +476,9 @@ class TestPurgeImageById:
 
         result = await processors.purge_image_by_id.wait_for_complete(action)
 
-        assert result.image == image_data
-        mock_image_repository.validate_image_ownership.assert_called_once_with(
-            image_data.id, user_id, load_aliases=True
+        assert result.image == owned_image_data
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(
+            image_data.id, load_aliases=True
         )
         mock_image_repository.delete_image_with_aliases.assert_called_once_with(image_data.id)
 
@@ -495,9 +489,8 @@ class TestPurgeImageById:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot purge image they don't own."""
-        mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ImageAccessForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
@@ -649,8 +642,9 @@ class TestUntagImageFromRegistry:
     ) -> None:
         """Regular user can untag image they own from registry."""
         user_id = uuid.uuid4()
-        mock_image_repository.validate_image_ownership = AsyncMock(return_value=image_data)
-        mock_image_repository.untag_image_from_registry = AsyncMock(return_value=image_data)
+        owned_image_data = replace(image_data, owner_id=user_id)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image_data)
+        mock_image_repository.untag_image_from_registry = AsyncMock(return_value=owned_image_data)
 
         action = UntagImageFromRegistryAction(
             user_id=user_id,
@@ -660,9 +654,9 @@ class TestUntagImageFromRegistry:
 
         result = await processors.untag_image_from_registry.wait_for_complete(action)
 
-        assert result.image == image_data
-        mock_image_repository.validate_image_ownership.assert_called_once_with(
-            image_data.id, user_id, load_aliases=True
+        assert result.image == owned_image_data
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(
+            image_data.id, load_aliases=True
         )
         mock_image_repository.untag_image_from_registry.assert_called_once_with(image_data.id)
 
@@ -673,9 +667,8 @@ class TestUntagImageFromRegistry:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot untag image they don't own."""
-        mock_image_repository.validate_image_ownership = AsyncMock(
-            side_effect=ImageAccessForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = UntagImageFromRegistryAction(
             user_id=uuid.uuid4(),

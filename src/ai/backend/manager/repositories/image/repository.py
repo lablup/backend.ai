@@ -217,14 +217,12 @@ class ImageRepository:
         return await self._db_source.mark_image_deleted_by_id(image_id)
 
     @image_repository_resilience.apply()
-    async def validate_image_ownership(
-        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> None:
+    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
-        Validates that user owns the image.
-        Raises ImageAccessForbiddenError if image doesn't exist or user doesn't own it.
+        Fetches an image from database by ID.
+        Raises ImageNotFound if image doesn't exist.
         """
-        await self._db_source.validate_image_ownership(image_id, user_id, load_aliases)
+        return await self._db_source.fetch_image_by_id(image_id, load_aliases)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
