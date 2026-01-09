@@ -15,7 +15,7 @@ import graphene
 import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql.pyutils import Undefined
+from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import load_only
 
@@ -622,40 +622,16 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     def to_updater(self, name: str) -> Updater[ScalingGroupRow]:
         """Convert GraphQL input to Updater for scaling group modification."""
         status_spec = ScalingGroupStatusUpdaterSpec(
-            is_active=(
-                OptionalState.update(self.is_active)
-                if self.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_public=(
-                OptionalState.update(self.is_public)
-                if self.is_public is not None
-                else OptionalState.nop()
-            ),
+            is_active=OptionalState.from_graphql(self.is_active),
+            is_public=OptionalState.from_graphql(self.is_public),
         )
         metadata_spec = ScalingGroupMetadataUpdaterSpec(
-            description=(
-                TriState.update(self.description)
-                if self.description is not None
-                else TriState.nop()
-            ),
+            description=TriState.from_graphql(self.description),
         )
         network_spec = ScalingGroupNetworkConfigUpdaterSpec(
-            wsproxy_addr=(
-                TriState.update(self.wsproxy_addr)
-                if self.wsproxy_addr is not None
-                else TriState.nop()
-            ),
-            wsproxy_api_token=(
-                TriState.update(self.wsproxy_api_token)
-                if self.wsproxy_api_token is not None
-                else TriState.nop()
-            ),
-            use_host_network=(
-                OptionalState.update(self.use_host_network)
-                if self.use_host_network is not None
-                else OptionalState.nop()
-            ),
+            wsproxy_addr=TriState.from_graphql(self.wsproxy_addr),
+            wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
+            use_host_network=OptionalState.from_graphql(self.use_host_network),
         )
         driver_spec = ScalingGroupDriverConfigUpdaterSpec(
             driver=OptionalState.from_graphql(self.driver),
