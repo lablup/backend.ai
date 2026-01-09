@@ -7,13 +7,13 @@ import logging
 import secrets
 from collections.abc import Iterable, Mapping
 from contextlib import ExitStack
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
@@ -22,7 +22,7 @@ from dateutil.tz import tzutc
 from ai.backend.common import validators as tx
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
-from ai.backend.common.dto.manager.auth.field import (
+from ai.backend.common.dto.manager.auth.types import (
     AuthResponseType,
     AuthSuccessResponse,
     AuthTokenType,
@@ -33,19 +33,13 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.data.auth.types import CredentialData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
     InvalidClientIPConfig,
 )
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
-    keypair_resource_policies,
-    user_resource_policies,
-)
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
@@ -426,97 +420,102 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-async def _query_cred_by_access_key(
-    root_ctx: RootContext,
-    access_key: str,
-) -> tuple[Any, Any]:
+"""
+To effectively handle Unmatched condition between request and type/user , type/keypair
+TODO: migrate user, keypair types to match with request form.
+"""
+
+
+def _credential_to_keypair_dict(credential: CredentialData) -> dict[str, Any]:
     """
-    Query keypair and user information by access_key.
+    Convert CredentialData.keypair to legacy request["keypair"] dict format.
 
-    Returns:
-        Tuple of (user_row, keypair_row) or (None, None) if not found
+    Field mappings:
+    - user_id -> user (legacy DB column name)
+    - resource_policy_name -> removed (resource_policy is nested dict)
+    - secret_key -> removed (sensitive)
     """
-    async with root_ctx.db.begin_readonly() as conn:
-        # Query keypair with resource policy
-        j = keypairs.join(
-            keypair_resource_policies,
-            keypairs.c.resource_policy == keypair_resource_policies.c.name,
-        )
-        query = (
-            sa.select([keypairs, keypair_resource_policies], use_labels=True)
-            .select_from(j)
-            .where(
-                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
-            )
-        )
-        result = await conn.execute(query)
-        keypair_row = result.first()
+    kp = credential.keypair
+    rp = credential.keypair_resource_policy
 
-        if keypair_row is None:
-            return None, None
+    return {
+        "user": kp.user_id,  # legacy field name
+        "access_key": kp.access_key,
+        "is_active": kp.is_active,
+        "is_admin": kp.is_admin,
+        "created_at": kp.created_at,
+        "modified_at": kp.modified_at,
+        "rate_limit": kp.rate_limit,
+        "ssh_public_key": kp.ssh_public_key,
+        "ssh_private_key": kp.ssh_private_key,
+        "dotfiles": kp.dotfiles,
+        "bootstrap_script": kp.bootstrap_script,
+        "resource_policy": asdict(rp),
+    }
 
-        # Query user with resource policy by joining keypairs table
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
-        )
-        query = (
-            sa.select([users, user_resource_policies], use_labels=True)
-            .select_from(j)
-            .where(keypairs.c.access_key == access_key)
-        )
-        result = await conn.execute(query)
-        user_row = result.first()
 
-        return user_row, keypair_row
+def _credential_to_user_dict(credential: CredentialData) -> dict[str, Any]:
+    """
+    Convert CredentialData.user to legacy request["user"] dict format.
+
+    Field mappings:
+    - id is same as uuid (legacy)
+    - role is UserRole enum, converted to str for comparison
+    """
+    u = credential.user
+    rp = credential.user_resource_policy
+
+    return {
+        "uuid": u.uuid,
+        "id": u.id,  # legacy (same as uuid)
+        "username": u.username,
+        "email": u.email,
+        "need_password_change": u.need_password_change,
+        "full_name": u.full_name,
+        "is_active": u.is_active,
+        "status": u.status,
+        "status_info": u.status_info,
+        "modified_at": u.modified_at,
+        "domain_name": u.domain_name,
+        "role": u.role,
+        "allowed_client_ip": u.allowed_client_ip,
+        "totp_activated": u.totp_activated,
+        "totp_activated_at": u.totp_activated_at,
+        "sudo_session_enabled": u.sudo_session_enabled,
+        "main_access_key": u.main_access_key,
+        "container_uid": u.container_uid,
+        "container_main_gid": u.container_main_gid,
+        "container_gids": u.container_gids,
+        "resource_policy": asdict(rp),
+    }
 
 
 def _populate_auth_result(
     request: web.Request,
-    user_row: Any,
-    keypair_row: Any,
+    credential: CredentialData,
 ) -> None:
     """
     Populate authentication result into request state.
 
     This function is called by all authentication flows (JWT, HMAC, Hook)
-    to set up the common request state structure.
+    to set up the common request state structure using CredentialData.
+
+    Args:
+        request: aiohttp request object to populate
+        credential: CredentialData containing user, keypair, and resource policies
     """
-    if not user_row or not keypair_row:
-        return
+    keypair_dict = _credential_to_keypair_dict(credential)
+    user_dict = _credential_to_user_dict(credential)
 
-    auth_result = {
-        "is_authorized": True,
-        "keypair": {
-            col.name: keypair_row[f"keypairs_{col.name}"]
-            for col in keypairs.c
-            if col.name != "secret_key"
-        },
-        "user": {
-            col.name: user_row[f"users_{col.name}"]
-            for col in users.c
-            if col.name not in ("password", "description", "created_at")
-        },
-        "is_admin": keypair_row["keypairs_is_admin"],
-    }
-
-    validate_ip(request, auth_result["user"])
-
-    auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_row[f"keypair_resource_policies_{col.name}"]
-        for col in keypair_resource_policies.c
-    }
-    auth_result["user"]["resource_policy"] = {
-        col.name: user_row[f"user_resource_policies_{col.name}"] for col in user_resource_policies.c
-    }
-    auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
-    auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
+    # Validate IP before populating
+    validate_ip(request, user_dict)
 
     # Populate the result to the per-request state dict
-    request.update(auth_result)
+    request["is_authorized"] = True
+    request["keypair"] = keypair_dict
+    request["user"] = user_dict
+    request["is_admin"] = credential.is_admin
+    request["is_superadmin"] = credential.is_superadmin
 
 
 async def _authenticate_via_jwt(
@@ -551,20 +550,19 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        # 2. Query keypair and user from database to get secret_key
-        user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-        )
+        # 2. Query credential from database via repository
+        auth_repo = root_ctx.repositories.auth.repository
+        credential = await auth_repo.get_credential_by_access_key(access_key)
 
-        if keypair_row is None:
+        if credential is None:
             raise AuthorizationFailed("Access key not found in database")
 
         # 3. Validate JWT token using user's secret key
-        secret_key = keypair_row["keypairs_secret_key"]
+        secret_key = credential.keypair.secret_key
         root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
 
         # 4. Populate authentication result
-        _populate_auth_result(request, user_row, keypair_row)
+        _populate_auth_result(request, credential)
         log.trace("JWT authentication succeeded for access_key={}", access_key)
 
         # 5. Update statistics
@@ -604,22 +602,21 @@ async def _authenticate_via_hmac(
 
     sign_method, access_key, signature = params
 
-    # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    # 3. Query credential from database via repository
+    auth_repo = root_ctx.repositories.auth.repository
+    credential = await auth_repo.get_credential_by_access_key(access_key)
 
-    if keypair_row is None:
+    if credential is None:
         raise AuthorizationFailed("Access key not found in HMAC")
 
     # 4. Verify HMAC signature
-    my_signature = await sign_request(sign_method, request, keypair_row["keypairs_secret_key"])
+    my_signature = await sign_request(sign_method, request, credential.keypair.secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")
 
     # 5. Populate authentication result
-    _populate_auth_result(request, user_row, keypair_row)
+    _populate_auth_result(request, credential)
 
     # 6. Update statistics
     await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
@@ -662,16 +659,15 @@ async def _authenticate_via_hook(
         # Anonymous access allowed
         return
 
-    # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    # 3. Query credential from database via repository
+    auth_repo = root_ctx.repositories.auth.repository
+    credential = await auth_repo.get_credential_by_access_key(access_key)
 
-    if keypair_row is None:
+    if credential is None:
         raise AuthorizationFailed("Access key not found in hook")
 
     # 4. Populate authentication result
-    _populate_auth_result(request, user_row, keypair_row)
+    _populate_auth_result(request, credential)
 
     # 5. Update statistics
     await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
