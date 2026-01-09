@@ -873,7 +873,7 @@ class ModifyAgent(graphene.Mutation):
     @classmethod
     @privileged_mutation(
         UserRole.SUPERADMIN,
-        lambda id, **kwargs: (None, id),
+        lambda id, **kwargs: (None, id),  # noqa: A006
     )
     async def mutate(
         cls,
