@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import decimal
 import logging
-from typing import TYPE_CHECKING
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.options import EndpointConditions
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -39,6 +35,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
+from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -52,26 +49,6 @@ class AutoScalingService:
     ) -> None:
         self._repository = repository
 
-    def _validate_endpoint_access(
-        self,
-        endpoint_data: EndpointData,
-        ctx: RequesterCtx,
-    ) -> bool:
-        """Validate user access to endpoint based on role."""
-        if endpoint_data.session_owner_id is None:
-            return True
-
-        match ctx.user_role:
-            case UserRole.SUPERADMIN:
-                return True
-            case UserRole.ADMIN:
-                # ADMIN cannot access SUPERADMIN's resources
-                if endpoint_data.session_owner_role == UserRole.SUPERADMIN:
-                    return False
-                return endpoint_data.domain == ctx.domain_name
-            case _:
-                return endpoint_data.session_owner_id == ctx.user_id
-
     async def check_requester_access(self, requester_ctx: RequesterCtx) -> None:
         if requester_ctx.is_authorized is False:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -84,7 +61,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise ModelServiceNotFound
 
         # Update replicas (access already validated)
@@ -109,7 +86,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(action.endpoint_id)
         if not endpoint_data:
             raise EndpointNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise EndpointNotFound
 
         # Create auto scaling rule (access already validated)
@@ -145,7 +122,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
         if not endpoint_data:
             raise EndpointNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise EndpointAutoScalingRuleNotFound
 
         # Update auto scaling rule (access already validated)
@@ -170,7 +147,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
         if not endpoint_data:
             raise EndpointNotFound
-        if not self._validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
             raise EndpointAutoScalingRuleNotFound
 
         # Delete auto scaling rule (access already validated)
