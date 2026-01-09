@@ -11,8 +11,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ai.backend.common.data.notification import NotificationRuleType
-from ai.backend.common.data.notification.types import NotificationChannelType, WebhookConfig
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookConfig,
+)
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
