@@ -249,7 +249,7 @@ async def resolve_vfolder_rows(
         await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
     )
     vf_user_cond = None
-    vf_group_cond = None
+    vf_group_cond: sa.ColumnElement[bool] | None = None
 
     match perm:
         case VFolderPermissionSetAlias():

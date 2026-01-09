@@ -22,7 +22,15 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx

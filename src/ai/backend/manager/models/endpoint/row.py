@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
+    foreign,
     mapped_column,
     relationship,
     selectinload,
@@ -101,22 +102,14 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-    from ai.backend.common.types import ResourceSlot
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
-    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
     from ai.backend.manager.models.gql import GraphQueryContext
-    from ai.backend.manager.models.routing import RoutingRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -255,9 +248,7 @@ class EndpointRow(Base):
         "model_definition_path", sa.String(length=128), nullable=True
     )
 
-    resource_slots: Mapped[ResourceSlot] = mapped_column(
-        "resource_slots", ResourceSlotColumn(), nullable=False
-    )
+    resource_slots = mapped_column("resource_slots", ResourceSlotColumn(), nullable=False)
     url: Mapped[str | None] = mapped_column("url", sa.String(length=1024))
     resource_opts: Mapped[dict[str, str] | None] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=True, default={}
@@ -273,7 +264,7 @@ class EndpointRow(Base):
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
 
-    extra_mounts: Mapped[list[VFolderMount]] = mapped_column(
+    extra_mounts = mapped_column(
         "extra_mounts",
         StructuredJSONObjectListColumn(VFolderMount),
         nullable=False,
@@ -308,49 +299,49 @@ class EndpointRow(Base):
         server_default=sa.text("10"),
     )
 
-    routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    tokens: Mapped[list[EndpointTokenRow]] = relationship(
+    routings = relationship("RoutingRow", back_populates="endpoint_row")
+    tokens = relationship(
         "EndpointTokenRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_tokens_join_condition,
     )
-    endpoint_auto_scaling_rules: Mapped[list[EndpointAutoScalingRuleRow]] = relationship(
+    endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
-    image_row: Mapped[ImageRow | None] = relationship(
+    image_row = relationship(
         "ImageRow",
         primaryjoin="foreign(EndpointRow.image) == ImageRow.id",
         back_populates="endpoints",
     )
 
-    model_row: Mapped[VFolderRow | None] = relationship("VFolderRow", back_populates="endpoints")
-    created_user_row: Mapped[UserRow | None] = relationship(
+    model_row = relationship("VFolderRow", back_populates="endpoints")
+    created_user_row = relationship(
         "UserRow",
         back_populates="created_endpoints",
         foreign_keys=[created_user],
         primaryjoin="foreign(EndpointRow.created_user) == UserRow.uuid",
     )
-    session_owner_row: Mapped[UserRow | None] = relationship(
+    session_owner_row = relationship(
         "UserRow",
         back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin="foreign(EndpointRow.session_owner) == UserRow.uuid",
     )
 
-    revisions: Mapped[list[DeploymentRevisionRow]] = relationship(
+    revisions = relationship(
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
     )
 
-    auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
+    auto_scaling_policy = relationship(
         "DeploymentAutoScalingPolicyRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
         uselist=False,
     )
 
-    deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
+    deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_deployment_policy_join_condition,

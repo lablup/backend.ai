@@ -27,7 +27,7 @@ import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -360,105 +360,17 @@ class VFolderRow(Base):
         "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
     )
 
-
-vfolder_attachment = sa.Table(
-    "vfolder_attachment",
-    metadata,
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column(
-        "kernel",
-        GUID,
-        sa.ForeignKey("kernels.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.PrimaryKeyConstraint("vfolder", "kernel"),
-)
-
-
-vfolder_invitations = sa.Table(
-    "vfolder_invitations",
-    metadata,
-    IDColumn("id"),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
-    sa.Column("inviter", sa.String(length=256)),  # email
-    sa.Column("invitee", sa.String(length=256), nullable=False),  # email
-    sa.Column(
-        "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
-    ),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.current_timestamp(),
-    ),
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-)
-
-
-class VFolderInvitationRow(Base):
-    __table__ = vfolder_invitations
-
-    vfolder_row = relationship("VFolderRow", back_populates="invitation_rows")
-
-
-vfolder_permissions = sa.Table(
-    "vfolder_permissions",
-    metadata,
-    IDColumn(),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
-)
-
-
-class VFolderPermissionRow(Base):
-    __table__ = vfolder_permissions
-
-    vfolder_row = relationship("VFolderRow", back_populates="permission_rows")
-
-
-def _get_user_join_condition():
-    from ai.backend.manager.models.user import UserRow
-
-    return UserRow.uuid == foreign(VFolderRow.user)
-
-
-def _get_group_join_condition():
-    from ai.backend.manager.models.group import GroupRow
-
-    return GroupRow.id == foreign(VFolderRow.group)
-
-
-class VFolderRow(Base):
-    __table__ = vfolders
-
-    # Relationships
+    # Relationships (defined with string-based join conditions to avoid circular imports)
     endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         back_populates="vfolder_rows",
-        primaryjoin=_get_user_join_condition,
+        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
     )
     group_row: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         back_populates="vfolder_rows",
-        primaryjoin=_get_group_join_condition,
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
     permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
         "VFolderPermissionRow", back_populates="vfolder_row"

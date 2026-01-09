@@ -21,7 +21,14 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, foreign, joinedload, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    joinedload,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
@@ -196,31 +203,7 @@ class GroupRow(Base):
         default=None,
     )
 
-
-# Defined for avoiding circular import
-def _get_network_join_condition():
-    from ai.backend.manager.models.network import NetworkRow
-
-    return GroupRow.id == foreign(NetworkRow.project)
-
-
-def _get_vfolder_join_condition():
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return GroupRow.id == foreign(VFolderRow.group)
-
-
-def _get_association_container_registries_groups_join_condition():
-    from ai.backend.manager.models.association_container_registries_groups import (
-        AssociationContainerRegistriesGroupsRow,
-    )
-
-    return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
-
-
-class GroupRow(Base):
-    __table__ = groups
-
+    # Relationships (defined with deferred join conditions to avoid circular imports)
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
     domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
@@ -236,19 +219,19 @@ class GroupRow(Base):
     networks: Mapped[list[NetworkRow]] = relationship(
         "NetworkRow",
         back_populates="project_row",
-        primaryjoin=_get_network_join_condition,
+        primaryjoin="GroupRow.id == foreign(NetworkRow.project)",
     )
     vfolder_rows: Mapped[list[VFolderRow]] = relationship(
         "VFolderRow",
         back_populates="group_row",
-        primaryjoin=_get_vfolder_join_condition,
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="group_row",
-        primaryjoin=_get_association_container_registries_groups_join_condition,
+        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
     )
 
     def to_data(self) -> GroupData:

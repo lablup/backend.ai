@@ -463,7 +463,7 @@ class KernelRow(Base):
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
     requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()
+        "requested_slots", ResourceSlotColumn(), nullable=False
     )
     occupied_shares: Mapped[dict[str, Any]] = mapped_column(
         "occupied_shares", pgsql.JSONB(), nullable=False, default={}

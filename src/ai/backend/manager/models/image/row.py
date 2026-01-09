@@ -91,7 +91,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
-    from ai.backend.manager.models.endpoint import EndpointRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -378,15 +377,15 @@ class ImageRow(Base):
         nullable=False,
     )
 
-    aliases: Mapped[list[ImageAliasRow]] = relationship("ImageAliasRow", back_populates="image")
+    aliases = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
-    endpoints: Mapped[list[EndpointRow]] = relationship(
+    endpoints = relationship(
         "EndpointRow",
         primaryjoin=_get_image_endpoint_join_condition,
         back_populates="image_row",
     )
 
-    registry_row: Mapped[ContainerRegistryRow] = relationship(
+    registry_row = relationship(
         "ContainerRegistryRow",
         back_populates="image_rows",
         primaryjoin=_get_container_registry_join_condition,
