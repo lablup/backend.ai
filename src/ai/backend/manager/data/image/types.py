@@ -1,9 +1,9 @@
 import enum
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, NamedTuple, Optional
+from uuid import UUID
 
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
 
@@ -50,7 +50,7 @@ class ImageData:
     created_at: Optional[datetime] = field(compare=False)
     tag: Optional[str]
     registry: str
-    registry_id: uuid.UUID
+    registry_id: UUID
     architecture: str
     config_digest: str
     size_bytes: int
@@ -60,7 +60,7 @@ class ImageData:
     labels: ImageLabelsData
     resources: ImageResourcesData
     status: ImageStatus
-    owner_id: Optional[uuid.UUID] = field(default=None)
+    owner_id: Optional[UUID] = field(default=None)
 
 
 @dataclass
@@ -88,7 +88,7 @@ class ImageDataWithDetails:
     tags: list[KVPair]
     version: Optional[str]
     registry: str
-    registry_id: uuid.UUID
+    registry_id: UUID
     type: ImageType
     architecture: str
     is_local: bool
@@ -131,5 +131,5 @@ class RescanImagesResult:
 
 @dataclass
 class ImageAliasData:
-    id: uuid.UUID = field(compare=False)
+    id: UUID = field(compare=False)
     alias: str
