@@ -84,6 +84,7 @@ class ScalingGroupRepository:
         """
         return await self._db_source.purge_scaling_group(purger)
 
+    @scaling_group_repository_resilience.apply()
     async def update_scaling_group(
         self,
         updater: Updater[ScalingGroupRow],
