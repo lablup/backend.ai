@@ -24,7 +24,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
-    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -98,7 +97,7 @@ class RoutingRow(Base):
     revision: Mapped[uuid.UUID | None] = mapped_column("revision", GUID, nullable=True)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
-        StrEnumType(RouteTrafficStatus),
+        EnumValueType(RouteTrafficStatus),
         nullable=False,
         server_default=sa.text("'active'"),
         default=RouteTrafficStatus.ACTIVE,

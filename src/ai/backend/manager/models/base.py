@@ -597,6 +597,10 @@ class GUID(TypeDecorator, Generic[TUUIDSubType]):
         cls = type(self)
         if isinstance(value, bytes):
             return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+        # Handle asyncpg's UUID type (asyncpg.pgproto.pgproto.UUID) and standard uuid.UUID
+        # Both have a 'bytes' attribute, so we can use it to construct a standard uuid.UUID
+        if hasattr(value, "bytes"):
+            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value.bytes)))
         return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 

@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Any,
     Optional,
     cast,
 )
@@ -491,7 +490,7 @@ async def check_credential_with_migration(
     domain: str,
     email: str,
     target_password_info: PasswordInfo,
-) -> dict[str, Any]:
+) -> sa.RowMapping:
     """
     Check user credentials and optionally migrate password hash if needed.
 
@@ -532,7 +531,7 @@ async def check_credential_with_migration(
     current_hash_info = HashInfo.from_hash_string(row.password)
     if current_hash_info is None:
         # Shouldn't happen since password was just verified
-        return row
+        return row._mapping
 
     if target_password_info.need_migration(current_hash_info):
         # Re-hash the password with the new algorithm using the provided PasswordInfo
@@ -544,7 +543,7 @@ async def check_credential_with_migration(
                 .values(password=target_password_info)
             )
 
-    return row
+    return row._mapping
 
 
 async def check_credential(
@@ -552,7 +551,7 @@ async def check_credential(
     domain: str,
     email: str,
     password: str,
-) -> dict[str, Any]:
+) -> sa.RowMapping:
     """
     Check user credentials without migration (for signout, update password, etc.)
 
@@ -589,4 +588,4 @@ async def check_credential(
     except ValueError:
         raise AuthorizationFailed("User credential mismatch.")
 
-    return row
+    return row._mapping

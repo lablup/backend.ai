@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -243,7 +243,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> dict[str, Any]:
+    ) -> sa.RowMapping:
         """Verify credentials with password migration support."""
         return await check_credential_with_migration(
             db=self._db,
@@ -258,7 +258,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         password: str,
-    ) -> dict[str, Any]:
+    ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
         return await check_credential(
             db=self._db,

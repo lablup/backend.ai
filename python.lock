@@ -3282,13 +3282,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3671a94fd25e62f5f2f554f5e95389c2294d89822378a5f2dd24353e1494a9e0",
-              "url": "https://files.pythonhosted.org/packages/bb/f5/fddaec430367be9d62a7ed125530e133bfd4a1c0350fe221149ee0f2b526/jupyter_client-8.7.0-py3-none-any.whl"
+              "hash": "f93a5b99c5e23a507b773d3a1136bd6e16c67883ccdbd9a829b0bbdb98cd7d7a",
+              "url": "https://files.pythonhosted.org/packages/2d/0b/ceb7694d864abc0a047649aec263878acb9f792e1fec3e676f22dc9015e3/jupyter_client-8.8.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3357212d9cbe01209e59190f67a3a7e1f387a4f4e88d1e0433ad84d7b262531d",
-              "url": "https://files.pythonhosted.org/packages/a6/27/d10de45e8ad4ce872372c4a3a37b7b35b6b064f6f023a5c14ffcced4d59d/jupyter_client-8.7.0.tar.gz"
+              "hash": "d556811419a4f2d96c869af34e854e3f059b7cc2d6d01a9cd9c85c267691be3e",
+              "url": "https://files.pythonhosted.org/packages/05/e4/ba649102a3bc3fbca54e7239fb924fd434c766f855693d86de0b1f2bec81/jupyter_client-8.8.0.tar.gz"
             }
           ],
           "project_name": "jupyter-client",
@@ -3298,8 +3298,10 @@
             "ipykernel; extra == \"docs\"",
             "ipykernel>=6.14; extra == \"test\"",
             "jupyter-core>=5.1",
-            "mypy; extra == \"test\"",
+            "msgpack; extra == \"test\"",
+            "mypy; platform_python_implementation != \"PyPy\" and extra == \"test\"",
             "myst-parser; extra == \"docs\"",
+            "orjson; extra == \"orjson\"",
             "paramiko; sys_platform == \"win32\" and extra == \"test\"",
             "pre-commit; extra == \"test\"",
             "pydata-sphinx-theme; extra == \"docs\"",
@@ -3317,7 +3319,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.10",
-          "version": "8.7.0"
+          "version": "8.8.0"
         },
         {
           "artifacts": [

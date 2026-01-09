@@ -592,7 +592,7 @@ async def query_accessible_vfolders(
             _query = _query.where(extra_vf_user_conds)
         result = await conn.execute(_query)
         for row in result:
-            row_keys = row.keys()
+            row_keys = row._mapping.keys()
             _perm = (
                 row.vfolder_permissions_permission
                 if "vfolder_permissions_permission" in row_keys

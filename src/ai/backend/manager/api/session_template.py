@@ -118,7 +118,8 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
         ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
         query = (
-            sa.select(session_templates, users.c.email, groups.c.name, use_labels=True)
+            sa.select(session_templates, users.c.email, groups.c.name)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (session_templates.c.is_active) & (session_templates.c.type == TemplateType.TASK),

@@ -38,6 +38,14 @@ def _get_artifact_join_cond():
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
+def _get_association_artifacts_storages_join_cond():
+    from ai.backend.manager.models.association_artifacts_storages import (
+        AssociationArtifactsStorageRow,
+    )
+
+    return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
+
+
 class ArtifactRevisionRow(Base):
     __tablename__ = "artifact_revisions"
     __table_args__ = (
@@ -103,8 +111,7 @@ class ArtifactRevisionRow(Base):
         relationship(
             "AssociationArtifactsStorageRow",
             back_populates="artifact_revision_row",
-            primaryjoin=lambda: ArtifactRevisionRow.id
-            == foreign(AssociationArtifactsStorageRow.artifact_revision_id),
+            primaryjoin=_get_association_artifacts_storages_join_cond,
         )
     )
 
