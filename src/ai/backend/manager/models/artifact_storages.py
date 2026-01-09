@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
     GUID,
     Base,
-    IDColumn,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.object_storage import ObjectStorageRow
+    from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -37,19 +42,21 @@ class ArtifactStorageRow(Base):
 
     __tablename__ = "artifact_storages"
 
-    id = IDColumn("id")
-    name = sa.Column("name", sa.String, nullable=False, unique=True)
-    storage_id = sa.Column("storage_id", GUID, nullable=False, unique=True)
-    type = sa.Column("type", sa.String, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String, nullable=False, unique=True)
+    storage_id: Mapped[uuid.UUID] = mapped_column("storage_id", GUID, nullable=False, unique=True)
+    type: Mapped[str] = mapped_column("type", sa.String, nullable=False)
 
-    object_storages = relationship(
+    object_storages: Mapped[ObjectStorageRow | None] = relationship(
         "ObjectStorageRow",
         back_populates="meta",
         primaryjoin=_get_object_storage_join_condition,
         uselist=False,
         viewonly=True,
     )
-    vfs_storages = relationship(
+    vfs_storages: Mapped[VFSStorageRow | None] = relationship(
         "VFSStorageRow",
         back_populates="meta",
         primaryjoin=_get_vfs_storage_join_condition,
