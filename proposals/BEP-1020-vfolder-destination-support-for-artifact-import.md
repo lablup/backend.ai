@@ -161,13 +161,6 @@ class StorageTarget:
     def __init__(self, value: str | AbstractStorage) -> None:
         self._value = value
 
-    @property
-    def name(self) -> str:
-        """Get the storage name from this mapping."""
-        if isinstance(self._value, str):
-            return self._value
-        return getattr(self._value, "name", str(id(self._value)))
-
     def resolve(self, storage_pool: AbstractStoragePool) -> AbstractStorage:
         """Resolve this mapping to an AbstractStorage instance."""
         if isinstance(self._value, AbstractStorage):
