@@ -46,7 +46,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=44.0.2",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py~=0.4.1",
+//     "etcd-client-py~=0.5.0",
 //     "faker~=24.7.1",
 //     "graphene-federation~=3.2.0",
 //     "graphene~=3.3.0",
@@ -103,7 +103,7 @@
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
-//     "testcontainers[minio,postgres,redis]~=4.8.1",
+//     "testcontainers[minio,postgres,redis]~=4.13.3",
 //     "textual~=0.79.1",
 //     "tomli-w~=1.2.0",
 //     "tomli~=2.0.1",
@@ -2063,29 +2063,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e10e972639606206892aef94953fb023e4bb1a4fa68143396e49f4d0da31a13a",
-              "url": "https://files.pythonhosted.org/packages/46/32/6b0a21ddd58c6da6dd1c2fedd9c23fa717cc0ca204a6ca5329c8123374b9/etcd_client_py-0.4.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "1328083489288f4f7d0a14055eb34bac0cd8fe295d273da8ef47e0c04866bc87",
+              "url": "https://files.pythonhosted.org/packages/80/d4/203ea9adedf26456adcd0d55fa2e0e8250aa7641897564d9b98d34df22a1/etcd_client_py-0.5.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "26845fbf2bbdee9283df60f58938e8f8ea111e3cce4bb9737154ccd526a01813",
-              "url": "https://files.pythonhosted.org/packages/25/3c/ec281bc41637d163471f491dc04367799cf6e75e86526ff486b8a997d44c/etcd_client_py-0.4.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+              "hash": "b42f87c47414383666e1e600adea9e595bf822061fa256c6f08e8a640acb93fa",
+              "url": "https://files.pythonhosted.org/packages/0c/2d/c85d45f3d197145320bc1305723766338e7d332fb79f635a7a562d23d8c9/etcd_client_py-0.5.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3909bd4857274e2ffa37aabc6d4a7e49dc2f903ef657dbf141555887b707129e",
-              "url": "https://files.pythonhosted.org/packages/c7/75/4034fbbdcb9b670e7add878a208484b9aceafea7dc55c4964fd5e0eb67a1/etcd_client_py-0.4.1.tar.gz"
+              "hash": "9a09538497fa73045e522cd214556b0a5a6a22cc2e3e16b81b6cdac42b62a93f",
+              "url": "https://files.pythonhosted.org/packages/b9/d7/50a668fc498c807bab8667a3bcba9588fc1d0abd8426cd33a4d3d7e3a8f5/etcd_client_py-0.5.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "cdbf59cc758692595ae2f4a592bf75108ddb5d61fa7a5440ba089bbbe766dbe9",
-              "url": "https://files.pythonhosted.org/packages/fa/91/c67993ae03b54db1f4f308a7cabdf765371a2cbdc2b7e94fa3ea28065c37/etcd_client_py-0.4.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "905dd5c3c5d4544a37b58e5209b3a89787ebc9097c737eeb03fa5fb7f32a228f",
+              "url": "https://files.pythonhosted.org/packages/cd/9f/84fd47b74353adf1f7915585f3de82a9e762d52bbcb5699eda918ef830e6/etcd_client_py-0.5.0-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
             }
           ],
           "project_name": "etcd-client-py",
-          "requires_dists": [],
+          "requires_dists": [
+            "maturin>=1.11.2",
+            "mypy>=1.19.1; extra == \"dev\"",
+            "pytest-asyncio<2,>=1.3.0",
+            "pytest<10,>=9.0.2",
+            "ruff>=0.14.10; extra == \"dev\"",
+            "testcontainers<5,>=4.13.3",
+            "trafaret<3,>=2.1"
+          ],
           "requires_python": ">=3.10",
-          "version": "0.4.1"
+          "version": "0.5.0"
         },
         {
           "artifacts": [
@@ -3697,6 +3705,73 @@
           ],
           "requires_python": null,
           "version": "1.5.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "50f6c668c1d5d4d4dc1c3ffec7b4270dab493e5b2368f8e4213f4bcde6a50eea",
+              "url": "https://files.pythonhosted.org/packages/cf/8f/be14395c6e23b19ddaa0c171e68915bdcd1ef61ad1f411739c6721196903/maturin-1.11.5-py3-none-manylinux_2_31_riscv64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2079447967819b5cf615e5b5b99a406d662effdc8d6afd493dcd253c6afc3707",
+              "url": "https://files.pythonhosted.org/packages/2e/da/7118de648182971d723ea99d79c55007f96cdafc95f5322cc1ad15f6683e/maturin-1.11.5-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "ffe7418834ff3b4a6c987187b7abb85ba033f4733e089d77d84e2de87057b4e7",
+              "url": "https://files.pythonhosted.org/packages/58/e0/c8fa042daf0608cc2e9a59b6df3a9e287bfc7f229136f17727f4118bac2d/maturin-1.11.5-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2a4e872fb78e77748217084ffeb59de565d08a86ccefdace054520aaa7b66db4",
+              "url": "https://files.pythonhosted.org/packages/76/17/654a59c66287e287373f2a0086e4fc8a23f0545a81c2bd6e324db26a5801/maturin-1.11.5-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.musllinux_1_1_ppc64le.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8127d2cd25950bacbcdc8a2ec6daab1d4d27200f7d73964392680ad64d27f7f0",
+              "url": "https://files.pythonhosted.org/packages/8a/12/cc341f6abbf9005f90935a4ee5dc7b30e2df7d1bb90b96d48b756b2c0ee7/maturin-1.11.5-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.musllinux_1_1_armv7l.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "1c27a2eb47821edf26c75d100b3150b52dca2c1a5f074d7514af06f7a7acb9d5",
+              "url": "https://files.pythonhosted.org/packages/90/a1/5ad62913271724035a7e4bcf796d7c95b4119317ae5f8cb034844aa99bc4/maturin-1.11.5-py3-none-macosx_10_12_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "c739b243d012386902f112ea63a54a94848932b70ae3565fa5e121fd1c0200e0",
+              "url": "https://files.pythonhosted.org/packages/99/af/9d3edc8375efc8d435d5f24794bc4de234d4e743447592da970d53b31361/maturin-1.11.5-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "7579cf47640fb9595a19fe83a742cbf63203f0343055c349c1cab39045a30c29",
+              "url": "https://files.pythonhosted.org/packages/a4/84/bfed8cc10e2d8b6656cf0f0ca6609218e6fcb45a62929f5094e1063570f7/maturin-1.11.5.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2a596eab137cb3e169b97e89a739515abfa7a8755e2e5f0fc91432ef446f74f4",
+              "url": "https://files.pythonhosted.org/packages/c5/03/abf1826d8aebc0d47ef6d21bdd752d98d63ac4372ad2b115db9cd5176229/maturin-1.11.5-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f1320dacddcd3aa84a4bdfc77ee6fdb60e4c3835c853d7eb79c09473628b0498",
+              "url": "https://files.pythonhosted.org/packages/c6/66/997974b44f8d3de641281ec04fbf5b6ca821bdc8291a2fa73305978db74d/maturin-1.11.5-py3-none-manylinux_2_12_i686.manylinux2010_i686.musllinux_1_1_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "edd1d4d35050ea2b9ef42aa01e87fe019a1e822940346b35ccb973e0aa8f6d82",
+              "url": "https://files.pythonhosted.org/packages/d2/6c/3443d2f8c6d4eae5fc7479cd4053542aff4c1a8566d0019d0612d241b15a/maturin-1.11.5-py3-none-linux_armv6l.whl"
+            }
+          ],
+          "project_name": "maturin",
+          "requires_dists": [
+            "patchelf; extra == \"patchelf\"",
+            "tomli>=1.1.0; python_full_version < \"3.11\"",
+            "ziglang<0.13.0,>=0.10.0; extra == \"zig\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "1.11.5"
         },
         {
           "artifacts": [
@@ -6435,13 +6510,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9e19af077cd96e1957c13ee466f1f32905bc6c5bc1bc98643eb18be1a989bfb0",
-              "url": "https://files.pythonhosted.org/packages/80/77/5ac0dff2903a033d83d971fd85957356abdb66a327f3589df2b3d1a586b4/testcontainers-4.8.2-py3-none-any.whl"
+              "hash": "063278c4805ffa6dd85e56648a9da3036939e6c0ac1001e851c9276b19b05970",
+              "url": "https://files.pythonhosted.org/packages/73/27/c2f24b19dafa197c514abe70eda69bc031c5152c6b1f1e5b20099e2ceedd/testcontainers-4.13.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dd4a6a2ea09e3c3ecd39e180b6548105929d0bb78d665ce9919cb3f8c98f9853",
-              "url": "https://files.pythonhosted.org/packages/1f/72/c58d84f5704c6caadd9f803a3adad5ab54ac65328c02d13295f40860cf33/testcontainers-4.8.2.tar.gz"
+              "hash": "9d82a7052c9a53c58b69e1dc31da8e7a715e8b3ec1c4df5027561b47e2efe646",
+              "url": "https://files.pythonhosted.org/packages/fc/b3/c272537f3ea2f312555efeb86398cc382cd07b740d5f3c730918c36e64e1/testcontainers-4.13.3.tar.gz"
             }
           ],
           "project_name": "testcontainers",
@@ -6451,29 +6526,30 @@
             "bcrypt; extra == \"registry\"",
             "boto3; extra == \"aws\" or extra == \"localstack\"",
             "cassandra-driver==3.29.1; extra == \"scylla\"",
-            "chromadb-client; extra == \"chroma\"",
-            "clickhouse-driver; extra == \"clickhouse\"",
+            "chromadb-client<2.0.0,>=1.0.0; extra == \"chroma\"",
             "cryptography; extra == \"mailpit\" or extra == \"sftp\"",
             "docker",
             "google-cloud-datastore>=2; extra == \"google\"",
             "google-cloud-pubsub>=2; extra == \"google\"",
             "httpx; extra == \"aws\" or extra == \"generic\" or extra == \"test-module-import\"",
-            "ibm_db_sa; extra == \"db2\"",
+            "ibm_db_sa; (platform_machine != \"aarch64\" and platform_machine != \"arm64\") and extra == \"db2\"",
             "influxdb-client; extra == \"influxdb\"",
             "influxdb; extra == \"influxdb\"",
             "kubernetes; extra == \"k3s\"",
             "minio; extra == \"minio\"",
             "nats-py; extra == \"nats\"",
             "neo4j; extra == \"neo4j\"",
-            "opensearch-py; extra == \"opensearch\"",
-            "oracledb; extra == \"oracle\" or extra == \"oracle-free\"",
+            "openfga-sdk; python_version >= \"3.10\" and extra == \"openfga\"",
+            "opensearch-py; python_version < \"4.0\" and extra == \"opensearch\"",
+            "oracledb>=3.4.1; extra == \"oracle\" or extra == \"oracle-free\"",
             "pika; extra == \"rabbitmq\"",
             "pymongo; extra == \"mongodb\"",
-            "pymssql; extra == \"mssql\"",
+            "pymssql>=2.3.9; (platform_machine != \"arm64\" or python_version >= \"3.10\") and extra == \"mssql\"",
             "pymysql[rsa]; extra == \"mysql\"",
             "python-arango<8.0,>=7.8; extra == \"arangodb\"",
+            "python-dotenv",
             "python-keycloak; extra == \"keycloak\"",
-            "pyyaml; extra == \"k3s\"",
+            "pyyaml>=6.0.3; extra == \"k3s\"",
             "qdrant-client; extra == \"qdrant\"",
             "redis; extra == \"generic\" or extra == \"redis\"",
             "selenium; extra == \"selenium\"",
@@ -6484,8 +6560,8 @@
             "weaviate-client<5.0.0,>=4.5.4; extra == \"weaviate\"",
             "wrapt"
           ],
-          "requires_python": "<4.0,>=3.9",
-          "version": "4.8.2"
+          "requires_python": ">=3.9.2",
+          "version": "4.13.3"
         },
         {
           "artifacts": [
@@ -7717,7 +7793,7 @@
     "coloredlogs~=15.0",
     "cryptography>=44.0.2",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py~=0.4.1",
+    "etcd-client-py~=0.5.0",
     "faker~=24.7.1",
     "graphene-federation~=3.2.0",
     "graphene~=3.3.0",
@@ -7774,7 +7850,7 @@
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",
-    "testcontainers[minio,postgres,redis]~=4.8.1",
+    "testcontainers[minio,postgres,redis]~=4.13.3",
     "textual~=0.79.1",
     "tomli-w~=1.2.0",
     "tomli~=2.0.1",
