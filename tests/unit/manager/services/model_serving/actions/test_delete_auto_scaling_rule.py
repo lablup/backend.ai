@@ -20,7 +20,7 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_check_requester_access_delete(mocker, auto_scaling_service):
+def mock_check_requester_access_delete_rule(mocker, auto_scaling_service):
     mock = mocker.patch.object(
         auto_scaling_service,
         "check_requester_access",
@@ -31,7 +31,7 @@ def mock_check_requester_access_delete(mocker, auto_scaling_service):
 
 
 @pytest.fixture
-def mock_get_auto_scaling_rule_by_id_delete(mocker, mock_repositories):
+def mock_get_auto_scaling_rule_by_id_delete_rule(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
         "get_auto_scaling_rule_by_id",
@@ -40,7 +40,7 @@ def mock_get_auto_scaling_rule_by_id_delete(mocker, mock_repositories):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_delete(mocker, mock_repositories):
+def mock_get_endpoint_by_id_delete_rule(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
         "get_endpoint_by_id",
@@ -113,9 +113,9 @@ class TestDeleteAutoScalingRule:
             DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_requester_access_delete,
-        mock_get_auto_scaling_rule_by_id_delete,
-        mock_get_endpoint_by_id_delete,
+        mock_check_requester_access_delete_rule,
+        mock_get_auto_scaling_rule_by_id_delete_rule,
+        mock_get_endpoint_by_id_delete_rule,
         mock_delete_auto_scaling_rule,
     ):
         action = scenario.input
@@ -127,7 +127,7 @@ class TestDeleteAutoScalingRule:
                 enabled=True,
                 endpoint=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             )
-            mock_get_auto_scaling_rule_by_id_delete.return_value = mock_rule
+            mock_get_auto_scaling_rule_by_id_delete_rule.return_value = mock_rule
 
             mock_endpoint = MagicMock(
                 id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
@@ -135,11 +135,11 @@ class TestDeleteAutoScalingRule:
                 session_owner_role=action.requester_ctx.user_role,
                 domain=action.requester_ctx.domain_name,
             )
-            mock_get_endpoint_by_id_delete.return_value = mock_endpoint
+            mock_get_endpoint_by_id_delete_rule.return_value = mock_endpoint
             mock_delete_auto_scaling_rule.return_value = True
 
         elif scenario.description == "Rule not found":
-            mock_get_auto_scaling_rule_by_id_delete.return_value = None
+            mock_get_auto_scaling_rule_by_id_delete_rule.return_value = None
             mock_delete_auto_scaling_rule.return_value = False
 
         async def delete_auto_scaling_rule(action: DeleteEndpointAutoScalingRuleAction):
