@@ -310,3 +310,9 @@ class DeploymentOrders:
         if ascending:
             return EndpointRow.created_at.asc()
         return EndpointRow.created_at.desc()
+
+    @staticmethod
+    def updated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.updated_at.asc()
+        return EndpointRow.updated_at.desc()

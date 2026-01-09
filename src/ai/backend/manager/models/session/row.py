@@ -23,19 +23,23 @@ from uuid import UUID
 import aiotools
 import redis.exceptions
 import sqlalchemy as sa
+import yarl
 from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
+    Mapped,
     contains_eager,
     foreign,
     joinedload,
     load_only,
+    mapped_column,
     noload,
     relationship,
     selectinload,
 )
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
@@ -103,9 +107,8 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumType,
-    ForeignKeyIDColumn,
     ResourceSlotColumn,
-    SessionIDColumn,
+    SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
@@ -142,6 +145,10 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.scaling_group import ScalingGroupRow
+    from ai.backend.manager.models.user import UserRow
     from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -551,8 +558,9 @@ async def _match_sessions_by_id(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-) -> list[SessionRow]:
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+) -> Sequence[SessionRow]:
+    cond: sa.sql.elements.ColumnElement[bool]
     if isinstance(session_id_or_list, list):
         cond = SessionRow.id.in_(session_id_or_list)
     else:
@@ -582,8 +590,9 @@ async def _match_sessions_by_name(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-) -> list[SessionRow]:
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+) -> Sequence[SessionRow]:
+    cond: sa.sql.elements.ColumnElement[bool]
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
     else:
@@ -667,10 +676,14 @@ def _get_user_row_join_condition():
 
 class SessionRow(Base):
     __tablename__ = "sessions"
-    id = SessionIDColumn()
-    creation_id = sa.Column("creation_id", sa.String(length=32), unique=False, index=False)
-    name = sa.Column("name", sa.String(length=64), unique=False, index=True)
-    session_type = sa.Column(
+    id: Mapped[SessionId] = mapped_column(
+        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    creation_id: Mapped[str | None] = mapped_column(
+        "creation_id", sa.String(length=32), unique=False, index=False
+    )
+    name: Mapped[str | None] = mapped_column("name", sa.String(length=64), unique=False, index=True)
+    session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),
         index=True,
@@ -678,7 +691,7 @@ class SessionRow(Base):
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
     )
-    priority = sa.Column(
+    priority: Mapped[int] = mapped_column(
         "priority",
         sa.Integer(),
         nullable=False,
@@ -686,48 +699,56 @@ class SessionRow(Base):
         index=True,
     )
 
-    cluster_mode = sa.Column(
+    cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
     )
-    cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
-    agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
-    designated_agent_ids = sa.Column("designated_agent_ids", sa.ARRAY(sa.String), nullable=True)
-    kernels = relationship("KernelRow", back_populates="session")
+    cluster_size: Mapped[int] = mapped_column("cluster_size", sa.Integer, nullable=False, default=1)
+    agent_ids: Mapped[list[str] | None] = mapped_column(
+        "agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    designated_agent_ids: Mapped[list[str] | None] = mapped_column(
+        "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
-    scaling_group_name = sa.Column(
+    scaling_group_name: Mapped[str | None] = mapped_column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
     )
-    scaling_group = relationship("ScalingGroupRow", back_populates="sessions")
-    target_sgroup_names = sa.Column(
+    scaling_group: Mapped[ScalingGroupRow | None] = relationship(
+        "ScalingGroupRow", back_populates="sessions"
+    )
+    target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
         default="{}",
         server_default="{}",
         nullable=True,
     )
-    domain_name = sa.Column(
+    domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    domain = relationship("DomainRow", back_populates="sessions")
-    group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
-    group = relationship("GroupRow", back_populates="sessions")
-    user_uuid = sa.Column(
+    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="sessions")
+    group_id: Mapped[UUID] = mapped_column(
+        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    )
+    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
+    user_uuid: Mapped[UUID] = mapped_column(
         "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
-    user = relationship(
+    user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="sessions",
         foreign_keys=[user_uuid],
     )
 
-    access_key = sa.Column("access_key", sa.String(length=20))
-    access_key_row = relationship(
+    access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
+    access_key_row: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
         primaryjoin=_get_keypair_row_join_condition,
         back_populates="sessions",
@@ -735,34 +756,46 @@ class SessionRow(Base):
     )
 
     # `image` column is identical to kernels `image` column.
-    images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
-    tag = sa.Column("tag", sa.String(length=64), nullable=True)
+    images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
+    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
-    # occupied_slots = sa.Column('occupied_slots', ResourceSlotColumn(), nullable=False)
-    occupying_slots = sa.Column("occupying_slots", ResourceSlotColumn(), nullable=False)
-    requested_slots = sa.Column("requested_slots", ResourceSlotColumn(), nullable=False)
-    vfolder_mounts = sa.Column(
+    # occupied_slots = mapped_column('occupied_slots', ResourceSlotColumn(), nullable=False)
+    occupying_slots: Mapped[ResourceSlot] = mapped_column(
+        "occupying_slots", ResourceSlotColumn(), nullable=False
+    )
+    requested_slots: Mapped[ResourceSlot] = mapped_column(
+        "requested_slots", ResourceSlotColumn(), nullable=False
+    )
+    vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
-    environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
-    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
-    use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
+    environ: Mapped[dict[str, Any] | None] = mapped_column(
+        "environ", pgsql.JSONB(), nullable=True, default={}
+    )
+    bootstrap_script: Mapped[str | None] = mapped_column(
+        "bootstrap_script", sa.String(length=16 * 1024), nullable=True
+    )
+    use_host_network: Mapped[bool] = mapped_column(
+        "use_host_network", sa.Boolean(), default=False, nullable=False
+    )
 
     # Lifecycle
     # Deprecated: Not used anymore
-    timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
-    batch_timeout = sa.Column(
+    timeout: Mapped[int | None] = mapped_column("timeout", sa.BigInteger(), nullable=True)
+    batch_timeout: Mapped[int | None] = mapped_column(
         "batch_timeout", sa.BigInteger(), nullable=True
     )  # Used to set timeout of batch sessions
-    created_at = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
     )
-    terminated_at = sa.Column(
+    terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
-    starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
-    status = sa.Column(
+    starts_at: Mapped[datetime | None] = mapped_column(
+        "starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
+    status: Mapped[SessionStatus] = mapped_column(
         "status",
         StrEnumType(SessionStatus),
         default=SessionStatus.PENDING,
@@ -770,9 +803,13 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
+    status_info: Mapped[str | None] = mapped_column(
+        "status_info", sa.Unicode(), nullable=True, default=sa.null()
+    )
 
-    status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_data: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_data", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
     # {
@@ -808,11 +845,15 @@ class SessionRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    status_history: Mapped[dict[str, Any] | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    callback_url: Mapped[yarl.URL | None] = mapped_column(
+        "callback_url", URLColumn, nullable=True, default=sa.null()
+    )
 
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
-    result = sa.Column(
+    startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
+    result: Mapped[SessionResult] = mapped_column(
         "result",
         EnumType(SessionResult),
         default=SessionResult.UNDEFINED,
@@ -822,18 +863,24 @@ class SessionRow(Base):
     )
 
     # Resource metrics measured upon termination
-    num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
-    last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
+    num_queries: Mapped[int | None] = mapped_column("num_queries", sa.BigInteger(), default=0)
+    last_stat: Mapped[dict[str, Any] | None] = mapped_column(
+        "last_stat", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
 
-    network_type = sa.Column("network_type", StrEnumType(NetworkType), nullable=True)
+    network_type: Mapped[NetworkType | None] = mapped_column(
+        "network_type", StrEnumType(NetworkType), nullable=True
+    )
     """Setting this column to null means this session does not utilize inter-container networking feature"""
-    network_id = sa.Column("network_id", sa.String(length=128), nullable=True)
+    network_id: Mapped[str | None] = mapped_column(
+        "network_id", sa.String(length=128), nullable=True
+    )
     """
     Depending on the network_type, this column may contain a network ID or other information.
     Use `get_network_ref()` method to reveal actual network ref (generated by network plugin).
     """
 
-    routing = relationship("RoutingRow", back_populates="session_row")
+    routing: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="session_row")
 
     __table_args__ = (
         # indexing
@@ -858,15 +905,15 @@ class SessionRow(Base):
     )
 
     @classmethod
-    def kernel_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def kernel_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return selectinload(cls.kernels) if not already_joined else contains_eager(cls.kernels)
 
     @classmethod
-    def user_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def user_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.user) if not already_joined else contains_eager(cls.user)
 
     @classmethod
-    def project_load_option(cls, already_joined: bool = False) -> sa.orm.Load:
+    def project_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return joinedload(cls.group) if not already_joined else contains_eager(cls.group)
 
     @classmethod
@@ -915,7 +962,7 @@ class SessionRow(Base):
             terminated_at=session_data.terminated_at,
             starts_at=session_data.starts_at,
         )
-        instance.id = session_data.id
+        instance.id = SessionId(session_data.id)
         return instance
 
     def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
@@ -925,7 +972,7 @@ class SessionRow(Base):
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
-            cluster_mode=self.cluster_mode,
+            cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
             scaling_group_name=self.scaling_group_name,
@@ -933,32 +980,36 @@ class SessionRow(Base):
             domain_name=self.domain_name,
             group_id=self.group_id,
             user_uuid=self.user_uuid,
-            access_key=self.access_key,
+            access_key=AccessKey(self.access_key) if self.access_key else None,
             images=self.images,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
             requested_slots=self.requested_slots,
-            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts],
+            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
+            if self.vfolder_mounts
+            else None,
             environ=self.environ,
             bootstrap_script=self.bootstrap_script,
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(tzutc()),
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,
             status_info=self.status_info,
             status_data=self.status_data,
             status_history=self.status_history,
-            callback_url=self.callback_url,
+            callback_url=str(self.callback_url) if self.callback_url else None,
             startup_command=self.startup_command,
             result=self.result,
-            num_queries=self.num_queries,
+            num_queries=self.num_queries or 0,
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            service_ports=self.main_kernel.service_ports,
+            service_ports=str(self.main_kernel.service_ports)
+            if self.main_kernel.service_ports
+            else None,
             owner=owner if owner is not None else None,
         )
 
@@ -1010,17 +1061,17 @@ class SessionRow(Base):
         return SessionInfo(
             identity=SessionIdentity(
                 id=self.id,
-                creation_id=self.creation_id,
-                name=self.name,
+                creation_id=self.creation_id or "",
+                name=self.name or "",
                 session_type=self.session_type,
                 priority=self.priority,
             ),
             metadata=SessionMetadata(
-                name=self.name,
+                name=self.name or "",
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 user_uuid=self.user_uuid,
-                access_key=self.access_key,
+                access_key=self.access_key or "",
                 session_type=self.session_type,
                 priority=self.priority,
                 created_at=self.created_at,
@@ -1040,14 +1091,16 @@ class SessionRow(Base):
                 tag=self.tag,
             ),
             mounts=MountSpec(
-                vfolder_mounts=self.vfolder_mounts,
+                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts]
+                if self.vfolder_mounts
+                else None,
             ),
             execution=SessionExecution(
                 environ=self.environ,
                 bootstrap_script=self.bootstrap_script,
                 startup_command=self.startup_command,
                 use_host_network=self.use_host_network,
-                callback_url=self.callback_url,
+                callback_url=str(self.callback_url) if self.callback_url else None,
             ),
             lifecycle=SessionLifecycle(
                 status=self.status,
@@ -1062,7 +1115,7 @@ class SessionRow(Base):
                 status_history=self.status_history,
             ),
             metrics=SessionMetrics(
-                num_queries=self.num_queries,
+                num_queries=self.num_queries or 0,
                 last_stat=self.last_stat,
             ),
             network=SessionNetwork(
@@ -1074,6 +1127,8 @@ class SessionRow(Base):
     @property
     def vfolders_sorted_by_id(self) -> list[VFolderMount]:
         # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
+        if self.vfolder_mounts is None:
+            return []
         return sorted(self.vfolder_mounts, key=lambda row: row.vfid.folder_id)
 
     @property
@@ -1129,7 +1184,7 @@ class SessionRow(Base):
     @classmethod
     async def get_session_id_by_kernel(
         cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
-    ) -> SessionId:
+    ) -> SessionId | None:
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
             return await db_session.scalar(query)
@@ -1148,7 +1203,7 @@ class SessionRow(Base):
                 joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
             )
         stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
-        return (await db_session.scalars(stmt)).all()
+        return list((await db_session.scalars(stmt)).all())
 
     @classmethod
     async def get_session_to_determine_status(
@@ -1201,7 +1256,7 @@ class SessionRow(Base):
             stmt = option(stmt)
 
         async def fetch(db_session: SASession) -> list[SessionRow]:
-            return (await db_session.scalars(stmt)).all()
+            return list((await db_session.scalars(stmt)).all())
 
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
@@ -1221,11 +1276,15 @@ class SessionRow(Base):
             self.terminated_at = now
         self.status = status
         self.status_history = {
-            **self.status_history,
+            **(self.status_history or {}),
             status.name: now.isoformat(),
         }
         if status_data is not None:
-            self.status_data = status_data
+            if not isinstance(status_data, Mapping):
+                # It's a JSONCoalesceExpr, cannot assign directly to ORM attribute
+                pass
+            else:
+                self.status_data = dict(status_data)
 
         _status_info: str | None = None
         if status_info is None:
@@ -1260,10 +1319,10 @@ class SessionRow(Base):
             now = datetime.now(tzutc())
         else:
             now = status_changed_at
-        data = {
+        data: dict[str, Any] = {
             "status": status,
             "status_history": sql_json_merge(
-                SessionRow.status_history,
+                SessionRow.__table__.c.status_history,
                 (),
                 {
                     status.name: datetime.now(tzutc()).isoformat(),
@@ -1372,7 +1431,7 @@ class SessionRow(Base):
             )
             if not rows:
                 continue
-            return rows
+            return list(rows)
         return []
 
     @classmethod
@@ -1543,7 +1602,7 @@ class SessionRow(Base):
             )
         )
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def get_network_ref(self, db_sess: SASession) -> str | None:
         if not self.network_id or not self.network_type:
@@ -1692,14 +1751,15 @@ class SessionLifecycleManager:
             case SessionStatus.PREPARED:
                 await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
+                creation_id = session_row.creation_id or ""
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
-                    session_row.creation_id,
+                    creation_id,
                 )
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
-                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
+                    SessionStartedAnycastEvent(session_row.id, creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1727,13 +1787,10 @@ class SessionLifecycleManager:
                         query = sa.delete(RoutingRow).where(RoutingRow.session == session_row.id)
                         await db_sess.execute(query)
                         await db_sess.commit()
+                status_info = session_row.main_kernel.status_info or ""
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionTerminatedAnycastEvent(
-                        session_row.id, session_row.main_kernel.status_info
-                    ),
-                    SessionTerminatedBroadcastEvent(
-                        session_row.id, session_row.main_kernel.status_info
-                    ),
+                    SessionTerminatedAnycastEvent(session_row.id, status_info),
+                    SessionTerminatedBroadcastEvent(session_row.id, status_info),
                 )
             case _:
                 pass
@@ -1835,14 +1892,14 @@ class SessionLifecycleManager:
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
-    session_id = sa.Column(
+    session_id: Mapped[UUID] = mapped_column(
         "session_id",
         GUID,
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    depends_on = sa.Column(
+    depends_on: Mapped[UUID] = mapped_column(
         "depends_on",
         GUID,
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),

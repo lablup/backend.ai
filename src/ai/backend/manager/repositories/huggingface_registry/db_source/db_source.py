@@ -40,7 +40,7 @@ class HuggingFaceDBSource:
                 .where(HuggingFaceRegistryRow.id == registry_id)
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
@@ -56,9 +56,13 @@ class HuggingFaceDBSource:
                     )
                 )
             )
-            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
+            if row.huggingface_registries is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry not found for registry {name}"
+                )
             return row.huggingface_registries.to_dataclass()
 
     async def get_registry_data_by_artifact_id(
@@ -74,9 +78,13 @@ class HuggingFaceDBSource:
                     ),
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
+            if row.huggingface_registry is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry not found for artifact {artifact_id}"
+                )
             return row.huggingface_registry.to_dataclass()
 
     async def create(
@@ -153,6 +161,10 @@ class HuggingFaceDBSource:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+            if deleted_id is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry with ID {registry_id} not found"
+                )
 
             delete_meta_query = sa.delete(ArtifactRegistryRow).where(
                 ArtifactRegistryRow.id == registry_id
@@ -172,7 +184,7 @@ class HuggingFaceDBSource:
                 .where(HuggingFaceRegistryRow.id.in_(registry_ids))
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
-            rows: list[HuggingFaceRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
@@ -184,7 +196,7 @@ class HuggingFaceDBSource:
                 selectinload(HuggingFaceRegistryRow.meta)
             )
             result = await db_session.execute(query)
-            rows: list[HuggingFaceRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def search_registries(

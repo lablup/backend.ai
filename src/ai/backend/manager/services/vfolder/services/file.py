@@ -55,6 +55,8 @@ class VFolderFileService:
     ) -> CreateUploadSessionActionResult:
         # Get VFolder data using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -103,6 +105,8 @@ class VFolderFileService:
     ) -> CreateDownloadSessionActionResult:
         # Get VFolder data using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -151,6 +155,8 @@ class VFolderFileService:
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         # Get user info and check VFolder access using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -189,6 +195,8 @@ class VFolderFileService:
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
         # Get VFolder data using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -230,6 +238,8 @@ class VFolderFileService:
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
         # Get user info and check VFolder access using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -261,6 +271,8 @@ class VFolderFileService:
     ) -> DeleteFilesAsyncActionResult:
         # Get user info and check VFolder access using repository
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -300,6 +312,8 @@ class VFolderFileService:
 
         # Get VFolder data using repository
         user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )

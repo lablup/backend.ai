@@ -43,9 +43,13 @@ def sort_requested_slots_by_priority(
 
 
 def get_requested_architecture(sess_ctx: SessionRow) -> str:
-    requested_architectures = {k.architecture for k in sess_ctx.kernels}
+    requested_architectures = {
+        k.architecture for k in sess_ctx.kernels if k.architecture is not None
+    }
     if len(requested_architectures) > 1:
         raise GenericBadRequest(
             "Cannot assign multiple kernels with different architectures' single node session",
         )
+    if not requested_architectures:
+        raise GenericBadRequest("No architecture specified in session kernels")
     return requested_architectures.pop()

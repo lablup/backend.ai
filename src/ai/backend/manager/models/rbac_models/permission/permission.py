@@ -4,7 +4,7 @@ import uuid
 from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import (
@@ -14,7 +14,6 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
@@ -34,16 +33,20 @@ class PermissionRow(Base):
     __tablename__ = "permissions"
     __table_args__ = (sa.Index("ix_id_permission_group_id", "id", "permission_group_id"),)
 
-    id: uuid.UUID = IDColumn()
-    permission_group_id: uuid.UUID = sa.Column("permission_group_id", GUID, nullable=False)
-    entity_type: EntityType = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission_group_id: Mapped[uuid.UUID] = mapped_column(
+        "permission_group_id", GUID, nullable=False
+    )
+    entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
     )
-    operation: OperationType = sa.Column(
+    operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
 
-    permission_group_row: PermissionGroupRow | None = relationship(
+    permission_group_row: Mapped[PermissionGroupRow | None] = relationship(
         "PermissionGroupRow",
         back_populates="permission_rows",
         primaryjoin=_get_permission_group_join_condition,

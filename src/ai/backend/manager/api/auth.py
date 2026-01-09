@@ -443,7 +443,8 @@ async def _query_cred_by_access_key(
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypairs, keypair_resource_policies], use_labels=True)
+            sa.select(keypairs, keypair_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
@@ -464,7 +465,8 @@ async def _query_cred_by_access_key(
             users.c.uuid == keypairs.c.user,
         )
         query = (
-            sa.select([users, user_resource_policies], use_labels=True)
+            sa.select(users, user_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(keypairs.c.access_key == access_key)
         )
@@ -488,31 +490,35 @@ def _populate_auth_result(
     if not user_row or not keypair_row:
         return
 
+    keypair_mapping = keypair_row._mapping
+    user_mapping = user_row._mapping
+
     auth_result = {
         "is_authorized": True,
         "keypair": {
-            col.name: keypair_row[f"keypairs_{col.name}"]
+            col.name: keypair_mapping[f"keypairs_{col.name}"]
             for col in keypairs.c
             if col.name != "secret_key"
         },
         "user": {
-            col.name: user_row[f"users_{col.name}"]
+            col.name: user_mapping[f"users_{col.name}"]
             for col in users.c
             if col.name not in ("password", "description", "created_at")
         },
-        "is_admin": keypair_row["keypairs_is_admin"],
+        "is_admin": keypair_mapping["keypairs_is_admin"],
     }
 
     validate_ip(request, auth_result["user"])
 
     auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_row[f"keypair_resource_policies_{col.name}"]
+        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
         for col in keypair_resource_policies.c
     }
     auth_result["user"]["resource_policy"] = {
-        col.name: user_row[f"user_resource_policies_{col.name}"] for col in user_resource_policies.c
+        col.name: user_mapping[f"user_resource_policies_{col.name}"]
+        for col in user_resource_policies.c
     }
-    auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
+    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
     auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
 
     # Populate the result to the per-request state dict
@@ -560,7 +566,7 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in database")
 
         # 3. Validate JWT token using user's secret key
-        secret_key = keypair_row["keypairs_secret_key"]
+        secret_key = keypair_row.keypairs_secret_key
         root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
 
         # 4. Populate authentication result
@@ -613,7 +619,7 @@ async def _authenticate_via_hmac(
         raise AuthorizationFailed("Access key not found in HMAC")
 
     # 4. Verify HMAC signature
-    my_signature = await sign_request(sign_method, request, keypair_row["keypairs_secret_key"])
+    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")

@@ -83,7 +83,7 @@ class Routing(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from()
+        query = sa.select(sa.func.count()).select_from()
         if endpoint_id is not None:
             query = query.where(RoutingRow.endpoint == endpoint_id)
         if project:

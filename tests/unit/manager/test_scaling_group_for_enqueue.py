@@ -14,28 +14,23 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.registry import check_scaling_group
 
 
+def _create_mock_sgroup(name: str, allowed_session_types: list[str]) -> MagicMock:
+    """Create a mock scaling group with proper attribute access."""
+    mock = MagicMock()
+    mock.name = name
+    mock.scheduler_opts = ScalingGroupOpts.from_json({
+        "allowed_session_types": allowed_session_types,
+    })
+    return mock
+
+
 @pytest.mark.asyncio
 @mock.patch("ai.backend.manager.registry.query_allowed_sgroups")
 async def test_allowed_session_types_check(mock_query):
     mock_query.return_value = [
-        {
-            "name": "a",
-            "scheduler_opts": ScalingGroupOpts().from_json({
-                "allowed_session_types": ["batch"],
-            }),
-        },
-        {
-            "name": "b",
-            "scheduler_opts": ScalingGroupOpts().from_json({
-                "allowed_session_types": ["interactive"],
-            }),
-        },
-        {
-            "name": "c",
-            "scheduler_opts": ScalingGroupOpts().from_json({
-                "allowed_session_types": ["batch", "interactive"],
-            }),
-        },
+        _create_mock_sgroup("a", ["batch"]),
+        _create_mock_sgroup("b", ["interactive"]),
+        _create_mock_sgroup("c", ["batch", "interactive"]),
     ]
     mock_conn = MagicMock()
     mock_sess_ctx = MagicMock()
@@ -126,12 +121,7 @@ async def test_allowed_session_types_check(mock_query):
     # No preferred scaling group with a non-empty list of allowed sgroups
 
     mock_query.return_value = [
-        {
-            "name": "a",
-            "scheduler_opts": ScalingGroupOpts.from_json({
-                "allowed_session_types": ["batch"],
-            }),
-        },
+        _create_mock_sgroup("a", ["batch"]),
     ]
 
     session_type = SessionTypes.BATCH

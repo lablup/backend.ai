@@ -8,10 +8,10 @@ Addresses BA-3054: Wrong parse of inference metrics.
 """
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -464,7 +464,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_resource_policy_name: str,
-    ) -> dict[str, str]:
+    ) -> Mapping[str, Any]:
         """Get resource policy dict for check_presets API"""
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             kp_policy_result = await db_sess.execute(
@@ -1015,7 +1015,7 @@ class TestCheckPresetsOccupiedSlots:
         test_group_name: str,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
-        test_resource_policy_dict: dict[str, str],
+        test_resource_policy_dict: Mapping[str, Any],
         alive_and_non_alive_agents: list[AgentId],
     ) -> None:
         """

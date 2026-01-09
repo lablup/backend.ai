@@ -4,8 +4,8 @@ Storage and virtual folder-related exceptions.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from aiohttp import web
 
@@ -19,9 +19,6 @@ from ai.backend.common.exception import (
 
 from .common import ObjectNotFound
 
-if TYPE_CHECKING:
-    from ai.backend.manager.api.vfolder import VFolderRow
-
 
 class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
@@ -34,15 +31,15 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
             error_detail=ErrorDetail.CONFLICT,
         )
 
-    def __init__(self, matched_rows: Sequence[VFolderRow]) -> None:
+    def __init__(self, matched_rows: Sequence[Mapping[str, Any]]) -> None:
         serialized_matches = [
             {
-                "id": row["id"],
-                "host": row["host"],
-                "user": row["user_email"],
-                "user_id": row["user"],
-                "group": row["group_name"],
-                "group_id": row["group"],
+                "id": row.get("id") if isinstance(row, Mapping) else row.id,
+                "host": row.get("host") if isinstance(row, Mapping) else row.host,
+                "user": row.get("user_email") if isinstance(row, Mapping) else row.user_email,
+                "user_id": row.get("user") if isinstance(row, Mapping) else row.user,
+                "group": row.get("group_name") if isinstance(row, Mapping) else row.group_name,
+                "group_id": row.get("group") if isinstance(row, Mapping) else row.group,
             }
             for row in matched_rows
         ]

@@ -287,6 +287,9 @@ class ArtifactOrderBy(GQLOrderBy):
                 return ArtifactOrders.scanned_at(ascending)
             case ArtifactOrderField.UPDATED_AT:
                 return ArtifactOrders.updated_at(ascending)
+            case ArtifactOrderField.SIZE:
+                # SIZE ordering is not supported yet, fall back to updated_at
+                return ArtifactOrders.updated_at(ascending)
 
 
 @strawberry.input(

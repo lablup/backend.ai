@@ -11,6 +11,7 @@ import attrs
 import msgpack
 import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
@@ -130,7 +131,7 @@ class BaseResourceUsageGroup:
     user_id: Optional[UUID] = attrs.field(default=None)
     user_email: Optional[str] = attrs.field(default=None)
     full_name: Optional[str] = attrs.field(default=None)  # User's full_name
-    access_key: Optional[UUID] = attrs.field(default=None)
+    access_key: Optional[str] = attrs.field(default=None)
     project_id: Optional[UUID] = attrs.field(default=None)
     project_name: Optional[str] = attrs.field(default=None)
     kernel_id: Optional[UUID] = attrs.field(default=None)
@@ -145,7 +146,7 @@ class BaseResourceUsageGroup:
 
     status: Optional[str] = attrs.field(default=None)
     status_info: Optional[str] = attrs.field(default=None)
-    status_history: Optional[str] = attrs.field(default=None)
+    status_history: Optional[Mapping[str, Any]] = attrs.field(default=None)
     cluster_mode: Optional[str] = attrs.field(default=None)
 
     total_usage: ResourceUsage = attrs.field(factory=ResourceUsage)
@@ -263,6 +264,8 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             raise ValueError(
                 "Cannot parse `KernelResourceUsage` from usage_group that have None value field"
             )
+        if usage_group.kernel_row.agent is None:
+            raise ValueError("Kernel row agent is None")
         return cls(
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
@@ -446,7 +449,7 @@ def parse_resource_usage(
 ) -> ResourceUsage:
     if not last_stat:
         return ResourceUsage(
-            agent_ids={kernel.agent},
+            agent_ids={kernel.agent} if kernel.agent else set(),
         )
     nfs = set()
     if kernel.vfolder_mounts:
@@ -471,13 +474,13 @@ def parse_resource_usage(
             gpu_allocated += value
 
     return ResourceUsage(
-        agent_ids={kernel.agent},
+        agent_ids={kernel.agent} if kernel.agent else set(),
         nfs={*nfs},
         cpu_allocated=float(kernel.occupied_slots.get("cpu", 0)),
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
         mem_allocated=int(kernel.occupied_slots.get("mem", 0)),
         mem_used=int(nmget(last_stat, "mem.capacity", 0)),
-        shared_memory=int(nmget(kernel.resource_opts, "shmem", 0)),
+        shared_memory=int(nmget(kernel.resource_opts or {}, "shmem", 0)),
         disk_allocated=0,
         disk_used=int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
         io_read=int(nmget(last_stat, "io_read.current", 0)),
@@ -511,29 +514,33 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
-            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
+            scheduled_at=(
+                kern.status_history.get(KernelStatus.SCHEDULED.name)
+                if kern.status_history
+                else None
+            ),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
-            last_stat=stat_map[kern.id],
+            last_stat=stat_map.get(kern.id),
             user_id=kern.session.user_uuid,
             user_email=kern.session.user.email if kern.session.user is not None else None,
             access_key=kern.session.access_key,
             project_id=kern.session.group.id if kern.session.group is not None else None,
             project_name=kern.session.group.name if kern.session.group is not None else None,
             kernel_id=kern.id,
-            container_ids={kern.container_id},
+            container_ids={kern.container_id} if kern.container_id else set(),
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
             full_name=kern.session.user.full_name if kern.session.user is not None else None,
-            images={kern.image},
-            agents={kern.agent},
+            images={kern.image} if kern.image else set(),
+            agents={kern.agent} if kern.agent else set(),
             status=kern.status.name,
             status_history=kern.status_history,
             cluster_mode=kern.cluster_mode,
             status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
-            total_usage=parse_resource_usage(kern, stat_map[kern.id]),
+            total_usage=parse_resource_usage(kern, stat_map.get(kern.id)),
         )
         for kern in kernels
     ]
@@ -583,9 +590,9 @@ KERNEL_RESOURCE_SELECT_COLS = (
 
 
 def _parse_query(
-    kernel_cond: Optional[sa.sql.BinaryExpression] = None,
-    session_cond: Optional[sa.sql.BinaryExpression] = None,
-    project_cond: Optional[sa.sql.BinaryExpression] = None,
+    kernel_cond: Optional[ColumnElement[bool]] = None,
+    session_cond: Optional[ColumnElement[bool]] = None,
+    project_cond: Optional[ColumnElement[bool]] = None,
 ) -> sa.sql.Select:
     session_load = joinedload(KernelRow.session)
     if session_cond is not None:
@@ -639,4 +646,4 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())

@@ -478,6 +478,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -490,6 +492,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -519,6 +523,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -532,6 +538,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )

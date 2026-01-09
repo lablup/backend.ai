@@ -195,6 +195,7 @@ class TestAuthRepository:
                 domain_name=default_domain.name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
+                need_password_change=False,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -214,6 +215,9 @@ class TestAuthRepository:
             await db_sess.flush()
             await db_sess.refresh(user)
 
+            assert user.need_password_change is not None
+            assert user.domain_name is not None
+            assert user.role is not None
             user_data = UserTestData(
                 uuid=user.uuid,
                 username=user.username,

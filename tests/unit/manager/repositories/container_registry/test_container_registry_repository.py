@@ -554,6 +554,8 @@ class TestContainerRegistryRepository:
             img_p1 = await session.scalar(sa.select(ImageRow).where(ImageRow.id == img1_id))
             img_p2 = await session.scalar(sa.select(ImageRow).where(ImageRow.id == img2_id))
 
+            assert img_p1 is not None
+            assert img_p2 is not None
             assert img_p1.status == ImageStatus.DELETED
             assert img_p2.status == ImageStatus.ALIVE
 

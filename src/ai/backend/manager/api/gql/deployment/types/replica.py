@@ -133,6 +133,8 @@ class ReplicaOrderBy(GQLOrderBy):
         match self.field:
             case ReplicaOrderField.CREATED_AT:
                 return RouteOrders.created_at(ascending)
+            case ReplicaOrderField.ID:
+                return RouteOrders.id(ascending)
 
 
 @strawberry.type

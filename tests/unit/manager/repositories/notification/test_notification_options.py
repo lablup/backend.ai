@@ -1182,12 +1182,12 @@ class TestNotificationCursorPagination:
         """
         # First, get the cursor value (Channel-3's ID)
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
+            db_result = await db_sess.execute(
                 sa.select(NotificationChannelRow.id).where(
                     NotificationChannelRow.name == "Channel-3"
                 )
             )
-            channel_3_id = result.scalar_one()
+            channel_3_id = db_result.scalar_one()
 
         # Forward cursor condition: created_at < cursor's created_at
         cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
@@ -1199,14 +1199,14 @@ class TestNotificationCursorPagination:
                 cursor_condition=cursor_condition,
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        search_result = await notification_repository.search_channels(querier=querier)
 
         # Should return older items (Channel-2, Channel-1)
-        assert len(result.items) == 2
-        assert result.items[0].name == "Channel-2"
-        assert result.items[1].name == "Channel-1"
-        assert result.has_previous_page is True  # Has items before (cursor was provided)
-        assert result.has_next_page is False  # No more items
+        assert len(search_result.items) == 2
+        assert search_result.items[0].name == "Channel-2"
+        assert search_result.items[1].name == "Channel-1"
+        assert search_result.has_previous_page is True  # Has items before (cursor was provided)
+        assert search_result.has_next_page is False  # No more items
 
     @pytest.mark.asyncio
     async def test_backward_pagination_last_page_fetches_oldest_first(
@@ -1251,12 +1251,12 @@ class TestNotificationCursorPagination:
         """
         # Get the cursor value (Channel-3's ID)
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
+            db_result = await db_sess.execute(
                 sa.select(NotificationChannelRow.id).where(
                     NotificationChannelRow.name == "Channel-3"
                 )
             )
-            channel_3_id = result.scalar_one()
+            channel_3_id = db_result.scalar_one()
 
         # Backward cursor condition: created_at > cursor's created_at
         cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
@@ -1268,11 +1268,11 @@ class TestNotificationCursorPagination:
                 cursor_condition=cursor_condition,
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        search_result = await notification_repository.search_channels(querier=querier)
 
         # Should return newer items (Channel-4, Channel-5) in ASC order
-        assert len(result.items) == 2
-        assert result.items[0].name == "Channel-4"
-        assert result.items[1].name == "Channel-5"
-        assert result.has_previous_page is False  # No more newer items
-        assert result.has_next_page is True  # Has items after (cursor was provided)
+        assert len(search_result.items) == 2
+        assert search_result.items[0].name == "Channel-4"
+        assert search_result.items[1].name == "Channel-5"
+        assert search_result.has_previous_page is False  # No more newer items
+        assert search_result.has_next_page is True  # Has items after (cursor was provided)
