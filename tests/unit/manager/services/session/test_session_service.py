@@ -162,9 +162,23 @@ def sample_access_key() -> AccessKey:
 
 
 @pytest.fixture
+def sample_user_id() -> UUID:
+    """Create sample user ID."""
+    return uuid4()
+
+
+@pytest.fixture
+def sample_group_id() -> UUID:
+    """Create sample group ID."""
+    return uuid4()
+
+
+@pytest.fixture
 def sample_session_data(
     sample_session_id: SessionId,
     sample_access_key: AccessKey,
+    sample_user_id: UUID,
+    sample_group_id: UUID,
 ) -> SessionData:
     """Create sample session data."""
     return SessionData(
@@ -177,8 +191,8 @@ def sample_session_data(
         cluster_size=1,
         agent_ids=["i-ubuntu"],
         domain_name="default",
-        group_id=UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831"),
-        user_uuid=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+        group_id=sample_group_id,
+        user_uuid=sample_user_id,
         access_key=sample_access_key,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
@@ -262,6 +276,8 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
     ) -> None:
         """Test matching multiple sessions"""
         sessions = [
@@ -275,8 +291,8 @@ class TestMatchSessions:
                 cluster_size=1,
                 agent_ids=[],
                 domain_name="default",
-                group_id=UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831"),
-                user_uuid=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                group_id=sample_group_id,
+                user_uuid=sample_user_id,
                 access_key=sample_access_key,
                 images=["python:latest"],
                 tag=None,
@@ -612,6 +628,8 @@ class TestGetSessionInfo:
         sample_session_data: SessionData,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
     ) -> None:
         """Test successfully getting session info"""
         # Create a mock session with main_kernel
@@ -626,8 +644,8 @@ class TestGetSessionInfo:
         mock_session = MagicMock()
         mock_session.id = sample_session_id
         mock_session.domain_name = "default"
-        mock_session.group_id = UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831")
-        mock_session.user_uuid = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
+        mock_session.group_id = sample_group_id
+        mock_session.user_uuid = sample_user_id
         mock_session.tag = None
         mock_session.main_kernel = mock_kernel
         mock_session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
@@ -694,6 +712,7 @@ class TestDownloadFiles:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully downloading files"""
         mock_session = MagicMock()
@@ -702,7 +721,7 @@ class TestDownloadFiles:
         mock_agent_registry.download_file = AsyncMock(return_value=b"file content")
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="test-session",
             owner_access_key=sample_access_key,
             files=["test_file.txt"],
@@ -721,6 +740,7 @@ class TestDownloadFiles:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test downloading files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -728,7 +748,7 @@ class TestDownloadFiles:
         )
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="nonexistent",
             owner_access_key=sample_access_key,
             files=["test_file.txt"],
@@ -743,6 +763,7 @@ class TestDownloadFiles:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test downloading too many files raises error"""
         from ai.backend.manager.errors.storage import VFolderBadRequest
@@ -752,7 +773,7 @@ class TestDownloadFiles:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="test-session",
             owner_access_key=sample_access_key,
             files=["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt", "file6.txt"],
@@ -1232,6 +1253,7 @@ class TestListFiles:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully listing files"""
         expected_files = {"files": ["file1.txt", "file2.py"]}
@@ -1247,7 +1269,7 @@ class TestListFiles:
         )
 
         action = ListFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             path="/home/work",
             session_name="test-session",
             owner_access_key=sample_access_key,
@@ -1265,6 +1287,7 @@ class TestListFiles:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test listing files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1276,7 +1299,7 @@ class TestListFiles:
         )
 
         action = ListFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             path="/home/work",
             session_name="nonexistent",
             owner_access_key=sample_access_key,
@@ -1363,14 +1386,9 @@ class TestCheckAndTransitStatus:
     """Test cases for SessionService.check_and_transit_status"""
 
     @pytest.fixture
-    def sample_user_id(self) -> UUID:
-        """Create sample user ID."""
-        return UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
-
-    @pytest.fixture
     def other_user_id(self) -> UUID:
         """Create another user ID for ownership tests."""
-        return UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+        return uuid4()
 
     async def test_check_and_transit_status_as_superadmin_success(
         self,
