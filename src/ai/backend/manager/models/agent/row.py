@@ -135,7 +135,7 @@ class AgentRow(Base):
 
     def to_data(self) -> AgentData:
         return AgentData(
-            id=self.id,
+            id=AgentId(self.id),
             status=self.status,
             status_changed=self.status_changed,
             region=self.region,

@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional, cast
+from types import SimpleNamespace
+from typing import Any, Optional
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
@@ -18,6 +18,11 @@ from ai.backend.manager.idle import (
     UtilizationIdleChecker,
     calculate_remaining_time,
 )
+
+
+def mock_row(**kwargs: Any) -> Any:
+    """Create a mock object that behaves like SQLAlchemy Row with attribute access."""
+    return SimpleNamespace(**kwargs)
 
 
 @dataclass
@@ -124,27 +129,23 @@ class TestNewUserGracePeriodChecker:
         return checker
 
     @pytest.fixture
-    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
-        """Mock kernel table - user table joined data as dict"""
-        return {
-            "user_created_at": base_time,
-        }
+    def kernel_user_joined_data(self, base_time: datetime) -> Any:
+        """Mock kernel table - user table joined data as mock row"""
+        return mock_row(user_created_at=base_time)
 
     @pytest.mark.asyncio
     async def test_new_user_grace_period(
         self,
         grace_period_checker: NewUserGracePeriodChecker,
-        kernel_user_joined_data: dict[str, datetime],
+        kernel_user_joined_data: Any,
         user_initial_grace_period_policy: dict[str, Any],
     ) -> None:
         """Test new user grace period calculation"""
         # When
-        grace_period_end = await grace_period_checker.get_grace_period_end(
-            cast(Row[Any], kernel_user_joined_data)
-        )
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
 
         # Then
-        expected_grace_period_end = kernel_user_joined_data["user_created_at"] + timedelta(
+        expected_grace_period_end = kernel_user_joined_data.user_created_at + timedelta(
             seconds=float(user_initial_grace_period_policy["user_initial_grace_period"])
         )
         assert grace_period_end == expected_grace_period_end
@@ -208,19 +209,17 @@ class TestNetworkTimeoutIdleChecker:
         return SessionId(uuid4())
 
     @pytest.fixture
-    def kernel_row(self, session_id: SessionId) -> dict[str, Any]:
+    def kernel_row(self, session_id: SessionId) -> Any:
         """Kernel row data"""
-        return {
-            "session_id": session_id,
-            "session_type": SessionTypes.INTERACTIVE,
-        }
+        return mock_row(
+            session_id=session_id,
+            session_type=SessionTypes.INTERACTIVE,
+        )
 
     @pytest.fixture
-    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
+    def kernel_user_joined_data(self, base_time: datetime) -> Any:
         """Mock kernel-user joined data"""
-        return {
-            "user_created_at": base_time,
-        }
+        return mock_row(user_created_at=base_time)
 
     @pytest.fixture
     async def network_timeout_checker(
@@ -266,7 +265,7 @@ class TestNetworkTimeoutIdleChecker:
         self,
         scenario: _NetworkTimeoutScenario,
         network_timeout_checker: NetworkTimeoutIdleChecker,
-        kernel_row: dict[str, Any],
+        kernel_row: Any,
         session_id: SessionId,
         base_time: datetime,
         test_valkey_live: AsyncMock,
@@ -279,9 +278,9 @@ class TestNetworkTimeoutIdleChecker:
 
         # When
         should_alive = await network_timeout_checker.check_idleness(
-            cast(Row[Any], kernel_row),
+            kernel_row,
             mock_db_connection,
-            cast(Row[Any], {"idle_timeout": scenario.idle_timeout}),
+            mock_row(idle_timeout=scenario.idle_timeout),
         )
 
         test_valkey_live.get_live_data.return_value = msgpack.packb(scenario.expected_remaining)
@@ -360,8 +359,8 @@ class TestNetworkTimeoutIdleChecker:
         scenario: _NetworkTimeoutWithGraceScenario,
         network_timeout_checker_with_grace: NetworkTimeoutIdleChecker,
         grace_period_checker: NewUserGracePeriodChecker,
-        kernel_user_joined_data: dict[str, datetime],
-        kernel_row: dict[str, Any],
+        kernel_user_joined_data: Any,
+        kernel_row: Any,
         session_id: SessionId,
         base_time: datetime,
         test_valkey_live: AsyncMock,
@@ -371,15 +370,13 @@ class TestNetworkTimeoutIdleChecker:
         # Given
         last_access = base_time
         test_valkey_live.get_live_data.return_value = str(last_access.timestamp()).encode()
-        grace_period_end = await grace_period_checker.get_grace_period_end(
-            cast(Row[Any], kernel_user_joined_data)
-        )
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
 
         # When
         should_alive = await network_timeout_checker_with_grace.check_idleness(
-            cast(Row[Any], kernel_row),
+            kernel_row,
             mock_db_connection,
-            cast(Row[Any], {"idle_timeout": scenario.idle_timeout}),
+            mock_row(idle_timeout=scenario.idle_timeout),
             grace_period_end=grace_period_end,
         )
 
@@ -442,9 +439,9 @@ class TestSessionLifetimeChecker:
         return SessionId(uuid4())
 
     @pytest.fixture
-    def kernel_user_joined_data(self, base_time: datetime) -> dict[str, datetime]:
+    def kernel_user_joined_data(self, base_time: datetime) -> Any:
         """Kernel user joined data with user created at base_time"""
-        return {"user_created_at": base_time}
+        return mock_row(user_created_at=base_time)
 
     @pytest.fixture
     async def grace_period_checker(
@@ -460,17 +457,17 @@ class TestSessionLifetimeChecker:
         return checker
 
     @pytest.fixture
-    def session_kernel_row(self, session_id: SessionId, base_time: datetime) -> dict[str, Any]:
+    def session_kernel_row(self, session_id: SessionId, base_time: datetime) -> Any:
         """Kernel row with session created at base_time"""
-        return {
-            "session_id": session_id,
-            "created_at": base_time,
-        }
+        return mock_row(
+            session_id=session_id,
+            created_at=base_time,
+        )
 
     @pytest.fixture
-    def session_lifetime_policy(self, test_config: _SessionLifetimeTestConfig) -> dict[str, Any]:
+    def session_lifetime_policy(self, test_config: _SessionLifetimeTestConfig) -> Any:
         """Policy with max_session_lifetime from test_config"""
-        return {"max_session_lifetime": test_config.max_lifetime_seconds}
+        return mock_row(max_session_lifetime=test_config.max_lifetime_seconds)
 
     @pytest.fixture
     async def session_lifetime_checker(
@@ -527,15 +524,15 @@ class TestSessionLifetimeChecker:
         valkey_live: AsyncMock,
         db_connection: AsyncMock,
         session_lifetime_checker: SessionLifetimeChecker,
-        session_kernel_row: dict[str, Any],
-        session_lifetime_policy: dict[str, Any],
+        session_kernel_row: Any,
+        session_lifetime_policy: Any,
     ) -> None:
         """Test session lifetime without grace period"""
         # When - check_idleness runs and stores remaining time
         should_alive = await session_lifetime_checker.check_idleness(
-            cast(Row[Any], session_kernel_row),
+            session_kernel_row,
             db_connection,
-            cast(Row[Any], session_lifetime_policy),
+            session_lifetime_policy,
         )
 
         # Mock: get_checker_result will read the stored result
@@ -580,21 +577,19 @@ class TestSessionLifetimeChecker:
         valkey_live: AsyncMock,
         db_connection: AsyncMock,
         session_lifetime_checker: SessionLifetimeChecker,
-        session_kernel_row: dict[str, Any],
-        session_lifetime_policy: dict[str, Any],
+        session_kernel_row: Any,
+        session_lifetime_policy: Any,
         grace_period_checker: NewUserGracePeriodChecker,
-        kernel_user_joined_data: dict[str, datetime],
+        kernel_user_joined_data: Any,
     ) -> None:
         # Get grace period end (user_created_at = base_time, grace from test_config)
-        grace_period_end = await grace_period_checker.get_grace_period_end(
-            cast(Row[Any], kernel_user_joined_data)
-        )
+        grace_period_end = await grace_period_checker.get_grace_period_end(kernel_user_joined_data)
 
         # When - check_idleness runs with grace_period_end
         should_alive = await session_lifetime_checker.check_idleness(
-            cast(Row[Any], session_kernel_row),
+            session_kernel_row,
             db_connection,
-            cast(Row[Any], session_lifetime_policy),
+            session_lifetime_policy,
             grace_period_end=grace_period_end,
         )
 
@@ -720,12 +715,12 @@ class TestUtilizationIdleChecker:
         return SessionId(uuid4())
 
     @pytest.fixture
-    def kernel_row(self, session_id: SessionId) -> dict[str, Any]:
+    def kernel_row(self, session_id: SessionId) -> Any:
         """Kernel row for network timeout positive test"""
-        return {
-            "session_id": session_id,
-            "session_type": SessionTypes.INTERACTIVE,
-        }
+        return mock_row(
+            session_id=session_id,
+            session_type=SessionTypes.INTERACTIVE,
+        )
 
     # Test 1: Get current utilization
     @pytest.fixture
@@ -969,7 +964,7 @@ class TestUtilizationIdleChecker:
         self,
         grace_test_config: _UtilizationGracePeriodTestConfig,
         utilization_grace_period_checker: UtilizationIdleChecker,
-        utilization_kernel_row: dict[str, Any],
+        utilization_kernel_row: Any,
         session_id: SessionId,
         valkey_live: AsyncMock,
         db_connection: AsyncMock,
@@ -977,9 +972,9 @@ class TestUtilizationIdleChecker:
         """Test utilization during grace period (util_info should be None)"""
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_grace_period_checker.check_idleness(
-            cast(Row[Any], utilization_kernel_row),
+            utilization_kernel_row,
             db_connection,
-            cast(Row[Any], {"idle_timeout": grace_test_config.time_window_seconds}),
+            mock_row(idle_timeout=grace_test_config.time_window_seconds),
         )
 
         # Reset side_effect after check_idleness so return_value can be used
@@ -1074,7 +1069,7 @@ class TestUtilizationIdleChecker:
         self,
         test_config: _UtilizationIdleTestConfig,
         utilization_idle_checker: UtilizationIdleChecker,
-        utilization_kernel_row: dict[str, Any],
+        utilization_kernel_row: Any,
         session_id: SessionId,
         valkey_live: AsyncMock,
         db_connection: AsyncMock,
@@ -1082,9 +1077,9 @@ class TestUtilizationIdleChecker:
         """Test utilization with sufficient usage (should NOT terminate session)"""
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_idle_checker.check_idleness(
-            cast(Row[Any], utilization_kernel_row),
+            utilization_kernel_row,
             db_connection,
-            cast(Row[Any], {"idle_timeout": test_config.time_window_seconds}),
+            mock_row(idle_timeout=test_config.time_window_seconds),
         )
 
         # Mock: get_checker_result
@@ -1119,16 +1114,16 @@ class TestUtilizationIdleChecker:
         utilization_kernel_id: KernelId,
         ten_gb_memory_slots: dict[str, Decimal],
         base_time: datetime,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Kernel row for utilization tests"""
-        return {
-            "id": utilization_kernel_id,
-            "session_id": session_id,
-            "created_at": base_time,
-            "cluster_size": 1,
-            "occupied_slots": ten_gb_memory_slots,
-            "requested_slots": ten_gb_memory_slots,
-        }
+        return mock_row(
+            id=utilization_kernel_id,
+            session_id=session_id,
+            created_at=base_time,
+            cluster_size=1,
+            occupied_slots=ten_gb_memory_slots,
+            requested_slots=ten_gb_memory_slots,
+        )
 
     # Test 4: Insufficient utilization (session should be terminated)
     @pytest.fixture
@@ -1201,7 +1196,7 @@ class TestUtilizationIdleChecker:
         self,
         insufficient_test_config: _UtilizationInsufficientTestConfig,
         utilization_insufficient_checker: UtilizationIdleChecker,
-        utilization_kernel_row: dict[str, Any],
+        utilization_kernel_row: Any,
         session_id: SessionId,
         base_time: datetime,
         valkey_live: AsyncMock,
@@ -1227,9 +1222,9 @@ class TestUtilizationIdleChecker:
 
         # When - check_idleness runs and stores remaining time
         should_alive = await utilization_insufficient_checker.check_idleness(
-            cast(Row[Any], utilization_kernel_row),
+            utilization_kernel_row,
             db_connection,
-            cast(Row[Any], {"idle_timeout": insufficient_test_config.time_window_seconds}),
+            mock_row(idle_timeout=insufficient_test_config.time_window_seconds),
         )
 
         # get_checker_result will read the stored result (already mocked above)
