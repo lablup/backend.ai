@@ -9,12 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleType,
 )
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,

@@ -4,10 +4,9 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ai.backend.common.data.notification import NotifiableMessage
+from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.services.notification.actions import ProcessNotificationAction
 
 if TYPE_CHECKING:
