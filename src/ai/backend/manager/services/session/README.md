@@ -211,7 +211,7 @@ for entry in result.status_history["history"]:
 - **Resource Monitoring**: Collect resource usage statistics from agents
 
 ### Database Integration
-- **SessionRepository**: Session operations with role-based access control in service layer
+- **SessionRepository**: Data access layer with repository pattern
 - **Database Schema**: PostgreSQL with SQLAlchemy ORM for session metadata
 - **Transaction Management**: Atomic operations with rollback support
 
