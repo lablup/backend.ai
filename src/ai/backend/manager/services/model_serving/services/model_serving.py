@@ -50,6 +50,7 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import (
+    EndpointAccessForbiddenError,
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,
@@ -392,7 +393,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Determine lifecycle stage based on routes
         has_routes = endpoint_data.routings and len(endpoint_data.routings) > 0
@@ -555,7 +556,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         return GetModelServiceInfoActionResult(
             ServiceInfo(
@@ -592,7 +593,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         error_routes = (
             [r for r in endpoint_data.routings if r.status == RouteStatus.FAILED_TO_START]
@@ -620,7 +621,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Clear errors
         success = await self._repository.clear_endpoint_errors(action.service_id)
@@ -640,7 +641,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Update route traffic
         updated_endpoint_data = await self._repository.update_route_traffic(
@@ -665,7 +666,7 @@ class ModelServingService:
 
         # Validate access
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Get route
         route_data = await self._repository.get_route_by_id(action.route_id, action.service_id)
@@ -700,7 +701,7 @@ class ModelServingService:
         if not endpoint_data:
             raise ModelServiceNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         # Get scaling group info
         scaling_group_data = await self._repository.get_scaling_group_info(
@@ -766,7 +767,7 @@ class ModelServingService:
         if not endpoint_data:
             raise ModelServiceNotFound
         if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise ModelServiceNotFound
+            raise EndpointAccessForbiddenError
 
         await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
 
