@@ -1001,3 +1001,57 @@ class TestModifyDomainNode:
 
         assert result.domain_data is not None
         mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
+
+    async def test_modify_domain_node_with_disjoint_scaling_groups_succeeds(
+        self,
+        service: DomainService,
+        mock_admin_repository: MagicMock,
+        superadmin_user: UserInfo,
+        sample_domain_data: DomainData,
+    ) -> None:
+        """Modify domain node with disjoint add/remove scaling groups should succeed."""
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
+            return_value=sample_domain_data
+        )
+
+        action = ModifyDomainNodeAction(
+            user_info=superadmin_user,
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(),
+                pk_value="test-domain",
+            ),
+            sgroups_to_add={"sg1", "sg2"},
+            sgroups_to_remove={"sg3", "sg4"},  # No overlap
+        )
+
+        result = await service.modify_domain_node(action)
+
+        assert result.domain_data is not None
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
+
+    async def test_modify_domain_node_with_empty_scaling_groups_succeeds(
+        self,
+        service: DomainService,
+        mock_admin_repository: MagicMock,
+        superadmin_user: UserInfo,
+        sample_domain_data: DomainData,
+    ) -> None:
+        """Modify domain node with both empty scaling groups should succeed."""
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
+            return_value=sample_domain_data
+        )
+
+        action = ModifyDomainNodeAction(
+            user_info=superadmin_user,
+            updater=Updater(
+                spec=DomainNodeUpdaterSpec(),
+                pk_value="test-domain",
+            ),
+            sgroups_to_add=set(),
+            sgroups_to_remove=set(),
+        )
+
+        result = await service.modify_domain_node(action)
+
+        assert result.domain_data is not None
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
