@@ -129,4 +129,4 @@ types-tqdm
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
 
-etcd-client-py~=0.5.0
+etcd-client-py~=0.5.1
