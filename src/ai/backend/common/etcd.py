@@ -320,7 +320,7 @@ class AsyncEtcd(AbstractKVStore):
         await self.etcd.__aenter__()
 
     async def close(self) -> None:
-        await self.etcd.__aexit__()
+        await self.etcd.__aexit__(None, None, None)
 
     async def __aenter__(self) -> Self:
         await self.etcd.__aenter__()
