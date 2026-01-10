@@ -21,7 +21,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessScheduleEvent,
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SchedulingResult
@@ -35,6 +35,8 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
+from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
@@ -327,8 +329,11 @@ class ScheduleCoordinator:
             # Execute handler logic
             result = await handler.execute(scaling_group, sessions)
 
+            # Get recorded steps for history
+            all_records = recorder.get_all_records()
+
             # Apply status transitions immediately for this scaling group
-            await self._handle_status_transitions(handler, result)
+            await self._handle_status_transitions(handler, result, all_records)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -348,7 +353,6 @@ class ScheduleCoordinator:
                     )
 
             # Log recorded steps for this scaling group
-            all_records = recorder.get_all_records()
             if all_records:
                 log.debug(
                     "Recorded {} sessions with execution records for {} in scaling group {}",
@@ -361,12 +365,14 @@ class ScheduleCoordinator:
         self,
         handler: SessionLifecycleHandler,
         result: SessionExecutionResult,
+        records: Mapping[SessionId, ExecutionRecord],
     ) -> None:
         """Apply status transitions based on handler execution results.
 
         Args:
             handler: The lifecycle handler that produced the result
             result: Execution result containing successes, failures, and stales
+            records: Mapping of session IDs to their execution records for sub_steps
         """
         target_statuses = handler.target_statuses()
         handler_name = handler.name()
@@ -389,6 +395,7 @@ class ScheduleCoordinator:
                     message=f"{handler_name} completed successfully",
                     from_status=s.from_status,
                     to_status=success_status,
+                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
                 )
                 for s in result.successes
             ]
@@ -421,6 +428,7 @@ class ScheduleCoordinator:
                     from_status=f.from_status,
                     to_status=failure_status,
                     error_code=f.error_detail,
+                    sub_steps=extract_sub_steps_for_entity(f.session_id, records),
                 )
                 for f in result.failures
             ]
@@ -452,6 +460,7 @@ class ScheduleCoordinator:
                     message=f"{handler_name} marked as stale",
                     from_status=s.from_status,
                     to_status=stale_status,
+                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
                 )
                 for s in result.stales
             ]

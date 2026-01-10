@@ -5,6 +5,7 @@ Tests the coordinator that manages scheduling operations and termination marking
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, call
 from uuid import uuid4
 
@@ -23,11 +24,17 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 )
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.recorder.types import (
+    ExecutionRecord,
+    PhaseRecord,
+    StepRecord,
+    StepStatus,
+)
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     ScheduleCoordinator,
     SchedulerTaskSpec,
@@ -493,18 +500,52 @@ class TestStatusTransitions:
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
     ) -> None:
-        """Test _handle_status_transitions applies success status."""
+        """Test _handle_status_transitions applies success status with sub_steps."""
         # Setup
         schedule_coordinator._repository = mock_repository
         session_id = SessionId(uuid4())
         from_status = SessionStatus.PREPARING
+
+        # Create ExecutionRecord with steps using distinct timestamps
+        step_started = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
+        step_ended = datetime(2024, 1, 15, 10, 0, 5, tzinfo=UTC)
+        phase_started = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
+        phase_ended = datetime(2024, 1, 15, 10, 0, 10, tzinfo=UTC)
+        exec_started = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
+        exec_ended = datetime(2024, 1, 15, 10, 0, 15, tzinfo=UTC)
+
+        step_record = StepRecord(
+            name="check_quota",
+            status=StepStatus.SUCCESS,
+            started_at=step_started,
+            ended_at=step_ended,
+            detail="Quota check passed",
+        )
+        phase_record = PhaseRecord(
+            name="validation",
+            status=StepStatus.SUCCESS,
+            started_at=phase_started,
+            ended_at=phase_ended,
+            detail=None,
+            steps=[step_record],
+        )
+        execution_record = ExecutionRecord(
+            operation="schedule",
+            started_at=exec_started,
+            ended_at=exec_ended,
+            status=StepStatus.SUCCESS,
+            phases=[phase_record],
+        )
+        records: dict[SessionId, ExecutionRecord] = {session_id: execution_record}
 
         result = SessionExecutionResult(
             successes=[SessionTransitionInfo(session_id=session_id, from_status=from_status)]
         )
 
         # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+        await schedule_coordinator._handle_status_transitions(
+            mock_lifecycle_handler, result, records
+        )
 
         # Verify update_with_history was called
         mock_repository.update_with_history.assert_called_once()
@@ -517,9 +558,18 @@ class TestStatusTransitions:
 
         # Verify history specs
         assert len(bulk_creator.specs) == 1
-        assert bulk_creator.specs[0].session_id == session_id
-        assert bulk_creator.specs[0].from_status == from_status
-        assert bulk_creator.specs[0].to_status == SessionStatus.PREPARED
+        history_spec = bulk_creator.specs[0]
+        assert history_spec.session_id == session_id
+        assert history_spec.from_status == from_status
+        assert history_spec.to_status == SessionStatus.PREPARED
+
+        # Verify sub_steps were extracted from records
+        assert len(history_spec.sub_steps) == 1
+        assert history_spec.sub_steps[0].step == "check_quota"
+        assert history_spec.sub_steps[0].result == SchedulingResult.SUCCESS
+        assert history_spec.sub_steps[0].message == "Quota check passed"
+        assert history_spec.sub_steps[0].started_at == step_started
+        assert history_spec.sub_steps[0].ended_at == step_ended
 
     async def test_handle_status_transitions_failure(
         self,
@@ -527,13 +577,40 @@ class TestStatusTransitions:
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
     ) -> None:
-        """Test _handle_status_transitions applies failure status."""
+        """Test _handle_status_transitions applies failure status with sub_steps."""
         # Setup
         schedule_coordinator._repository = mock_repository
         session_id = SessionId(uuid4())
         from_status = SessionStatus.PREPARING
         mock_lifecycle_handler.failure_status.return_value = SessionStatus.CANCELLED
         mock_lifecycle_handler.success_status.return_value = None
+
+        # Create ExecutionRecord with failed step
+        step_started = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
+        step_ended = datetime(2024, 1, 15, 10, 0, 3, tzinfo=UTC)
+        step_record = StepRecord(
+            name="check_resource",
+            status=StepStatus.FAILED,
+            started_at=step_started,
+            ended_at=step_ended,
+            detail="Insufficient resources",
+        )
+        phase_record = PhaseRecord(
+            name="validation",
+            status=StepStatus.FAILED,
+            started_at=step_started,
+            ended_at=step_ended,
+            detail=None,
+            steps=[step_record],
+        )
+        execution_record = ExecutionRecord(
+            operation="schedule",
+            started_at=step_started,
+            ended_at=step_ended,
+            status=StepStatus.FAILED,
+            phases=[phase_record],
+        )
+        records: dict[SessionId, ExecutionRecord] = {session_id: execution_record}
 
         result = SessionExecutionResult(
             failures=[
@@ -547,7 +624,9 @@ class TestStatusTransitions:
         )
 
         # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+        await schedule_coordinator._handle_status_transitions(
+            mock_lifecycle_handler, result, records
+        )
 
         # Verify update_with_history was called
         mock_repository.update_with_history.assert_called_once()
@@ -560,10 +639,19 @@ class TestStatusTransitions:
 
         # Verify history specs
         assert len(bulk_creator.specs) == 1
-        assert bulk_creator.specs[0].session_id == session_id
-        assert bulk_creator.specs[0].from_status == from_status
-        assert bulk_creator.specs[0].to_status == SessionStatus.CANCELLED
-        assert bulk_creator.specs[0].error_code == "test error"
+        history_spec = bulk_creator.specs[0]
+        assert history_spec.session_id == session_id
+        assert history_spec.from_status == from_status
+        assert history_spec.to_status == SessionStatus.CANCELLED
+        assert history_spec.error_code == "test error"
+
+        # Verify sub_steps were extracted from records
+        assert len(history_spec.sub_steps) == 1
+        assert history_spec.sub_steps[0].step == "check_resource"
+        assert history_spec.sub_steps[0].result == SchedulingResult.FAILURE
+        assert history_spec.sub_steps[0].message == "Insufficient resources"
+        assert history_spec.sub_steps[0].started_at == step_started
+        assert history_spec.sub_steps[0].ended_at == step_ended
 
     async def test_handle_status_transitions_stale(
         self,
@@ -571,7 +659,7 @@ class TestStatusTransitions:
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
     ) -> None:
-        """Test _handle_status_transitions applies stale status."""
+        """Test _handle_status_transitions applies stale status with empty sub_steps when no records."""
         # Setup
         schedule_coordinator._repository = mock_repository
         session_id = SessionId(uuid4())
@@ -584,8 +672,8 @@ class TestStatusTransitions:
             stales=[SessionTransitionInfo(session_id=session_id, from_status=from_status)]
         )
 
-        # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+        # Execute with empty records - sub_steps should be empty list
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result, {})
 
         # Verify update_with_history was called
         mock_repository.update_with_history.assert_called_once()
@@ -598,9 +686,13 @@ class TestStatusTransitions:
 
         # Verify history specs
         assert len(bulk_creator.specs) == 1
-        assert bulk_creator.specs[0].session_id == session_id
-        assert bulk_creator.specs[0].from_status == from_status
-        assert bulk_creator.specs[0].to_status == SessionStatus.TERMINATING
+        history_spec = bulk_creator.specs[0]
+        assert history_spec.session_id == session_id
+        assert history_spec.from_status == from_status
+        assert history_spec.to_status == SessionStatus.TERMINATING
+
+        # Verify sub_steps is empty list when no records exist
+        assert history_spec.sub_steps == []
 
     async def test_handle_status_transitions_no_update_when_status_none(
         self,
@@ -625,7 +717,7 @@ class TestStatusTransitions:
         )
 
         # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result, {})
 
         # Verify no updates were made
         mock_repository.update_with_history.assert_not_called()
