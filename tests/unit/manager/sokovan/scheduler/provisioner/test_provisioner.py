@@ -35,6 +35,7 @@ from ai.backend.manager.repositories.scheduler.types.snapshot import (
     ResourcePolicies,
     SnapshotData,
 )
+from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
@@ -231,8 +232,8 @@ def test_provisioner(
     )
 
 
-class TestScheduleQueuedSessionsWithData:
-    """Test _schedule_queued_sessions_with_data method."""
+class TestScheduleScalingGroup:
+    """Test schedule_scaling_group method."""
 
     @pytest.mark.parametrize(
         "strategy",
@@ -250,7 +251,7 @@ class TestScheduleQueuedSessionsWithData:
         mock_selector_pool: dict[AgentSelectionStrategy, MagicMock],
     ) -> None:
         """
-        Verify that _schedule_queued_sessions_with_data uses correct agent_selector.
+        Verify that schedule_scaling_group uses correct agent_selector.
         """
         # Given: Override provisioner's selector pool with mock selectors
         test_provisioner._agent_selector_pool = mock_selector_pool
@@ -258,8 +259,10 @@ class TestScheduleQueuedSessionsWithData:
         # Given: SchedulingData with specific strategy
         scheduling_data = _create_scheduling_data_with_strategy(strategy)
 
-        # When: Execute _schedule_queued_sessions_with_data
-        await test_provisioner._schedule_queued_sessions_with_data("test-sg", scheduling_data)
+        # When: Execute schedule_scaling_group within RecorderContext scope
+        # (In production, coordinator opens the scope before calling provisioner)
+        with RecorderContext[SessionId].scope("test-provisioning"):
+            await test_provisioner.schedule_scaling_group("test-sg", scheduling_data)
 
         # Then: The selector for the specified strategy was used
         used_selector = mock_selector_pool[strategy]

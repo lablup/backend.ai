@@ -1,15 +1,22 @@
 """Handler for retrying preparing sessions."""
 
-import logging
-from typing import Optional
+from __future__ import annotations
 
-from ai.backend.common.events.dispatcher import EventProducer
+import logging
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Optional
+
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.sokovan.scheduler.handlers.base import SchedulerHandler
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -17,36 +24,98 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 PREPARING_CHECK_THRESHOLD = 900.0  # 15 minutes
 
 
-class RetryPreparingHandler(SchedulerHandler):
-    """Handler for retrying PREPARING/PULLING sessions that appear stuck."""
+class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
+    """Handler for retrying PREPARING/PULLING sessions that appear stuck.
+
+    Following the DeploymentCoordinator pattern:
+    - Coordinator queries sessions with PREPARING/PULLING status
+    - Handler checks if sessions are truly stuck and retries them
+    - Sessions exceeding max retries are marked as stale (TERMINATING)
+    """
 
     def __init__(
         self,
-        scheduler: Scheduler,
-        scheduling_controller: SchedulingController,
-        event_producer: EventProducer,
+        launcher: SessionLauncher,
+        repository: SchedulerRepository,
     ) -> None:
-        self._scheduler = scheduler
-        self._scheduling_controller = scheduling_controller
-        self._event_producer = event_producer
+        self._launcher = launcher
+        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
         return "retry-preparing"
 
+    @classmethod
+    def target_statuses(cls) -> list[SessionStatus]:
+        """Sessions in PREPARING or PULLING state."""
+        return [SessionStatus.PREPARING, SessionStatus.PULLING]
+
+    @classmethod
+    def target_kernel_statuses(cls) -> list[KernelStatus]:
+        """Any kernel status - we check stuck sessions regardless."""
+        return []
+
+    @classmethod
+    def success_status(cls) -> Optional[SessionStatus]:
+        """No status change on retry - sessions stay in PREPARING/PULLING."""
+        return None
+
+    @classmethod
+    def failure_status(cls) -> Optional[SessionStatus]:
+        """No failure status for retry handler."""
+        return None
+
+    @classmethod
+    def stale_status(cls) -> Optional[SessionStatus]:
+        """Sessions exceeding max retries transition to TERMINATING."""
+        return SessionStatus.TERMINATING
+
     @property
     def lock_id(self) -> Optional[LockID]:
-        """Lock for operations targeting PREPARING sessions (retry)."""
+        """Lock for operations targeting PREPARING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
-    async def execute(self) -> ScheduleResult:
-        """Check and retry stuck PREPARING/PULLING sessions."""
-        log.debug("Checking for stuck PREPARING/PULLING sessions to retry")
+    async def execute(
+        self,
+        scaling_group: str,
+        sessions: Sequence[SessionWithKernels],
+    ) -> SessionExecutionResult:
+        """Check and retry stuck PREPARING/PULLING sessions.
 
-        # Call scheduler method to handle retry logic
-        return await self._scheduler.retry_preparing_sessions()
+        Fetches detailed session data and delegates to Launcher's retry method which handles:
+        - Filtering truly stuck sessions
+        - Checking with agents if sessions are actively pulling
+        - Updating retry counts
+        - Re-triggering image pulling for sessions that should retry
+        """
+        result = SessionExecutionResult()
 
-    async def post_process(self, result: ScheduleResult) -> None:
-        """Request precondition check if sessions were retried."""
-        log.info("Retried {} stuck PREPARING/PULLING sessions", len(result.scheduled_sessions))
+        if not sessions:
+            return result
+
+        # Extract session IDs from SessionWithKernels
+        session_ids = [s.session_info.identity.id for s in sessions]
+
+        # Fetch detailed session data (SessionDataForPull) from repository
+        sessions_with_images = await self._repository.get_sessions_for_pull_by_ids(session_ids)
+        sessions_for_pull = sessions_with_images.sessions
+        image_configs = sessions_with_images.image_configs
+
+        if not sessions_for_pull:
+            return result
+
+        # Delegate to Launcher's handler-specific method
+        retried_session_ids = await self._launcher.retry_preparing_for_handler(
+            sessions_for_pull, image_configs
+        )
+
+        # Sessions that were retried are successes
+        # Launcher internally handles retry count and marks stale sessions
+        result.successes.extend(retried_session_ids)
+
+        return result
+
+    async def post_process(self, result: SessionExecutionResult) -> None:
+        """Log retry results."""
+        log.info("Completed retry check for PREPARING/PULLING sessions")

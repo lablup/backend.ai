@@ -1198,18 +1198,17 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .clients.agent import AgentPool
-    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.scheduler.factory import create_default_scheduler_components
     from .sokovan.sokovan import SokovanOrchestrator
 
     # Create agent pool for scheduler
     agent_pool = AgentPool(root_ctx.agent_cache)
 
-    # Create scheduler with default components
-    scheduler = create_default_scheduler(
+    # Create scheduler components
+    scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
         root_ctx.config_provider,
-        root_ctx.distributed_lock_factory,
         agent_pool,
         root_ctx.network_plugin_ctx,
         root_ctx.event_producer,
@@ -1254,7 +1253,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
 
     # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler=scheduler,
+        scheduler_components=scheduler_components,
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,

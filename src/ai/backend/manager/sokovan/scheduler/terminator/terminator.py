@@ -10,18 +10,19 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentPool
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
+    SweptSessionInfo,
+    TerminatingKernelWithAgentData,
+    TerminatingSessionData,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
-from ai.backend.manager.sokovan.scheduler.types import SessionTransitionData
+from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -61,6 +62,32 @@ class SessionTerminator:
         # Fetch all terminating sessions
         terminating_sessions = await self._repository.get_terminating_sessions()
 
+        return await self._terminate_sessions_internal(terminating_sessions)
+
+    async def terminate_sessions_for_handler(
+        self,
+        terminating_sessions: list[TerminatingSessionData],
+    ) -> None:
+        """
+        Send termination requests for the given sessions.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by TerminateSessionsLifecycleHandler.
+
+        :param terminating_sessions: List of sessions to terminate with kernel details
+        """
+        await self._terminate_sessions_internal(terminating_sessions)
+
+    async def _terminate_sessions_internal(
+        self,
+        terminating_sessions: list[TerminatingSessionData],
+    ) -> ScheduleResult:
+        """
+        Internal implementation for terminating sessions.
+
+        :param terminating_sessions: List of sessions to terminate
+        :return: Empty ScheduleResult (no status updates performed here)
+        """
         if not terminating_sessions:
             log.debug("No sessions to terminate")
             return ScheduleResult()
@@ -215,6 +242,38 @@ class SessionTerminator:
 
         return ScheduleResult()
 
+    async def sweep_stale_sessions_for_handler(
+        self,
+        timed_out_sessions: list[SweptSessionInfo],
+    ) -> list[SessionId]:
+        """
+        Sweep stale sessions from given list.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by SweepSessionsLifecycleHandler.
+
+        :param timed_out_sessions: List of sessions that have timed out
+        :return: List of session IDs that were marked for termination
+        """
+        if not timed_out_sessions:
+            return []
+
+        # Extract session IDs
+        session_ids = [session.session_id for session in timed_out_sessions]
+
+        log.info(
+            "Found {} sessions with pending timeout that need termination",
+            len(session_ids),
+        )
+
+        # Mark sessions as TERMINATING
+        await self._repository.mark_sessions_terminating(
+            session_ids,
+            reason="PENDING_TIMEOUT",
+        )
+
+        return session_ids
+
     async def sweep_lost_agent_kernels(self) -> ScheduleResult:
         """
         Sweep kernels in TERMINATING sessions that cannot be terminated normally.
@@ -279,83 +338,138 @@ class SessionTerminator:
 
         return ScheduleResult()
 
-    async def sweep_stale_kernels(self) -> ScheduleResult:
+    async def sweep_lost_agent_kernels_for_handler(
+        self,
+        lost_kernels: list[TerminatingKernelWithAgentData],
+    ) -> int:
         """
-        Sweep kernels with stale presence status.
-        Only updates kernel status to TERMINATED, does NOT change session status.
+        Sweep kernels with lost/missing agents from given list.
 
-        :return: ScheduleResult with affected sessions for post-processing
+        Handler-specific method that works with pre-fetched data.
+        Used by SweepLostAgentKernelsLifecycleHandler.
+
+        :param lost_kernels: List of kernels with lost agents
+        :return: Number of swept kernels
         """
-        # 1. Get RUNNING sessions with RUNNING kernels
-        running_sessions = await self._repository.get_sessions_for_transition(
-            session_statuses=[SessionStatus.RUNNING],
-            kernel_statuses=[KernelStatus.RUNNING],
+        if not lost_kernels:
+            return 0
+
+        log.info(
+            "Sweeping {} kernels with lost/missing agents",
+            len(lost_kernels),
         )
-        if not running_sessions:
-            return ScheduleResult()
 
-        # 2. Extract kernel IDs and agent IDs, then check presence status in Redis
+        # Build kernel results
+        kernel_results: list[KernelTerminationResult] = []
+
+        for kernel in lost_kernels:
+            log.info(
+                "Sweeping kernel {} in session {} (agent: {}, agent_status: {})",
+                kernel.kernel_id,
+                kernel.session_id,
+                kernel.agent_id,
+                kernel.agent_status,
+            )
+
+            # Mark as successfully terminated since agent is gone
+            kernel_result = KernelTerminationResult(
+                kernel_id=kernel.kernel_id,
+                agent_id=kernel.agent_id,
+                occupied_slots=ResourceSlot(),  # Empty since agent is lost/missing
+                success=True,
+            )
+            kernel_results.append(kernel_result)
+
+        # Batch update all swept kernels (sessions will be updated by other handlers)
+        await self._repository.batch_update_kernels_terminated(
+            kernel_results,
+            reason="swept-lost-agent",
+        )
+
+        log.info("Successfully swept {} kernels", len(kernel_results))
+
+        # Request check-terminating-progress to update session status
+        await self._valkey_schedule.mark_schedule_needed(
+            ScheduleType.CHECK_TERMINATING_PROGRESS.value
+        )
+
+        return len(kernel_results)
+
+    async def sweep_stale_kernels_for_handler(
+        self,
+        sessions: list[SessionWithKernels],
+    ) -> list[SessionWithKernels]:
+        """
+        Sweep stale kernels from given sessions.
+
+        Handler-specific method that works with SessionWithKernels data.
+        Used by SweepStaleKernelsLifecycleHandler.
+
+        :param sessions: List of RUNNING sessions to check for stale kernels
+        :return: List of sessions that had stale kernels terminated
+        """
+        if not sessions:
+            return []
+
+        # 1. Extract kernel IDs and agent IDs, then check presence status in Redis
         running_kernel_ids: list[KernelId] = []
         agent_ids: set[AgentId] = set()
-        for session in running_sessions:
-            for kernel in session.kernels:
-                running_kernel_ids.append(KernelId(UUID(kernel.kernel_id)))
-                agent_ids.add(kernel.agent_id)
+        for session in sessions:
+            for kernel_info in session.kernel_infos:
+                running_kernel_ids.append(KernelId(kernel_info.id))
+                if kernel_info.resource.agent:
+                    agent_ids.add(AgentId(kernel_info.resource.agent))
+
+        if not running_kernel_ids:
+            return []
+
         statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
             running_kernel_ids,
             agent_ids=agent_ids,
         )
 
-        # 3. Filter STALE kernels (None status or STALE presence)
-        stale_kernel_id_set: set[str] = {
-            str(kernel_id)
+        # 2. Filter STALE kernels (None status or STALE presence)
+        stale_kernel_id_set: set[UUID] = {
+            kernel_id
             for kernel_id in running_kernel_ids
             if (status := statuses.get(kernel_id)) is None
             or status.presence == HealthCheckStatus.STALE
         }
         if not stale_kernel_id_set:
-            return ScheduleResult()
+            return []
 
-        # 4. Check with agent RPC - only explicit False terminates
+        # 3. Check with agent RPC - only explicit False terminates
         dead_kernel_ids: list[str] = []
-        affected_sessions: list[SessionTransitionData] = []
+        affected_sessions: list[SessionWithKernels] = []
 
-        for session in running_sessions:
-            for kernel in session.kernels:
-                if kernel.kernel_id not in stale_kernel_id_set:
+        for session in sessions:
+            for kernel_info in session.kernel_infos:
+                if kernel_info.id not in stale_kernel_id_set:
+                    continue
+                if not kernel_info.resource.agent:
                     continue
                 try:
-                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
-                    is_running = await agent_client.check_running(kernel.kernel_id)
+                    agent_id = AgentId(kernel_info.resource.agent)
+                    agent_client = self._agent_pool.get_agent_client(agent_id)
+                    is_running = await agent_client.check_running(str(kernel_info.id))
                     if is_running is False:
-                        dead_kernel_ids.append(kernel.kernel_id)
+                        dead_kernel_ids.append(str(kernel_info.id))
                         if session not in affected_sessions:
                             affected_sessions.append(session)
                 except Exception as e:
                     log.warning(
                         "Failed to check kernel {} status: {}. Skipping.",
-                        kernel.kernel_id,
+                        kernel_info.id,
                         e,
                     )
 
         if not dead_kernel_ids:
-            return ScheduleResult()
+            return []
 
-        # 5. Update kernel status to TERMINATED (NOT session status)
+        # 4. Update kernel status to TERMINATED (NOT session status)
         updated_count = await self._repository.update_kernels_to_terminated(
             dead_kernel_ids, reason="STALE_KERNEL"
         )
         log.info("Marked {} stale kernels as TERMINATED", updated_count)
 
-        # 6. Return result for post_process to trigger CHECK_RUNNING_SESSION_TERMINATION
-        return ScheduleResult(
-            scheduled_sessions=[
-                ScheduledSessionData(
-                    session_id=s.session_id,
-                    creation_id=s.creation_id,
-                    access_key=s.access_key,
-                    reason="STALE_KERNEL",
-                )
-                for s in affected_sessions
-            ]
-        )
+        return affected_sessions

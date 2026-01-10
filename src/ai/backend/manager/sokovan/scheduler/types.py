@@ -773,50 +773,6 @@ class KernelCreationInfo:
 
 
 @dataclass(frozen=True)
-class KernelTransitionData:
-    """Kernel information for state transitions."""
-
-    kernel_id: str
-    agent_id: AgentId
-    agent_addr: str
-    cluster_role: str  # DEFAULT_ROLE for main kernel
-    container_id: Optional[str]
-    startup_command: Optional[str]
-    status_info: Optional[str]
-    occupied_slots: Optional[ResourceSlot] = None
-
-
-@dataclass(frozen=True)
-class SessionTransitionData:
-    """
-    Session data for state transitions.
-    Contains all necessary information for hooks without exposing database rows.
-    """
-
-    session_id: SessionId
-    creation_id: str
-    session_name: str
-    session_type: SessionTypes
-    access_key: AccessKey
-    cluster_mode: ClusterMode
-    network_type: Optional[NetworkType]
-    network_id: Optional[str]
-    status_info: Optional[str]
-    kernels: list[KernelTransitionData]
-    batch_timeout: Optional[int]  # For batch sessions
-
-    @property
-    def main_kernel(self) -> KernelTransitionData:
-        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
-        main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
-        if len(main_kernels) > 1:
-            raise TooManyKernelsFound(f"Session {self.session_id} has more than 1 main kernel")
-        if len(main_kernels) == 0:
-            raise MainKernelNotFound(f"Session {self.session_id} has no main kernel")
-        return main_kernels[0]
-
-
-@dataclass(frozen=True)
 class SessionRunningData:
     """
     Data for updating a session to RUNNING state.
@@ -843,6 +799,18 @@ class SessionWithKernels:
 
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
+
+    @property
+    def main_kernel(self) -> KernelInfo:
+        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
+        main_kernels = [k for k in self.kernel_infos if k.cluster.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise TooManyKernelsFound(
+                f"Session {self.session_info.identity.id} has more than 1 main kernel"
+            )
+        if len(main_kernels) == 0:
+            raise MainKernelNotFound(f"Session {self.session_info.identity.id} has no main kernel")
+        return main_kernels[0]
 
 
 @dataclass

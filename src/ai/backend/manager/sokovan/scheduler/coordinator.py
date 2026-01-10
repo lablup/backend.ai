@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
@@ -24,29 +25,31 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
 from .handlers import (
-    CheckCreatingProgressHandler,
-    CheckPreconditionHandler,
-    CheckPullingProgressHandler,
-    CheckRunningSessionTerminationHandler,
-    CheckTerminatingProgressHandler,
-    RetryCreatingHandler,
-    RetryPreparingHandler,
-    SchedulerHandler,
-    ScheduleSessionsHandler,
-    StartSessionsHandler,
-    SweepLostAgentKernelsHandler,
-    SweepSessionsHandler,
-    SweepStaleKernelsHandler,
-    TerminateSessionsHandler,
+    CheckCreatingProgressLifecycleHandler,
+    CheckPreconditionLifecycleHandler,
+    CheckPullingProgressLifecycleHandler,
+    CheckRunningSessionTerminationLifecycleHandler,
+    CheckTerminatingProgressLifecycleHandler,
+    RetryCreatingLifecycleHandler,
+    RetryPreparingLifecycleHandler,
+    ScheduleSessionsLifecycleHandler,
+    SessionLifecycleHandler,
+    StartSessionsLifecycleHandler,
+    SweepLostAgentKernelsLifecycleHandler,
+    SweepSessionsLifecycleHandler,
+    SweepStaleKernelsLifecycleHandler,
+    TerminateSessionsLifecycleHandler,
 )
 from .kernel import KernelStateEngine
-from .recorder import RecorderContext
+from .recorder import SessionRecorderContext
+from .results import SessionExecutionResult
 from .types import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -87,9 +90,10 @@ class ScheduleCoordinator:
     """
 
     _valkey_schedule: ValkeyScheduleClient
-    _scheduler: Scheduler
+    _components: SchedulerComponents
     _scheduling_controller: SchedulingController
-    _schedule_handlers: Mapping[ScheduleType, SchedulerHandler]
+    _repository: SchedulerRepository
+    _lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
     _lock_factory: DistributedLockFactory
@@ -99,76 +103,310 @@ class ScheduleCoordinator:
     def __init__(
         self,
         valkey_schedule: ValkeyScheduleClient,
-        scheduler: Scheduler,
+        components: SchedulerComponents,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
-        config_provider: ManagerConfigProvider,
     ) -> None:
         self._valkey_schedule = valkey_schedule
-        self._scheduler = scheduler
+        self._components = components
         self._scheduling_controller = scheduling_controller
+        self._repository = components.repository
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        self._config_provider = config_provider
+        self._config_provider = components.config_provider
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
-        # Initialize kernel state engine with the scheduler's repository
-        self._kernel_state_engine = KernelStateEngine(scheduler._repository)
+        # Initialize kernel state engine with the component's repository
+        self._kernel_state_engine = KernelStateEngine(components.repository)
 
-        # Initialize handlers using a dedicated method
-        self._schedule_handlers = self._init_handlers()
+        # Initialize lifecycle handlers
+        self._lifecycle_handlers = self._init_lifecycle_handlers()
 
-    def _init_handlers(self) -> Mapping[ScheduleType, SchedulerHandler]:
-        """Initialize and return the mapping of schedule types to their handlers."""
+    def _init_lifecycle_handlers(self) -> Mapping[ScheduleType, SessionLifecycleHandler]:
+        """Initialize and return the mapping of schedule types to their lifecycle handlers.
+
+        Lifecycle handlers follow the DeploymentCoordinator pattern where:
+        - Coordinator queries sessions based on handler's target_statuses()
+        - Coordinator iterates over scaling groups
+        - Handler executes business logic and returns successes/failures/stales
+        - Coordinator applies status transitions based on handler's declared statuses
+        """
+        # Get components for handlers that need them
+        hook_registry = self._components.hook_registry
+        launcher = self._components.launcher
+        terminator = self._components.terminator
+        provisioner = self._components.provisioner
+
         return {
-            ScheduleType.SCHEDULE: ScheduleSessionsHandler(
-                self._scheduler,
+            # Lifecycle handlers
+            ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
+                provisioner,
                 self._scheduling_controller,
                 self._event_producer,
-                self._scheduler._repository,
+                self._repository,
             ),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                self._scheduler, self._scheduling_controller, self._event_producer
-            ),
-            ScheduleType.START: StartSessionsHandler(self._scheduler, self._event_producer),
-            ScheduleType.TERMINATE: TerminateSessionsHandler(
-                self._scheduler,
+            ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
+                launcher,
+                self._repository,
                 self._scheduling_controller,
                 self._event_producer,
-                self._scheduler._repository,
             ),
-            ScheduleType.SWEEP: SweepSessionsHandler(self._scheduler, self._scheduler._repository),
-            ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsHandler(
-                self._scheduler, self._scheduler._repository
+            ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressLifecycleHandler(
+                self._event_producer,
             ),
-            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsHandler(
-                self._valkey_schedule, self._scheduler, self._scheduler._repository
+            ScheduleType.START: StartSessionsLifecycleHandler(
+                launcher,
+                self._repository,
+                self._event_producer,
             ),
-            ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
-                self._scheduler, self._scheduling_controller, self._event_producer
-            ),
-            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(
-                self._scheduler, self._scheduling_controller, self._event_producer
-            ),
-            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
-                self._scheduler,
+            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressLifecycleHandler(
                 self._scheduling_controller,
                 self._event_producer,
-                self._scheduler._repository,
+                self._repository,
+                hook_registry,
             ),
-            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: CheckRunningSessionTerminationHandler(
+            ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
+                terminator,
+                self._repository,
+            ),
+            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressLifecycleHandler(
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+                hook_registry,
+            ),
+            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: (
+                CheckRunningSessionTerminationLifecycleHandler(
+                    self._valkey_schedule,
+                    self._repository,
+                )
+            ),
+            # Recovery handlers
+            ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
+                launcher,
+                self._repository,
+            ),
+            ScheduleType.RETRY_CREATING: RetryCreatingLifecycleHandler(
+                launcher,
+                self._repository,
+            ),
+            # Maintenance handlers
+            ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
+                terminator,
+                self._repository,
+            ),
+            ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsLifecycleHandler(
+                terminator,
+                self._repository,
+            ),
+            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
+                terminator,
                 self._valkey_schedule,
-                self._scheduler,
-                self._scheduler._repository,
-            ),
-            ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
-                self._scheduler, self._scheduling_controller, self._event_producer
-            ),
-            ScheduleType.RETRY_CREATING: RetryCreatingHandler(
-                self._scheduler, self._scheduling_controller, self._event_producer
+                self._repository,
             ),
         }
+
+    async def process_lifecycle_schedule(
+        self,
+        schedule_type: ScheduleType,
+    ) -> bool:
+        """Process a lifecycle schedule type using the DeploymentCoordinator pattern.
+
+        This method processes each scaling group independently:
+        1. Iterates over all schedulable scaling groups
+        2. For each scaling group:
+           - Creates a SessionRecorderContext for the scaling group
+           - Queries sessions based on handler's target_statuses() and target_kernel_statuses()
+           - Executes handler logic
+           - Applies status transitions immediately
+           - Emits metrics per scaling group
+           - Runs post-processing per scaling group
+
+        This per-scaling-group approach prevents accumulating too many sessions
+        in memory and ensures status updates are applied promptly.
+
+        Args:
+            schedule_type: Type of scheduling operation
+
+        Returns:
+            True if operation was performed, False otherwise
+        """
+        handler = self._lifecycle_handlers.get(schedule_type)
+        if not handler:
+            log.warning("No lifecycle handler for schedule type: {}", schedule_type.value)
+            return False
+
+        try:
+            log.debug("Processing lifecycle schedule type: {}", schedule_type.value)
+
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+
+                # Acquire lock if needed
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
+
+                # Process each scaling group in parallel
+                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+
+                results = await asyncio.gather(
+                    *[
+                        self._process_scaling_group(handler, schedule_type, scaling_group)
+                        for scaling_group in scaling_groups
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Log any exceptions that occurred during parallel processing
+                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error(
+                            "Error processing scaling group {} for {}: {}",
+                            scaling_group,
+                            schedule_type.value,
+                            result,
+                        )
+
+            return True
+
+        except Exception as e:
+            log.exception(
+                "Error processing lifecycle schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_scaling_group(
+        self,
+        handler: SessionLifecycleHandler,
+        schedule_type: ScheduleType,
+        scaling_group: str,
+    ) -> None:
+        """Process a single scaling group for the given handler.
+
+        This method handles all processing for one scaling group:
+        - Creates a SessionRecorderContext scoped to this scaling group
+        - Queries and processes sessions
+        - Applies status transitions
+        - Emits metrics
+        - Runs post-processing
+
+        Args:
+            handler: The lifecycle handler to execute
+            schedule_type: Type of scheduling operation
+            scaling_group: The scaling group to process
+        """
+        # Query sessions for this handler in this scaling group
+        sessions = await self._repository.get_sessions_for_handler(
+            scaling_group,
+            handler.target_statuses(),
+            handler.target_kernel_statuses(),
+        )
+
+        if not sessions:
+            return
+
+        # Create recorder scoped to this scaling group
+        recorder_scope = f"{schedule_type.value}:{scaling_group}"
+        with SessionRecorderContext.scope(recorder_scope) as recorder:
+            # Execute handler logic
+            result = await handler.execute(scaling_group, sessions)
+
+            # Apply status transitions immediately for this scaling group
+            await self._handle_status_transitions(handler, result)
+
+            # Emit metrics per scaling group
+            self._operation_metrics.observe_success(
+                operation=handler.name(),
+                count=result.success_count(),
+            )
+
+            # Post-process if needed (per scaling group)
+            if result.needs_post_processing():
+                try:
+                    await handler.post_process(result)
+                except Exception as e:
+                    log.error(
+                        "Error during post-processing for scaling group {}: {}",
+                        scaling_group,
+                        e,
+                    )
+
+            # Log recorded steps for this scaling group
+            all_records = recorder.get_all_records()
+            if all_records:
+                log.debug(
+                    "Recorded {} sessions with execution records for {} in scaling group {}",
+                    len(all_records),
+                    schedule_type.value,
+                    scaling_group,
+                )
+
+    async def _handle_status_transitions(
+        self,
+        handler: SessionLifecycleHandler,
+        result: SessionExecutionResult,
+    ) -> None:
+        """Apply status transitions based on handler execution results.
+
+        Args:
+            handler: The lifecycle handler that produced the result
+            result: Execution result containing successes, failures, and stales
+        """
+        target_statuses = handler.target_statuses()
+
+        # Update successful sessions
+        success_status = handler.success_status()
+        if success_status is not None and result.successes:
+            updated = await self._repository.update_sessions_status_bulk(
+                result.successes,
+                target_statuses,
+                success_status,
+            )
+            log.debug(
+                "{}: Updated {} sessions to {} (success)",
+                handler.name(),
+                updated,
+                success_status,
+            )
+
+        # Update failed sessions
+        failure_status = handler.failure_status()
+        if failure_status is not None and result.failures:
+            failure_ids = [f.session_id for f in result.failures]
+            updated = await self._repository.update_sessions_status_bulk(
+                failure_ids,
+                target_statuses,
+                failure_status,
+            )
+            log.debug(
+                "{}: Updated {} sessions to {} (failure)",
+                handler.name(),
+                updated,
+                failure_status,
+            )
+
+        # Update stale sessions
+        stale_status = handler.stale_status()
+        if stale_status is not None and result.stales:
+            updated = await self._repository.update_sessions_status_bulk(
+                result.stales,
+                target_statuses,
+                stale_status,
+            )
+            log.debug(
+                "{}: Updated {} sessions to {} (stale)",
+                handler.name(),
+                updated,
+                stale_status,
+            )
 
     async def process_schedule(
         self,
@@ -182,52 +420,7 @@ class ScheduleCoordinator:
         :param schedule_type: Type of scheduling operation
         :return: True if operation was performed, False otherwise
         """
-        try:
-            log.debug("Processing schedule type: {}", schedule_type.value)
-
-            # Get handler from map and execute
-            handler = self._schedule_handlers.get(schedule_type)
-            if not handler:
-                log.warning("No handler for schedule type: {}", schedule_type.value)
-                return False
-
-            # Execute the handler with optional locking and transition recording
-            with RecorderContext.scope(schedule_type.value) as recorder:
-                async with AsyncExitStack() as stack:
-                    stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
-                    if handler.lock_id is not None:
-                        lock_lifetime = (
-                            self._config_provider.config.manager.session_schedule_lock_lifetime
-                        )
-                        await stack.enter_async_context(
-                            self._lock_factory(handler.lock_id, lock_lifetime)
-                        )
-                    result = await handler.execute()
-                    self._operation_metrics.observe_success(
-                        operation=handler.name(), count=result.success_count()
-                    )
-                    if result.needs_post_processing():
-                        try:
-                            await handler.post_process(result)
-                        except Exception as e:
-                            log.error("Error during post-processing: {}", e)
-
-                # Log recorded steps for debugging (can be saved to DB later)
-                all_steps = recorder.get_all_steps()
-                if all_steps:
-                    log.debug(
-                        "Recorded {} sessions with execution steps for {}",
-                        len(all_steps),
-                        schedule_type.value,
-                    )
-            return True
-        except Exception as e:
-            log.exception(
-                "Error processing schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
+        return await self.process_lifecycle_schedule(schedule_type)
 
     async def process_if_needed(self, schedule_type: ScheduleType) -> bool:
         """
