@@ -24,6 +24,7 @@ from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -153,10 +154,15 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
             # Build success result - find matching SessionWithKernels for ScheduledSessionData
             session_map = {s.session_info.identity.id: s for s in sessions}
             for running_data in sessions_running_data:
-                result.successes.append(running_data.session_id)
                 original_session = session_map.get(running_data.session_id)
                 if original_session:
                     original_info = original_session.session_info
+                    result.successes.append(
+                        SessionTransitionInfo(
+                            session_id=running_data.session_id,
+                            from_status=original_info.lifecycle.status,
+                        )
+                    )
                     result.scheduled_data.append(
                         ScheduledSessionData(
                             session_id=original_info.identity.id,

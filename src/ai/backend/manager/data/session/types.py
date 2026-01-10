@@ -260,7 +260,7 @@ class SessionInfo:
 class SchedulingResult(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
-    SKIPPED = "SKIPPED"
+    STALE = "STALE"
 
 
 class SubStepResult(BaseModel):

@@ -24,8 +24,16 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
+from ai.backend.manager.repositories.scheduling_history.creators import (
+    SessionSchedulingHistoryCreatorSpec,
+)
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -361,18 +369,35 @@ class ScheduleCoordinator:
             result: Execution result containing successes, failures, and stales
         """
         target_statuses = handler.target_statuses()
+        handler_name = handler.name()
 
         # Update successful sessions
         success_status = handler.success_status()
         if success_status is not None and result.successes:
-            updated = await self._repository.update_sessions_status_bulk(
-                result.successes,
-                target_statuses,
-                success_status,
+            updater = BatchUpdater(
+                spec=SessionStatusBatchUpdaterSpec(to_status=success_status),
+                conditions=[
+                    SessionConditions.by_ids(result.success_ids()),
+                    SessionConditions.by_statuses(target_statuses),
+                ],
+            )
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=s.session_id,
+                    phase=handler_name,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{handler_name} completed successfully",
+                    from_status=s.from_status,
+                    to_status=success_status,
+                )
+                for s in result.successes
+            ]
+            updated = await self._repository.update_with_history(
+                updater, BulkCreator(specs=history_specs)
             )
             log.debug(
                 "{}: Updated {} sessions to {} (success)",
-                handler.name(),
+                handler_name,
                 updated,
                 success_status,
             )
@@ -380,15 +405,31 @@ class ScheduleCoordinator:
         # Update failed sessions
         failure_status = handler.failure_status()
         if failure_status is not None and result.failures:
-            failure_ids = [f.session_id for f in result.failures]
-            updated = await self._repository.update_sessions_status_bulk(
-                failure_ids,
-                target_statuses,
-                failure_status,
+            updater = BatchUpdater(
+                spec=SessionStatusBatchUpdaterSpec(to_status=failure_status),
+                conditions=[
+                    SessionConditions.by_ids(result.failure_ids()),
+                    SessionConditions.by_statuses(target_statuses),
+                ],
+            )
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=f.session_id,
+                    phase=handler_name,
+                    result=SchedulingResult.FAILURE,
+                    message=f.reason,
+                    from_status=f.from_status,
+                    to_status=failure_status,
+                    error_code=f.error_detail,
+                )
+                for f in result.failures
+            ]
+            updated = await self._repository.update_with_history(
+                updater, BulkCreator(specs=history_specs)
             )
             log.debug(
                 "{}: Updated {} sessions to {} (failure)",
-                handler.name(),
+                handler_name,
                 updated,
                 failure_status,
             )
@@ -396,14 +437,30 @@ class ScheduleCoordinator:
         # Update stale sessions
         stale_status = handler.stale_status()
         if stale_status is not None and result.stales:
-            updated = await self._repository.update_sessions_status_bulk(
-                result.stales,
-                target_statuses,
-                stale_status,
+            updater = BatchUpdater(
+                spec=SessionStatusBatchUpdaterSpec(to_status=stale_status),
+                conditions=[
+                    SessionConditions.by_ids(result.stale_ids()),
+                    SessionConditions.by_statuses(target_statuses),
+                ],
+            )
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=s.session_id,
+                    phase=handler_name,
+                    result=SchedulingResult.STALE,
+                    message=f"{handler_name} marked as stale",
+                    from_status=s.from_status,
+                    to_status=stale_status,
+                )
+                for s in result.stales
+            ]
+            updated = await self._repository.update_with_history(
+                updater, BulkCreator(specs=history_specs)
             )
             log.debug(
                 "{}: Updated {} sessions to {} (stale)",
-                handler.name(),
+                handler_name,
                 updated,
                 stale_status,
             )

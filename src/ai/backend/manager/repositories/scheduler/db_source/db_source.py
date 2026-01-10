@@ -51,6 +51,7 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
@@ -61,6 +62,8 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
+from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
@@ -3729,6 +3732,32 @@ class ScheduleDBSource:
             )
             result = cast(CursorResult, await db_sess.execute(stmt))
             return cast(int, result.rowcount) if result.rowcount else 0
+
+    async def update_with_history(
+        self,
+        updater: BatchUpdater[SessionRow],
+        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+    ) -> int:
+        """Update session statuses and record history in same transaction.
+
+        This method combines batch status update with history recording,
+        ensuring both operations are atomic within a single transaction.
+
+        Args:
+            updater: BatchUpdater containing spec and conditions for session update
+            bulk_creator: BulkCreator containing specs for history records
+
+        Returns:
+            Number of sessions updated
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # 1. Execute batch update
+            update_result = await execute_batch_updater(db_sess, updater)
+
+            # 2. Create history records
+            await execute_bulk_creator(db_sess, bulk_creator)
+
+            return update_result.updated_count
 
     async def update_kernels_status_bulk(
         self,

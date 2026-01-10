@@ -19,7 +19,10 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
-from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
+from ai.backend.manager.sokovan.scheduler.results import (
+    SessionExecutionResult,
+    SessionTransitionInfo,
+)
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -118,8 +121,20 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
         # Mark scheduled sessions as success for status transition
+        session_map = {s.session_info.identity.id: s for s in sessions}
         for event_data in schedule_result.scheduled_sessions:
-            result.successes.append(event_data.session_id)
+            original_session = session_map.get(event_data.session_id)
+            from_status = (
+                original_session.session_info.lifecycle.status
+                if original_session
+                else SessionStatus.PENDING  # fallback to expected status
+            )
+            result.successes.append(
+                SessionTransitionInfo(
+                    session_id=event_data.session_id,
+                    from_status=from_status,
+                )
+            )
             result.scheduled_data.append(event_data)
 
         return result

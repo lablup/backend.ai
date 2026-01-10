@@ -16,6 +16,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleH
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
@@ -110,9 +111,14 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         # Build scheduled data for post-processing
         session_map = {s.session_info.identity.id: s for s in sessions}
         for swept_id in swept_ids:
-            result.stales.append(swept_id)
             if swept_id in session_map:
                 session_data = session_map[swept_id]
+                result.stales.append(
+                    SessionTransitionInfo(
+                        session_id=swept_id,
+                        from_status=session_data.session_info.lifecycle.status,
+                    )
+                )
                 result.scheduled_data.append(
                     ScheduledSessionData(
                         session_id=swept_id,

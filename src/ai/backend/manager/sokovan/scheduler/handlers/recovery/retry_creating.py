@@ -12,7 +12,10 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
-from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
+from ai.backend.manager.sokovan.scheduler.results import (
+    SessionExecutionResult,
+    SessionTransitionInfo,
+)
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
@@ -112,7 +115,20 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
 
         # Sessions that were retried are successes
         # Launcher internally handles retry count and marks stale sessions
-        result.successes.extend(retried_session_ids)
+        session_map = {s.session_info.identity.id: s for s in sessions}
+        for session_id in retried_session_ids:
+            original_session = session_map.get(session_id)
+            from_status = (
+                original_session.session_info.lifecycle.status
+                if original_session
+                else SessionStatus.CREATING  # fallback to expected status
+            )
+            result.successes.append(
+                SessionTransitionInfo(
+                    session_id=session_id,
+                    from_status=from_status,
+                )
+            )
 
         return result
 
