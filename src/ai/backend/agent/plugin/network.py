@@ -19,7 +19,7 @@ class ContainerNetworkCapability(StrEnum):
 @dataclass
 class ContainerNetworkInfo:
     container_host: str
-    services: Mapping[str, Mapping[int, int]]  # {service name: {container port: host port}}
+    services: Mapping[str, tuple[int, int]]  # {service name: (container port, host port)}
 
 
 class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABCMeta):
