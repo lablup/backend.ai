@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
@@ -24,7 +23,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SubStepResult,
 )
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.base import GUID, Base, PydanticListColumn
 
 __all__ = (
     "DeploymentHistoryRow",
@@ -54,7 +53,12 @@ class SessionSchedulingHistoryRow(Base):
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
 
-    sub_steps: Mapped[list[dict] | None] = mapped_column("sub_steps", JSONB, nullable=True)
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
 
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
@@ -80,9 +84,6 @@ class SessionSchedulingHistoryRow(Base):
         return self.phase == phase and self.error_code == error_code
 
     def to_data(self) -> SessionSchedulingHistoryData:
-        sub_steps: list[SubStepResult] | None = None
-        if self.sub_steps:
-            sub_steps = [SubStepResult.model_validate(s) for s in self.sub_steps]
         return SessionSchedulingHistoryData(
             id=self.id,
             session_id=SessionId(self.session_id),
@@ -92,7 +93,7 @@ class SessionSchedulingHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
-            sub_steps=sub_steps,
+            sub_steps=self.sub_steps,  # PydanticListColumn handles conversion
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,
@@ -182,6 +183,13 @@ class DeploymentHistoryRow(Base):
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
 
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -215,6 +223,7 @@ class DeploymentHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,
@@ -243,6 +252,13 @@ class RouteHistoryRow(Base):
         "error_code", sa.String(length=128), nullable=True
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
+
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
 
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
@@ -278,6 +294,7 @@ class RouteHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,

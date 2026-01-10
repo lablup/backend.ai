@@ -23,7 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SchedulingResult
+    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -504,6 +504,8 @@ class DeploymentHistoryData:
     error_code: Optional[str]
     message: str
 
+    sub_steps: list[SubStepResult]
+
     attempts: int
     created_at: datetime
     updated_at: datetime
@@ -524,6 +526,8 @@ class RouteHistoryData:
     result: SchedulingResult
     error_code: Optional[str]
     message: str
+
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import logging
 import uuid
 from collections.abc import (
@@ -26,6 +27,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 from dateutil.parser import isoparse
+from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
@@ -115,6 +117,7 @@ class FixtureOpModes(enum.StrEnum):
 
 T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
 class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
@@ -433,6 +436,36 @@ class StructuredJSONObjectListColumn(TypeDecorator):
 
     def copy(self, **kw) -> Self:
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
+
+
+class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
+    """
+    A column type for storing a list of Pydantic models in JSONB.
+    Always returns empty list instead of None for null values.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: type[TBaseModel]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def coerce_compared_value(self, op, value):
+        return JSONB()
+
+    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> str:
+        if value is not None:
+            return json.dumps([item.model_dump(mode="json") for item in value])
+        return "[]"
+
+    def process_result_value(self, value: str | None, dialect) -> list[TBaseModel]:
+        if value is not None:
+            return [self._schema.model_validate(item) for item in json.loads(value)]
+        return []
+
+    def copy(self, **kw) -> Self:
+        return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
 class URLColumn(TypeDecorator):
