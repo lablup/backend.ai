@@ -22,6 +22,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleH
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -122,7 +123,12 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         # Mark all sessions as success for status transition
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(session_info.identity.id)
+            result.successes.append(
+                SessionTransitionInfo(
+                    session_id=session_info.identity.id,
+                    from_status=session_info.lifecycle.status,
+                )
+            )
             result.scheduled_data.append(
                 ScheduledSessionData(
                     session_id=session_info.identity.id,

@@ -1580,13 +1580,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0c675bd26e91428cab31e3e927929b42da94aa96da92974e57c78f9a732d0e9b",
-              "url": "https://files.pythonhosted.org/packages/6a/d6/6c6a036655e5091b26b9f350dcf43821895325aa4727396b14c67679a957/cross_web-0.4.0-py3-none-any.whl"
+              "hash": "41b07c3a38253c517ec0603c1a366353aff77538946092b0f9a2235033f192c2",
+              "url": "https://files.pythonhosted.org/packages/67/49/92b46b6e65f09b717a66c4e5a9bc47a45ebc83dd0e0ed126f8258363479d/cross_web-0.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4ae65619ddfcd06d6803432c0366342d7e8aeba10194b4e144d73a662e75370c",
-              "url": "https://files.pythonhosted.org/packages/93/4f/bdb62e969649ee76d4741ef8eee34384ec2bc21cc66eb7fd244e6ad62be8/cross_web-0.4.0.tar.gz"
+              "hash": "0466295028dcae98c9ab3d18757f90b0e74fac2ff90efbe87e74657546d9993d",
+              "url": "https://files.pythonhosted.org/packages/a4/58/e688e99d1493c565d1587e64b499268d0a3129ae59f4efe440aac395f803/cross_web-0.4.1.tar.gz"
             }
           ],
           "project_name": "cross-web",
@@ -1594,7 +1594,7 @@
             "typing-extensions>=4.14.0"
           ],
           "requires_python": ">=3.9",
-          "version": "0.4.0"
+          "version": "0.4.1"
         },
         {
           "artifacts": [
@@ -2112,19 +2112,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "fbba7237d6ea277175a32c54bb71ef814a8546d8601269e1bfc388de333974e8",
-              "url": "https://files.pythonhosted.org/packages/9a/30/ab407e2ec752aa541704ed8f93c11e2a5d92c168b8a755d818b74a3c5c2d/filelock-3.20.2-py3-none-any.whl"
+              "hash": "4b0dda527ee31078689fc205ec4f1c1bf7d56cf88b6dc9426c4f230e46c2dce1",
+              "url": "https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a2241ff4ddde2a7cebddf78e39832509cb045d18ec1a09d7248d6bfc6bfbbe64",
-              "url": "https://files.pythonhosted.org/packages/c1/e0/a75dbe4bca1e7d41307323dad5ea2efdd95408f74ab2de8bd7dba9b51a1a/filelock-3.20.2.tar.gz"
+              "hash": "18c57ee915c7ec61cff0ecf7f0f869936c7c30191bb0cf406f1341778d0834e1",
+              "url": "https://files.pythonhosted.org/packages/1d/65/ce7f1b70157833bf3cb851b556a37d4547ceafc158aa9b34b36782f23696/filelock-3.20.3.tar.gz"
             }
           ],
           "project_name": "filelock",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "3.20.2"
+          "version": "3.20.3"
         },
         {
           "artifacts": [
@@ -2278,13 +2278,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8bf1fe301b7d8acfa6e8571e3b1c3d158f909666642431cc78a1b7b4dbc5ec5b",
-              "url": "https://files.pythonhosted.org/packages/51/c7/b64cae5dba3a1b138d7123ec36bb5ccd39d39939f18454407e5468f4763f/fsspec-2025.12.0-py3-none-any.whl"
+              "hash": "cb76aa913c2285a3b49bdd5fc55b1d7c708d7208126b60f2eb8194fe1b4cbdcc",
+              "url": "https://files.pythonhosted.org/packages/01/c9/97cc5aae1648dcb851958a3ddf73ccd7dbe5650d95203ecb4d7720b4cdbf/fsspec-2026.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c505de011584597b1060ff778bb664c1bc022e87921b0e4f10cc9c44f9635973",
-              "url": "https://files.pythonhosted.org/packages/b6/27/954057b0d1f53f086f681755207dda6de6c660ce133c829158e8e8fe7895/fsspec-2025.12.0.tar.gz"
+              "hash": "e987cb0496a0d81bba3a9d1cee62922fb395e7d4c3b575e57f547953334fe07b",
+              "url": "https://files.pythonhosted.org/packages/d5/7d/5df2650c57d47c57232af5ef4b4fdbff182070421e405e0d62c6cdbfaa87/fsspec-2026.1.0.tar.gz"
             }
           ],
           "project_name": "fsspec",
@@ -2298,6 +2298,7 @@
             "aiohttp!=4.0.0a0,!=4.0.0a1; extra == \"http\"",
             "aiohttp!=4.0.0a0,!=4.0.0a1; extra == \"test\"",
             "aiohttp!=4.0.0a0,!=4.0.0a1; extra == \"test-full\"",
+            "backports-zstd; python_version < \"3.14\" and extra == \"test-full\"",
             "cloudpickle; extra == \"test-full\"",
             "dask; extra == \"dask\"",
             "dask; extra == \"full\"",
@@ -2316,10 +2317,10 @@
             "fusepy; extra == \"full\"",
             "fusepy; extra == \"fuse\"",
             "fusepy; extra == \"test-full\"",
-            "gcsfs; extra == \"full\"",
             "gcsfs; extra == \"gcs\"",
             "gcsfs; extra == \"gs\"",
             "gcsfs; extra == \"test-full\"",
+            "gcsfs>2024.2.0; extra == \"full\"",
             "jinja2; extra == \"test-full\"",
             "kerchunk; extra == \"test-full\"",
             "libarchive-c; extra == \"full\"",
@@ -2374,8 +2375,8 @@
             "requests; extra == \"test\"",
             "requests; extra == \"test-full\"",
             "ruff>=0.5; extra == \"dev\"",
-            "s3fs; extra == \"full\"",
             "s3fs; extra == \"s3\"",
+            "s3fs>2024.2.0; extra == \"full\"",
             "smbprotocol; extra == \"full\"",
             "smbprotocol; extra == \"smb\"",
             "smbprotocol; extra == \"test-full\"",
@@ -2388,11 +2389,10 @@
             "urllib3; extra == \"test-full\"",
             "xarray; extra == \"test-downstream\"",
             "yarl; extra == \"doc\"",
-            "zarr; extra == \"test-full\"",
-            "zstandard; python_version < \"3.14\" and extra == \"test-full\""
+            "zarr; extra == \"test-full\""
           ],
           "requires_python": ">=3.10",
-          "version": "2025.12.0"
+          "version": "2026.1.0"
         },
         {
           "artifacts": [
@@ -4819,39 +4819,39 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7636aad9bb01768870266de5dc009de2d1b936771b38a793f73cbbf279c91c5c",
-              "url": "https://files.pythonhosted.org/packages/0e/15/4f02896cc3df04fc465010a4c6a0cd89810f54617a32a70ef531ed75d61c/protobuf-6.33.2-py3-none-any.whl"
+              "hash": "c2bf221076b0d463551efa2e1319f08d4cffcc5f0d864614ccd3d0e77a637794",
+              "url": "https://files.pythonhosted.org/packages/a6/b9/067b8a843569d5605ba6f7c039b9319720a974f82216cd623e13186d3078/protobuf-6.33.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "56dc370c91fbb8ac85bc13582c9e373569668a290aa2e66a590c2a0d35ddb9e4",
-              "url": "https://files.pythonhosted.org/packages/34/44/e49ecff446afeec9d1a66d6bbf9adc21e3c7cea7803a920ca3773379d4f6/protobuf-6.33.2.tar.gz"
+              "hash": "6fa9b5f4baa12257542273e5e6f3c3d3867b30bc2770c14ad9ac8315264bf986",
+              "url": "https://files.pythonhosted.org/packages/38/8c/6522b8e543ece46f645911c3cebe361d8460134c0fee02ddcf70ebf32999/protobuf-6.33.3-cp39-abi3-manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1f8017c48c07ec5859106533b682260ba3d7c5567b1ca1f24297ce03384d1b4f",
-              "url": "https://files.pythonhosted.org/packages/56/13/333b8f421738f149d4fe5e49553bc2a2ab75235486259f689b4b91f96cec/protobuf-6.33.2-cp39-abi3-manylinux2014_x86_64.whl"
+              "hash": "08a6ca12f60ba99097dd3625ef4275280f99c9037990e47ce9368826b159b890",
+              "url": "https://files.pythonhosted.org/packages/c5/46/551c69b6ff1957bd703654342bfb776bb97db400bc80afc56fbb64e7c11d/protobuf-6.33.3-cp39-abi3-manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b5d3b5625192214066d99b2b605f5783483575656784de223f00a8d00754fc0e",
-              "url": "https://files.pythonhosted.org/packages/7d/4f/f743761e41d3b2b2566748eb76bbff2b43e14d5fcab694f494a16458b05f/protobuf-6.33.2-cp39-abi3-manylinux2014_aarch64.whl"
+              "hash": "642fce7187526c98683c79a3ad68e5d646a5ef5eb004582fe123fc9a33a9456b",
+              "url": "https://files.pythonhosted.org/packages/ca/6d/ade1cca06c64a421ee9745e082671465ead28164c809efaf2c15bc93f9a0/protobuf-6.33.3-cp39-abi3-manylinux2014_s390x.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8cd7640aee0b7828b6d03ae518b5b4806fdfc1afe8de82f79c3454f8aef29872",
-              "url": "https://files.pythonhosted.org/packages/b1/fa/26468d00a92824020f6f2090d827078c09c9c587e34cbfd2d0c7911221f8/protobuf-6.33.2-cp39-abi3-manylinux2014_s390x.whl"
+              "hash": "c8794debeb402963fddff41a595e1f649bcd76616ba56c835645cab4539e810e",
+              "url": "https://files.pythonhosted.org/packages/cc/5c/f912bdebdd4af4160da6a2c2b1b3aaa1b8c578d0243ba8f694f93c7095f0/protobuf-6.33.3.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "d9b19771ca75935b3a4422957bc518b0cecb978b31d1dd12037b088f6bcc0e43",
-              "url": "https://files.pythonhosted.org/packages/b2/ca/7e485da88ba45c920fb3f50ae78de29ab925d9e54ef0de678306abfbb497/protobuf-6.33.2-cp39-abi3-macosx_10_9_universal2.whl"
+              "hash": "648b7b0144222eb06cf529a3d7b01333c5f30b4196773b682d388f04db373759",
+              "url": "https://files.pythonhosted.org/packages/ec/5d/0ef28dded98973a26443a6a7bc49bff6206be8c57dc1d1e28e6c1147b879/protobuf-6.33.3-cp39-abi3-macosx_10_9_universal2.whl"
             }
           ],
           "project_name": "protobuf",
           "requires_dists": [],
           "requires_python": ">=3.9",
-          "version": "6.33.2"
+          "version": "6.33.3"
         },
         {
           "artifacts": [
@@ -7322,28 +7322,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a1e37a3b71c7cb923b54af21a9a50eab1cbf9423ecbf9be096abd77f19f8a7ad",
-              "url": "https://files.pythonhosted.org/packages/89/23/dad9c15aa6ed4e5ab8779afe1fa947c04a87b75f8cc11ddf7ddb15724b35/valkey_glide-2.2.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "a2357da132e58b96165c5c7226b571eb68f87d176b4f1b61c15b720db6d61d02",
+              "url": "https://files.pythonhosted.org/packages/8e/57/f8d9e729cb15c6ec90b7fcf10d1548cab5703c8f7a355b12fd7925a62faf/valkey_glide-2.2.5-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1b21ea0b8baf4512c94d6aeb16bf05746237b29000c1542eb831d4d3e7254645",
-              "url": "https://files.pythonhosted.org/packages/2a/d3/5b2fe03205ceda7f5d8643cc09b5fb8aa147a2900a9ed496f93e1d6b8757/valkey_glide-2.2.3-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "098f6f3c0a941e7ae39ed937ecfadb02db75f2c514b94e9f8b6a85f9be1acb2a",
+              "url": "https://files.pythonhosted.org/packages/7b/8d/c34c6b57a67da47a359a3f6abe4a1a2955157d3d751e17af56fa0dd75a0d/valkey_glide-2.2.5-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dba0ce2cee2c74b5bdf6c971e3d615e8e56952e77e3d40b800f57dd6e18e0928",
-              "url": "https://files.pythonhosted.org/packages/57/22/2e1094949eef4ffba0d6dc3f592468767a67cf9a03c3586673e5558ca2c4/valkey_glide-2.2.3-cp313-cp313-macosx_11_0_arm64.whl"
+              "hash": "e36e312791ce204fa2580c7f6677d659b5080c4af96f4b1a9e7fc8ecbb358c72",
+              "url": "https://files.pythonhosted.org/packages/96/35/1fe029b13cd34642fc57f53b4e8ceb8b4f6864ab78be08385b378ec7f4e0/valkey_glide-2.2.5-cp313-cp313-macosx_10_7_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1c0ab1df2b5cfb73814fc2685a3455568aa43e76f21a7bf514c8b2aef5c7be3f",
-              "url": "https://files.pythonhosted.org/packages/74/2f/eeaf576ff279eb89e6f341edcff16c5d1ef8fc2589223a51075e17514bb9/valkey_glide-2.2.3-cp313-cp313-macosx_10_7_x86_64.whl"
+              "hash": "4f074927d15b00d481e0c7d206b64b991e92e27c335a4a309dc67fe6080d660d",
+              "url": "https://files.pythonhosted.org/packages/de/d4/d4798a6f384948c0cb41a61bc7d80cc64d68288db556515ec021a5ab39ec/valkey_glide-2.2.5-cp313-cp313-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "24fba62939b58b15476f7b0f7e0c8beea18a2aaec18c353a21a5776252814dea",
-              "url": "https://files.pythonhosted.org/packages/cd/6c/2f0ed839a9b82fc3677f5a7de11d7b9d6e0ecc4f5be60911737e0e994cbe/valkey_glide-2.2.3.tar.gz"
+              "hash": "7abd6ce28d655caed4a5f41e056b5a13ce7b3271435ae9bc2c8c72ba725c4adf",
+              "url": "https://files.pythonhosted.org/packages/f6/eb/9303e7b46f9375144ef70810c7de8b7e734a8f690b84f095dc8f04f59922/valkey_glide-2.2.5.tar.gz"
             }
           ],
           "project_name": "valkey-glide",
@@ -7354,19 +7354,19 @@
             "typing-extensions>=4.8.0; python_version < \"3.11\""
           ],
           "requires_python": ">=3.9",
-          "version": "2.2.3"
+          "version": "2.2.5"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e7ded577f3af534fd0886d4ca03277f5542053bedb98a70a989d3c22cfa5c9ac",
-              "url": "https://files.pythonhosted.org/packages/eb/6a/0af36875e0023a1f2d0b66b4051721fc26740e947696922df1665b75e5d3/virtualenv-20.36.0-py3-none-any.whl"
+              "hash": "575a8d6b124ef88f6f51d56d656132389f961062a9177016a50e4f507bbcc19f",
+              "url": "https://files.pythonhosted.org/packages/6a/2a/dc2228b2888f51192c7dc766106cd475f1b768c10caaf9727659726f7391/virtualenv-20.36.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a3601f540b515a7983508113f14e78993841adc3d83710fa70f0ac50f43b23ed",
-              "url": "https://files.pythonhosted.org/packages/78/49/87e23d8f742f10f965bce5d6b285fc88a4f436b11daf6b6225d4d66f8492/virtualenv-20.36.0.tar.gz"
+              "hash": "8befb5c81842c641f8ee658481e42641c68b5eab3521d8e092d18320902466ba",
+              "url": "https://files.pythonhosted.org/packages/aa/a3/4d310fa5f00863544e1d0f4de93bddec248499ccf97d4791bc3122c9d4f3/virtualenv-20.36.1.tar.gz"
             }
           ],
           "project_name": "virtualenv",
@@ -7398,7 +7398,7 @@
             "typing-extensions>=4.13.2; python_version < \"3.11\""
           ],
           "requires_python": ">=3.8",
-          "version": "20.36.0"
+          "version": "20.36.1"
         },
         {
           "artifacts": [

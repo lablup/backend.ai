@@ -45,10 +45,22 @@ class ScheduleResult:
 
 
 @dataclass
+class SessionTransitionInfo:
+    """Session transition information for history recording.
+
+    Contains session_id with its actual from_status at the time of processing.
+    """
+
+    session_id: SessionId
+    from_status: SessionStatus
+
+
+@dataclass
 class SessionExecutionError:
     """Error information for a failed session operation."""
 
     session_id: SessionId
+    from_status: SessionStatus
     reason: str
     error_detail: str
 
@@ -93,9 +105,9 @@ class SessionExecutionResult:
     Coordinator uses this result to apply status transitions.
     """
 
-    successes: list[SessionId] = field(default_factory=list)
+    successes: list[SessionTransitionInfo] = field(default_factory=list)
     failures: list[SessionExecutionError] = field(default_factory=list)
-    stales: list[SessionId] = field(default_factory=list)
+    stales: list[SessionTransitionInfo] = field(default_factory=list)
     # For post-processing (event broadcasting, cache invalidation)
     scheduled_data: list[ScheduledSessionData] = field(default_factory=list)
 
@@ -106,6 +118,18 @@ class SessionExecutionResult:
     def success_count(self) -> int:
         """Get the count of successfully processed sessions."""
         return len(self.successes)
+
+    def success_ids(self) -> list[SessionId]:
+        """Get list of successful session IDs."""
+        return [s.session_id for s in self.successes]
+
+    def failure_ids(self) -> list[SessionId]:
+        """Get list of failed session IDs."""
+        return [f.session_id for f in self.failures]
+
+    def stale_ids(self) -> list[SessionId]:
+        """Get list of stale session IDs."""
+        return [s.session_id for s in self.stales]
 
     def merge(self, other: SessionExecutionResult) -> None:
         """Merge another result into this one."""

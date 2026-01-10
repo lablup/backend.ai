@@ -28,8 +28,12 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
@@ -813,6 +817,26 @@ class SchedulerRepository:
         return await self._db_source.update_sessions_status_bulk(
             session_ids, from_statuses, to_status, reason
         )
+
+    @scheduler_repository_resilience.apply()
+    async def update_with_history(
+        self,
+        updater: BatchUpdater[SessionRow],
+        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+    ) -> int:
+        """Update session statuses and record history in same transaction.
+
+        This method combines batch status update with history recording,
+        ensuring both operations are atomic within a single transaction.
+
+        Args:
+            updater: BatchUpdater containing spec and conditions for session update
+            bulk_creator: BulkCreator containing specs for history records
+
+        Returns:
+            Number of sessions updated
+        """
+        return await self._db_source.update_with_history(updater, bulk_creator)
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_status_bulk(

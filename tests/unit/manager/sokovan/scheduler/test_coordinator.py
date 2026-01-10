@@ -35,7 +35,10 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     HandlerSessionData,
+    ScheduledSessionData,
+    SessionExecutionError,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -307,7 +310,7 @@ def create_handler_session_data(
 
 
 class TestProcessLifecycleSchedule:
-    """Test cases for process_lifecycle_schedule method."""
+    """Test cases for process_lifecycle_schedule basic flow."""
 
     @pytest.fixture
     def mock_lifecycle_handler(self) -> MagicMock:
@@ -331,6 +334,7 @@ class TestProcessLifecycleSchedule:
         mock.get_schedulable_scaling_groups = AsyncMock(return_value=["default"])
         mock.get_sessions_for_handler = AsyncMock(return_value=[])
         mock.update_sessions_status_bulk = AsyncMock(return_value=0)
+        mock.update_with_history = AsyncMock(return_value=1)
         return mock
 
     async def test_process_lifecycle_schedule_no_handler(
@@ -376,7 +380,12 @@ class TestProcessLifecycleSchedule:
 
         # Handler returns success for each
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult(
-            successes=[session1.session_id]
+            successes=[
+                SessionTransitionInfo(
+                    session_id=session1.session_id,
+                    from_status=session1.status,
+                )
+            ]
         )
 
         result = await schedule_coordinator.process_lifecycle_schedule(
@@ -414,115 +423,6 @@ class TestProcessLifecycleSchedule:
         # Handler execute should only be called once (for sg2)
         assert mock_lifecycle_handler.execute.call_count == 1
 
-    async def test_handle_status_transitions_success(
-        self,
-        schedule_coordinator: ScheduleCoordinator,
-        mock_lifecycle_handler: MagicMock,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test _handle_status_transitions applies success status."""
-        # Setup
-        schedule_coordinator._repository = mock_repository
-        session_id = SessionId(uuid4())
-
-        result = SessionExecutionResult(successes=[session_id])
-
-        # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
-
-        # Verify success status update was called
-        mock_repository.update_sessions_status_bulk.assert_called_once_with(
-            [session_id],
-            [SessionStatus.PREPARING],
-            SessionStatus.PREPARED,
-        )
-
-    async def test_handle_status_transitions_failure(
-        self,
-        schedule_coordinator: ScheduleCoordinator,
-        mock_lifecycle_handler: MagicMock,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test _handle_status_transitions applies failure status."""
-        # Setup
-        schedule_coordinator._repository = mock_repository
-        session_id = SessionId(uuid4())
-        mock_lifecycle_handler.failure_status.return_value = SessionStatus.CANCELLED
-
-        from ai.backend.manager.sokovan.scheduler.results import SessionExecutionError
-
-        result = SessionExecutionResult(
-            failures=[
-                SessionExecutionError(
-                    session_id=session_id,
-                    reason="test",
-                    error_detail="test error",
-                )
-            ]
-        )
-
-        # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
-
-        # Verify failure status update was called
-        mock_repository.update_sessions_status_bulk.assert_called_once_with(
-            [session_id],
-            [SessionStatus.PREPARING],
-            SessionStatus.CANCELLED,
-        )
-
-    async def test_handle_status_transitions_stale(
-        self,
-        schedule_coordinator: ScheduleCoordinator,
-        mock_lifecycle_handler: MagicMock,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test _handle_status_transitions applies stale status."""
-        # Setup
-        schedule_coordinator._repository = mock_repository
-        session_id = SessionId(uuid4())
-        mock_lifecycle_handler.stale_status.return_value = SessionStatus.TERMINATING
-        mock_lifecycle_handler.success_status.return_value = None
-
-        result = SessionExecutionResult(stales=[session_id])
-
-        # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
-
-        # Verify stale status update was called
-        mock_repository.update_sessions_status_bulk.assert_called_once_with(
-            [session_id],
-            [SessionStatus.PREPARING],
-            SessionStatus.TERMINATING,
-        )
-
-    async def test_handle_status_transitions_no_update_when_status_none(
-        self,
-        schedule_coordinator: ScheduleCoordinator,
-        mock_lifecycle_handler: MagicMock,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test _handle_status_transitions doesn't update when status is None."""
-        # Setup
-        schedule_coordinator._repository = mock_repository
-        session_id = SessionId(uuid4())
-
-        # All status methods return None
-        mock_lifecycle_handler.success_status.return_value = None
-        mock_lifecycle_handler.failure_status.return_value = None
-        mock_lifecycle_handler.stale_status.return_value = None
-
-        result = SessionExecutionResult(
-            successes=[session_id],
-            stales=[session_id],
-        )
-
-        # Execute
-        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
-
-        # Verify no updates were made
-        mock_repository.update_sessions_status_bulk.assert_not_called()
-
     async def test_process_lifecycle_schedule_calls_post_process(
         self,
         schedule_coordinator: ScheduleCoordinator,
@@ -540,11 +440,9 @@ class TestProcessLifecycleSchedule:
         session = create_handler_session_data(session_id)
         mock_repository.get_sessions_for_handler.return_value = [session]
 
-        from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-
         # Handler returns result that needs post-processing
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult(
-            successes=[session_id],
+            successes=[SessionTransitionInfo(session_id=session_id, from_status=session.status)],
             scheduled_data=[
                 ScheduledSessionData(
                     session_id=session_id,
@@ -559,6 +457,207 @@ class TestProcessLifecycleSchedule:
 
         # Verify post_process was called
         mock_lifecycle_handler.post_process.assert_called_once()
+
+
+class TestStatusTransitions:
+    """Test cases for _handle_status_transitions method."""
+
+    @pytest.fixture
+    def mock_lifecycle_handler(self) -> MagicMock:
+        """Create mock lifecycle handler."""
+        mock = MagicMock(spec=SessionLifecycleHandler)
+        mock.name = MagicMock(return_value="test-handler")
+        mock.lock_id = None
+        mock.target_statuses = MagicMock(return_value=[SessionStatus.PREPARING])
+        mock.target_kernel_statuses = MagicMock(return_value=[KernelStatus.PREPARED])
+        mock.success_status = MagicMock(return_value=SessionStatus.PREPARED)
+        mock.failure_status = MagicMock(return_value=None)
+        mock.stale_status = MagicMock(return_value=None)
+        mock.execute = AsyncMock(return_value=SessionExecutionResult())
+        mock.post_process = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        """Create mock repository."""
+        mock = MagicMock()
+        mock.get_schedulable_scaling_groups = AsyncMock(return_value=["default"])
+        mock.get_sessions_for_handler = AsyncMock(return_value=[])
+        mock.update_sessions_status_bulk = AsyncMock(return_value=0)
+        mock.update_with_history = AsyncMock(return_value=1)
+        return mock
+
+    async def test_handle_status_transitions_success(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test _handle_status_transitions applies success status."""
+        # Setup
+        schedule_coordinator._repository = mock_repository
+        session_id = SessionId(uuid4())
+        from_status = SessionStatus.PREPARING
+
+        result = SessionExecutionResult(
+            successes=[SessionTransitionInfo(session_id=session_id, from_status=from_status)]
+        )
+
+        # Execute
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+
+        # Verify update_with_history was called
+        mock_repository.update_with_history.assert_called_once()
+        call_args = mock_repository.update_with_history.call_args
+        updater = call_args[0][0]
+        bulk_creator = call_args[0][1]
+
+        # Verify updater spec
+        assert updater.spec.to_status == SessionStatus.PREPARED
+
+        # Verify history specs
+        assert len(bulk_creator.specs) == 1
+        assert bulk_creator.specs[0].session_id == session_id
+        assert bulk_creator.specs[0].from_status == from_status
+        assert bulk_creator.specs[0].to_status == SessionStatus.PREPARED
+
+    async def test_handle_status_transitions_failure(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test _handle_status_transitions applies failure status."""
+        # Setup
+        schedule_coordinator._repository = mock_repository
+        session_id = SessionId(uuid4())
+        from_status = SessionStatus.PREPARING
+        mock_lifecycle_handler.failure_status.return_value = SessionStatus.CANCELLED
+        mock_lifecycle_handler.success_status.return_value = None
+
+        result = SessionExecutionResult(
+            failures=[
+                SessionExecutionError(
+                    session_id=session_id,
+                    from_status=from_status,
+                    reason="test",
+                    error_detail="test error",
+                )
+            ]
+        )
+
+        # Execute
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+
+        # Verify update_with_history was called
+        mock_repository.update_with_history.assert_called_once()
+        call_args = mock_repository.update_with_history.call_args
+        updater = call_args[0][0]
+        bulk_creator = call_args[0][1]
+
+        # Verify updater spec
+        assert updater.spec.to_status == SessionStatus.CANCELLED
+
+        # Verify history specs
+        assert len(bulk_creator.specs) == 1
+        assert bulk_creator.specs[0].session_id == session_id
+        assert bulk_creator.specs[0].from_status == from_status
+        assert bulk_creator.specs[0].to_status == SessionStatus.CANCELLED
+        assert bulk_creator.specs[0].error_code == "test error"
+
+    async def test_handle_status_transitions_stale(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test _handle_status_transitions applies stale status."""
+        # Setup
+        schedule_coordinator._repository = mock_repository
+        session_id = SessionId(uuid4())
+        from_status = SessionStatus.PREPARING
+        mock_lifecycle_handler.stale_status.return_value = SessionStatus.TERMINATING
+        mock_lifecycle_handler.success_status.return_value = None
+        mock_lifecycle_handler.failure_status.return_value = None
+
+        result = SessionExecutionResult(
+            stales=[SessionTransitionInfo(session_id=session_id, from_status=from_status)]
+        )
+
+        # Execute
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+
+        # Verify update_with_history was called
+        mock_repository.update_with_history.assert_called_once()
+        call_args = mock_repository.update_with_history.call_args
+        updater = call_args[0][0]
+        bulk_creator = call_args[0][1]
+
+        # Verify updater spec
+        assert updater.spec.to_status == SessionStatus.TERMINATING
+
+        # Verify history specs
+        assert len(bulk_creator.specs) == 1
+        assert bulk_creator.specs[0].session_id == session_id
+        assert bulk_creator.specs[0].from_status == from_status
+        assert bulk_creator.specs[0].to_status == SessionStatus.TERMINATING
+
+    async def test_handle_status_transitions_no_update_when_status_none(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        mock_lifecycle_handler: MagicMock,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test _handle_status_transitions doesn't update when status is None."""
+        # Setup
+        schedule_coordinator._repository = mock_repository
+        session_id = SessionId(uuid4())
+        from_status = SessionStatus.PREPARING
+
+        # All status methods return None
+        mock_lifecycle_handler.success_status.return_value = None
+        mock_lifecycle_handler.failure_status.return_value = None
+        mock_lifecycle_handler.stale_status.return_value = None
+
+        result = SessionExecutionResult(
+            successes=[SessionTransitionInfo(session_id=session_id, from_status=from_status)],
+            stales=[SessionTransitionInfo(session_id=session_id, from_status=from_status)],
+        )
+
+        # Execute
+        await schedule_coordinator._handle_status_transitions(mock_lifecycle_handler, result)
+
+        # Verify no updates were made
+        mock_repository.update_with_history.assert_not_called()
+
+
+class TestScalingGroupProcessing:
+    """Test cases for scaling group processing in process_lifecycle_schedule."""
+
+    @pytest.fixture
+    def mock_lifecycle_handler(self) -> MagicMock:
+        """Create mock lifecycle handler."""
+        mock = MagicMock(spec=SessionLifecycleHandler)
+        mock.name = MagicMock(return_value="test-handler")
+        mock.lock_id = None
+        mock.target_statuses = MagicMock(return_value=[SessionStatus.PREPARING])
+        mock.target_kernel_statuses = MagicMock(return_value=[KernelStatus.PREPARED])
+        mock.success_status = MagicMock(return_value=SessionStatus.PREPARED)
+        mock.failure_status = MagicMock(return_value=None)
+        mock.stale_status = MagicMock(return_value=None)
+        mock.execute = AsyncMock(return_value=SessionExecutionResult())
+        mock.post_process = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        """Create mock repository."""
+        mock = MagicMock()
+        mock.get_schedulable_scaling_groups = AsyncMock(return_value=["default"])
+        mock.get_sessions_for_handler = AsyncMock(return_value=[])
+        mock.update_sessions_status_bulk = AsyncMock(return_value=0)
+        mock.update_with_history = AsyncMock(return_value=1)
+        return mock
 
     async def test_process_lifecycle_schedule_per_scaling_group(
         self,
@@ -585,25 +684,37 @@ class TestProcessLifecycleSchedule:
 
         # Each scaling group returns one success
         mock_lifecycle_handler.execute.side_effect = [
-            SessionExecutionResult(successes=[session1.session_id]),
-            SessionExecutionResult(successes=[session2.session_id]),
+            SessionExecutionResult(
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session1.session_id, from_status=session1.status
+                    )
+                ]
+            ),
+            SessionExecutionResult(
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session2.session_id, from_status=session2.status
+                    )
+                ]
+            ),
         ]
 
         await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
 
         # Verify status updates were called per scaling group (2 separate calls)
-        calls = mock_repository.update_sessions_status_bulk.call_args_list
+        calls = mock_repository.update_with_history.call_args_list
         assert len(calls) == 2
 
         # First call for sg1
-        updated_session_ids_sg1 = calls[0][0][0]
-        assert len(updated_session_ids_sg1) == 1
-        assert updated_session_ids_sg1[0] == session1.session_id
+        _first_updater, first_bulk_creator = calls[0][0]
+        assert len(first_bulk_creator.specs) == 1
+        assert first_bulk_creator.specs[0].session_id == session1.session_id
 
         # Second call for sg2
-        updated_session_ids_sg2 = calls[1][0][0]
-        assert len(updated_session_ids_sg2) == 1
-        assert updated_session_ids_sg2[0] == session2.session_id
+        _second_updater, second_bulk_creator = calls[1][0]
+        assert len(second_bulk_creator.specs) == 1
+        assert second_bulk_creator.specs[0].session_id == session2.session_id
 
     async def test_process_lifecycle_schedule_post_process_per_scaling_group(
         self,
@@ -628,12 +739,14 @@ class TestProcessLifecycleSchedule:
             [session2],
         ]
 
-        from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-
         # Both scaling groups return results that need post-processing
         mock_lifecycle_handler.execute.side_effect = [
             SessionExecutionResult(
-                successes=[session1.session_id],
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session1.session_id, from_status=session1.status
+                    )
+                ],
                 scheduled_data=[
                     ScheduledSessionData(
                         session_id=session1.session_id,
@@ -644,7 +757,11 @@ class TestProcessLifecycleSchedule:
                 ],
             ),
             SessionExecutionResult(
-                successes=[session2.session_id],
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session2.session_id, from_status=session2.status
+                    )
+                ],
                 scheduled_data=[
                     ScheduledSessionData(
                         session_id=session2.session_id,
@@ -688,9 +805,21 @@ class TestProcessLifecycleSchedule:
 
         # sg2 raises an exception, sg1 and sg3 should still succeed
         mock_lifecycle_handler.execute.side_effect = [
-            SessionExecutionResult(successes=[session1.session_id]),
+            SessionExecutionResult(
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session1.session_id, from_status=session1.status
+                    )
+                ]
+            ),
             RuntimeError("sg2 processing failed"),
-            SessionExecutionResult(successes=[session3.session_id]),
+            SessionExecutionResult(
+                successes=[
+                    SessionTransitionInfo(
+                        session_id=session3.session_id, from_status=session3.status
+                    )
+                ]
+            ),
         ]
 
         # Execute - should not raise despite one scaling group failing
@@ -702,7 +831,7 @@ class TestProcessLifecycleSchedule:
         # Handler was called 3 times (once per scaling group)
         assert mock_lifecycle_handler.execute.call_count == 3
         # Status updates were called only for successful scaling groups (sg1 and sg3)
-        assert mock_repository.update_sessions_status_bulk.call_count == 2
+        assert mock_repository.update_with_history.call_count == 2
 
 
 class TestKernelEventHandlers:

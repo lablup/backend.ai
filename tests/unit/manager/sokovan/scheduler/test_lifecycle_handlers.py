@@ -56,6 +56,7 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
@@ -612,18 +613,36 @@ class TestSessionExecutionResult:
     def test_success_count(self) -> None:
         """Test success_count returns correct count."""
         result = SessionExecutionResult()
-        result.successes.append(SessionId(uuid4()))
-        result.successes.append(SessionId(uuid4()))
+        result.successes.append(
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARING
+            )
+        )
+        result.successes.append(
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARING
+            )
+        )
         assert result.success_count() == 2
 
     def test_merge(self) -> None:
         """Test merge combines two results."""
         result1 = SessionExecutionResult()
-        result1.successes.append(SessionId(uuid4()))
+        result1.successes.append(
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARING
+            )
+        )
 
         result2 = SessionExecutionResult()
-        result2.successes.append(SessionId(uuid4()))
-        result2.stales.append(SessionId(uuid4()))
+        result2.successes.append(
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARING
+            )
+        )
+        result2.stales.append(
+            SessionTransitionInfo(session_id=SessionId(uuid4()), from_status=SessionStatus.CREATING)
+        )
 
         result1.merge(result2)
 

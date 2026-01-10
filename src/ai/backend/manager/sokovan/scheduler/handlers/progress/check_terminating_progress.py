@@ -24,6 +24,7 @@ from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
+    SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -133,7 +134,12 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
                     hook_result,
                 )
             # Always include in successes - termination always proceeds
-            result.successes.append(session_info.identity.id)
+            result.successes.append(
+                SessionTransitionInfo(
+                    session_id=session_info.identity.id,
+                    from_status=session_info.lifecycle.status,
+                )
+            )
             result.scheduled_data.append(
                 ScheduledSessionData(
                     session_id=session_info.identity.id,
@@ -145,7 +151,7 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
 
         # Update sessions to TERMINATED via repository
         if result.successes:
-            await self._repository.update_sessions_to_terminated(result.successes)
+            await self._repository.update_sessions_to_terminated(result.success_ids())
 
         return result
 
