@@ -1,5 +1,5 @@
 [project]
-requires-python = "~=3.13.7"
+requires-python = "~=3.14.2"
 name = "backend.ai"
 dynamic = ["version"]
 
@@ -78,6 +78,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
+target-version = "py313"  # keep Python 3.13 compatibility for backports
 line-length = 100
 src = ["src"]
 
@@ -265,11 +266,11 @@ follow_untyped_imports = false
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.14.2/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
 [tool.pyright]
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 include = [
     "src",
     "tools/pants-plugins",
@@ -282,7 +283,7 @@ exclude = [
     "src/ai/backend/web/static",
 ]
 venvPath = "dist/export/python/virtualenvs/python-default"
-venv = "3.13.7"
+venv = "3.14.2"
 typeCheckingMode = "standard"
 
 [tool.pydantic-mypy]

@@ -9,9 +9,8 @@ import os
 import socket
 import uuid
 from collections.abc import Awaitable, Callable, Iterable
+from ipaddress import IPv4Network, IPv6Network, ip_address
 from ipaddress import _BaseAddress as BaseIPAddress
-from ipaddress import _BaseNetwork as BaseIPNetwork
-from ipaddress import ip_address
 from pathlib import Path, PosixPath
 from typing import Optional
 
@@ -32,6 +31,8 @@ __all__ = (
     "get_root_fs_type",
     "get_wsl_version",
 )
+
+type BaseIPNetwork = IPv4Network | IPv6Network
 
 log = logging.getLogger(__spec__.name)
 
