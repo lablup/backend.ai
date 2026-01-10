@@ -52,7 +52,6 @@ class TestRecorderContext:
 
     def test_nested_scopes_are_independent(self) -> None:
         """Test that nested scopes have independent pools."""
-        session_id = SessionId(uuid4())
         with RecorderContext[SessionId].scope("schedule") as outer_pool:
             with RecorderContext[SessionId].scope("create") as inner_pool:
                 assert inner_pool is not outer_pool

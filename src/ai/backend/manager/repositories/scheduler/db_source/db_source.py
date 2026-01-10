@@ -23,7 +23,6 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    ClusterMode,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -925,7 +924,7 @@ class ScheduleDBSource:
                         kernel_id=str(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
-                        agent_id=kernel.agent,
+                        agent_id=AgentId(kernel.agent) if kernel.agent else None,
                         agent_addr=kernel.agent_addr,
                         occupied_slots=kernel.occupied_slots,
                     )
@@ -935,8 +934,10 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=session_row.access_key,
-                        creation_id=session_row.creation_id,
+                        access_key=AccessKey(session_row.access_key)
+                        if session_row.access_key
+                        else AccessKey(""),
+                        creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
                         session_type=session_row.session_type,
@@ -2613,130 +2614,6 @@ class ScheduleDBSource:
             )
             await db_sess.execute(stmt)
 
-    async def get_sessions_for_transition(
-        self,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> list[SessionTransitionData]:
-        """
-        Get sessions ready for state transition based on current session and kernel status.
-
-        :param session_statuses: List of current session statuses to filter by
-        :param kernel_statuses: List of required kernel statuses for transition
-        :return: List of sessions ready for transition with detailed information
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            # Find sessions in specified states
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.status.in_(session_statuses))
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_sessions: list[SessionTransitionData] = []
-            for session in sessions:
-                # Check if all kernels have the required status
-                all_ready = all(kernel.status in kernel_statuses for kernel in session.kernels)
-                if not all_ready or not session.kernels:
-                    continue
-
-                # Build kernel transition data
-                kernel_data = [
-                    KernelTransitionData(
-                        kernel_id=str(kernel.id),
-                        agent_id=AgentId(kernel.agent) if kernel.agent else AgentId(""),
-                        agent_addr=kernel.agent_addr or "",
-                        cluster_role=kernel.cluster_role,
-                        container_id=kernel.container_id,
-                        startup_command=kernel.startup_command,
-                        status_info=kernel.status_info,
-                        occupied_slots=kernel.occupied_slots,
-                    )
-                    for kernel in session.kernels
-                ]
-
-                # Build session transition data
-                session_data = SessionTransitionData(
-                    session_id=session.id,
-                    creation_id=session.creation_id or "",
-                    session_name=session.name or "",
-                    network_type=session.network_type,
-                    network_id=session.network_id,
-                    session_type=session.session_type,
-                    access_key=AccessKey(session.access_key)
-                    if session.access_key
-                    else AccessKey(""),
-                    cluster_mode=ClusterMode(session.cluster_mode),
-                    kernels=kernel_data,
-                    batch_timeout=session.batch_timeout,
-                    status_info=session.status_info,
-                )
-
-                ready_sessions.append(session_data)
-
-            return ready_sessions
-
-    async def get_sessions_for_transition_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> list[SessionTransitionData]:
-        """
-        Get sessions ready for state transition from given session IDs.
-
-        :param session_ids: Pre-filtered session IDs from Coordinator
-        :return: List of sessions with detailed information for transition
-        """
-        if not session_ids:
-            return []
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            # Find sessions by IDs
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.id.in_(session_ids))
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_sessions: list[SessionTransitionData] = []
-            for session in sessions:
-                # Build kernel transition data
-                kernel_data = [
-                    KernelTransitionData(
-                        kernel_id=str(kernel.id),
-                        agent_id=kernel.agent,
-                        agent_addr=kernel.agent_addr,
-                        cluster_role=kernel.cluster_role,
-                        container_id=kernel.container_id,
-                        startup_command=kernel.startup_command,
-                        status_info=kernel.status_info,
-                        occupied_slots=kernel.occupied_slots,
-                    )
-                    for kernel in session.kernels
-                ]
-
-                # Build session transition data
-                session_data = SessionTransitionData(
-                    session_id=session.id,
-                    creation_id=session.creation_id,
-                    session_name=session.name,
-                    network_type=session.network_type,
-                    network_id=session.network_id,
-                    session_type=session.session_type,
-                    access_key=session.access_key,
-                    cluster_mode=session.cluster_mode,
-                    kernels=kernel_data,
-                    batch_timeout=session.batch_timeout,
-                    status_info=session.status_info,
-                )
-
-                ready_sessions.append(session_data)
-
-            return ready_sessions
-
     async def get_sessions_ready_to_run(self) -> list[SessionId]:
         """
         Get sessions in CREATING state where all kernels are RUNNING.
@@ -3850,8 +3727,8 @@ class ScheduleDBSource:
                 )
                 .values(**values)
             )
-            result = await db_sess.execute(stmt)
-            return result.rowcount
+            result = cast(CursorResult, await db_sess.execute(stmt))
+            return cast(int, result.rowcount) if result.rowcount else 0
 
     async def update_kernels_status_bulk(
         self,
@@ -3887,8 +3764,8 @@ class ScheduleDBSource:
                 )
                 .values(**values)
             )
-            result = await db_sess.execute(stmt)
-            return result.rowcount
+            result = cast(CursorResult, await db_sess.execute(stmt))
+            return cast(int, result.rowcount) if result.rowcount else 0
 
     async def get_sessions_for_pull_by_ids(
         self,
