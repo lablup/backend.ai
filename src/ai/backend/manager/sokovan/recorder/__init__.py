@@ -4,7 +4,7 @@ This module provides base recorder functionality that can be specialized
 for different coordinator contexts (scheduler, deployment, route).
 """
 
-from .context import RecordPool, RecorderContext
+from .context import RecorderContext, RecordPool
 from .exceptions import (
     NestedPhaseError,
     RecorderError,

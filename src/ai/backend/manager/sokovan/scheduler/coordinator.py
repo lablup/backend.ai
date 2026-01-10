@@ -340,11 +340,11 @@ class ScheduleCoordinator:
                     )
 
             # Log recorded steps for this scaling group
-            all_steps = recorder.get_all_steps()
-            if all_steps:
+            all_records = recorder.get_all_records()
+            if all_records:
                 log.debug(
-                    "Recorded {} sessions with execution steps for {} in scaling group {}",
-                    len(all_steps),
+                    "Recorded {} sessions with execution records for {} in scaling group {}",
+                    len(all_records),
                     schedule_type.value,
                     scaling_group,
                 )

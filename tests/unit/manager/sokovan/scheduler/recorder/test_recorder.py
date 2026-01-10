@@ -12,8 +12,8 @@ from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
     NestedPhaseError,
     PhaseRecord,
-    RecordPool,
     RecorderContext,
+    RecordPool,
     StepRecord,
     StepStatus,
     StepWithoutPhaseError,
@@ -575,3 +575,330 @@ class TestEntityContextAPI:
             assert phase.status == StepStatus.FAILED
             # On failure, detail should be None (not the success_detail)
             assert phase.detail is None
+
+
+class TestSharedPhases:
+    """Tests for shared phases functionality (using context manager API)."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    def test_shared_phase_added_to_pool(self) -> None:
+        """Test that shared phases can be added to pool via context manager."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase(
+                "sequencing", success_detail="Sorted by DRF"
+            ):
+                with RecorderContext[SessionId].shared_step(
+                    "drf", success_detail="DRF sequencing applied"
+                ):
+                    pass
+
+            shared = pool.get_shared_phases()
+            assert len(shared) == 1
+            assert shared[0].name == "sequencing"
+
+    def test_shared_phase_copied_to_entity_record(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test that shared phases are copied to entity records."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            # Add shared phase before creating entities
+            with RecorderContext[SessionId].shared_phase(
+                "sequencing", success_detail="Sorted by DRF"
+            ):
+                pass
+
+            # Create entity - should inherit shared phase
+            with RecorderContext[SessionId].entity(session_id):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("validation"):
+                    with recorder.step("quota_check"):
+                        pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            # Should have 2 phases: sequencing (shared) + validation (entity-specific)
+            assert len(record.phases) == 2
+            assert record.phases[0].name == "sequencing"
+            assert record.phases[1].name == "validation"
+
+    def test_shared_phases_copied_to_multiple_entities(self) -> None:
+        """Test that shared phases are copied to all entities."""
+        session1 = SessionId(uuid4())
+        session2 = SessionId(uuid4())
+
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            # Add shared phase via context manager
+            with RecorderContext[SessionId].shared_phase(
+                "sequencing", success_detail="Sorted by DRF"
+            ):
+                pass
+
+            # Create first entity
+            with RecorderContext[SessionId].entity(session1):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("validation"):
+                    with recorder.step("check1"):
+                        pass
+
+            # Create second entity
+            with RecorderContext[SessionId].entity(session2):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("allocation"):
+                    with recorder.step("allocate"):
+                        pass
+
+            record1 = pool.get_record(session1)
+            record2 = pool.get_record(session2)
+
+            # Both should have sequencing as first phase
+            assert record1 is not None
+            assert record2 is not None
+            assert record1.phases[0].name == "sequencing"
+            assert record2.phases[0].name == "sequencing"
+            # But different second phases
+            assert record1.phases[1].name == "validation"
+            assert record2.phases[1].name == "allocation"
+
+    def test_shared_phases_are_independent_copies(self) -> None:
+        """Test that shared phases are independent copies for each entity."""
+        session1 = SessionId(uuid4())
+        session2 = SessionId(uuid4())
+
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase("sequencing", success_detail="Sorted"):
+                pass
+
+            with RecorderContext[SessionId].entity(session1):
+                pass
+
+            with RecorderContext[SessionId].entity(session2):
+                pass
+
+            record1 = pool.get_record(session1)
+            record2 = pool.get_record(session2)
+
+            assert record1 is not None
+            assert record2 is not None
+            # Phases should be independent (not the same object)
+            assert record1.phases[0] is not record2.phases[0]
+
+    def test_entity_without_shared_phases(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test that entities work normally without shared phases."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            # No shared phases added
+            with RecorderContext[SessionId].entity(session_id):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("validation"):
+                    with recorder.step("check"):
+                        pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            # Should have only the entity-specific phase
+            assert len(record.phases) == 1
+            assert record.phases[0].name == "validation"
+
+
+class TestSharedPhaseContextManager:
+    """Tests for shared_phase() and shared_step() context managers."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    def test_shared_phase_context_manager_basic(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test basic shared_phase() context manager usage."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase("sequencing", success_detail="DRF"):
+                pass
+
+            # Create entity - should inherit the shared phase
+            with RecorderContext[SessionId].entity(session_id):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("validation"):
+                    with recorder.step("check"):
+                        pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            assert len(record.phases) == 2
+            assert record.phases[0].name == "sequencing"
+            assert record.phases[0].status == StepStatus.SUCCESS
+            assert record.phases[0].detail == "DRF"
+            assert record.phases[1].name == "validation"
+
+    def test_shared_step_within_shared_phase(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test shared_step() within shared_phase()."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase("sequencing", success_detail="Sequenced"):
+                with RecorderContext[SessionId].shared_step("drf", success_detail="DRF applied"):
+                    pass
+
+            with RecorderContext[SessionId].entity(session_id):
+                pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            phase = record.phases[0]
+            assert phase.name == "sequencing"
+            assert len(phase.steps) == 1
+            assert phase.steps[0].name == "drf"
+            assert phase.steps[0].status == StepStatus.SUCCESS
+            assert phase.steps[0].detail == "DRF applied"
+
+    def test_shared_phase_failure_handling(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test that shared_phase() handles exceptions correctly."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with pytest.raises(ValueError, match="Sequencing failed"):
+                with RecorderContext[SessionId].shared_phase("sequencing", success_detail="OK"):
+                    raise ValueError("Sequencing failed")
+
+            # Entity should still inherit the (failed) shared phase
+            with RecorderContext[SessionId].entity(session_id):
+                pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            assert len(record.phases) == 1
+            assert record.phases[0].name == "sequencing"
+            assert record.phases[0].status == StepStatus.FAILED
+            # On failure, detail should be None (not the success_detail)
+            assert record.phases[0].detail is None
+
+    def test_shared_step_failure_handling(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test that shared_step() handles exceptions correctly."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with pytest.raises(ValueError, match="Step failed"):
+                with RecorderContext[SessionId].shared_phase("sequencing"):
+                    with RecorderContext[SessionId].shared_step("drf", success_detail="OK"):
+                        raise ValueError("Step failed")
+
+            with RecorderContext[SessionId].entity(session_id):
+                pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            phase = record.phases[0]
+            assert phase.status == StepStatus.FAILED
+            assert phase.steps[0].status == StepStatus.FAILED
+            assert phase.steps[0].detail == "Step failed"
+
+    def test_shared_step_without_phase_raises_error(self) -> None:
+        """Test that shared_step() outside shared_phase() raises RuntimeError."""
+        with RecorderContext[SessionId].scope("schedule"):
+            with pytest.raises(RuntimeError, match="no shared phase is active"):
+                with RecorderContext[SessionId].shared_step("drf"):
+                    pass
+
+    def test_nested_shared_phases_not_allowed(self) -> None:
+        """Test that nested shared_phase() raises RuntimeError."""
+        with RecorderContext[SessionId].scope("schedule"):
+            with RecorderContext[SessionId].shared_phase("sequencing"):
+                with pytest.raises(RuntimeError, match="already active"):
+                    with RecorderContext[SessionId].shared_phase("sorting"):
+                        pass
+
+    def test_multiple_shared_steps_in_phase(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test multiple shared_step() calls within a shared_phase()."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase("sequencing"):
+                with RecorderContext[SessionId].shared_step("fifo", success_detail="FIFO"):
+                    pass
+                with RecorderContext[SessionId].shared_step("drf", success_detail="DRF"):
+                    pass
+
+            with RecorderContext[SessionId].entity(session_id):
+                pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            phase = record.phases[0]
+            assert len(phase.steps) == 2
+            assert phase.steps[0].name == "fifo"
+            assert phase.steps[1].name == "drf"
+
+    def test_shared_phase_timestamps_are_recorded(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Test that shared_phase() and shared_step() record timestamps."""
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            with RecorderContext[SessionId].shared_phase("sequencing"):
+                with RecorderContext[SessionId].shared_step("drf"):
+                    pass
+
+            with RecorderContext[SessionId].entity(session_id):
+                pass
+
+            record = pool.get_record(session_id)
+            assert record is not None
+            phase = record.phases[0]
+            assert phase.started_at is not None
+            assert phase.ended_at is not None
+            assert phase.ended_at >= phase.started_at
+
+            step = phase.steps[0]
+            assert step.started_at is not None
+            assert step.ended_at is not None
+            assert step.ended_at >= step.started_at
+
+    def test_shared_phases_copied_to_multiple_entities(self) -> None:
+        """Test that shared phases from context manager are copied to all entities."""
+        session1 = SessionId(uuid4())
+        session2 = SessionId(uuid4())
+
+        with RecorderContext[SessionId].scope("schedule") as pool:
+            # Record shared phase using context manager
+            with RecorderContext[SessionId].shared_phase("sequencing", success_detail="DRF"):
+                with RecorderContext[SessionId].shared_step("drf"):
+                    pass
+
+            # Create first entity
+            with RecorderContext[SessionId].entity(session1):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("validation"):
+                    with recorder.step("check1"):
+                        pass
+
+            # Create second entity
+            with RecorderContext[SessionId].entity(session2):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase("allocation"):
+                    with recorder.step("allocate"):
+                        pass
+
+            record1 = pool.get_record(session1)
+            record2 = pool.get_record(session2)
+
+            # Both should have sequencing as first phase
+            assert record1 is not None
+            assert record2 is not None
+            assert record1.phases[0].name == "sequencing"
+            assert record2.phases[0].name == "sequencing"
+            # But different second phases
+            assert record1.phases[1].name == "validation"
+            assert record2.phases[1].name == "allocation"
+            # Shared phases should be independent copies
+            assert record1.phases[0] is not record2.phases[0]

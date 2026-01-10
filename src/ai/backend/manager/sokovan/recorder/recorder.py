@@ -55,10 +55,15 @@ class TransitionRecorder(Generic[EntityIdT]):
     _phases: list[PhaseRecord]
     _current_phase: Optional[_PhaseContext]
 
-    def __init__(self, entity_id: EntityIdT, started_at: datetime) -> None:
+    def __init__(
+        self,
+        entity_id: EntityIdT,
+        started_at: datetime,
+        initial_phases: Optional[list[PhaseRecord]] = None,
+    ) -> None:
         self._entity_id = entity_id
         self._started_at = started_at
-        self._phases = []
+        self._phases = list(initial_phases) if initial_phases else []
         self._current_phase = None
 
     @property

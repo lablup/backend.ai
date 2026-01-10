@@ -9,6 +9,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     ResourceSlot,
+    SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -18,6 +19,11 @@ from ai.backend.manager.metrics.scheduler import (
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
+)
+from ai.backend.manager.sokovan.recorder import (
+    ExecutionRecord,
+    RecorderContext,
+    StepStatus,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
@@ -171,11 +177,20 @@ class SessionProvisioner:
             max_container_count=scheduling_data.spec.max_container_count,
             enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
         )
-        # Add sequencing predicate to track in passed predicates
-        with self._phase_metrics.measure_phase(
-            "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+        # Perform sequencing (batch operation for all workloads)
+        # Record as shared phase so all entity records include it
+        sequencer = self._get_sequencer(sg_info.scheduler)
+        with (
+            self._phase_metrics.measure_phase(
+                "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+            ),
+            RecorderContext[SessionId].shared_phase(
+                "sequencing", success_detail=sequencer.success_message()
+            ),
+            RecorderContext[SessionId].shared_step(
+                sequencer.name, success_detail=sequencer.success_message()
+            ),
         ):
-            sequencer = self._get_sequencer(sg_info.scheduler)
             sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
 
         # Build mutable agents with occupancy data from snapshot
@@ -193,49 +208,49 @@ class SessionProvisioner:
         # Get agent selection strategy from scheduler opts config
         agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
         agent_selector = self._agent_selector_pool[agent_selection_strategy]
-        for session_workload in sequenced_workloads:
-            # Track predicates for this session
-            passed_phases: list[SchedulingPredicate] = []
-            failed_phases: list[SchedulingPredicate] = []
-            passed_phases.append(
-                SchedulingPredicate(name=sequencer.name, msg=sequencer.success_message())
-            )
 
+        # Get current pool from RecorderContext (scope opened by coordinator)
+        pool = RecorderContext[SessionId].current_pool()
+
+        for session_workload in sequenced_workloads:
             try:
-                session_allocation = await self._schedule_workload(
-                    scaling_group,
-                    system_snapshot,
-                    mutable_agents,
-                    selection_config,
-                    agent_selector,
-                    session_workload,
-                    passed_phases,
-                    failed_phases,
-                )
-                session_allocations.append(session_allocation)
+                with RecorderContext[SessionId].entity(session_workload.session_id):
+                    # Sequencing phase is automatically included via shared phases
+                    session_allocation = await self._schedule_workload(
+                        scaling_group,
+                        system_snapshot,
+                        mutable_agents,
+                        selection_config,
+                        agent_selector,
+                        session_workload,
+                    )
+                    session_allocations.append(session_allocation)
             except Exception as e:
                 log.debug(
                     "Scheduling failed for workload {}: {}",
                     session_workload.session_id,
                     e,
                 )
-                if not failed_phases:
-                    # If no specific failure predicates were added, add a exception information
-                    failed_phases.append(
-                        SchedulingPredicate(
-                            name=type(e).__name__,
-                            msg=str(e),
-                        )
-                    )
-
+                # Get execution record from pool and convert to SchedulingFailure
+                record = pool.get_record(session_workload.session_id)
+                passed, failed = self._convert_record_to_predicates(record)
                 failure = SchedulingFailure(
                     session_id=session_workload.session_id,
-                    passed_phases=passed_phases,
-                    failed_phases=failed_phases,
+                    passed_phases=passed,
+                    failed_phases=failed,
                     msg=str(e),
                 )
                 scheduling_failures.append(failure)
                 continue
+
+        # Convert execution records to passed_phases/failed_phases for allocations
+        for allocation in session_allocations:
+            record = pool.get_record(allocation.session_id)
+            if record:
+                passed, failed = self._convert_record_to_predicates(record)
+                allocation.passed_phases = passed
+                allocation.failed_phases = failed
+
         log.info(
             "Processing {} allocations and {} failures in scaling group {}",
             len(session_allocations),
@@ -264,56 +279,44 @@ class SessionProvisioner:
         selection_config: AgentSelectionConfig,
         agent_selector: AgentSelector,
         session_workload: SessionWorkload,
-        passed_phases: list[SchedulingPredicate],
-        failed_phases: list[SchedulingPredicate],
     ) -> SessionAllocation:
+        recorder = RecorderContext[SessionId].current_recorder()
+
         # Phase 1: Validation
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "validation"):
-            # validate_with_predicates will update both lists and raise if validation fails
-            self._validator.validate(
-                mutable_snapshot, session_workload, passed_phases, failed_phases
-            )
+            with recorder.phase("validation"):
+                self._validator.validate(mutable_snapshot, session_workload)
 
         # Phase 2: Agent Selection
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "agent_selection"):
-            try:
-                session_allocation = await self._allocate_workload(
-                    session_workload,
-                    mutable_agents,
-                    selection_config,
-                    scaling_group,
-                    agent_selector,
-                )
-                # Agent selection succeeded - add to passed predicates
-                passed_phases.append(
-                    SchedulingPredicate(
-                        name=agent_selector.strategy_name(),
-                        msg=agent_selector.strategy_success_message(),
+            with recorder.phase(
+                "agent_selection", success_detail=agent_selector.strategy_success_message()
+            ):
+                with recorder.step(
+                    agent_selector.strategy_name(),
+                    success_detail=agent_selector.strategy_success_message(),
+                ):
+                    session_allocation = await self._allocate_workload(
+                        session_workload,
+                        mutable_agents,
+                        selection_config,
+                        scaling_group,
+                        agent_selector,
                     )
+
+        # Phase 3: Allocation (prepare)
+        with recorder.phase("allocation", success_detail=self._allocator.success_message()):
+            with recorder.step(
+                self._allocator.name(), success_detail=self._allocator.success_message()
+            ):
+                # Update the snapshot to reflect this allocation
+                # Note: agent state changes are already applied to mutable_agents
+                self._update_system_snapshot(
+                    mutable_snapshot,
+                    session_workload,
+                    session_allocation,
                 )
-            except Exception as e:
-                # Add failed predicate for agent selection
-                failed_phases.append(
-                    SchedulingPredicate(name=agent_selector.strategy_name(), msg=str(e))
-                )
-                raise
 
-        # Phase 3: Allocation success - add allocator predicate
-        passed_phases.append(
-            SchedulingPredicate(name=self._allocator.name(), msg=self._allocator.success_message())
-        )
-
-        # Update the snapshot to reflect this allocation
-        # Note: agent state changes are already applied to mutable_agents by select_agents_for_batch_requirements
-        self._update_system_snapshot(
-            mutable_snapshot,
-            session_workload,
-            session_allocation,
-        )
-
-        # Store predicates in the allocation
-        session_allocation.passed_phases = passed_phases
-        session_allocation.failed_phases = failed_phases
         return session_allocation
 
     def _update_system_snapshot(
@@ -419,3 +422,46 @@ class SessionProvisioner:
             selections,
             scaling_group,
         )
+
+    @staticmethod
+    def _convert_record_to_predicates(
+        record: ExecutionRecord | None,
+    ) -> tuple[list[SchedulingPredicate], list[SchedulingPredicate]]:
+        """
+        Convert an ExecutionRecord to passed/failed SchedulingPredicate lists.
+
+        Args:
+            record: The execution record to convert (may be None if entity context failed early)
+
+        Returns:
+            Tuple of (passed_predicates, failed_predicates)
+        """
+        passed: list[SchedulingPredicate] = []
+        failed: list[SchedulingPredicate] = []
+
+        if record is None:
+            return passed, failed
+
+        for phase in record.phases:
+            # Add phase-level predicate
+            phase_predicate = SchedulingPredicate(
+                name=phase.name,
+                msg=phase.detail or "",
+            )
+            if phase.status == StepStatus.SUCCESS:
+                passed.append(phase_predicate)
+            else:
+                failed.append(phase_predicate)
+
+            # Add step-level predicates
+            for step in phase.steps:
+                step_predicate = SchedulingPredicate(
+                    name=step.name,
+                    msg=step.detail or "",
+                )
+                if step.status == StepStatus.SUCCESS:
+                    passed.append(step_predicate)
+                else:
+                    failed.append(step_predicate)
+
+        return passed, failed

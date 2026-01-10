@@ -34,8 +34,7 @@ class NestedPhaseError(RecorderError):
         self.active_phase = active_phase
         super().__init__(
             extra_msg=(
-                f"Phase '{new_phase}' cannot be started: "
-                f"phase '{active_phase}' is already active."
+                f"Phase '{new_phase}' cannot be started: phase '{active_phase}' is already active."
             )
         )
 
