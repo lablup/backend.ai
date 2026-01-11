@@ -108,6 +108,22 @@ class SessionRepository:
             return await SessionRow.get_session_to_determine_status(db_sess, session_id)
 
     @session_repository_resilience.apply()
+    async def get_session_by_id_for_status(
+        self,
+        session_id: SessionId,
+    ) -> SessionRow:
+        """
+        Get session by ID for status determination without ownership checks.
+        Used by service layer which handles ownership validation based on user role.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            session_row = await db_sess.scalar(query_stmt)
+            if session_row is None:
+                raise SessionNotFound(f"Session not found (id:{session_id})")
+            return session_row
+
+    @session_repository_resilience.apply()
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
