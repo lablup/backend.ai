@@ -17,6 +17,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     DefaultForUnspecified,
+    KernelId,
     ResourceSlot,
     SecretKey,
     SessionId,
@@ -748,7 +749,7 @@ class TestKernelTermination:
         # Create kernel termination results
         kernel_results = [
             KernelTerminationResult(
-                kernel_id=str(test_terminating_kernel_id),
+                kernel_id=KernelId(test_terminating_kernel_id),
                 agent_id=test_agent_id,
                 occupied_slots=ResourceSlot(),
                 success=True,
