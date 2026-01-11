@@ -1402,16 +1402,13 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
     etcd_config_data = local_config.etcd.to_dataclass()
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
-    )
-    try:
+    ) as etcd:
         yield etcd
-    finally:
-        await etcd.close()
 
 
 async def prepare_krunner_volumes(local_config: AgentUnifiedConfig) -> None:

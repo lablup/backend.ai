@@ -291,52 +291,52 @@ async def watcher_server(
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             app["config"]["etcd"]["addr"],
             app["config"]["etcd"]["namespace"],
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,
-        )
-        app["config_server"] = etcd
+        ) as etcd:
+            app["config_server"] = etcd
 
-        token = await etcd.get("config/watcher/token")
-        if token is None:
-            token = "insecure"
-        log.debug("watcher authentication token: {}", token)
-        app["token"] = token
+            token = await etcd.get("config/watcher/token")
+            if token is None:
+                token = "insecure"
+            log.debug("watcher authentication token: {}", token)
+            app["token"] = token
 
-        app.middlewares.append(auth_middleware)
-        app.on_shutdown.append(shutdown_app)
-        app.on_startup.append(init_app)
-        app.on_response_prepare.append(prepare_hook)
-        ssl_ctx = None
-        if app["config"]["watcher"]["ssl-enabled"]:
-            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_ctx.load_cert_chain(
-                str(app["config"]["watcher"]["ssl-cert"]),
-                str(app["config"]["watcher"]["ssl-privkey"]),
+            app.middlewares.append(auth_middleware)
+            app.on_shutdown.append(shutdown_app)
+            app.on_startup.append(init_app)
+            app.on_response_prepare.append(prepare_hook)
+            ssl_ctx = None
+            if app["config"]["watcher"]["ssl-enabled"]:
+                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_ctx.load_cert_chain(
+                    str(app["config"]["watcher"]["ssl-cert"]),
+                    str(app["config"]["watcher"]["ssl-privkey"]),
+                )
+            runner = web.AppRunner(app)
+            await runner.setup()
+            watcher_addr = app["config"]["watcher"]["service-addr"]
+            site = web.TCPSite(
+                runner,
+                str(watcher_addr.host),
+                watcher_addr.port,
+                backlog=5,
+                reuse_port=True,
+                ssl_context=ssl_ctx,
             )
-        runner = web.AppRunner(app)
-        await runner.setup()
-        watcher_addr = app["config"]["watcher"]["service-addr"]
-        site = web.TCPSite(
-            runner,
-            str(watcher_addr.host),
-            watcher_addr.port,
-            backlog=5,
-            reuse_port=True,
-            ssl_context=ssl_ctx,
-        )
-        await site.start()
-        log.info("started at {}", watcher_addr)
-        try:
-            stop_sig = yield
-        finally:
-            log.info("shutting down...")
-            if stop_sig == signal.SIGALRM and shutdown_enabled:
-                log.warning("shutting down the agent node!")
-                subprocess.run(["shutdown", "-h", "now"])
-            await runner.cleanup()
+            await site.start()
+            log.info("started at {}", watcher_addr)
+            try:
+                stop_sig = yield
+            finally:
+                log.info("shutting down...")
+                if stop_sig == signal.SIGALRM and shutdown_enabled:
+                    log.warning("shutting down the agent node!")
+                    subprocess.run(["shutdown", "-h", "now"])
+                await runner.cleanup()
 
 
 @click.command()

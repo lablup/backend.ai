@@ -23,6 +23,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from types import TracebackType
 from typing import (
     Optional,
     ParamSpec,
@@ -293,7 +294,7 @@ class AsyncEtcd(AbstractKVStore):
         )
 
     @classmethod
-    def initialize(cls, etcd_config: EtcdConfigData) -> Self:
+    def create_from_config(cls, etcd_config: EtcdConfigData) -> Self:
         etcd_addrs = [addr.to_legacy() for addr in etcd_config.addrs]
         namespace = etcd_config.namespace
         etcd_user = etcd_config.user
@@ -315,8 +316,23 @@ class AsyncEtcd(AbstractKVStore):
 
         return cls(etcd_addrs, namespace, scope_prefix_map, credentials=credentials)
 
-    async def close(self):
-        pass  # for backward compatibility
+    async def open(self) -> None:
+        await self.etcd.__aenter__()
+
+    async def close(self) -> None:
+        await self.etcd.__aexit__(None, None, None)
+
+    async def __aenter__(self) -> Self:
+        await self.etcd.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)
 
     async def ping(self) -> None:
         """

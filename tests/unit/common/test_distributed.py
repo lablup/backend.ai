@@ -206,10 +206,28 @@ def etcd_timer_node_process(
         await event_dispatcher.start()
         await asyncio.sleep(0.1)  # Allow dispatcher to start
 
-        etcd_lock: AbstractDistributedLock
+        async def _lock_test(dist_lock: AbstractDistributedLock) -> None:
+            # Common test logic for distributed lock
+            timer = GlobalTimer(
+                dist_lock,
+                event_producer,
+                lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
+                timer_ctx.interval,
+            )
+            try:
+                await timer.join()
+                while not stop_event.is_set():
+                    await asyncio.sleep(0)
+            finally:
+                await timer.leave()
+                await event_dispatcher.close()
+                await event_producer.close()
+                await redis_mq.close()
+                await asyncio.sleep(0.2)  # Allow cleanup to complete
+
         match etcd_client:
             case "etcd-client-py":
-                etcd = AsyncEtcd(
+                async with AsyncEtcd(
                     addrs=etcd_ctx.addrs,
                     namespace=etcd_ctx.namespace,
                     scope_prefix_map={
@@ -217,25 +235,9 @@ def etcd_timer_node_process(
                         ConfigScopes.SGROUP: "sgroup/testing",
                         ConfigScopes.NODE: "node/i-test",
                     },
-                )
-                etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
-
-        timer = GlobalTimer(
-            etcd_lock,
-            event_producer,
-            lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
-            timer_ctx.interval,
-        )
-        try:
-            await timer.join()
-            while not stop_event.is_set():
-                await asyncio.sleep(0)
-        finally:
-            await timer.leave()
-            await event_dispatcher.close()
-            await event_producer.close()
-            await redis_mq.close()
-            await asyncio.sleep(0.2)  # Allow cleanup to complete
+                ) as etcd:
+                    etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
+                    await _lock_test(etcd_lock)
 
     asyncio.run(_main())
 

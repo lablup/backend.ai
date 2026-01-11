@@ -48,8 +48,7 @@ class TestRedisProvider:
 
         redis_container_id, redis_addr = redis_container
 
-        etcd = make_etcd(storage_config)
-        try:
+        async with make_etcd(storage_config) as etcd:
             # Store redis config in etcd for RedisProvider
             await etcd.put_prefix(
                 "config/redis",
@@ -61,8 +60,6 @@ class TestRedisProvider:
                 },
             )
             yield etcd
-        finally:
-            await etcd.close()
 
     @pytest.mark.integration
     @pytest.mark.asyncio
