@@ -43,6 +43,7 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
@@ -702,25 +703,37 @@ class SessionLauncher:
 
         # Determine truly stuck sessions
         for session in sessions:
-            images_to_check = session_images[session.session_id]
-            if not images_to_check:
-                # No images to check, consider it stuck
-                truly_stuck_sessions.append(session)
-                continue
+            with RecorderContext[SessionId].entity(session.session_id):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase(
+                    "verify_pull_status",
+                    success_detail="Image pull status verified",
+                ):
+                    with recorder.step(
+                        "check_pull_progress",
+                        success_detail="Image pull progress checked",
+                    ):
+                        images_to_check = session_images[session.session_id]
+                        if not images_to_check:
+                            # No images to check, consider it stuck
+                            truly_stuck_sessions.append(session)
+                            continue
 
-            # Check if any image for this session is actively being pulled
-            any_pulling = False
-            for kernel in session.kernels:
-                if kernel.agent_id and kernel.image in image_configs:
-                    img_cfg = image_configs[kernel.image]
-                    canonical = img_cfg.canonical
-                    if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
-                        any_pulling = True
-                        break
+                        # Check if any image for this session is actively being pulled
+                        any_pulling = False
+                        for kernel in session.kernels:
+                            if kernel.agent_id and kernel.image in image_configs:
+                                img_cfg = image_configs[kernel.image]
+                                canonical = img_cfg.canonical
+                                if agent_pulling_status.get(kernel.agent_id, {}).get(
+                                    canonical, False
+                                ):
+                                    any_pulling = True
+                                    break
 
-            if not any_pulling:
-                # No images are being pulled, session is truly stuck
-                truly_stuck_sessions.append(session)
+                        if not any_pulling:
+                            # No images are being pulled, session is truly stuck
+                            truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
@@ -883,17 +896,27 @@ class SessionLauncher:
         # Filter sessions that have no active kernels
         truly_stuck_sessions: list[SessionDataForStart] = []
         for session, result in zip(sessions, results, strict=True):
-            if isinstance(result, BaseException):
-                log.warning(
-                    "Failed to check session {} creating status: {}",
-                    session.session_id,
-                    result,
-                )
-                # If we can't check, assume it's stuck
-                truly_stuck_sessions.append(session)
-            elif not result:
-                # No active kernels, session is stuck
-                truly_stuck_sessions.append(session)
+            with RecorderContext[SessionId].entity(session.session_id):
+                recorder = RecorderContext[SessionId].current_recorder()
+                with recorder.phase(
+                    "verify_creation_status",
+                    success_detail="Kernel creation status verified",
+                ):
+                    with recorder.step(
+                        "check_kernel_status",
+                        success_detail="Kernel creation status checked",
+                    ):
+                        if isinstance(result, BaseException):
+                            log.warning(
+                                "Failed to check session {} creating status: {}",
+                                session.session_id,
+                                result,
+                            )
+                            # If we can't check, assume it's stuck
+                            truly_stuck_sessions.append(session)
+                        elif not result:
+                            # No active kernels, session is stuck
+                            truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
