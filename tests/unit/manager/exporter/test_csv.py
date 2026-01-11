@@ -144,7 +144,9 @@ class TestCSVExporter:
         assert "id-2" in data
 
     @pytest.mark.asyncio
-    async def test_export_multiple_partitions(self, multi_partition_stream: ExportDataStream) -> None:
+    async def test_export_multiple_partitions(
+        self, multi_partition_stream: ExportDataStream
+    ) -> None:
         """Test that multiple partitions produce multiple data chunks."""
         exporter = CSVExporter(multi_partition_stream)
         chunks = [chunk async for chunk in exporter.export()]

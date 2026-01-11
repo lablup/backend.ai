@@ -99,5 +99,6 @@ AUDIT_LOG_REPORT = ReportDef(
     report_key="audit-logs",
     name="Audit Logs",
     description="System audit log records for compliance and monitoring",
+    select_from=AuditLogRow.__table__,
     fields=AUDIT_LOG_FIELDS,
 )

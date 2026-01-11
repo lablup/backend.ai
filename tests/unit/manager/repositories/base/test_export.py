@@ -48,9 +48,7 @@ class ExportTestChildRow(Base):
     __table_args__ = {"extend_existing": True}
 
     id: Mapped[str] = mapped_column(GUID, primary_key=True)
-    parent_id: Mapped[str] = mapped_column(
-        GUID, sa.ForeignKey("test_export.id"), nullable=False
-    )
+    parent_id: Mapped[str] = mapped_column(GUID, sa.ForeignKey("test_export.id"), nullable=False)
     child_name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 

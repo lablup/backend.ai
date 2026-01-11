@@ -95,7 +95,7 @@ class ExportService:
 
         # Get selected field definitions and build query
         fields = report.get_fields_by_keys(action.field_keys)
-        query = StreamingExportQuery.from_params(action.query_params, fields)
+        query = StreamingExportQuery.from_params(action.query_params, report.select_from, fields)
 
         # Check concurrent export limit (non-blocking)
         if self._semaphore.locked():
