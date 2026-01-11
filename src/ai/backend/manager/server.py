@@ -453,7 +453,7 @@ async def exception_middleware(
 
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    async with AsyncEtcd.initialize(etcd_config) as etcd:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
         root_ctx.etcd = etcd
         yield
 

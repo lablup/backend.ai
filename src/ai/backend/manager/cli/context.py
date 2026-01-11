@@ -91,13 +91,12 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
         ConfigScopes.GLOBAL: "",
         # TODO: provide a way to specify other scope prefixes
     }
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         [addr.to_legacy() for addr in etcd_config_data.addrs],
         etcd_config_data.namespace,
         scope_prefix_map,
         credentials=creds,
-    )
-    async with etcd:
+    ) as etcd:
         yield etcd
 
 
@@ -111,9 +110,8 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    etcd = AsyncEtcd.initialize(etcd_config_data)
-    etcd_loader = LegacyEtcdLoader(etcd)
-    async with etcd_loader:
+    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
+        etcd_loader = LegacyEtcdLoader(etcd)
         redis_config = await etcd_loader.load()
         unified_config = ManagerUnifiedConfig(**redis_config)
     yield unified_config
@@ -140,8 +138,8 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    etcd = AsyncEtcd.initialize(etcd_config_data)
-    async with LegacyEtcdLoader(etcd, config_prefix="config/redis") as loader:
+    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
+        loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
         raw_redis_config = await loader.load()
         redis_config = RedisConfig(**raw_redis_config)
         redis_profile_target = redis_config.to_redis_profile_target()

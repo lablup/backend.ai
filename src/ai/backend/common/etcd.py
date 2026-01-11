@@ -294,7 +294,7 @@ class AsyncEtcd(AbstractKVStore):
         )
 
     @classmethod
-    def initialize(cls, etcd_config: EtcdConfigData) -> Self:
+    def create_from_config(cls, etcd_config: EtcdConfigData) -> Self:
         etcd_addrs = [addr.to_legacy() for addr in etcd_config.addrs]
         namespace = etcd_config.namespace
         etcd_user = etcd_config.user

@@ -28,7 +28,7 @@ class EtcdDependency(BootstrapDependency[AsyncEtcd]):
         Yields:
             Initialized AsyncEtcd client
         """
-        async with AsyncEtcd.initialize(setup_input.etcd.to_dataclass()) as etcd:
+        async with AsyncEtcd.create_from_config(setup_input.etcd.to_dataclass()) as etcd:
             yield etcd
 
     def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:

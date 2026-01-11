@@ -3,8 +3,7 @@ from __future__ import annotations
 import urllib
 from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
-from types import TracebackType
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, override
 
 import aiotools
 import yarl
@@ -23,6 +22,13 @@ type NestedStrKeyedDict = dict[str, Any | NestedStrKeyedDict]
 
 
 class LegacyEtcdLoader(AbstractConfigLoader):
+    """
+    A configuration loader from an AsyncEtcd instance.
+
+    The responsibility to keep the etcd client's lifecycle longer than the loader
+    is on the user of this class.
+    """
+
     _etcd: AsyncEtcd
     _config_prefix: str = "config"
 
@@ -35,24 +41,6 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     @override
     async def load(self) -> Mapping[str, Any]:
         return await self._etcd.get_prefix(self._config_prefix)
-
-    async def open(self) -> None:
-        await self._etcd.__aenter__()
-
-    async def close(self) -> None:
-        await self._etcd.__aexit__(None, None, None)
-
-    async def __aenter__(self) -> Self:
-        await self._etcd.__aenter__()
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException],
-        exc_val: BaseException,
-        exc_tb: TracebackType,
-    ) -> Optional[bool]:
-        return await self._etcd.__aexit__(exc_type, exc_val, exc_tb)
 
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.

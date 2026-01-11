@@ -403,8 +403,8 @@ def read_from_file(
 async def read_from_etcd(
     etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
 ) -> Optional[dict[str, Any]]:
-    etcd = AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map)
-    raw_value = await etcd.get("daemon/config")
+    async with AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map) as etcd:
+        raw_value = await etcd.get("daemon/config")
     if raw_value is None:
         return None
     config: dict[str, Any]
