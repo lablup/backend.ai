@@ -323,14 +323,17 @@ class ScheduleCoordinator:
         if not sessions:
             return
 
+        # Extract session IDs for recorder entity_ids
+        session_ids = [s.session_info.identity.id for s in sessions]
+
         # Create recorder scoped to this scaling group
         recorder_scope = f"{schedule_type.value}:{scaling_group}"
-        with SessionRecorderContext.scope(recorder_scope) as recorder:
+        with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
             # Execute handler logic
             result = await handler.execute(scaling_group, sessions)
 
             # Get recorded steps for history
-            all_records = recorder.get_all_records()
+            all_records = pool.get_all_records()
 
             # Apply status transitions immediately for this scaling group
             await self._handle_status_transitions(handler, result, all_records)

@@ -14,6 +14,7 @@ from .types import (
     EntityIdT,
     ExecutionRecord,
     PhaseRecord,
+    RecordBuildData,
     StepRecord,
     StepStatus,
 )
@@ -35,19 +36,18 @@ class TransitionRecorder(Generic[EntityIdT]):
     Records execution steps during lifecycle operations.
 
     This class provides the API for recording phases and steps.
-    It is created by RecorderContext.entity() and accumulates
-    phase/step records internally until entity context exits.
+    It is created by RecordPool when scope() is entered and accumulates
+    phase/step records internally until scope exits.
 
     Note: Phases and steps cannot be nested. Only one phase can be
     active at a time, and only one step can be active within a phase.
 
     Usage:
-        with RecorderContext[SessionId].scope("schedule") as pool:
-            with RecorderContext[SessionId].entity(session_id):
-                recorder = RecorderContext[SessionId].current_recorder()
-                with recorder.phase("validation"):
-                    with recorder.step("check_quota", success_detail="OK"):
-                        await check_quota()
+        with RecorderContext[SessionId].scope("schedule", entity_ids=session_ids) as pool:
+            recorder = pool.recorder(session_id)
+            with recorder.phase("validation"):
+                with recorder.step("check_quota", success_detail="OK"):
+                    await check_quota()
     """
 
     _entity_id: EntityIdT
@@ -59,11 +59,10 @@ class TransitionRecorder(Generic[EntityIdT]):
         self,
         entity_id: EntityIdT,
         started_at: datetime,
-        initial_phases: Optional[list[PhaseRecord]] = None,
     ) -> None:
         self._entity_id = entity_id
         self._started_at = started_at
-        self._phases = list(initial_phases) if initial_phases else []
+        self._phases = []
         self._current_phase = None
 
     @property
@@ -92,19 +91,28 @@ class TransitionRecorder(Generic[EntityIdT]):
         )
         self._phases.append(phase_record)
 
-    def build_execution_record(self, operation: str, *, failed: bool = False) -> ExecutionRecord:
-        """Build the final ExecutionRecord when entity context exits.
+    def build_execution_record(self, build_data: RecordBuildData) -> ExecutionRecord:
+        """Build the final ExecutionRecord when scope exits.
 
         Args:
-            operation: The operation name (e.g., "schedule", "create").
-            failed: Whether the entity context exited with an exception.
+            build_data: Data containing operation metadata and shared phases.
         """
+        # Merge shared phases (copied) with entity phases
+        all_phases = [p.model_copy(deep=True) for p in build_data.shared_phases]
+        all_phases.extend(self._phases)
+
+        # Sort by started_at to maintain execution order
+        all_phases.sort(key=lambda p: p.started_at)
+
+        # Determine status from last phase
+        status = all_phases[-1].status if all_phases else StepStatus.SUCCESS
+
         return ExecutionRecord(
-            operation=operation,
-            started_at=self._started_at,
-            ended_at=datetime.now(UTC),
-            status=StepStatus.FAILED if failed else StepStatus.SUCCESS,
-            phases=self._phases,
+            operation=build_data.operation,
+            started_at=build_data.started_at,
+            ended_at=build_data.ended_at,
+            status=status,
+            phases=all_phases,
         )
 
     @contextmanager
@@ -124,8 +132,8 @@ class TransitionRecorder(Generic[EntityIdT]):
             NestedPhaseError: If a phase is already active (nesting not allowed)
 
         Usage:
-            with RecorderContext[SessionId].entity(session_id):
-                recorder = RecorderContext[SessionId].current_recorder()
+            with RecorderContext[SessionId].scope("op", entity_ids=ids) as pool:
+                recorder = pool.recorder(session_id)
                 with recorder.phase("validation", success_detail="All passed"):
                     pass
         """
@@ -167,8 +175,8 @@ class TransitionRecorder(Generic[EntityIdT]):
             StepWithoutPhaseError: If no phase is active
 
         Usage:
-            with RecorderContext[SessionId].entity(session_id):
-                recorder = RecorderContext[SessionId].current_recorder()
+            with RecorderContext[SessionId].scope("op", entity_ids=ids) as pool:
+                recorder = pool.recorder(session_id)
                 with recorder.phase("validation"):
                     with recorder.step("check_quota", success_detail="Quota OK"):
                         await check_quota()

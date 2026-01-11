@@ -33,23 +33,23 @@ class BatchSessionHook(AbstractSessionHook):
                 f"Main kernel has no agent assigned for session {session.session_info.identity.id}"
             )
 
-        with RecorderContext[SessionId].entity(session.session_info.identity.id):
-            recorder = RecorderContext[SessionId].current_recorder()
-            with recorder.phase(
-                "finalize_start",
-                success_detail="Session startup finalized",
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session.session_info.identity.id)
+        with recorder.phase(
+            "finalize_start",
+            success_detail="Session startup finalized",
+        ):
+            with recorder.step(
+                "trigger_batch_execution",
+                success_detail=f"Triggered batch execution on agent {agent_id}",
             ):
-                with recorder.step(
-                    "trigger_batch_execution",
-                    success_detail=f"Triggered batch execution on agent {agent_id}",
-                ):
-                    async with self._agent_client_pool.acquire(agent_id) as client:
-                        await client.trigger_batch_execution(
-                            str(session.session_info.identity.id),
-                            str(main_kernel.id),
-                            main_kernel.runtime.startup_command or "",
-                            float(session.session_info.lifecycle.batch_timeout or 0),
-                        )
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    await client.trigger_batch_execution(
+                        str(session.session_info.identity.id),
+                        str(main_kernel.id),
+                        main_kernel.runtime.startup_command or "",
+                        float(session.session_info.lifecycle.batch_timeout or 0),
+                    )
         log.info(
             "Successfully triggered batch execution for session {} on agent {}",
             session.session_info.identity.id,

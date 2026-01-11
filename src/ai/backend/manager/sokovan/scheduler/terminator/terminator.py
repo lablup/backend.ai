@@ -457,6 +457,7 @@ class SessionTerminator:
         # 3. Check with agent - only explicit False terminates
         dead_kernel_ids: list[str] = []
         affected_sessions: list[SessionWithKernels] = []
+        pool = RecorderContext[SessionId].current_pool()
 
         for session in sessions:
             for kernel_info in session.kernel_infos:
@@ -465,23 +466,22 @@ class SessionTerminator:
                 if not kernel_info.resource.agent:
                     continue
                 try:
-                    with RecorderContext[SessionId].entity(session.session_info.identity.id):
-                        recorder = RecorderContext[SessionId].current_recorder()
-                        with recorder.phase(
-                            "verify_kernel_liveness",
-                            success_detail="Kernel liveness verified",
+                    recorder = pool.recorder(session.session_info.identity.id)
+                    with recorder.phase(
+                        "verify_kernel_liveness",
+                        success_detail="Kernel liveness verified",
+                    ):
+                        with recorder.step(
+                            "confirm_with_agent",
+                            success_detail=f"Kernel {kernel_info.id} status confirmed",
                         ):
-                            with recorder.step(
-                                "confirm_with_agent",
-                                success_detail=f"Kernel {kernel_info.id} status confirmed",
-                            ):
-                                agent_id = AgentId(kernel_info.resource.agent)
-                                async with self._agent_client_pool.acquire(agent_id) as client:
-                                    is_running = await client.check_running(str(kernel_info.id))
-                                if is_running is False:
-                                    dead_kernel_ids.append(str(kernel_info.id))
-                                    if session not in affected_sessions:
-                                        affected_sessions.append(session)
+                            agent_id = AgentId(kernel_info.resource.agent)
+                            async with self._agent_client_pool.acquire(agent_id) as client:
+                                is_running = await client.check_running(str(kernel_info.id))
+                            if is_running is False:
+                                dead_kernel_ids.append(str(kernel_info.id))
+                                if session not in affected_sessions:
+                                    affected_sessions.append(session)
                 except Exception as e:
                     log.warning(
                         "Failed to check kernel {} status: {}. Skipping.",

@@ -258,10 +258,11 @@ class TestScheduleScalingGroup:
 
         # Given: SchedulingData with specific strategy
         scheduling_data = _create_scheduling_data_with_strategy(strategy)
+        session_ids = [s.id for s in scheduling_data.pending_sessions.sessions]
 
         # When: Execute schedule_scaling_group within RecorderContext scope
         # (In production, coordinator opens the scope before calling provisioner)
-        with RecorderContext[SessionId].scope("test-provisioning"):
+        with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
             await test_provisioner.schedule_scaling_group("test-sg", scheduling_data)
 
         # Then: The selector for the specified strategy was used
