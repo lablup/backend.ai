@@ -24,7 +24,7 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
@@ -60,7 +60,7 @@ from .handlers import (
 from .kernel import KernelStateEngine
 from .recorder import SessionRecorderContext
 from .results import SessionExecutionResult
-from .types import KernelCreationInfo
+from .types import KernelCreationInfo, KernelTerminationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -203,7 +203,6 @@ class ScheduleCoordinator:
             ),
             # Maintenance handlers
             ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
-                terminator,
                 self._repository,
             ),
             ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsLifecycleHandler(
@@ -476,6 +475,69 @@ class ScheduleCoordinator:
                 updated,
                 stale_status,
             )
+
+            # When sessions go to PENDING, also reset their kernels
+            if stale_status == SessionStatus.PENDING:
+                stale_session_ids = result.stale_ids()
+                await self._apply_kernel_pending_resets(handler_name, stale_session_ids)
+
+        # Apply kernel terminations (processed together with session status changes)
+        if result.kernel_terminations:
+            await self._apply_kernel_terminations(handler_name, result.kernel_terminations)
+
+    async def _apply_kernel_terminations(
+        self,
+        handler_name: str,
+        kernel_terminations: list[KernelTerminationInfo],
+    ) -> None:
+        """Apply kernel terminations using the kernel state engine.
+
+        This is processed together with session status changes to ensure
+        consistency in the coordinator.
+
+        Args:
+            handler_name: Name of the handler for logging
+            kernel_terminations: List of kernel terminations to apply
+        """
+        for termination in kernel_terminations:
+            await self._kernel_state_engine.mark_kernel_terminated(
+                termination.kernel_id,
+                termination.reason,
+            )
+        if kernel_terminations:
+            log.debug(
+                "{}: Terminated {} kernels",
+                handler_name,
+                len(kernel_terminations),
+            )
+
+    async def _apply_kernel_pending_resets(
+        self,
+        handler_name: str,
+        session_ids: list[SessionId],
+    ) -> None:
+        """Reset kernels to PENDING for sessions going back to PENDING.
+
+        When sessions exceed max retries, they go back to PENDING for re-scheduling.
+        This also resets their kernels to PENDING and clears agent assignments.
+
+        Args:
+            handler_name: Name of the handler for logging
+            session_ids: List of session IDs whose kernels should be reset
+        """
+        if not session_ids:
+            return
+
+        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
+            session_ids,
+            reason="EXCEEDED_MAX_RETRIES",
+        )
+        log.debug(
+            "{}: Reset {} kernels to PENDING for {} sessions",
+            handler_name,
+            reset_count,
+            len(session_ids),
+        )
 
     async def process_schedule(
         self,

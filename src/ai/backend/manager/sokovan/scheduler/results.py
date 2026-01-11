@@ -11,6 +11,7 @@ from uuid import UUID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo
 
 
 @dataclass
@@ -53,6 +54,7 @@ class SessionTransitionInfo:
 
     session_id: SessionId
     from_status: SessionStatus
+    reason: Optional[str] = None
 
 
 @dataclass
@@ -110,6 +112,8 @@ class SessionExecutionResult:
     stales: list[SessionTransitionInfo] = field(default_factory=list)
     # For post-processing (event broadcasting, cache invalidation)
     scheduled_data: list[ScheduledSessionData] = field(default_factory=list)
+    # Kernel terminations to be processed together with session status changes
+    kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
 
     def needs_post_processing(self) -> bool:
         """Check if post-processing is needed based on the result."""
@@ -137,3 +141,4 @@ class SessionExecutionResult:
         self.failures.extend(other.failures)
         self.stales.extend(other.stales)
         self.scheduled_data.extend(other.scheduled_data)
+        self.kernel_terminations.extend(other.kernel_terminations)

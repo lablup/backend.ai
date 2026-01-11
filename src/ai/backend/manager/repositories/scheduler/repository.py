@@ -38,6 +38,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
+    RetryUpdateResult,
     SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -531,6 +532,20 @@ class SchedulerRepository:
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     @scheduler_repository_resilience.apply()
+    async def reset_kernels_to_pending_for_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> int:
+        """Reset kernels to PENDING for the given sessions when max retries exceeded."""
+        return await self._db_source.reset_kernels_to_pending_for_sessions(session_ids, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def update_kernels_to_creating_for_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> int:
+        """Update kernels to CREATING for the given sessions when session starts creating."""
+        return await self._db_source.update_kernels_to_creating_for_sessions(session_ids, reason)
+
+    @scheduler_repository_resilience.apply()
     async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
         """Update multiple kernels to TERMINATED status."""
         return await self._db_source.update_kernels_to_terminated(kernel_ids, reason)
@@ -641,14 +656,16 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def batch_update_stuck_session_retries(
         self, session_ids: list[SessionId], max_retries: int = 5
-    ) -> list[SessionId]:
+    ) -> RetryUpdateResult:
         """
         Batch update retry counts for stuck sessions.
-        Sessions that exceed max_retries are moved to PENDING status.
+
+        Status changes for exceeded sessions are handled by the Coordinator
+        via handler's stale_status().
 
         :param session_ids: List of session IDs to update
-        :param max_retries: Maximum retries before moving to PENDING (default: 5)
-        :return: List of session IDs that should continue retrying (not moved to PENDING)
+        :param max_retries: Maximum retries allowed (default: 5)
+        :return: RetryUpdateResult containing sessions to retry and sessions that exceeded
         """
         return await self._db_source.batch_update_stuck_session_retries(session_ids, max_retries)
 

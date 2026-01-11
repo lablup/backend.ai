@@ -31,8 +31,6 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -44,11 +42,11 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
     KernelBindingData,
     NetworkSetup,
+    RetryResult,
     SessionDataForPull,
     SessionDataForStart,
 )
@@ -89,51 +87,6 @@ class SessionLauncher:
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
-
-    async def check_preconditions(self) -> ScheduleResult:
-        """
-        Check preconditions for scheduled sessions.
-        Transitions sessions from SCHEDULED to PREPARING and triggers image pulling.
-
-        :return: ScheduleResult with the count of sessions transitioned
-        """
-        # Get scheduled sessions for image pulling
-        result = await self._repository.get_sessions_for_pull(
-            [SessionStatus.SCHEDULED],
-            [
-                KernelStatus.SCHEDULED,
-            ],
-        )
-        scheduled_sessions = result.sessions
-        image_configs = result.image_configs
-
-        if not scheduled_sessions:
-            return ScheduleResult()
-
-        # Extract session IDs for status update
-        session_ids = [s.session_id for s in scheduled_sessions]
-
-        # Update sessions to PREPARING status
-        await self._repository.update_sessions_to_preparing(session_ids)
-
-        # Trigger image checking and pulling on agents
-        with RecorderContext[SessionId].shared_phase(
-            "prepare_images",
-            success_detail="Image pull requested",
-        ):
-            await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
-
-        # Convert to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="passed-preconditions",
-            )
-            for session in scheduled_sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     async def trigger_image_pulling(
         self,
@@ -203,46 +156,6 @@ class SessionLauncher:
                 success_detail="Image pull triggered",
             ):
                 await asyncio.gather(*pull_tasks, return_exceptions=True)
-
-    async def start_sessions(self) -> ScheduleResult:
-        """
-        Start sessions that have passed precondition checks.
-        Transitions sessions from PREPARED to CREATING and starts kernels on agents.
-
-        :return: ScheduleResult with the count of sessions started
-        """
-        # Get prepared sessions for starting
-        sessions_with_images = await self._repository.get_sessions_for_start(
-            [SessionStatus.PREPARED],
-            [
-                KernelStatus.PREPARED,
-            ],
-        )
-        prepared_sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
-
-        if not prepared_sessions:
-            return ScheduleResult()
-        # Extract session IDs for status update
-        session_ids = [s.session_id for s in prepared_sessions]
-
-        # Update sessions and kernels to CREATING status
-        await self._repository.update_sessions_and_kernels_to_creating(session_ids)
-
-        # Start sessions concurrently
-        await self._start_sessions_concurrently(prepared_sessions, image_configs)
-
-        # Convert prepared sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
-            )
-            for session in prepared_sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
 
     async def start_sessions_for_handler(
         self,
@@ -775,87 +688,6 @@ class SessionLauncher:
                 pulling_status[image] = False
         return agent_id, pulling_status
 
-    async def retry_preparing_sessions(self) -> ScheduleResult:
-        """
-        Retry PREPARING/PULLING sessions that appear stuck.
-        Re-triggers check_and_pull operations for their images.
-
-        :return: ScheduleResult with number of sessions retried
-        """
-        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
-
-        # Get sessions with PREPARING and PULLING statuses
-        sessions_with_images = await self._repository.get_sessions_for_pull(
-            [
-                SessionStatus.PREPARING,
-                SessionStatus.PULLING,
-            ],
-            [
-                KernelStatus.SCHEDULED,
-                KernelStatus.PREPARING,
-                KernelStatus.PULLING,
-            ],
-        )
-        sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
-
-        if not sessions:
-            log.trace("No sessions found with PREPARING/PULLING status")
-            return ScheduleResult()
-
-        # Filter sessions that haven't changed status for threshold time
-        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
-
-        if not stuck_sessions:
-            return ScheduleResult()
-
-        # Check which sessions are actually stuck (not actively pulling)
-        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
-            stuck_sessions, image_configs
-        )
-
-        if not truly_stuck_sessions:
-            log.debug("All sessions are actively pulling, no retry needed")
-            return ScheduleResult()
-
-        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
-
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return ScheduleResult()
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
-        ]
-
-        # Use the existing _trigger_image_pulling_for_sessions method
-        with RecorderContext[SessionId].shared_phase(
-            "prepare_images",
-            success_detail="Image pull retried",
-        ):
-            await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
-
-        # Convert retried sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
-            )
-            for session in sessions_to_retry
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
-
     def _filter_stuck_sessions_for_start(
         self,
         sessions: list[SessionDataForStart],
@@ -953,82 +785,11 @@ class SessionLauncher:
                 )
         return False
 
-    async def retry_creating_sessions(self) -> ScheduleResult:
-        """
-        Retry CREATING sessions that appear stuck.
-        Re-triggers kernel creation operations directly.
-
-        :return: ScheduleResult with number of sessions retried
-        """
-        CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
-
-        # Get CREATING sessions from repository
-        sessions_with_images = await self._repository.get_sessions_for_start(
-            [SessionStatus.CREATING],
-            [
-                KernelStatus.PREPARED,
-                KernelStatus.CREATING,
-            ],
-        )
-        sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
-
-        if not sessions:
-            return ScheduleResult()
-
-        # Filter sessions that haven't changed status for threshold time
-        stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
-
-        if not stuck_sessions:
-            return ScheduleResult()
-
-        # Check which sessions are truly stuck (not actively creating)
-        truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
-
-        if not truly_stuck_sessions:
-            log.debug("All sessions are actively creating kernels, no retry needed")
-            return ScheduleResult()
-
-        log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
-
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return ScheduleResult()
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
-        ]
-
-        # Use the existing _start_sessions_concurrently method to retry
-        # This will re-trigger kernel creation for stuck sessions
-        await self._start_sessions_concurrently(sessions_to_retry, image_configs)
-
-        # Convert retried sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
-            )
-            for session in sessions_to_retry
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
-
     async def retry_preparing_for_handler(
         self,
         sessions: list[SessionDataForPull],
         image_configs: dict[str, ImageConfigData],
-    ) -> list[SessionId]:
+    ) -> RetryResult:
         """
         Retry PREPARING/PULLING sessions for the given sessions list.
 
@@ -1037,18 +798,20 @@ class SessionLauncher:
 
         :param sessions: List of sessions to check for retry
         :param image_configs: Image configurations indexed by image name
-        :return: List of session IDs that were retried
+        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
         """
         PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
+        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
+
         if not sessions:
-            return []
+            return empty_result
 
         # Filter sessions that haven't changed status for threshold time
         stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
 
         if not stuck_sessions:
-            return []
+            return empty_result
 
         # Check which sessions are actually stuck (not actively pulling)
         truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
@@ -1057,37 +820,40 @@ class SessionLauncher:
 
         if not truly_stuck_sessions:
             log.debug("All sessions are actively pulling, no retry needed")
-            return []
+            return empty_result
 
         log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
 
         # Update retry counts and get sessions that should continue retrying
         stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+        retry_update_result = await self._repository.batch_update_stuck_session_retries(
             stuck_session_ids, SERVICE_MAX_RETRIES
         )
 
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return []
+        if not retry_update_result.sessions_to_retry:
+            log.info("All stuck sessions exceeded max retries")
+            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
 
         # Filter sessions that should be retried based on returned IDs
         sessions_to_retry = [
             session
             for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
+            if session.session_id in retry_update_result.sessions_to_retry
         ]
 
         # Use the existing _trigger_image_pulling_for_sessions method
         await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
 
-        return list(sessions_to_retry_ids)
+        return RetryResult(
+            retried_ids=list(retry_update_result.sessions_to_retry),
+            exceeded_ids=list(retry_update_result.sessions_exceeded),
+        )
 
     async def retry_creating_for_handler(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[str, ImageConfigData],
-    ) -> list[SessionId]:
+    ) -> RetryResult:
         """
         Retry CREATING sessions for the given sessions list.
 
@@ -1096,46 +862,51 @@ class SessionLauncher:
 
         :param sessions: List of sessions to check for retry
         :param image_configs: Image configurations indexed by image name
-        :return: List of session IDs that were retried
+        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
         """
         CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
+        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
+
         if not sessions:
-            return []
+            return empty_result
 
         # Filter sessions that haven't changed status for threshold time
         stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
 
         if not stuck_sessions:
-            return []
+            return empty_result
 
         # Check which sessions are truly stuck (not actively creating)
         truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
 
         if not truly_stuck_sessions:
             log.debug("All sessions are actively creating kernels, no retry needed")
-            return []
+            return empty_result
 
         log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
         # Update retry counts and get sessions that should continue retrying
         stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+        retry_update_result = await self._repository.batch_update_stuck_session_retries(
             stuck_session_ids, SERVICE_MAX_RETRIES
         )
 
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return []
+        if not retry_update_result.sessions_to_retry:
+            log.info("All stuck sessions exceeded max retries")
+            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
 
         # Filter sessions that should be retried based on returned IDs
         sessions_to_retry = [
             session
             for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
+            if session.session_id in retry_update_result.sessions_to_retry
         ]
 
         # Use the existing _start_sessions_concurrently method to retry
         await self._start_sessions_concurrently(sessions_to_retry, image_configs)
 
-        return list(sessions_to_retry_ids)
+        return RetryResult(
+            retried_ids=list(retry_update_result.sessions_to_retry),
+            exceeded_ids=list(retry_update_result.sessions_exceeded),
+        )
