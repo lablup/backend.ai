@@ -41,6 +41,19 @@ class ExportTestRow(Base):
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="active")
 
 
+class ExportTestChildRow(Base):
+    """Child ORM model for JOIN testing."""
+
+    __tablename__ = "test_export_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[str] = mapped_column(GUID, primary_key=True)
+    parent_id: Mapped[str] = mapped_column(
+        GUID, sa.ForeignKey("test_export.id"), nullable=False
+    )
+    child_name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
 # Field definitions for test model
 TEST_EXPORT_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
@@ -134,6 +147,7 @@ class TestReportDef:
             report_key="test-report",
             name="Test Report",
             description="Test report for unit tests",
+            select_from=ExportTestRow.__table__,
             fields=sample_fields,
         )
 
@@ -209,6 +223,7 @@ class TestExecuteStreamingExport:
             report_key="test-export",
             name="Test Export",
             description="Test export report",
+            select_from=ExportTestRow.__table__,
             fields=TEST_EXPORT_FIELDS,
         )
 
@@ -223,6 +238,7 @@ class TestExecuteStreamingExport:
         fields = test_report.get_fields_by_keys(["id", "name", "value"])
 
         query = StreamingExportQuery(
+            select_from=test_report.select_from,
             fields=fields,
             conditions=[],
             orders=[],
@@ -250,6 +266,7 @@ class TestExecuteStreamingExport:
         fields = test_report.get_fields_by_keys(["id", "name", "status"])
 
         query = StreamingExportQuery(
+            select_from=test_report.select_from,
             fields=fields,
             conditions=[lambda: ExportTestRow.status == "active"],
             orders=[],
@@ -278,6 +295,7 @@ class TestExecuteStreamingExport:
         fields = test_report.get_fields_by_keys(["name", "value"])
 
         query = StreamingExportQuery(
+            select_from=test_report.select_from,
             fields=fields,
             conditions=[],
             orders=[ExportTestRow.value.desc()],
@@ -306,6 +324,7 @@ class TestExecuteStreamingExport:
         fields = test_report.get_fields_by_keys(["id", "name"])
 
         query = StreamingExportQuery(
+            select_from=test_report.select_from,
             fields=fields,
             conditions=[],
             orders=[],
@@ -331,6 +350,7 @@ class TestExecuteStreamingExport:
         fields = test_report.get_fields_by_keys(["id", "name"])
 
         query = StreamingExportQuery(
+            select_from=test_report.select_from,
             fields=fields,
             conditions=[],
             orders=[],
@@ -348,3 +368,91 @@ class TestExecuteStreamingExport:
         assert len(partitions[1]) == 3
         assert len(partitions[2]) == 3
         assert len(partitions[3]) == 1
+
+    @pytest.fixture
+    async def db_with_join_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database with parent-child tables for JOIN testing."""
+        async with with_tables(database_connection, [ExportTestRow, ExportTestChildRow]):
+            yield database_connection
+
+    @pytest.fixture
+    async def parent_child_data(
+        self,
+        db_with_join_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Insert parent with two children, return parent_id."""
+        parent_id = str(uuid4())
+        async with db_with_join_tables.begin_session() as db_sess:
+            await db_sess.execute(
+                ExportTestRow.__table__.insert(),
+                [{"id": parent_id, "name": "parent-1", "value": 100, "status": "active"}],
+            )
+            await db_sess.execute(
+                ExportTestChildRow.__table__.insert(),
+                [
+                    {"id": str(uuid4()), "parent_id": parent_id, "child_name": "child-1"},
+                    {"id": str(uuid4()), "parent_id": parent_id, "child_name": "child-2"},
+                ],
+            )
+        yield parent_id
+
+    @pytest.fixture
+    def join_report(self) -> ReportDef:
+        """Report definition for parent-child JOIN."""
+        join_clause = ExportTestRow.__table__.join(
+            ExportTestChildRow.__table__,
+            ExportTestRow.id == ExportTestChildRow.parent_id,
+        )
+        return ReportDef(
+            report_key="join-test",
+            name="Join Test",
+            description="Parent-child join report",
+            select_from=join_clause,
+            fields=[
+                ExportFieldDef(
+                    key="parent_name",
+                    name="Parent Name",
+                    description="Parent name",
+                    field_type=ExportFieldType.STRING,
+                    column=ExportTestRow.name,
+                ),
+                ExportFieldDef(
+                    key="child_name",
+                    name="Child Name",
+                    description="Child name",
+                    field_type=ExportFieldType.STRING,
+                    column=ExportTestChildRow.child_name,
+                ),
+            ],
+        )
+
+    @pytest.mark.asyncio
+    async def test_streaming_export_with_join(
+        self,
+        db_with_join_tables: ExtendedAsyncSAEngine,
+        parent_child_data: str,
+        join_report: ReportDef,
+    ) -> None:
+        """Test streaming export with multi-table JOIN using select_from."""
+        query = StreamingExportQuery(
+            select_from=join_report.select_from,
+            fields=join_report.fields,
+            conditions=[],
+            orders=[ExportTestChildRow.child_name.asc()],
+            max_rows=100,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Sequence[Any]] = []
+        async for partition in execute_streaming_export(db_with_join_tables, query):
+            for row_values in partition:
+                rows.append(row_values)
+
+        assert len(rows) == 2
+        assert rows[0][0] == "parent-1"  # parent_name
+        assert rows[0][1] == "child-1"  # child_name (ordered)
+        assert rows[1][0] == "parent-1"  # parent_name
+        assert rows[1][1] == "child-2"  # child_name (ordered)

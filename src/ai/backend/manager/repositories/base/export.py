@@ -95,6 +95,7 @@ class StreamingExportQuery:
     Limits export size with max_rows.
 
     Attributes:
+        select_from: FROM clause (single table or joined tables)
         fields: Selected field definitions for SELECT query building
         conditions: WHERE clause conditions
         orders: ORDER BY clause sort conditions
@@ -102,6 +103,7 @@ class StreamingExportQuery:
         statement_timeout_sec: DB statement timeout (passed from config.export.statement_timeout_sec)
     """
 
+    select_from: sa.FromClause
     fields: list[ExportFieldDef]
     conditions: list[QueryCondition]
     orders: list[QueryOrder]
@@ -112,10 +114,12 @@ class StreamingExportQuery:
     def from_params(
         cls,
         params: ExportQueryParams,
+        select_from: sa.FromClause,
         fields: list[ExportFieldDef],
     ) -> StreamingExportQuery:
-        """Create StreamingExportQuery from params and fields."""
+        """Create StreamingExportQuery from params, select_from, and fields."""
         return cls(
+            select_from=select_from,
             fields=fields,
             conditions=params.conditions,
             orders=params.orders,
@@ -134,12 +138,14 @@ class ReportDef:
         report_key: Report identifier (e.g., "audit-logs")
         name: Report name for display
         description: Report description
+        select_from: FROM clause (single table or joined tables)
         fields: Available field list
     """
 
     report_key: str
     name: str
     description: str
+    select_from: sa.FromClause
     fields: list[ExportFieldDef]
 
     def get_field(self, key: str) -> ExportFieldDef | None:
@@ -186,9 +192,9 @@ async def execute_streaming_export(
     Yields:
         Partitions of row values (each row in query.fields order)
     """
-    # Build SELECT from field columns
+    # Build SELECT from field columns with explicit FROM clause
     columns = [f.column for f in query.fields]
-    base_query = sa.select(*columns)
+    base_query = sa.select(*columns).select_from(query.select_from)
 
     # Apply conditions
     for condition in query.conditions:
