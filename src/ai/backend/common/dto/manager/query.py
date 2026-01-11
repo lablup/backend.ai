@@ -47,5 +47,20 @@ class StringFilter(BaseRequestModel):
     )
 
 
+class UUIDFilter(BaseRequestModel):
+    """Filter for UUID fields supporting equality and set operations.
+
+    Provides UUID matching with equals/not_equals and in/not_in operations.
+    """
+
+    # Basic operations
+    equals: Optional[uuid.UUID] = Field(default=None, description="Exact UUID match")
+    in_: Optional[list[uuid.UUID]] = Field(default=None, alias="in", description="UUID is in list")
+
+    # NOT operations
+    not_equals: Optional[uuid.UUID] = Field(default=None, description="Not equals UUID")
+    not_in: Optional[list[uuid.UUID]] = Field(default=None, description="UUID is not in list")
+
+
 class ListGroupQuery(BaseRequestModel):
     group_id: Optional[uuid.UUID] = Field(default=None, alias="groupId")

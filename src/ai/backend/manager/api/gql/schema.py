@@ -110,6 +110,11 @@ from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
 from .scheduler import (
     scheduling_events_by_session,
 )
+from .scheduling_history import (
+    deployment_histories,
+    route_histories,
+    session_scheduling_histories,
+)
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -159,6 +164,9 @@ class Query:
     inference_runtime_config = inference_runtime_config
     route = route
     routes = routes
+    session_scheduling_histories = session_scheduling_histories
+    deployment_histories = deployment_histories
+    route_histories = route_histories
 
 
 @strawberry.type
