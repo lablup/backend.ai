@@ -1,13 +1,13 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2025-01-11
-Created-Version: 25.1.0
-Target-Version:
-Implemented-Version:
+Created-Version: 26.1.0
+Target-Version: 26.1.0
+Implemented-Version: 26.1.0
 ---
 
-# Agent RPC 연결 풀링
+# Agent RPC Connection Pooling
 
 ## Related Issues
 
@@ -16,36 +16,36 @@ Implemented-Version:
 
 ## Motivation
 
-현재 Manager에서 Agent로 RPC 호출 시 매번 새로운 ZeroMQ 연결을 생성하고 있다.
+Currently, the Manager creates a new ZeroMQ connection for every RPC call to an Agent.
 
 ```python
-# AgentRPCCache.rpc_context() - 매 호출마다 새 PeerInvoker 생성
+# AgentRPCCache.rpc_context() - Creates new PeerInvoker for each call
 peer = PeerInvoker(
     connect=ZeroMQAddress(agent_addr),
     transport=ZeroMQRPCTransport,
     ...
 )
-async with peer:  # 연결 생성
+async with peer:  # Connection established
     yield peer
-# 연결 종료
+# Connection closed
 ```
 
-**문제점:**
-1. **연결 오버헤드**: ZeroMQ 연결 설정 → CurveZMQ 인증 → RPC 호출 → 연결 종료가 매번 발생
-2. **TCP Keepalive 무의미**: 코드에 keepalive 설정이 있지만, 매번 새 연결이라 실제로 작동하지 않음
-3. **동시 호출 시 다중 연결**: 한 Agent에 여러 RPC 동시 호출 시 각각 별도 연결 생성
+**Problems:**
+1. **Connection overhead**: ZeroMQ connection setup → CurveZMQ authentication → RPC call → connection teardown happens every time
+2. **TCP Keepalive ineffective**: Keepalive settings exist in code but don't work since connections are recreated each time
+3. **Multiple connections for concurrent calls**: Multiple simultaneous RPC calls to the same Agent create separate connections
 
-**영향 범위:**
-- `AgentClient`의 30개 이상 메서드가 모두 이 패턴 사용
-- 스케줄링 시 다수 Agent에 대한 빈번한 RPC 호출에서 성능 저하
+**Impact:**
+- Over 30 methods in `AgentClient` all use this pattern
+- Performance degradation during scheduling when making frequent RPC calls to many Agents
 
 ## Current Design
 
-### AgentRPCCache 구조
+### AgentRPCCache Structure
 
 ```python
 class AgentRPCCache:
-    _cache: dict[AgentId, tuple[str, PublicKey | None]]  # 메타데이터만 캐시
+    _cache: dict[AgentId, tuple[str, PublicKey | None]]  # Only metadata cached
 
     @actxmgr
     async def rpc_context(
@@ -56,14 +56,14 @@ class AgentRPCCache:
         order_key: Optional[str] = None,
     ) -> AsyncIterator[PeerInvoker]:
         agent_addr, agent_public_key = await self.get_rpc_args(agent_id)
-        # ... 인증 핸들러 설정 ...
+        # ... authentication handler setup ...
 
         peer = PeerInvoker(...)
-        async with peer:  # 매번 새 연결
+        async with peer:  # New connection every time
             yield peer
 ```
 
-### AgentClient 구조
+### AgentClient Structure
 
 ```python
 class AgentClient:
@@ -84,43 +84,43 @@ class AgentClient:
             yield rpc
 
     async def health(self) -> Mapping[str, Any]:
-        async with self._with_connection() as rpc:  # 매번 새 연결
+        async with self._with_connection() as rpc:  # New connection every time
             return await rpc.call.health()
 ```
 
-### callosum Peer 동작 분석
+### callosum Peer Behavior Analysis
 
-- `__aenter__`: 연결 설정, send/recv 루프 시작
-- `__aexit__`: 연결 종료
-- `request_id = (method, order_key, client_seq_id)` 기반 응답 매핑
-- **결론: 하나의 PeerInvoker를 여러 호출자가 공유해도 응답 매핑 정상 동작**
+- `__aenter__`: Establishes connection, starts send/recv loops
+- `__aexit__`: Closes connection
+- `request_id = (method, order_key, client_seq_id)` based response mapping
+- **Conclusion: A single PeerInvoker can be safely shared among multiple callers with proper response mapping**
 
 ## Proposed Design
 
-### 설계 원칙
+### Design Principles
 
-1. **기존 코드 변경 최소화**: `AgentRPCCache` 수정하지 않음
-2. **간결한 구현**: 필요한 최소한의 기능만 구현
-3. **AgentClient 동작 방식 변경**: `PeerInvoker`를 내부에 보관하고 재사용
-4. **관심사 분리**: `acquire()`는 클라이언트 획득만, `health_check_loop`가 연결 관리 책임
-5. **향후 목표**: `AgentRPCCache` 의존성 분리 (현재는 그대로 사용)
+1. **Minimize existing code changes**: Do not modify `AgentRPCCache`
+2. **Simple implementation**: Implement only the minimum required functionality
+3. **Change AgentClient behavior**: Store and reuse `PeerInvoker` internally
+4. **Separation of concerns**: `acquire()` only acquires clients, `health_check_loop` manages connections
+5. **Future goal**: Decouple `AgentRPCCache` dependency (currently used as-is)
 
-### 파일 구조
+### File Structure
 
 ```
 src/ai/backend/manager/
 ├── clients/
 │   └── agent/
 │       ├── __init__.py
-│       ├── abc.py             # 새로 추가: BackendAIClient ABC
-│       ├── client.py          # AgentClient 수정
-│       ├── pool.py            # 새로 추가: AgentClientPool
-│       └── types.py           # 새로 추가: AgentPoolSpec
+│       ├── abc.py             # New: BackendAIClient ABC
+│       ├── client.py          # Modified AgentClient
+│       ├── pool.py            # New: AgentClientPool
+│       └── types.py           # New: AgentPoolSpec
 ├── errors/
-│   └── agent.py               # 새로 추가: AgentConnectionUnavailable
+│   └── agent.py               # New: AgentConnectionUnavailable
 ```
 
-### 예외 정의
+### Exception Definition
 
 ```python
 # manager/errors/agent.py
@@ -139,7 +139,7 @@ from ai.backend.common.types import AgentId
 
 
 class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
-    """Agent 연결을 사용할 수 없을 때 발생"""
+    """Raised when Agent connection is unavailable"""
 
     error_type = "https://api.backend.ai/probs/agent-connection-unavailable"
     error_title = "Agent connection unavailable."
@@ -157,7 +157,7 @@ class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 ```
 
-### 설정 데이터 클래스
+### Configuration Dataclass
 
 ```python
 # manager/clients/agent/types.py
@@ -168,10 +168,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class AgentPoolSpec:
-    """AgentClientPool 설정"""
-    health_check_interval: float  # 주기적 health check 간격 (초)
-    failure_threshold: int        # unhealthy 마킹까지 실패 횟수
-    recovery_timeout: float       # unhealthy 지속 시 삭제까지 대기 시간 (초)
+    """AgentClientPool configuration"""
+    health_check_interval: float  # Periodic health check interval (seconds)
+    failure_threshold: int        # Number of failures before marking unhealthy
+    recovery_timeout: float       # Time to wait before removing unhealthy connection (seconds)
 ```
 
 ### BackendAIClient ABC
@@ -184,20 +184,20 @@ from abc import ABC, abstractmethod
 
 
 class BackendAIClient(ABC):
-    """Backend.AI 클라이언트 추상 베이스 클래스"""
+    """Abstract base class for Backend.AI clients"""
 
     @abstractmethod
     async def connect(self) -> None:
-        """연결 시작"""
+        """Start connection"""
         raise NotImplementedError
 
     @abstractmethod
     async def close(self) -> None:
-        """연결 종료"""
+        """Close connection"""
         raise NotImplementedError
 ```
 
-### AgentClient 변경
+### AgentClient Changes
 
 ```python
 # manager/clients/agent/client.py
@@ -214,9 +214,9 @@ from .abc import BackendAIClient
 
 class AgentClient(BackendAIClient):
     """
-    Agent RPC 클라이언트.
+    Agent RPC client.
 
-    Pool에서 생성되며, 내부 PeerInvoker를 재사용한다.
+    Created by the Pool and reuses internal PeerInvoker.
     """
 
     def __init__(self, peer: PeerInvoker, agent_id: AgentId) -> None:
@@ -228,18 +228,18 @@ class AgentClient(BackendAIClient):
         return self._agent_id
 
     async def connect(self) -> None:
-        """연결 시작"""
+        """Start connection"""
         await self._peer.__aenter__()
 
     async def close(self) -> None:
-        """연결 종료"""
+        """Close connection"""
         try:
             await self._peer.__aexit__(None, None, None)
         except Exception:
             pass
 
     async def ping(self) -> None:
-        """연결 상태 확인용 ping"""
+        """Ping for connection status check"""
         await self._peer.call.ping()
 
     async def health(self) -> Mapping[str, Any]:
@@ -248,23 +248,23 @@ class AgentClient(BackendAIClient):
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
         return await self._peer.call.gather_hwinfo()
 
-    # ... 나머지 메서드들도 동일하게 self._peer.call.xxx() 사용
+    # ... remaining methods also use self._peer.call.xxx()
 ```
 
-### 내부 캐시 엔트리
+### Internal Cache Entry
 
 ```python
-# manager/clients/agent/pool.py (내부용)
+# manager/clients/agent/pool.py (internal use)
 @dataclass(slots=True)
 class _CachedEntry:
-    """Pool 내부에서 관리하는 캐시 엔트리"""
+    """Cache entry managed internally by Pool"""
     client: AgentClient
     is_healthy: bool = True
     failure_count: int = 0
-    unhealthy_since: float | None = None  # unhealthy 시작 시간
+    unhealthy_since: float | None = None  # Time when marked unhealthy
 ```
 
-### AgentClientPool 구현
+### AgentClientPool Implementation
 
 ```python
 # manager/clients/agent/pool.py
@@ -295,7 +295,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# connection 관련 에러 타입
+# Connection-related error types
 CONNECTION_ERRORS = (
     ConnectionError,
     asyncio.TimeoutError,
@@ -313,15 +313,15 @@ class _CachedEntry:
 
 class AgentClientPool:
     """
-    Agent RPC 연결 풀.
+    Agent RPC connection pool.
 
-    연결 상태 관리:
-    1. 주기적 health check: ping으로 연결 상태 확인, 복구 불가 시 삭제
-    2. 사용 시점 실패 추적: acquire() 사용 중 connection error 시 failure_count 증가
+    Connection state management:
+    1. Periodic health check: Verify connection status via ping, remove if unrecoverable
+    2. Usage-time failure tracking: Increment failure_count on connection errors during acquire()
 
-    관심사 분리:
-    - acquire(): 클라이언트 획득만 (unhealthy면 예외)
-    - health_check_loop: 연결 상태 관리 및 삭제
+    Separation of concerns:
+    - acquire(): Only acquires clients (raises exception if unhealthy)
+    - health_check_loop: Manages connection state and removal
     """
 
     def __init__(
@@ -334,14 +334,14 @@ class AgentClientPool:
         self._entries: dict[AgentId, _CachedEntry] = {}
         self._lock = asyncio.Lock()
 
-        # 생성자에서 백그라운드 태스크 시작
+        # Start background task in constructor
         self._health_check_task = asyncio.create_task(
             self._health_check_loop(),
             name="AgentClientPool._health_check_loop",
         )
 
     async def close(self) -> None:
-        """풀 종료"""
+        """Close the pool"""
         await cancel_and_wait(self._health_check_task)
 
         async with self._lock:
@@ -352,13 +352,13 @@ class AgentClientPool:
     @asynccontextmanager
     async def acquire(self, agent_id: AgentId) -> AsyncIterator[AgentClient]:
         """
-        Agent 클라이언트를 획득하여 사용.
+        Acquire and use an Agent client.
 
-        사용 중 connection error 발생 시 실패 카운트를 증가시키고,
-        threshold 초과 시 연결을 unhealthy로 마킹한다.
-        unhealthy 연결은 예외를 발생시킨다 (삭제는 health_check_loop에서).
+        On connection errors during use, increments failure count and
+        marks connection as unhealthy if threshold exceeded.
+        Unhealthy connections raise exceptions (removal handled by health_check_loop).
 
-        비즈니스 로직 에러는 failure count에 영향을 주지 않는다.
+        Business logic errors do not affect failure count.
         """
         client = await self._get_or_create(agent_id)
         try:
@@ -367,17 +367,17 @@ class AgentClientPool:
             self._record_failure(agent_id)
             raise
         except Exception:
-            # connection error가 아닌 경우 failure count 증가 안 함
+            # Non-connection errors don't increment failure count
             raise
         else:
             self._record_success(agent_id)
 
     def invalidate(self, agent_id: AgentId) -> None:
         """
-        특정 Agent 연결을 unhealthy로 마킹.
+        Mark a specific Agent connection as unhealthy.
 
-        Agent exit, heartbeat 실패 등의 이벤트에서 호출.
-        실제 삭제는 health_check_loop에서 수행.
+        Called from event handlers like Agent exit or heartbeat failure.
+        Actual removal is performed by health_check_loop.
         """
         entry = self._entries.get(agent_id)
         if entry is not None:
@@ -386,16 +386,16 @@ class AgentClientPool:
                 entry.unhealthy_since = time.perf_counter()
 
     async def _get_or_create(self, agent_id: AgentId) -> AgentClient:
-        """healthy한 클라이언트 반환, 없으면 생성"""
+        """Return healthy client, create if not exists"""
         async with self._lock:
             entry = self._entries.get(agent_id)
 
-            # unhealthy면 예외 발생 (삭제는 health_check_loop에서)
+            # Raise exception if unhealthy (removal handled by health_check_loop)
             if entry is not None and not entry.is_healthy:
                 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
                 raise AgentConnectionUnavailable(agent_id, "connection unhealthy")
 
-            # 연결 없으면 새로 생성
+            # Create new connection if not exists
             if entry is None:
                 entry = await self._create_entry(agent_id)
                 self._entries[agent_id] = entry
@@ -403,14 +403,14 @@ class AgentClientPool:
             return entry.client
 
     async def _create_entry(self, agent_id: AgentId) -> _CachedEntry:
-        """새 엔트리 생성 (lock 내부에서 호출)"""
+        """Create new entry (called within lock)"""
         try:
             agent_addr, agent_public_key = await self._agent_cache.get_rpc_args(agent_id)
         except ValueError as e:
             from ai.backend.manager.errors.agent import AgentConnectionUnavailable
             raise AgentConnectionUnavailable(agent_id, str(e)) from e
 
-        # 인증 핸들러 설정
+        # Authentication handler setup
         if agent_public_key:
             auth_handler = ManagerAuthHandler(
                 "local",
@@ -452,7 +452,7 @@ class AgentClientPool:
         )
 
     def _record_failure(self, agent_id: AgentId) -> None:
-        """connection error 시 실패 기록 및 threshold 초과 시 unhealthy 마킹"""
+        """Record failure on connection error, mark unhealthy if threshold exceeded"""
         entry = self._entries.get(agent_id)
         if entry is None:
             return
@@ -469,7 +469,7 @@ class AgentClientPool:
             )
 
     def _record_success(self, agent_id: AgentId) -> None:
-        """성공 시 상태 리셋"""
+        """Reset state on success"""
         entry = self._entries.get(agent_id)
         if entry is not None:
             entry.failure_count = 0
@@ -477,13 +477,13 @@ class AgentClientPool:
             entry.unhealthy_since = None
 
     async def _health_check_loop(self) -> None:
-        """주기적으로 모든 연결 health check"""
+        """Periodically health check all connections"""
         while True:
             await asyncio.sleep(self._spec.health_check_interval)
             await self._check_all_health()
 
     async def _check_all_health(self) -> None:
-        """모든 연결 health check (asyncio.gather 사용)"""
+        """Health check all connections (using asyncio.gather)"""
         async with self._lock:
             entries = list(self._entries.items())
 
@@ -496,22 +496,22 @@ class AgentClientPool:
         )
 
     async def _check_one_health(self, agent_id: AgentId, entry: _CachedEntry) -> None:
-        """단일 연결 health check 및 복구 불가 시 삭제"""
+        """Health check single connection and remove if unrecoverable"""
         try:
             async with asyncio.timeout(5.0):
                 await entry.client.ping()
-            # ping 성공 → 복구
+            # ping success → recover
             entry.is_healthy = True
             entry.failure_count = 0
             entry.unhealthy_since = None
         except Exception:
-            # ping 실패 → unhealthy 마킹
+            # ping failure → mark unhealthy
             entry.is_healthy = False
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
                 log.debug("Health check failed for agent {}", agent_id)
 
-        # recovery_timeout 초과 시 삭제
+        # Remove if recovery_timeout exceeded
         if (
             not entry.is_healthy
             and entry.unhealthy_since is not None
@@ -528,10 +528,10 @@ class AgentClientPool:
             )
 ```
 
-### 사용 예시
+### Usage Example
 
 ```python
-# Sokovan 스케줄러에서 사용
+# Usage in Sokovan scheduler
 class SchedulingController:
     def __init__(self, agent_cache: AgentRPCCache, ...):
         spec = AgentPoolSpec(
@@ -549,7 +549,7 @@ class SchedulingController:
             return await client.health()
 
     def on_agent_lost(self, agent_id: AgentId) -> None:
-        """Agent heartbeat 실패 등의 이벤트 핸들러"""
+        """Event handler for Agent heartbeat failure, etc."""
         self._agent_pool.invalidate(agent_id)
 ```
 
@@ -557,75 +557,75 @@ class SchedulingController:
 
 ### Backward Compatibility
 
-- 기존 `AgentRPCCache` 변경 없음
-- 기존 `AgentClient` 사용처는 그대로 유지 가능 (Sokovan 외부)
-- **Sokovan 스케줄러 하위에서는 `AgentRPCCache` 대신 `AgentClientPool`만 사용**
+- No changes to existing `AgentRPCCache`
+- Existing `AgentClient` usage can be maintained (outside Sokovan)
+- **Within Sokovan scheduler, only `AgentClientPool` is used instead of `AgentRPCCache`**
 
 ### Breaking Changes
 
-- `AgentClient` 생성자 시그니처 변경: `(agent_cache, agent_id)` → `(peer, agent_id)`
-- 기존 `AgentClient` 직접 생성 코드가 있다면 수정 필요
+- `AgentClient` constructor signature changed: `(agent_cache, agent_id)` → `(peer, agent_id)`
+- Code directly creating `AgentClient` instances needs modification
 
 ### Migration Steps
 
-1. `manager/errors/agent.py` 추가
-2. `manager/clients/agent/abc.py` 추가
-3. `manager/clients/agent/types.py` 추가
-4. `manager/clients/agent/pool.py` 추가
-5. `manager/clients/agent/client.py` 수정
-6. Sokovan 스케줄러에서 `AgentClientPool` 사용
+1. Add `manager/errors/agent.py`
+2. Add `manager/clients/agent/abc.py`
+3. Add `manager/clients/agent/types.py`
+4. Add `manager/clients/agent/pool.py`
+5. Modify `manager/clients/agent/client.py`
+6. Use `AgentClientPool` in Sokovan scheduler
 
 ## Implementation Plan
 
-### Phase 1: 기본 구조
+### Phase 1: Basic Structure
 
-1. `manager/errors/agent.py` - 예외 클래스 정의
+1. `manager/errors/agent.py` - Exception class definition
 2. `manager/clients/agent/abc.py` - `BackendAIClient` ABC
 3. `manager/clients/agent/types.py` - `AgentPoolSpec`
-4. `manager/clients/agent/pool.py` - `AgentClientPool` 기본 구현
+4. `manager/clients/agent/pool.py` - Basic `AgentClientPool` implementation
 
-### Phase 2: AgentClient 변경
+### Phase 2: AgentClient Changes
 
-1. `BackendAIClient` ABC 상속
-2. `connect()`, `close()` 메서드 구현
-3. `_with_connection()` 제거
-4. 각 메서드에서 `self._peer.call.xxx()` 직접 사용
+1. Inherit from `BackendAIClient` ABC
+2. Implement `connect()`, `close()` methods
+3. Remove `_with_connection()`
+4. Use `self._peer.call.xxx()` directly in each method
 
-### Phase 3: 통합
+### Phase 3: Integration
 
-1. Sokovan 스케줄러에 `AgentClientPool` 통합
-2. Agent 이벤트(exit, heartbeat 실패)와 `invalidate()` 연동
+1. Integrate `AgentClientPool` into Sokovan scheduler
+2. Connect Agent events (exit, heartbeat failure) with `invalidate()`
 
-### Phase 4: 테스트
+### Phase 4: Testing
 
-1. 단위 테스트 작성
-2. 통합 테스트
+1. Write unit tests
+2. Integration tests
 
 ## Open Questions
 
-1. **Health check 주기**
-   - 30초가 적절한가?
-   - Agent 수가 많으면 부하가 될 수 있음
+1. **Health check interval**
+   - Is 30 seconds appropriate?
+   - May cause load with many Agents
 
-2. **recovery_timeout 값**
-   - 60초가 적절한가?
-   - 일시적 네트워크 문제 복구 시간 vs 빠른 재연결
+2. **recovery_timeout value**
+   - Is 60 seconds appropriate?
+   - Temporary network issue recovery time vs. fast reconnection
 
-3. **failure_threshold 값**
-   - 3회가 적절한가?
-   - 일시적 문제 vs 실제 연결 불량 구분
+3. **failure_threshold value**
+   - Is 3 appropriate?
+   - Distinguishing temporary issues vs. actual connection problems
 
-4. **일반화 시점**
-   - 동작 검증 후 `common/clients/connection_pool.py`로 일반화할 것인가?
+4. **Generalization timing**
+   - Generalize to `common/clients/connection_pool.py` after behavior verification?
 
 ## Future Work
 
-- **`AgentRPCCache` 의존성 분리**: 현재는 `agent_cache`를 받지만, 향후 연결 생성 로직을 분리하여 의존성 제거
-- **`_create_entry` 주입 가능하도록**: 일반화 시 클라이언트 생성 로직을 외부에서 주입받을 수 있도록 팩토리 패턴 적용
+- **Decouple `AgentRPCCache` dependency**: Currently receives `agent_cache`, but future work to separate connection creation logic and remove dependency
+- **Make `_create_entry` injectable**: Apply factory pattern to allow external injection of client creation logic during generalization
 
 ## References
 
-- [common/clients/http_client/client_pool.py](../src/ai/backend/common/clients/http_client/client_pool.py) - 참조 패턴
-- [callosum RPC 라이브러리](https://github.com/lablup/callosum)
+- [common/clients/http_client/client_pool.py](../src/ai/backend/common/clients/http_client/client_pool.py) - Reference pattern
+- [callosum RPC library](https://github.com/lablup/callosum)
 - BA-3813: Manager Client Connection Pooling Improvements (Epic)
 - BA-3815: Implement Agent RPC Connection Pool
