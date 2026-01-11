@@ -117,7 +117,7 @@ class NotificationChannelAdapter(BaseFilterAdapter):
             BatchQuerier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
-        orders = [self._convert_order(request.order)] if request.order else []
+        orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
@@ -221,7 +221,7 @@ class NotificationRuleAdapter(BaseFilterAdapter):
             BatchQuerier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
-        orders = [self._convert_order(request.order)] if request.order else []
+        orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

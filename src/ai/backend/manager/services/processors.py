@@ -84,6 +84,8 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
+from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -164,6 +166,7 @@ class Services:
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
+    scheduling_history: SchedulingHistoryService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -334,6 +337,9 @@ class Services:
             repositories.storage_namespace.repository
         )
         audit_log_service = AuditLogService(repositories.audit_log.repository)
+        scheduling_history_service = SchedulingHistoryService(
+            repositories.scheduling_history.repository
+        )
 
         return cls(
             agent=agent_service,
@@ -367,6 +373,7 @@ class Services:
             deployment=deployment_service,
             storage_namespace=storage_namespace_service,
             audit_log=audit_log_service,
+            scheduling_history=scheduling_history_service,
         )
 
 
@@ -408,6 +415,7 @@ class Processors(AbstractProcessorPackage):
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
+    scheduling_history: SchedulingHistoryProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -471,6 +479,9 @@ class Processors(AbstractProcessorPackage):
             services.storage_namespace, action_monitors
         )
         audit_log_processors = AuditLogProcessors(services.audit_log, [])
+        scheduling_history_processors = SchedulingHistoryProcessors(
+            services.scheduling_history, action_monitors
+        )
 
         return cls(
             agent=agent_processors,
@@ -504,6 +515,7 @@ class Processors(AbstractProcessorPackage):
             deployment=deployment_processors,
             storage_namespace=storage_namespace_processors,
             audit_log=audit_log_processors,
+            scheduling_history=scheduling_history_processors,
         )
 
     @override
@@ -540,4 +552,5 @@ class Processors(AbstractProcessorPackage):
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
+            *self.scheduling_history.supported_actions(),
         ]

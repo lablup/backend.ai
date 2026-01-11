@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
 
@@ -333,17 +334,22 @@ class TestSchedulingHistoryRepository:
         """Test recording session history with sub_steps"""
         session_id = SessionId(uuid.uuid4())
 
+        now = datetime.now(UTC)
         sub_steps = [
             SubStepResult(
                 step="validate_resources",
                 result=SchedulingResult.SUCCESS,
                 message="Resources validated",
+                started_at=now,
+                ended_at=now,
             ),
             SubStepResult(
                 step="allocate_agent",
                 result=SchedulingResult.FAILURE,
                 error_code="NO_AGENT",
                 message="No agent available",
+                started_at=now,
+                ended_at=now,
             ),
         ]
 
