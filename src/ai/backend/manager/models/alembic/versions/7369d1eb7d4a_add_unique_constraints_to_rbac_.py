@@ -29,10 +29,10 @@ def upgrade() -> None:
                 WHERE id IN (
                     SELECT id FROM (
                         SELECT id,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY role_id, entity_type, entity_id, operation
-                                   ORDER BY id
-                               ) AS rn
+                            ROW_NUMBER() OVER (
+                                PARTITION BY role_id, entity_type, entity_id, operation
+                                ORDER BY id
+                            ) AS rn
                         FROM object_permissions
                     ) duplicates
                     WHERE rn > 1
@@ -50,10 +50,10 @@ def upgrade() -> None:
                 WHERE id IN (
                     SELECT id FROM (
                         SELECT id,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY role_id, scope_type, scope_id
-                                   ORDER BY id
-                               ) AS rn
+                            ROW_NUMBER() OVER (
+                                PARTITION BY role_id, scope_type, scope_id
+                                ORDER BY id
+                            ) AS rn
                         FROM permission_groups
                     ) duplicates
                     WHERE rn > 1
