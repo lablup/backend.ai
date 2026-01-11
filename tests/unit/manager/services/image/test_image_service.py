@@ -22,7 +22,7 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
 )
 from ai.backend.manager.errors.image import (
-    ForgetImageForbiddenError,
+    ImageAccessForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
 )
@@ -146,12 +146,12 @@ class TestForgetImage:
     async def test_forget_image_as_superadmin_success(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
         """Superadmin can forget any image."""
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
-        mock_admin_image_repository.soft_delete_image_force = AsyncMock(return_value=deleted_image)
+        mock_image_repository.soft_delete_image = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageAction(
             user_id=uuid.uuid4(),
@@ -163,7 +163,33 @@ class TestForgetImage:
         result = await processors.forget_image.wait_for_complete(action)
 
         assert result.image.status == ImageStatus.DELETED
-        mock_admin_image_repository.soft_delete_image_force.assert_called_once()
+        mock_image_repository.soft_delete_image.assert_called_once()
+
+    async def test_forget_image_as_user_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Regular user can forget image they own."""
+        user_id = uuid.uuid4()
+        owned_image = replace(image_data, owner_id=user_id)
+        deleted_image = replace(owned_image, status=ImageStatus.DELETED)
+        mock_image_repository.resolve_image = AsyncMock(return_value=owned_image)
+        mock_image_repository.soft_delete_image = AsyncMock(return_value=deleted_image)
+
+        action = ForgetImageAction(
+            user_id=user_id,
+            client_role=UserRole.USER,
+            reference=image_data.name,
+            architecture=image_data.architecture,
+        )
+
+        result = await processors.forget_image.wait_for_complete(action)
+
+        assert result.image.status == ImageStatus.DELETED
+        mock_image_repository.resolve_image.assert_called_once()
+        mock_image_repository.soft_delete_image.assert_called_once()
 
     async def test_forget_image_as_user_forbidden(
         self,
@@ -172,9 +198,8 @@ class TestForgetImage:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot forget image they don't own."""
-        mock_image_repository.soft_delete_user_image = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
 
         action = ForgetImageAction(
             user_id=uuid.uuid4(),
@@ -183,16 +208,16 @@ class TestForgetImage:
             architecture=image_data.architecture,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.forget_image.wait_for_complete(action)
 
     async def test_forget_image_not_found(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
     ) -> None:
         """Forget non-existent image should raise ImageNotFound."""
-        mock_admin_image_repository.soft_delete_image_force = AsyncMock(side_effect=ImageNotFound())
+        mock_image_repository.soft_delete_image = AsyncMock(side_effect=ImageNotFound())
 
         action = ForgetImageAction(
             user_id=uuid.uuid4(),
@@ -211,14 +236,12 @@ class TestForgetImageById:
     async def test_forget_image_by_id_as_superadmin_success(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
         """Superadmin can forget any image by ID."""
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
-        mock_admin_image_repository.soft_delete_image_by_id_force = AsyncMock(
-            return_value=deleted_image
-        )
+        mock_image_repository.soft_delete_image_by_id = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
@@ -229,9 +252,32 @@ class TestForgetImageById:
         result = await processors.forget_image_by_id.wait_for_complete(action)
 
         assert result.image.status == ImageStatus.DELETED
-        mock_admin_image_repository.soft_delete_image_by_id_force.assert_called_once_with(
-            image_data.id
+        mock_image_repository.soft_delete_image_by_id.assert_called_once_with(image_data.id)
+
+    async def test_forget_image_by_id_as_user_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Regular user can forget image they own by ID."""
+        user_id = uuid.uuid4()
+        owned_image = replace(image_data, owner_id=user_id)
+        deleted_image = replace(owned_image, status=ImageStatus.DELETED)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image)
+        mock_image_repository.soft_delete_image_by_id = AsyncMock(return_value=deleted_image)
+
+        action = ForgetImageByIdAction(
+            user_id=user_id,
+            client_role=UserRole.USER,
+            image_id=image_data.id,
         )
+
+        result = await processors.forget_image_by_id.wait_for_complete(action)
+
+        assert result.image.status == ImageStatus.DELETED
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(image_data.id)
+        mock_image_repository.soft_delete_image_by_id.assert_called_once_with(image_data.id)
 
     async def test_forget_image_by_id_as_user_forbidden(
         self,
@@ -240,9 +286,8 @@ class TestForgetImageById:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot forget image they don't own."""
-        mock_image_repository.soft_delete_image_by_id = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
@@ -250,18 +295,16 @@ class TestForgetImageById:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.forget_image_by_id.wait_for_complete(action)
 
     async def test_forget_image_by_id_not_found(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
     ) -> None:
         """Forget non-existent image should raise ImageNotFound."""
-        mock_admin_image_repository.soft_delete_image_by_id_force = AsyncMock(
-            side_effect=ImageNotFound()
-        )
+        mock_image_repository.soft_delete_image_by_id = AsyncMock(side_effect=ImageNotFound())
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
@@ -396,13 +439,11 @@ class TestPurgeImageById:
     async def test_purge_image_by_id_as_superadmin_success(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
         """Superadmin can purge any image by ID."""
-        mock_admin_image_repository.delete_image_with_aliases_force = AsyncMock(
-            return_value=image_data
-        )
+        mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=image_data)
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
@@ -413,9 +454,33 @@ class TestPurgeImageById:
         result = await processors.purge_image_by_id.wait_for_complete(action)
 
         assert result.image == image_data
-        mock_admin_image_repository.delete_image_with_aliases_force.assert_called_once_with(
-            image_data.id
+        mock_image_repository.delete_image_with_aliases.assert_called_once_with(image_data.id)
+
+    async def test_purge_image_by_id_as_user_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Regular user can purge image they own by ID."""
+        user_id = uuid.uuid4()
+        owned_image_data = replace(image_data, owner_id=user_id)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image_data)
+        mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=owned_image_data)
+
+        action = PurgeImageByIdAction(
+            user_id=user_id,
+            client_role=UserRole.USER,
+            image_id=image_data.id,
         )
+
+        result = await processors.purge_image_by_id.wait_for_complete(action)
+
+        assert result.image == owned_image_data
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(
+            image_data.id, load_aliases=True
+        )
+        mock_image_repository.delete_image_with_aliases.assert_called_once_with(image_data.id)
 
     async def test_purge_image_by_id_as_user_forbidden(
         self,
@@ -424,9 +489,8 @@ class TestPurgeImageById:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot purge image they don't own."""
-        mock_image_repository.delete_image_with_aliases_validated = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
@@ -434,18 +498,16 @@ class TestPurgeImageById:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.purge_image_by_id.wait_for_complete(action)
 
     async def test_purge_image_by_id_not_found(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
     ) -> None:
         """Purge non-existent image should raise ImageNotFound."""
-        mock_admin_image_repository.delete_image_with_aliases_force = AsyncMock(
-            side_effect=ImageNotFound()
-        )
+        mock_image_repository.delete_image_with_aliases = AsyncMock(side_effect=ImageNotFound())
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
@@ -555,13 +617,11 @@ class TestUntagImageFromRegistry:
     async def test_untag_image_as_superadmin_success(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
         image_data: ImageData,
     ) -> None:
         """Superadmin can untag any image from registry."""
-        mock_admin_image_repository.untag_image_from_registry_force = AsyncMock(
-            return_value=image_data
-        )
+        mock_image_repository.untag_image_from_registry = AsyncMock(return_value=image_data)
 
         action = UntagImageFromRegistryAction(
             user_id=uuid.uuid4(),
@@ -572,9 +632,33 @@ class TestUntagImageFromRegistry:
         result = await processors.untag_image_from_registry.wait_for_complete(action)
 
         assert result.image == image_data
-        mock_admin_image_repository.untag_image_from_registry_force.assert_called_once_with(
-            image_data.id
+        mock_image_repository.untag_image_from_registry.assert_called_once_with(image_data.id)
+
+    async def test_untag_image_as_user_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Regular user can untag image they own from registry."""
+        user_id = uuid.uuid4()
+        owned_image_data = replace(image_data, owner_id=user_id)
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=owned_image_data)
+        mock_image_repository.untag_image_from_registry = AsyncMock(return_value=owned_image_data)
+
+        action = UntagImageFromRegistryAction(
+            user_id=user_id,
+            client_role=UserRole.USER,
+            image_id=image_data.id,
         )
+
+        result = await processors.untag_image_from_registry.wait_for_complete(action)
+
+        assert result.image == owned_image_data
+        mock_image_repository.fetch_image_by_id.assert_called_once_with(
+            image_data.id, load_aliases=True
+        )
+        mock_image_repository.untag_image_from_registry.assert_called_once_with(image_data.id)
 
     async def test_untag_image_as_user_forbidden(
         self,
@@ -583,9 +667,8 @@ class TestUntagImageFromRegistry:
         image_data: ImageData,
     ) -> None:
         """Regular user cannot untag image they don't own."""
-        mock_image_repository.untag_image_from_registry_validated = AsyncMock(
-            side_effect=ForgetImageForbiddenError()
-        )
+        # image_data has owner_id=None by default, so ownership validation will fail
+        mock_image_repository.fetch_image_by_id = AsyncMock(return_value=image_data)
 
         action = UntagImageFromRegistryAction(
             user_id=uuid.uuid4(),
@@ -593,18 +676,16 @@ class TestUntagImageFromRegistry:
             image_id=image_data.id,
         )
 
-        with pytest.raises(ForgetImageForbiddenError):
+        with pytest.raises(ImageAccessForbiddenError):
             await processors.untag_image_from_registry.wait_for_complete(action)
 
     async def test_untag_image_not_found(
         self,
         processors: ImageProcessors,
-        mock_admin_image_repository: MagicMock,
+        mock_image_repository: MagicMock,
     ) -> None:
         """Untag non-existent image should raise ImageNotFound."""
-        mock_admin_image_repository.untag_image_from_registry_force = AsyncMock(
-            side_effect=ImageNotFound()
-        )
+        mock_image_repository.untag_image_from_registry = AsyncMock(side_effect=ImageNotFound())
 
         action = UntagImageFromRegistryAction(
             user_id=uuid.uuid4(),
