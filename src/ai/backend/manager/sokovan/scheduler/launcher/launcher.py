@@ -117,7 +117,11 @@ class SessionLauncher:
         await self._repository.update_sessions_to_preparing(session_ids)
 
         # Trigger image checking and pulling on agents
-        await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "prepare_images",
+            success_detail="Image pull requested",
+        ):
+            await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
 
         # Convert to ScheduledSessionData format
         scheduled_data = [
@@ -193,15 +197,12 @@ class SessionLauncher:
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            with RecorderContext[SessionId].shared_phase(
-                "prepare_images",
-                success_detail="Image preparation completed",
+            # Note: shared_phase should be provided by the caller (e.g., handler)
+            with RecorderContext[SessionId].shared_step(
+                "check_and_pull_images",
+                success_detail="Image pull triggered",
             ):
-                with RecorderContext[SessionId].shared_step(
-                    "check_and_pull_images",
-                    success_detail="Image pull triggered",
-                ):
-                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+                await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions(self) -> ScheduleResult:
         """
@@ -839,7 +840,11 @@ class SessionLauncher:
         ]
 
         # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "prepare_images",
+            success_detail="Image pull retried",
+        ):
+            await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
 
         # Convert retried sessions to ScheduledSessionData format
         scheduled_data = [
