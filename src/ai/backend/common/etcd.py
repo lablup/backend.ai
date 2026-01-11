@@ -328,11 +328,11 @@ class AsyncEtcd(AbstractKVStore):
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
-        return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[func-returns-value]
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)
 
     async def ping(self) -> None:
         """
