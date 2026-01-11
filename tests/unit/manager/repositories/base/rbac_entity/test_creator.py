@@ -338,3 +338,120 @@ class TestRBACCreatorFieldScoped:
             )
             assert entity_count == 3
             assert field_count == 3
+
+
+class TestRBACCreatorIdempotent:
+    """Tests for idempotent behavior of RBAC entity creator."""
+
+    async def test_creator_handles_duplicate_association_gracefully(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that creating entity with existing association doesn't fail.
+
+        The creator uses insert_on_conflict_do_nothing, so duplicate associations
+        should be handled gracefully without errors.
+        """
+        user_id = str(uuid.uuid4())
+        entity_id = uuid.uuid4()
+
+        async with database_connection.begin_session() as db_sess:
+            # First creation
+            spec1 = SimpleRBACCreatorSpec(
+                name="test-entity",
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_id=entity_id,
+            )
+            creator1: Creator[RBACCreatorTestRow] = Creator(spec=spec1)
+            result1 = await execute_creator(db_sess, creator1)
+            assert result1.row.id == entity_id
+
+            # Verify one association created
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 1
+
+        async with database_connection.begin_session() as db_sess:
+            # Manually create another entity row with same ID (simulating re-creation)
+            # but the association already exists
+            new_entity_row = RBACCreatorTestRow(
+                id=uuid.uuid4(),  # Different entity
+                name="another-entity",
+                owner_scope_type=ScopeType.USER.value,
+                owner_scope_id=user_id,
+            )
+            db_sess.add(new_entity_row)
+            await db_sess.flush()
+
+            # Manually try to insert duplicate association (same scope, same entity_id)
+            # This simulates what would happen if somehow the same entity is created twice
+            from ai.backend.manager.repositories.base.rbac_entity.utils import (
+                insert_on_conflict_do_nothing,
+            )
+
+            duplicate_assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=str(entity_id),  # Same entity_id as first
+            )
+            # Should not raise an error
+            await insert_on_conflict_do_nothing(db_sess, duplicate_assoc)
+
+            # Verify still only one association (no duplicate)
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 1
+
+    async def test_creator_handles_duplicate_entity_field_gracefully(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that creating field entity with existing EntityFieldRow doesn't fail."""
+        user_id = str(uuid.uuid4())
+        parent_entity_id = str(uuid.uuid4())
+        field_id = uuid.uuid4()
+
+        async with database_connection.begin_session() as db_sess:
+            # First creation
+            spec = SimpleRBACFieldCreatorSpec(
+                name="test-field",
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                parent_entity_id=parent_entity_id,
+                field_id=field_id,
+            )
+            creator: Creator[RBACFieldCreatorTestRow] = Creator(spec=spec)
+            await execute_creator(db_sess, creator)
+
+            # Verify one EntityFieldRow created
+            field_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert field_count == 1
+
+        async with database_connection.begin_session() as db_sess:
+            # Try to insert duplicate EntityFieldRow
+            from ai.backend.manager.repositories.base.rbac_entity.utils import (
+                insert_on_conflict_do_nothing,
+            )
+
+            duplicate_field = EntityFieldRow(
+                entity_type=EntityType.VFOLDER.value,
+                entity_id=parent_entity_id,
+                field_type=EntityType.VFOLDER.value,
+                field_id=str(field_id),  # Same field_id as first
+            )
+            # Should not raise an error
+            await insert_on_conflict_do_nothing(db_sess, duplicate_field)
+
+            # Verify still only one EntityFieldRow (no duplicate)
+            field_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert field_count == 1
