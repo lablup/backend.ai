@@ -15,6 +15,7 @@ import pytest
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -130,7 +131,7 @@ class TestTerminateSessions:
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=str(kernel_id),
+                    kernel_id=KernelId(kernel_id),
                     status=KernelStatus.TERMINATING,
                     container_id="container-123",
                     agent_id=agent_id,
@@ -184,7 +185,7 @@ class TestTerminateSessions:
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=str(kernel_ids[i]),
+                    kernel_id=KernelId(kernel_ids[i]),
                     status=KernelStatus.TERMINATING,
                     container_id=f"container-{i}",
                     agent_id=agent_ids[i],
@@ -235,7 +236,7 @@ class TestTerminateSessions:
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=str(kernel_ids[0]),
+                    kernel_id=KernelId(kernel_ids[0]),
                     status=KernelStatus.TERMINATING,
                     container_id="container-1",
                     agent_id=agent_ids[0],
@@ -243,7 +244,7 @@ class TestTerminateSessions:
                     occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
                 ),
                 TerminatingKernelData(
-                    kernel_id=str(kernel_ids[1]),
+                    kernel_id=KernelId(kernel_ids[1]),
                     status=KernelStatus.TERMINATING,
                     container_id="container-2",
                     agent_id=agent_ids[1],
@@ -291,7 +292,7 @@ class TestTerminateSessions:
                 all_agent_ids.append(agent_id)
                 kernels.append(
                     TerminatingKernelData(
-                        kernel_id=str(kernel_id),
+                        kernel_id=KernelId(kernel_id),
                         status=KernelStatus.TERMINATING,
                         container_id=f"container-{i}-{j}",
                         agent_id=agent_id,

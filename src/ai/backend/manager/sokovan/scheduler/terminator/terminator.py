@@ -89,7 +89,7 @@ class SessionTerminator:
                 if kernel.agent_id:
                     task = self._terminate_kernel(
                         kernel.agent_id,
-                        str(kernel.kernel_id),
+                        kernel.kernel_id,
                         str(session.session_id),
                         session.status_info,
                         kernel.occupied_slots,
@@ -150,7 +150,7 @@ class SessionTerminator:
     async def _terminate_kernel(
         self,
         agent_id: AgentId,
-        kernel_id: str,
+        kernel_id: KernelId,
         session_id: str,
         reason: str,
         occupied_slots: ResourceSlot,

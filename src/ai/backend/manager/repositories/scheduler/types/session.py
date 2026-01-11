@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -110,7 +111,7 @@ class PendingSessions:
 class TerminatingKernelData:
     """Kernel data for termination processing."""
 
-    kernel_id: str
+    kernel_id: KernelId
     status: KernelStatus
     container_id: Optional[str]
     agent_id: Optional[AgentId]
@@ -135,7 +136,7 @@ class TerminatingSessionData:
 class TerminatingKernelWithAgentData:
     """Kernel data with agent status for lost agent cleanup."""
 
-    kernel_id: str
+    kernel_id: KernelId
     session_id: SessionId
     status: KernelStatus
     agent_id: Optional[AgentId]
@@ -146,7 +147,7 @@ class TerminatingKernelWithAgentData:
 class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
-    kernel_id: str
+    kernel_id: KernelId
     agent_id: Optional[AgentId]
     occupied_slots: ResourceSlot
     success: bool

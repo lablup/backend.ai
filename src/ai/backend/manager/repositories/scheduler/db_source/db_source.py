@@ -23,6 +23,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -858,7 +859,7 @@ class ScheduleDBSource:
             for session_row in session_rows:
                 kernels = [
                     TerminatingKernelData(
-                        kernel_id=str(kernel.id),
+                        kernel_id=KernelId(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
                         agent_id=AgentId(kernel.agent) if kernel.agent else None,
@@ -924,7 +925,7 @@ class ScheduleDBSource:
             for session_row in session_rows:
                 kernels = [
                     TerminatingKernelData(
-                        kernel_id=str(kernel.id),
+                        kernel_id=KernelId(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
                         agent_id=AgentId(kernel.agent) if kernel.agent else None,
@@ -986,7 +987,7 @@ class ScheduleDBSource:
 
             return [
                 TerminatingKernelWithAgentData(
-                    kernel_id=str(row.id),
+                    kernel_id=KernelId(row.id),
                     session_id=row.session_id,
                     status=row.status,
                     agent_id=row.agent,
@@ -1137,7 +1138,7 @@ class ScheduleDBSource:
 
             return [
                 TerminatingKernelWithAgentData(
-                    kernel_id=str(row.id),
+                    kernel_id=KernelId(row.id),
                     session_id=row.session_id,
                     status=row.status,
                     agent_id=row.agent,

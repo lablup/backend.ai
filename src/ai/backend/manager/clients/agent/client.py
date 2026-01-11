@@ -149,7 +149,7 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def destroy_kernel(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         session_id: str,
         reason: str,
         suppress_events: bool = True,
