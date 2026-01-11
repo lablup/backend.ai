@@ -19,7 +19,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
 )
-from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
+from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo, SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -93,7 +93,7 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         This handler:
         1. Uses provided session/kernel data directly
         2. Checks kernel presence in Redis via Terminator
-        3. Confirms with agent and terminates stale kernels
+        3. Returns kernel terminations for Coordinator to process
         4. Returns affected sessions for post-processing
         """
         result = SessionExecutionResult()
@@ -103,10 +103,19 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
 
         # Delegate to Terminator's handler-specific method
         # Phase/step recording is handled inside the terminator per entity
-        affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
+        sweep_result = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
+
+        # Add kernel terminations for Coordinator to process
+        for kernel_id in sweep_result.dead_kernel_ids:
+            result.kernel_terminations.append(
+                KernelTerminationInfo(
+                    kernel_id=kernel_id,
+                    reason="STALE_KERNEL",
+                )
+            )
 
         # Build scheduled data for affected sessions
-        for session in affected_sessions:
+        for session in sweep_result.affected_sessions:
             result.scheduled_data.append(
                 ScheduledSessionData(
                     session_id=session.session_info.identity.id,

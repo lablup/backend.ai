@@ -5,10 +5,8 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
-from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AgentId,
@@ -29,14 +27,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 agent_client_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)),
-        RetryPolicy(
-            RetryArgs(
-                max_retries=3,
-                retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
-                non_retryable_exceptions=(BackendAIError,),
-            )
-        ),
     ]
 )
 
@@ -156,7 +146,7 @@ class AgentClient(BackendAIClient):
     ) -> None:
         """Destroy a kernel on the agent."""
         await self._peer.call.destroy_kernel(
-            kernel_id,
+            str(kernel_id),
             session_id,
             reason,
             suppress_events=suppress_events,

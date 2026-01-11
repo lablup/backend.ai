@@ -13,7 +13,7 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
-from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
+from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo, SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
@@ -84,7 +84,7 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
         This handler:
         1. Fetches kernels with lost/missing agents from repository
         2. Delegates to Terminator's handler-specific method
-        3. Returns empty result (kernel status updated, not session status)
+        3. Returns kernel terminations for Coordinator to process
         """
         result = SessionExecutionResult()
 
@@ -104,12 +104,18 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
 
         # Delegate to Terminator's handler-specific method
         # Note: No recorder instrumentation - this is DB-update only operation
-        swept_count = await self._terminator.sweep_lost_agent_kernels_for_handler(lost_kernels)
+        kernel_results = await self._terminator.sweep_lost_agent_kernels_for_handler(lost_kernels)
 
-        log.info("Swept {} kernels with lost/missing agents", swept_count)
+        # Add kernel terminations for Coordinator to process
+        for kernel_result in kernel_results:
+            result.kernel_terminations.append(
+                KernelTerminationInfo(
+                    kernel_id=kernel_result.kernel_id,
+                    reason="swept-lost-agent",
+                )
+            )
 
-        # No session status change - kernel status updated only
-        # CHECK_TERMINATING_PROGRESS will update session status when all kernels are terminated
+        log.info("Swept {} kernels with lost/missing agents", len(kernel_results))
 
         return result
 

@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHPortMapping,
     ImageConfig,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -848,3 +849,51 @@ class SchedulerExecutionResult:
     def has_successes(self) -> bool:
         """Check if there are any successful operations."""
         return len(self.successes) > 0
+
+
+@dataclass
+class KernelTerminationInfo:
+    """Information about a kernel to be terminated.
+
+    Used by SessionExecutionResult to communicate kernel terminations
+    that should be processed by the Coordinator together with session status changes.
+    """
+
+    kernel_id: KernelId
+    reason: str
+
+
+@dataclass
+class SweepStaleKernelsResult:
+    """Result of sweep_stale_kernels_for_handler operation.
+
+    Contains both the dead kernel IDs and affected sessions for the Coordinator
+    to process kernel terminations and session updates.
+    """
+
+    dead_kernel_ids: list[KernelId]
+    affected_sessions: list[SessionWithKernels]
+
+
+@dataclass
+class RetryUpdateResult:
+    """Result of batch_update_stuck_session_retries operation.
+
+    Used by repository to communicate which sessions should be retried
+    and which have exceeded max retries (for Coordinator to update status).
+    """
+
+    sessions_to_retry: list[SessionId]
+    sessions_exceeded: list[SessionId]
+
+
+@dataclass
+class RetryResult:
+    """Result of retry_*_for_handler operations in Launcher.
+
+    Used to communicate retried sessions and exceeded sessions to handlers
+    for Coordinator to process status changes.
+    """
+
+    retried_ids: list[SessionId]
+    exceeded_ids: list[SessionId]

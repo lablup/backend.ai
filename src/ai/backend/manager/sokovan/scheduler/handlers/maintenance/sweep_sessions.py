@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -20,9 +20,6 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
-
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
@@ -37,10 +34,8 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
 
     def __init__(
         self,
-        terminator: SessionTerminator,
         repository: SchedulerRepository,
     ) -> None:
-        self._terminator = terminator
         self._repository = repository
 
     @classmethod
@@ -88,8 +83,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         The coordinator provides SessionWithKernels with full SessionInfo/KernelInfo.
         This handler:
         1. Fetches detailed timeout data from repository
-        2. Delegates to Terminator's handler-specific method
-        3. Returns stale session IDs for status transition
+        2. Adds timed out sessions to stales for Coordinator to handle status transition
         """
         result = SessionExecutionResult()
 
@@ -105,26 +99,29 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         if not timed_out_sessions:
             return result
 
-        # Delegate to Terminator's handler-specific method
-        # Note: No recorder instrumentation - this is DB-update only operation
-        swept_ids = await self._terminator.sweep_stale_sessions_for_handler(timed_out_sessions)
+        log.info(
+            "Found {} sessions with pending timeout that need termination",
+            len(timed_out_sessions),
+        )
 
-        # Build scheduled data for post-processing
+        # Build session map for getting current status
         session_map = {s.session_info.identity.id: s for s in sessions}
-        for swept_id in swept_ids:
-            if swept_id in session_map:
-                session_data = session_map[swept_id]
+
+        # Add timed out sessions to stales - Coordinator will handle status transition
+        for timed_out in timed_out_sessions:
+            session_data = session_map.get(timed_out.session_id)
+            if session_data:
                 result.stales.append(
                     SessionTransitionInfo(
-                        session_id=swept_id,
+                        session_id=timed_out.session_id,
                         from_status=session_data.session_info.lifecycle.status,
                     )
                 )
                 result.scheduled_data.append(
                     ScheduledSessionData(
-                        session_id=swept_id,
-                        creation_id=session_data.session_info.identity.creation_id,
-                        access_key=AccessKey(session_data.session_info.metadata.access_key),
+                        session_id=timed_out.session_id,
+                        creation_id=timed_out.creation_id,
+                        access_key=timed_out.access_key,
                         reason="sweeped-as-stale",
                     )
                 )

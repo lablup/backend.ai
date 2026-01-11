@@ -73,8 +73,8 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def stale_status(cls) -> Optional[SessionStatus]:
-        """Sessions exceeding max retries transition to TERMINATING."""
-        return SessionStatus.TERMINATING
+        """Sessions exceeding max retries transition to PENDING for re-scheduling."""
+        return SessionStatus.PENDING
 
     @property
     def lock_id(self) -> Optional[LockID]:
@@ -93,6 +93,7 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
         - Checking with agents if sessions are actively pulling
         - Updating retry counts
         - Re-triggering image pulling for sessions that should retry
+        - Returning exceeded sessions for Coordinator to update to PENDING
         """
         result = SessionExecutionResult()
 
@@ -115,14 +116,13 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
             "prepare_images",
             success_detail="Image pull retried",
         ):
-            retried_session_ids = await self._launcher.retry_preparing_for_handler(
+            retry_result = await self._launcher.retry_preparing_for_handler(
                 sessions_for_pull, image_configs
             )
 
         # Sessions that were retried are successes
-        # Launcher internally handles retry count and marks stale sessions
         session_map = {s.session_info.identity.id: s for s in sessions}
-        for session_id in retried_session_ids:
+        for session_id in retry_result.retried_ids:
             original_session = session_map.get(session_id)
             from_status = (
                 original_session.session_info.lifecycle.status
@@ -133,6 +133,22 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_id,
                     from_status=from_status,
+                )
+            )
+
+        # Sessions that exceeded max retries go to stales (Coordinator applies PENDING)
+        for session_id in retry_result.exceeded_ids:
+            original_session = session_map.get(session_id)
+            from_status = (
+                original_session.session_info.lifecycle.status
+                if original_session
+                else SessionStatus.PREPARING  # fallback to expected status
+            )
+            result.stales.append(
+                SessionTransitionInfo(
+                    session_id=session_id,
+                    from_status=from_status,
+                    reason="EXCEEDED_MAX_RETRIES",
                 )
             )
 

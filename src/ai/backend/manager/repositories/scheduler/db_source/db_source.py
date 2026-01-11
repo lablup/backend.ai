@@ -108,6 +108,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
+    RetryUpdateResult,
     SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
@@ -2187,7 +2188,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.id == kernel_id,
-                        KernelRow.status == KernelStatus.CREATING,
+                        KernelRow.status.in_([KernelStatus.PREPARED, KernelStatus.CREATING]),
                     )
                 )
                 .values(
@@ -2326,6 +2327,96 @@ class ScheduleDBSource:
             )
             result = await db_sess.execute(stmt)
             return cast(CursorResult, result).rowcount > 0
+
+    async def reset_kernels_to_pending_for_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> int:
+        """
+        Reset kernels to PENDING status for the given sessions.
+
+        This is used when sessions exceed max retries and need to be rescheduled.
+        Clears agent assignments and resets retry count in status_data.
+
+        :param session_ids: List of session IDs whose kernels should be reset
+        :param reason: The reason for the reset
+        :return: The number of kernels reset
+        """
+        if not session_ids:
+            return 0
+
+        now = datetime.now(tzutc())
+        status_data = {"retries": 0}
+
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(session_ids),
+                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                    )
+                )
+                .values(
+                    agent=None,
+                    agent_addr=None,
+                    status=KernelStatus.PENDING,
+                    status_info=reason,
+                    status_changed=now,
+                    status_data=sql_json_merge(
+                        KernelRow.__table__.c.status_data,
+                        ("scheduler",),
+                        obj=status_data,
+                    ),
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.PENDING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return cast(CursorResult, result).rowcount
+
+    async def update_kernels_to_creating_for_sessions(
+        self, session_ids: list[SessionId], reason: str
+    ) -> int:
+        """
+        Update kernels to CREATING status for the given sessions.
+
+        This is used when sessions transition from PREPARED to CREATING.
+        Only updates kernels that are currently in PREPARED status.
+
+        :param session_ids: List of session IDs whose kernels should be updated
+        :param reason: The reason for the status change
+        :return: The number of kernels updated
+        """
+        if not session_ids:
+            return 0
+
+        now = datetime.now(tzutc())
+
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(session_ids),
+                        KernelRow.status == KernelStatus.PREPARED,
+                    )
+                )
+                .values(
+                    status=KernelStatus.CREATING,
+                    status_info=reason,
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.CREATING.name: now.isoformat()},
+                    ),
+                )
+            )
+            result = await db_sess.execute(stmt)
+            return cast(CursorResult, result).rowcount
 
     async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
         """
@@ -3376,14 +3467,18 @@ class ScheduleDBSource:
 
     async def _increment_session_retry_count(
         self, db_sess: SASession, session_id: SessionId, max_retries: int
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         """
         Private method to increment retry count for a session.
 
+        This method only updates the retry count without changing session/kernel status.
+        Status changes are handled by the Coordinator via handler's stale_status().
+
         :param db_sess: Database session to use
         :param session_id: The session ID to update
-        :param max_retries: Maximum retries before moving to PENDING
-        :return: True if session should continue retrying, False if moved to PENDING
+        :param max_retries: Maximum retries before being marked as exceeded
+        :return: Tuple of (should_retry, exceeded) - should_retry is True if within limit,
+                 exceeded is True if max retries was reached
         """
         # Get current session and its retry count
         stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -3392,7 +3487,7 @@ class ScheduleDBSource:
 
         if not session_row:
             log.warning("Session {} not found for retry count update", session_id)
-            return False
+            return (False, False)
 
         # Get current retries count from existing status_data
         current_status_data = session_row.status_data or {}
@@ -3400,63 +3495,19 @@ class ScheduleDBSource:
         current_retries = scheduler_data.get("retries", 0)
         new_retries = current_retries + 1
 
-        # Check if we should move to PENDING
-        should_move_to_pending = new_retries >= max_retries
+        # Check if we exceeded max retries
+        exceeded = new_retries >= max_retries
 
-        if should_move_to_pending:
-            # Reset retry count to 0 when moving back to PENDING
+        if exceeded:
+            # Reset retry count to 0 when exceeded (will be moved to PENDING by Coordinator)
             status_data = {"retries": 0}
+            log.info("Session {} exceeded max retries ({})", session_id, max_retries)
+        else:
+            # Update with incremented retry count
+            status_data = {"retries": new_retries}
+            log.debug("Session {} retry count incremented to {}", session_id, new_retries)
 
-            # Update session to PENDING with reset retry count
-            update_stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id == session_id,
-                        SessionRow.status.in_(SessionStatus.retriable_statuses()),
-                    )
-                )
-                .values(
-                    status=SessionStatus.PENDING,
-                    status_data=sql_json_merge(
-                        SessionRow.__table__.c.status_data,
-                        ("scheduler",),
-                        obj=status_data,
-                    ),
-                )
-            )
-            await db_sess.execute(update_stmt)
-
-            # Also update kernel status to PENDING
-            kernel_stmt = (
-                sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.session_id == session_id,
-                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
-                    )
-                )
-                .values(
-                    agent=None,
-                    agent_addr=None,
-                    status=KernelStatus.PENDING,
-                    status_data=sql_json_merge(
-                        KernelRow.__table__.c.status_data,
-                        ("scheduler",),
-                        obj=status_data,
-                    ),
-                )
-            )
-            await db_sess.execute(kernel_stmt)
-
-            log.info(
-                "Session {} exceeded max retries ({}), moved to PENDING", session_id, max_retries
-            )
-            return False  # Should not retry
-        # Update with incremented retry count
-        status_data = {"retries": new_retries}
-
-        # Just update retry count, keep current status
+        # Update retry count in status_data (no status change)
         update_stmt = (
             sa.update(SessionRow)
             .where(SessionRow.id == session_id)
@@ -3470,32 +3521,39 @@ class ScheduleDBSource:
         )
         await db_sess.execute(update_stmt)
 
-        log.debug("Session {} retry count incremented to {}", session_id, new_retries)
-        return True  # Should continue retrying
+        return (not exceeded, exceeded)  # Should continue retrying
 
     async def batch_update_stuck_session_retries(
         self, session_ids: list[SessionId], max_retries: int = 5
-    ) -> list[SessionId]:
+    ) -> RetryUpdateResult:
         """
         Batch update retry counts for stuck sessions.
-        Sessions that exceed max_retries are moved to PENDING status.
+
+        This method only updates retry counts. Status changes (PENDING for exceeded sessions)
+        are handled by the Coordinator via handler's stale_status().
 
         :param session_ids: List of session IDs to update
-        :param max_retries: Maximum retries before moving to PENDING (default: 5)
-        :return: List of session IDs that should continue retrying (not moved to PENDING)
+        :param max_retries: Maximum retries allowed (default: 5)
+        :return: RetryUpdateResult containing sessions to retry and sessions that exceeded
         """
         sessions_to_retry: list[SessionId] = []
+        sessions_exceeded: list[SessionId] = []
 
         async with self._begin_session_read_committed() as db_sess:
             for session_id in session_ids:
-                should_retry = await self._increment_session_retry_count(
+                should_retry, exceeded = await self._increment_session_retry_count(
                     db_sess, session_id, max_retries
                 )
 
                 if should_retry:
                     sessions_to_retry.append(session_id)
+                if exceeded:
+                    sessions_exceeded.append(session_id)
 
-        return sessions_to_retry
+        return RetryUpdateResult(
+            sessions_to_retry=sessions_to_retry,
+            sessions_exceeded=sessions_exceeded,
+        )
 
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo
