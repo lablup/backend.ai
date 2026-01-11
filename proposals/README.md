@@ -108,9 +108,10 @@ BEP numbers start from 1000.
 | [1018](BEP-1018-local-cache-for-model-vfolders.md) | Local Cache for Model VFolders | Joongi Kim | Draft |
 | [1019](BEP-1019-minio-artifact-registry-storage.md) | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
 | 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
-| [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | Hyeokjin Kim | Implemented |
-| [1022](BEP-1022-pydantic-field-annotations.md) | Pydantic Field Metadata Annotation | Hyeokjin Kim | Draft |
-| [1023](BEP-1023-unified-config-consolidation.md) | UnifiedConfig Consolidation & Loader/CLI | Hyeokjin Kim | Draft |
+| [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | HyeokJin Kim | Implemented |
+| [1022](BEP-1022-pydantic-field-annotations.md) | Pydantic Field Metadata Annotation | HyeokJin Kim | Draft |
+| [1023](BEP-1023-unified-config-consolidation.md) | UnifiedConfig Consolidation & Loader/CLI | HyeokJin Kim | Draft |
+| [1024](BEP-1024-agent-rpc-connection-pooling.md) | Agent RPC Connection Pooling | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
