@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
-import jwt
 import sqlalchemy as sa
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
@@ -297,13 +296,9 @@ async def generate_endpoint_api_token(
         circuit: Circuit = await Circuit.find_by_endpoint(
             sess, UUID(request.match_info["endpoint_id"]), load_worker=False, load_endpoint=False
         )
-        payload = dict(circuit.dump_model())
-        payload["config"] = {}
-        payload["app_url"] = str(await circuit.get_endpoint_url(session=sess))
-
-    payload["user"] = str(params.user_uuid)
-    payload["exp"] = params.exp
-    encoded_jwt = jwt.encode(payload, root_ctx.local_config.secrets.jwt_secret, algorithm="HS256")
+        encoded_jwt = await circuit.generate_jwt(
+            sess, root_ctx.local_config.secrets.jwt_secret, params.user_uuid, params.exp
+        )
     return PydanticResponse(EndpointAPITokenResponseModel(token=encoded_jwt))
 
 
