@@ -75,24 +75,24 @@ celerybeat-schedule
 
 # virtualenv
 venv/
-.venv/
+.venv
 ENV/
 
 # IDE/vim
-.idea/
+.idea
 .swp
 .swo
 .*.swp
 .*.swo
-.vscode/
-.vim/
-/.vimrc
-/.nvimrc
-/.exrc
+.vscode
+.vim
+.vimrc
+.nvimrc
+.exrc
 .ripgreprc
 .neoconf.json
-.zed/
-/.ropeproject
+.zed
+.ropeproject
 pyrightconfig.json
 
 # Pants
