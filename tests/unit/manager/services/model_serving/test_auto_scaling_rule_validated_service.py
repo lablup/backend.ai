@@ -64,7 +64,7 @@ class TestAutoScalingServiceSearch:
         sample_requester_ctx: RequesterCtx,
     ) -> None:
         """Test searching auto scaling rules with querier"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[sample_auto_scaling_rule_data],
                 total_count=1,
@@ -96,7 +96,7 @@ class TestAutoScalingServiceSearch:
         sample_requester_ctx: RequesterCtx,
     ) -> None:
         """Test searching auto scaling rules when no results are found"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[],
                 total_count=0,
@@ -127,7 +127,7 @@ class TestAutoScalingServiceSearch:
         sample_requester_ctx: RequesterCtx,
     ) -> None:
         """Test searching auto scaling rules with pagination"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[sample_auto_scaling_rule_data],
                 total_count=25,
