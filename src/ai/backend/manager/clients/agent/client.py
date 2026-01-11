@@ -74,9 +74,9 @@ class AgentClient(BackendAIClient):
         except Exception:
             pass
 
-    async def ping(self) -> None:
+    async def ping(self) -> str:
         """Ping the agent to check connection health."""
-        await self._peer.call.ping()
+        return await self._peer.call.ping("ping")
 
     # Hardware information methods
     @agent_client_resilience.apply()
