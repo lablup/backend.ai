@@ -158,7 +158,7 @@ class TestTerminateSessions:
 
         # Verify agent destroy_kernel was called with correct parameters
         mock_agent.destroy_kernel.assert_called_once_with(
-            str(kernel_id),
+            KernelId(kernel_id),
             str(session_id),
             "USER_REQUESTED",
             suppress_events=False,
@@ -209,7 +209,7 @@ class TestTerminateSessions:
         for i in range(3):
             mock_agent = mock_agent_client_pool.get_agent_client(agent_ids[i])
             mock_agent.destroy_kernel.assert_called_once_with(
-                str(kernel_ids[i]),
+                KernelId(kernel_ids[i]),
                 str(session_id),
                 "FORCED_TERMINATION",
                 suppress_events=False,
