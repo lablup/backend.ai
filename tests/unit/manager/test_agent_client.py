@@ -1,8 +1,15 @@
 from unittest.mock import AsyncMock, MagicMock, Mock
+from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterInfo, ImageConfig, KernelCreationConfig
+from ai.backend.common.types import (
+    AgentId,
+    ClusterInfo,
+    ImageConfig,
+    KernelCreationConfig,
+    KernelId,
+)
 from ai.backend.manager.clients.agent.client import AgentClient
 
 
@@ -54,7 +61,7 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.destroy_kernel = AsyncMock()
 
-        await client.destroy_kernel("kernel-id", "session-id", "test-reason")
+        await client.destroy_kernel(KernelId(uuid4()), "session-id", "test-reason")
 
         args, kwargs = mock_peer.call.destroy_kernel.call_args
         assert kwargs["agent_id"] == AgentId("agent-1")

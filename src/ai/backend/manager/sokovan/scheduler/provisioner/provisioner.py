@@ -214,17 +214,16 @@ class SessionProvisioner:
 
         for session_workload in sequenced_workloads:
             try:
-                with RecorderContext[SessionId].entity(session_workload.session_id):
-                    # Sequencing phase is automatically included via shared phases
-                    session_allocation = await self._schedule_workload(
-                        scaling_group,
-                        system_snapshot,
-                        mutable_agents,
-                        selection_config,
-                        agent_selector,
-                        session_workload,
-                    )
-                    session_allocations.append(session_allocation)
+                # Sequencing phase is automatically included via shared phases
+                session_allocation = await self._schedule_workload(
+                    scaling_group,
+                    system_snapshot,
+                    mutable_agents,
+                    selection_config,
+                    agent_selector,
+                    session_workload,
+                )
+                session_allocations.append(session_allocation)
             except Exception as e:
                 log.debug(
                     "Scheduling failed for workload {}: {}",
@@ -280,7 +279,8 @@ class SessionProvisioner:
         agent_selector: AgentSelector,
         session_workload: SessionWorkload,
     ) -> SessionAllocation:
-        recorder = RecorderContext[SessionId].current_recorder()
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session_workload.session_id)
 
         # Phase 1: Validation
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "validation"):

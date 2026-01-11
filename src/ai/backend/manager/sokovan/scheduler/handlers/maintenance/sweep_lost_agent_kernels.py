@@ -103,6 +103,7 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Terminator's handler-specific method
+        # Note: No recorder instrumentation - this is DB-update only operation
         swept_count = await self._terminator.sweep_lost_agent_kernels_for_handler(lost_kernels)
 
         log.info("Swept {} kernels with lost/missing agents", swept_count)

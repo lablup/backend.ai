@@ -23,6 +23,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -858,7 +859,7 @@ class ScheduleDBSource:
             for session_row in session_rows:
                 kernels = [
                     TerminatingKernelData(
-                        kernel_id=str(kernel.id),
+                        kernel_id=KernelId(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
                         agent_id=AgentId(kernel.agent) if kernel.agent else None,
@@ -924,7 +925,7 @@ class ScheduleDBSource:
             for session_row in session_rows:
                 kernels = [
                     TerminatingKernelData(
-                        kernel_id=str(kernel.id),
+                        kernel_id=KernelId(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
                         agent_id=AgentId(kernel.agent) if kernel.agent else None,
@@ -986,7 +987,7 @@ class ScheduleDBSource:
 
             return [
                 TerminatingKernelWithAgentData(
-                    kernel_id=str(row.id),
+                    kernel_id=KernelId(row.id),
                     session_id=row.session_id,
                     status=row.status,
                     agent_id=row.agent,
@@ -1137,7 +1138,7 @@ class ScheduleDBSource:
 
             return [
                 TerminatingKernelWithAgentData(
-                    kernel_id=str(row.id),
+                    kernel_id=KernelId(row.id),
                     session_id=row.session_id,
                     status=row.status,
                     agent_id=row.agent,
@@ -2400,14 +2401,19 @@ class ScheduleDBSource:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
-            # Find kernels on this agent with this image in PREPARING state
+            # Find kernels on this agent with this image in SCHEDULED or PREPARING state.
+            # SCHEDULED is included because image pulling can start before kernel
+            # transitions to PREPARING (which happens in create_kernel RPC).
             stmt = (
                 sa.update(KernelRow)
                 .where(
                     sa.and_(
                         KernelRow.agent == agent_id,
                         KernelRow.image == image_to_match,
-                        KernelRow.status == KernelStatus.PREPARING,
+                        KernelRow.status.in_([
+                            KernelStatus.SCHEDULED,
+                            KernelStatus.PREPARING,
+                        ]),
                     )
                 )
                 .values(
@@ -2438,8 +2444,10 @@ class ScheduleDBSource:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
-            # Find kernels on this agent with this image in PULLING or PREPARING state
-            # and update them to PREPARED
+            # Find kernels on this agent with this image in SCHEDULED, PULLING or PREPARING state
+            # and update them to PREPARED.
+            # SCHEDULED is included because when image already exists, ImagePullFinishedEvent
+            # arrives before kernel transitions to PREPARING (which happens in create_kernel RPC).
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2447,6 +2455,7 @@ class ScheduleDBSource:
                         KernelRow.agent == agent_id,
                         KernelRow.image == image_to_match,
                         KernelRow.status.in_([
+                            KernelStatus.SCHEDULED,
                             KernelStatus.PULLING,
                             KernelStatus.PREPARING,
                         ]),
@@ -2481,7 +2490,9 @@ class ScheduleDBSource:
             now = datetime.now(tzutc())
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
-            # Find and cancel kernels on this agent with this image in PULLING or PREPARING state
+            # Find and cancel kernels on this agent with this image in SCHEDULED, PULLING
+            # or PREPARING state. SCHEDULED is included because image pull failure can
+            # occur before kernel transitions to PREPARING.
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2489,6 +2500,7 @@ class ScheduleDBSource:
                         KernelRow.agent == agent_id,
                         KernelRow.image == image_to_match,
                         KernelRow.status.in_([
+                            KernelStatus.SCHEDULED,
                             KernelStatus.PULLING,
                             KernelStatus.PREPARING,
                         ]),

@@ -22,7 +22,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
-from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId, SessionTypes
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
@@ -41,7 +41,6 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
 )
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
-    HandlerSessionData,
     ScheduledSessionData,
     SessionExecutionError,
     SessionExecutionResult,
@@ -300,22 +299,6 @@ class TestScheduleCoordinator:
         assert result.skipped_sessions == non_existing
 
 
-def create_handler_session_data(
-    session_id: SessionId,
-    scaling_group: str = "default",
-) -> HandlerSessionData:
-    """Helper to create test HandlerSessionData."""
-    return HandlerSessionData(
-        session_id=session_id,
-        creation_id=str(uuid4()),
-        access_key=AccessKey("test-key"),
-        status=SessionStatus.PREPARING,
-        scaling_group=scaling_group,
-        session_type=SessionTypes.INTERACTIVE,
-        kernels=[],
-    )
-
-
 class TestProcessLifecycleSchedule:
     """Test cases for process_lifecycle_schedule basic flow."""
 
@@ -363,8 +346,11 @@ class TestProcessLifecycleSchedule:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        sessions_for_multi_scaling_group_iteration: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test process_lifecycle_schedule iterates over scaling groups."""
+        session_sg1, session_sg2, session_sg3 = sessions_for_multi_scaling_group_iteration
+
         # Setup
         schedule_coordinator._lifecycle_handlers = {
             ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
@@ -374,23 +360,18 @@ class TestProcessLifecycleSchedule:
         # Multiple scaling groups
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2", "sg3"]
 
-        # Return sessions for each scaling group
-        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
-        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
-        session3 = create_handler_session_data(SessionId(uuid4()), "sg3")
-
         mock_repository.get_sessions_for_handler.side_effect = [
-            [session1],
-            [session2],
-            [session3],
+            [session_sg1],
+            [session_sg2],
+            [session_sg3],
         ]
 
         # Handler returns success for each
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult(
             successes=[
                 SessionTransitionInfo(
-                    session_id=session1.session_id,
-                    from_status=session1.status,
+                    session_id=session_sg1.session_id,
+                    from_status=session_sg1.status,
                 )
             ]
         )
@@ -409,6 +390,7 @@ class TestProcessLifecycleSchedule:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        session_for_empty_scaling_group_skip: MagicMock,
     ) -> None:
         """Test process_lifecycle_schedule skips scaling groups with no sessions."""
         # Setup
@@ -420,7 +402,7 @@ class TestProcessLifecycleSchedule:
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
         mock_repository.get_sessions_for_handler.side_effect = [
             [],  # sg1 has no sessions
-            [create_handler_session_data(SessionId(uuid4()), "sg2")],  # sg2 has sessions
+            [session_for_empty_scaling_group_skip],  # sg2 has sessions
         ]
 
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult()
@@ -435,6 +417,7 @@ class TestProcessLifecycleSchedule:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        session_for_post_process_verification: MagicMock,
     ) -> None:
         """Test process_lifecycle_schedule calls post_process when needed."""
         # Setup
@@ -443,16 +426,21 @@ class TestProcessLifecycleSchedule:
         }
         schedule_coordinator._repository = mock_repository
 
-        session_id = SessionId(uuid4())
-        session = create_handler_session_data(session_id)
-        mock_repository.get_sessions_for_handler.return_value = [session]
+        mock_repository.get_sessions_for_handler.return_value = [
+            session_for_post_process_verification
+        ]
 
         # Handler returns result that needs post-processing
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult(
-            successes=[SessionTransitionInfo(session_id=session_id, from_status=session.status)],
+            successes=[
+                SessionTransitionInfo(
+                    session_id=session_for_post_process_verification.session_id,
+                    from_status=session_for_post_process_verification.status,
+                )
+            ],
             scheduled_data=[
                 ScheduledSessionData(
-                    session_id=session_id,
+                    session_id=session_for_post_process_verification.session_id,
                     creation_id="test",
                     access_key=AccessKey("test"),
                     reason="test",
@@ -756,8 +744,11 @@ class TestScalingGroupProcessing:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        sessions_for_independent_scaling_group_processing: tuple[MagicMock, MagicMock],
     ) -> None:
         """Test process_lifecycle_schedule processes each scaling group independently."""
+        session1, session2 = sessions_for_independent_scaling_group_processing
+
         # Setup
         schedule_coordinator._lifecycle_handlers = {
             ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
@@ -765,9 +756,6 @@ class TestScalingGroupProcessing:
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
-
-        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
-        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
 
         mock_repository.get_sessions_for_handler.side_effect = [
             [session1],
@@ -813,8 +801,11 @@ class TestScalingGroupProcessing:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        sessions_for_independent_scaling_group_processing: tuple[MagicMock, MagicMock],
     ) -> None:
         """Test post_process is called per scaling group, not merged."""
+        session1, session2 = sessions_for_independent_scaling_group_processing
+
         # Setup
         schedule_coordinator._lifecycle_handlers = {
             ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
@@ -822,9 +813,6 @@ class TestScalingGroupProcessing:
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
-
-        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
-        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
 
         mock_repository.get_sessions_for_handler.side_effect = [
             [session1],
@@ -875,8 +863,11 @@ class TestScalingGroupProcessing:
         schedule_coordinator: ScheduleCoordinator,
         mock_lifecycle_handler: MagicMock,
         mock_repository: MagicMock,
+        sessions_for_parallel_processing_with_error: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test parallel processing continues even when one scaling group fails."""
+        session1, session2, session3 = sessions_for_parallel_processing_with_error
+
         # Setup
         schedule_coordinator._lifecycle_handlers = {
             ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
@@ -884,10 +875,6 @@ class TestScalingGroupProcessing:
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2", "sg3"]
-
-        session1 = create_handler_session_data(SessionId(uuid4()), "sg1")
-        session2 = create_handler_session_data(SessionId(uuid4()), "sg2")
-        session3 = create_handler_session_data(SessionId(uuid4()), "sg3")
 
         mock_repository.get_sessions_for_handler.side_effect = [
             [session1],

@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 from .base import AbstractSessionHook
@@ -32,13 +33,23 @@ class BatchSessionHook(AbstractSessionHook):
                 f"Main kernel has no agent assigned for session {session.session_info.identity.id}"
             )
 
-        async with self._agent_client_pool.acquire(agent_id) as client:
-            await client.trigger_batch_execution(
-                str(session.session_info.identity.id),
-                str(main_kernel.id),
-                main_kernel.runtime.startup_command or "",
-                float(session.session_info.lifecycle.batch_timeout or 0),
-            )
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session.session_info.identity.id)
+        with recorder.phase(
+            "finalize_start",
+            success_detail="Session startup finalized",
+        ):
+            with recorder.step(
+                "trigger_batch_execution",
+                success_detail=f"Triggered batch execution on agent {agent_id}",
+            ):
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    await client.trigger_batch_execution(
+                        str(session.session_info.identity.id),
+                        str(main_kernel.id),
+                        main_kernel.runtime.startup_command or "",
+                        float(session.session_info.lifecycle.batch_timeout or 0),
+                    )
         log.info(
             "Successfully triggered batch execution for session {} on agent {}",
             session.session_info.identity.id,

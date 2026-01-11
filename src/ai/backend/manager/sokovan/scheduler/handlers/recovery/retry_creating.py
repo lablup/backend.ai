@@ -109,6 +109,7 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Launcher's handler-specific method
+        # Phase/step recording is handled inside the launcher per entity
         retried_session_ids = await self._launcher.retry_creating_for_handler(
             sessions_for_start, image_configs
         )

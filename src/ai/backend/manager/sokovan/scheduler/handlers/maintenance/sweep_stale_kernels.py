@@ -102,7 +102,7 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Terminator's handler-specific method
-        # Terminator now accepts SessionWithKernels directly
+        # Phase/step recording is handled inside the terminator per entity
         affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
 
         # Build scheduled data for affected sessions

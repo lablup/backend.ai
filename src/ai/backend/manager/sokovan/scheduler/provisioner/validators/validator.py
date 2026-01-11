@@ -62,7 +62,7 @@ class SchedulingValidator:
         Validate a session workload using the recorder context.
 
         Each validation rule is recorded as a step within the current phase.
-        The recorder must be initialized via RecorderContext.entity() before calling.
+        The recorder must be accessible via RecorderContext.current_pool().
 
         Args:
             snapshot: The current system state snapshot
@@ -71,7 +71,8 @@ class SchedulingValidator:
         Raises:
             SchedulingValidationError: If any validation fails
         """
-        recorder = RecorderContext[SessionId].current_recorder()
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(workload.session_id)
         errors: list[SchedulingValidationError] = []
 
         for rule in self._rules:

@@ -21,7 +21,8 @@ from ai.backend.manager.repositories.scheduler import (
     TerminatingSessionData,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -47,22 +48,6 @@ class SessionTerminator:
         self._repository = args.repository
         self._agent_client_pool = args.agent_client_pool
         self._valkey_schedule = args.valkey_schedule
-
-    async def terminate_sessions(self) -> ScheduleResult:
-        """
-        Send termination requests to all agents for sessions marked as TERMINATING.
-
-        This method only sends RPC calls to agents. Actual status updates are handled by:
-        - Agent event callbacks (for successful terminations)
-        - sweep_lost_agent_kernels() (for lost agents or failed RPC calls)
-
-        Returns:
-            Empty ScheduleResult (no status updates performed here)
-        """
-        # Fetch all terminating sessions
-        terminating_sessions = await self._repository.get_terminating_sessions()
-
-        return await self._terminate_sessions_internal(terminating_sessions)
 
     async def terminate_sessions_for_handler(
         self,
@@ -104,7 +89,7 @@ class SessionTerminator:
                 if kernel.agent_id:
                     task = self._terminate_kernel(
                         kernel.agent_id,
-                        str(kernel.kernel_id),
+                        kernel.kernel_id,
                         str(session.session_id),
                         session.status_info,
                         kernel.occupied_slots,
@@ -132,7 +117,15 @@ class SessionTerminator:
         log.info("Terminating {} kernels in parallel", len(all_tasks))
 
         # Use gather with return_exceptions to ensure partial failures don't block others
-        results = await asyncio.gather(*all_tasks, return_exceptions=True)
+        with RecorderContext[SessionId].shared_phase(
+            "kernel_destruction",
+            success_detail="Kernels terminating",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "destroy_kernels",
+                success_detail="Kernel destruction requested",
+            ):
+                results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
         # Log results but don't update DB (handled by events and sweep)
         success_count = 0
@@ -157,7 +150,7 @@ class SessionTerminator:
     async def _terminate_kernel(
         self,
         agent_id: AgentId,
-        kernel_id: str,
+        kernel_id: KernelId,
         session_id: str,
         reason: str,
         occupied_slots: ResourceSlot,
@@ -197,50 +190,6 @@ class SessionTerminator:
                 error=str(e),
             )
 
-    async def sweep_stale_sessions(self) -> ScheduleResult:
-        """
-        Sweep stale sessions including those with pending timeout.
-        This is a maintenance operation, not a scheduling operation.
-
-        Note: The actual marking of sessions for termination should be done
-        through SchedulingController.mark_sessions_for_termination() by the coordinator.
-
-        :return: ScheduleResult with the count of swept sessions
-        """
-        # Get sessions that have exceeded their pending timeout
-        timed_out_sessions = await self._repository.get_pending_timeout_sessions()
-
-        if timed_out_sessions:
-            # Extract session IDs
-            session_ids = [session.session_id for session in timed_out_sessions]
-
-            log.info(
-                "Found {} sessions with pending timeout that need termination",
-                len(session_ids),
-            )
-
-            # Note: The coordinator should call SchedulingController.mark_sessions_for_termination()
-            # with these session_ids. This method just identifies the sessions.
-            # For now, we'll directly mark them through repository for backward compatibility
-            await self._repository.mark_sessions_terminating(
-                session_ids,
-                reason="PENDING_TIMEOUT",
-            )
-
-            # Convert swept sessions to ScheduledSessionData format
-            scheduled_data = [
-                ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
-                    reason="sweeped-as-stale",
-                )
-                for session in timed_out_sessions
-            ]
-            return ScheduleResult(scheduled_sessions=scheduled_data)
-
-        return ScheduleResult()
-
     async def sweep_stale_sessions_for_handler(
         self,
         timed_out_sessions: list[SweptSessionInfo],
@@ -272,70 +221,6 @@ class SessionTerminator:
         )
 
         return session_ids
-
-    async def sweep_lost_agent_kernels(self) -> ScheduleResult:
-        """
-        Sweep kernels in TERMINATING sessions that cannot be terminated normally.
-
-        This handles kernels where:
-        - Agent is LOST
-        - Agent is None (never assigned)
-
-        These kernels are directly marked as TERMINATED without RPC calls.
-        This is a cleanup operation separate from normal termination.
-        Only kernel status is updated; session status updates are handled
-        by other mechanisms when all kernels are terminated.
-
-        Returns:
-            ScheduleResult (empty - no scheduled sessions)
-        """
-        # Fetch kernels with lost or missing agents
-        lost_kernels = await self._repository.get_terminating_kernels_with_lost_agents()
-
-        if not lost_kernels:
-            log.debug("No lost agent kernels to sweep")
-            return ScheduleResult()
-
-        log.info(
-            "Sweeping {} kernels with lost/missing agents",
-            len(lost_kernels),
-        )
-
-        # Build kernel results
-        kernel_results: list[KernelTerminationResult] = []
-
-        for kernel in lost_kernels:
-            log.info(
-                "Sweeping kernel {} in session {} (agent: {}, agent_status: {})",
-                kernel.kernel_id,
-                kernel.session_id,
-                kernel.agent_id,
-                kernel.agent_status,
-            )
-
-            # Mark as successfully terminated since agent is gone
-            kernel_result = KernelTerminationResult(
-                kernel_id=kernel.kernel_id,
-                agent_id=kernel.agent_id,
-                occupied_slots=ResourceSlot(),  # Empty since agent is lost/missing
-                success=True,
-            )
-            kernel_results.append(kernel_result)
-
-        # Batch update all swept kernels (sessions will be updated by other handlers)
-        await self._repository.batch_update_kernels_terminated(
-            kernel_results,
-            reason="swept-lost-agent",
-        )
-
-        log.info("Successfully swept {} kernels", len(kernel_results))
-
-        # Request check-terminating-progress to update session status
-        await self._valkey_schedule.mark_schedule_needed(
-            ScheduleType.CHECK_TERMINATING_PROGRESS.value
-        )
-
-        return ScheduleResult()
 
     async def sweep_lost_agent_kernels_for_handler(
         self,
@@ -410,7 +295,7 @@ class SessionTerminator:
         if not sessions:
             return []
 
-        # 1. Extract kernel IDs and agent IDs, then check presence status in Redis
+        # 1. Extract kernel IDs and agent IDs, then check presence status
         running_kernel_ids: list[KernelId] = []
         agent_ids: set[AgentId] = set()
         for session in sessions:
@@ -422,10 +307,18 @@ class SessionTerminator:
         if not running_kernel_ids:
             return []
 
-        statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
-            running_kernel_ids,
-            agent_ids=agent_ids,
-        )
+        with RecorderContext[SessionId].shared_phase(
+            "verify_kernel_liveness",
+            success_detail="Kernel liveness verification completed",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "check_kernel_presence",
+                success_detail="Kernel presence checked",
+            ):
+                statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
+                    running_kernel_ids,
+                    agent_ids=agent_ids,
+                )
 
         # 2. Filter STALE kernels (None status or STALE presence)
         stale_kernel_id_set: set[UUID] = {
@@ -437,9 +330,10 @@ class SessionTerminator:
         if not stale_kernel_id_set:
             return []
 
-        # 3. Check with agent RPC - only explicit False terminates
+        # 3. Check with agent - only explicit False terminates
         dead_kernel_ids: list[str] = []
         affected_sessions: list[SessionWithKernels] = []
+        pool = RecorderContext[SessionId].current_pool()
 
         for session in sessions:
             for kernel_info in session.kernel_infos:
@@ -448,13 +342,22 @@ class SessionTerminator:
                 if not kernel_info.resource.agent:
                     continue
                 try:
-                    agent_id = AgentId(kernel_info.resource.agent)
-                    async with self._agent_client_pool.acquire(agent_id) as client:
-                        is_running = await client.check_running(str(kernel_info.id))
-                    if is_running is False:
-                        dead_kernel_ids.append(str(kernel_info.id))
-                        if session not in affected_sessions:
-                            affected_sessions.append(session)
+                    recorder = pool.recorder(session.session_info.identity.id)
+                    with recorder.phase(
+                        "verify_kernel_liveness",
+                        success_detail="Kernel liveness verified",
+                    ):
+                        with recorder.step(
+                            "confirm_with_agent",
+                            success_detail=f"Kernel {kernel_info.id} status confirmed",
+                        ):
+                            agent_id = AgentId(kernel_info.resource.agent)
+                            async with self._agent_client_pool.acquire(agent_id) as client:
+                                is_running = await client.check_running(str(kernel_info.id))
+                            if is_running is False:
+                                dead_kernel_ids.append(str(kernel_info.id))
+                                if session not in affected_sessions:
+                                    affected_sessions.append(session)
                 except Exception as e:
                     log.warning(
                         "Failed to check kernel {} status: {}. Skipping.",

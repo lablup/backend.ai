@@ -23,10 +23,11 @@ from ai.backend.common.types import (
 from ai.backend.manager.clients.agent import AgentClient, AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.schedule.repository import (
+from ai.backend.manager.repositories.scheduler import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
@@ -99,10 +100,11 @@ class TestTerminateSessions:
     ) -> None:
         """Test terminate_sessions when no sessions need termination."""
         # Setup - no terminating sessions
-        mock_repository.get_terminating_sessions.return_value = []
+        terminating_sessions: list[TerminatingSessionData] = []
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope with entity_ids
+        with RecorderContext[SessionId].scope("terminate", []):
+            result = await terminator._terminate_sessions_internal(terminating_sessions)
 
         # Verify
         assert isinstance(result, ScheduleResult)
@@ -145,8 +147,9 @@ class TestTerminateSessions:
         mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
         mock_agent.destroy_kernel.return_value = None  # Success
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope with entity_ids
+        with RecorderContext[SessionId].scope("terminate", [session_id]):
+            result = await terminator._terminate_sessions_internal([terminating_session])
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -155,7 +158,7 @@ class TestTerminateSessions:
 
         # Verify agent destroy_kernel was called with correct parameters
         mock_agent.destroy_kernel.assert_called_once_with(
-            str(kernel_id),
+            KernelId(kernel_id),
             str(session_id),
             "USER_REQUESTED",
             suppress_events=False,
@@ -193,10 +196,9 @@ class TestTerminateSessions:
             ],
         )
 
-        mock_repository.get_terminating_sessions.return_value = [terminating_session]
-
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope with entity_ids
+        with RecorderContext[SessionId].scope("terminate", [session_id]):
+            result = await terminator._terminate_sessions_internal([terminating_session])
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -207,7 +209,7 @@ class TestTerminateSessions:
         for i in range(3):
             mock_agent = mock_agent_client_pool.get_agent_client(agent_ids[i])
             mock_agent.destroy_kernel.assert_called_once_with(
-                str(kernel_ids[i]),
+                KernelId(kernel_ids[i]),
                 str(session_id),
                 "FORCED_TERMINATION",
                 suppress_events=False,
@@ -261,8 +263,9 @@ class TestTerminateSessions:
         mock_agent2 = mock_agent_client_pool.get_agent_client(agent_ids[1])
         mock_agent2.destroy_kernel.side_effect = Exception("Agent connection failed")
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope with entity_ids
+        with RecorderContext[SessionId].scope("terminate", [session_id]):
+            result = await terminator._terminate_sessions_internal([terminating_session])
 
         # Verify
         # Session should not be counted as terminated due to partial failure
@@ -323,11 +326,15 @@ class TestTerminateSessions:
             mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
             mock_agent.destroy_kernel.side_effect = delayed_destroy
 
-        # Execute
+        # Extract session_ids for RecorderContext scope
+        session_ids = [s.session_id for s in sessions]
+
+        # Execute - wrap in RecorderContext scope with entity_ids
         import time
 
         start_time = time.time()
-        result = await terminator.terminate_sessions()
+        with RecorderContext[SessionId].scope("terminate", session_ids):
+            result = await terminator._terminate_sessions_internal(sessions)
         elapsed = time.time() - start_time
 
         # Verify
@@ -363,10 +370,9 @@ class TestTerminateSessions:
             kernels=[],  # No kernels
         )
 
-        mock_repository.get_terminating_sessions.return_value = [terminating_session]
-
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope with entity_ids
+        with RecorderContext[SessionId].scope("terminate", [session_id]):
+            result = await terminator._terminate_sessions_internal([terminating_session])
 
         # Verify
         # Session without kernels cannot be terminated

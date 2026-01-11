@@ -43,6 +43,7 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
@@ -116,7 +117,11 @@ class SessionLauncher:
         await self._repository.update_sessions_to_preparing(session_ids)
 
         # Trigger image checking and pulling on agents
-        await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "prepare_images",
+            success_detail="Image pull requested",
+        ):
+            await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
 
         # Convert to ScheduledSessionData format
         scheduled_data = [
@@ -192,7 +197,12 @@ class SessionLauncher:
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            await asyncio.gather(*pull_tasks, return_exceptions=True)
+            # Note: shared_phase should be provided by the caller (e.g., handler)
+            with RecorderContext[SessionId].shared_step(
+                "check_and_pull_images",
+                success_detail="Image pull triggered",
+            ):
+                await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions(self) -> ScheduleResult:
         """
@@ -701,26 +711,36 @@ class SessionLauncher:
             agent_pulling_status[agent_id] = pulling_status
 
         # Determine truly stuck sessions
+        pool = RecorderContext[SessionId].current_pool()
         for session in sessions:
-            images_to_check = session_images[session.session_id]
-            if not images_to_check:
-                # No images to check, consider it stuck
-                truly_stuck_sessions.append(session)
-                continue
+            recorder = pool.recorder(session.session_id)
+            with recorder.phase(
+                "verify_pull_status",
+                success_detail="Image pull status verified",
+            ):
+                with recorder.step(
+                    "check_pull_progress",
+                    success_detail="Image pull progress checked",
+                ):
+                    images_to_check = session_images[session.session_id]
+                    if not images_to_check:
+                        # No images to check, consider it stuck
+                        truly_stuck_sessions.append(session)
+                        continue
 
-            # Check if any image for this session is actively being pulled
-            any_pulling = False
-            for kernel in session.kernels:
-                if kernel.agent_id and kernel.image in image_configs:
-                    img_cfg = image_configs[kernel.image]
-                    canonical = img_cfg.canonical
-                    if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
-                        any_pulling = True
-                        break
+                    # Check if any image for this session is actively being pulled
+                    any_pulling = False
+                    for kernel in session.kernels:
+                        if kernel.agent_id and kernel.image in image_configs:
+                            img_cfg = image_configs[kernel.image]
+                            canonical = img_cfg.canonical
+                            if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
+                                any_pulling = True
+                                break
 
-            if not any_pulling:
-                # No images are being pulled, session is truly stuck
-                truly_stuck_sessions.append(session)
+                    if not any_pulling:
+                        # No images are being pulled, session is truly stuck
+                        truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
@@ -818,7 +838,11 @@ class SessionLauncher:
         ]
 
         # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "prepare_images",
+            success_detail="Image pull retried",
+        ):
+            await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
 
         # Convert retried sessions to ScheduledSessionData format
         scheduled_data = [
@@ -882,18 +906,28 @@ class SessionLauncher:
 
         # Filter sessions that have no active kernels
         truly_stuck_sessions: list[SessionDataForStart] = []
+        pool = RecorderContext[SessionId].current_pool()
         for session, result in zip(sessions, results, strict=True):
-            if isinstance(result, BaseException):
-                log.warning(
-                    "Failed to check session {} creating status: {}",
-                    session.session_id,
-                    result,
-                )
-                # If we can't check, assume it's stuck
-                truly_stuck_sessions.append(session)
-            elif not result:
-                # No active kernels, session is stuck
-                truly_stuck_sessions.append(session)
+            recorder = pool.recorder(session.session_id)
+            with recorder.phase(
+                "verify_creation_status",
+                success_detail="Kernel creation status verified",
+            ):
+                with recorder.step(
+                    "check_kernel_status",
+                    success_detail="Kernel creation status checked",
+                ):
+                    if isinstance(result, BaseException):
+                        log.warning(
+                            "Failed to check session {} creating status: {}",
+                            session.session_id,
+                            result,
+                        )
+                        # If we can't check, assume it's stuck
+                        truly_stuck_sessions.append(session)
+                    elif not result:
+                        # No active kernels, session is stuck
+                        truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
