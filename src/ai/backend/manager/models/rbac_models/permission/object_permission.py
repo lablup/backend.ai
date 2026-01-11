@@ -19,6 +19,9 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
@@ -26,6 +29,17 @@ def _get_role_join_condition():
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
+
+
+def _get_scope_association_join_condition():
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+
+    return sa.and_(
+        ObjectPermissionRow.entity_type == foreign(AssociationScopesEntitiesRow.entity_type),
+        ObjectPermissionRow.entity_id == foreign(AssociationScopesEntitiesRow.entity_id),
+    )
 
 
 class ObjectPermissionRow(Base):
@@ -50,6 +64,13 @@ class ObjectPermissionRow(Base):
         "RoleRow",
         back_populates="object_permission_rows",
         primaryjoin=_get_role_join_condition,
+    )
+
+    scope_association_rows: list[AssociationScopesEntitiesRow] = relationship(
+        "AssociationScopesEntitiesRow",
+        primaryjoin=_get_scope_association_join_condition,
+        viewonly=True,
+        uselist=True,
     )
 
     def object_id(self) -> ObjectId:
