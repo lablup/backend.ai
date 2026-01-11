@@ -3,7 +3,13 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterInfo, ImageConfig, KernelCreationConfig, KernelId
+from ai.backend.common.types import (
+    AgentId,
+    ClusterInfo,
+    ImageConfig,
+    KernelCreationConfig,
+    KernelId,
+)
 from ai.backend.manager.clients.agent.client import AgentClient
 
 

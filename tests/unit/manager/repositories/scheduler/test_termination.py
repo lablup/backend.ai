@@ -662,22 +662,22 @@ class TestKernelTermination:
         # Verify - should find exactly 2 kernels (TERMINATING + LOST, TERMINATING + TERMINATED)
         kernel_ids = [k.kernel_id for k in result]
         assert len(result) == 2
-        assert str(kernel_terminating_lost) in kernel_ids
-        assert str(kernel_terminating_terminated) in kernel_ids
+        assert KernelId(kernel_terminating_lost) in kernel_ids
+        assert KernelId(kernel_terminating_terminated) in kernel_ids
 
         # Verify these kernels are NOT included
-        assert str(kernel_terminating_alive) not in kernel_ids
-        assert str(kernel_running_lost) not in kernel_ids
+        assert KernelId(kernel_terminating_alive) not in kernel_ids
+        assert KernelId(kernel_running_lost) not in kernel_ids
 
         # Verify kernel data structure for LOST agent
-        found_lost = next(k for k in result if k.kernel_id == str(kernel_terminating_lost))
+        found_lost = next(k for k in result if k.kernel_id == KernelId(kernel_terminating_lost))
         assert found_lost.agent_id == agent_lost
         assert found_lost.agent_status == str(AgentStatus.LOST)
         assert found_lost.status == KernelStatus.TERMINATING
 
         # Verify kernel data structure for TERMINATED agent
         found_terminated = next(
-            k for k in result if k.kernel_id == str(kernel_terminating_terminated)
+            k for k in result if k.kernel_id == KernelId(kernel_terminating_terminated)
         )
         assert found_terminated.agent_id == agent_terminated
         assert found_terminated.agent_status == str(AgentStatus.TERMINATED)
@@ -707,7 +707,7 @@ class TestKernelTermination:
         # Verify - should find kernel with terminated agent
         assert len(result) >= 1
         kernel_ids = [k.kernel_id for k in result]
-        assert str(test_terminating_kernel_id) in kernel_ids
+        assert KernelId(test_terminating_kernel_id) in kernel_ids
 
     async def test_get_terminating_kernels_with_no_agent(
         self,
@@ -732,10 +732,12 @@ class TestKernelTermination:
         # Verify - should find kernel without agent
         assert len(result) >= 1
         kernel_ids = [k.kernel_id for k in result]
-        assert str(test_terminating_kernel_id) in kernel_ids
+        assert KernelId(test_terminating_kernel_id) in kernel_ids
 
         # Verify kernel data structure
-        found_kernel = next(k for k in result if k.kernel_id == str(test_terminating_kernel_id))
+        found_kernel = next(
+            k for k in result if k.kernel_id == KernelId(test_terminating_kernel_id)
+        )
         assert found_kernel.agent_id is None
         assert found_kernel.agent_status is None
 
