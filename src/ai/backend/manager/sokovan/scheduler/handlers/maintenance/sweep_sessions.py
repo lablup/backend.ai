@@ -106,6 +106,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Terminator's handler-specific method
+        # Note: No recorder instrumentation - this is DB-update only operation
         swept_ids = await self._terminator.sweep_stale_sessions_for_handler(timed_out_sessions)
 
         # Build scheduled data for post-processing

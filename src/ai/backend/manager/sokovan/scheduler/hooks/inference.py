@@ -16,6 +16,7 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 from .base import AbstractSessionHook
@@ -78,26 +79,34 @@ class InferenceSessionHook(AbstractSessionHook):
             )
             return
 
-        try:
-            # Update route info in Redis
-            await self._repository.update_endpoint_route_info(endpoint_id)
+        with RecorderContext[SessionId].entity(session_id):
+            recorder = RecorderContext[SessionId].current_recorder()
+            with recorder.step(
+                "setup_route",
+                success_detail=f"Set up route for endpoint {endpoint_id}",
+            ):
+                try:
+                    # Update route info
+                    await self._repository.update_endpoint_route_info(endpoint_id)
 
-            # Send event to app proxy
-            await self._event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint_id))
+                    # Send event to app proxy
+                    await self._event_producer.anycast_event(
+                        EndpointRouteListUpdatedEvent(endpoint_id)
+                    )
 
-            log.info(
-                "Successfully updated route info and notified app proxy for endpoint {} (session {})",
-                endpoint_id,
-                session_id,
-            )
-        except Exception as e:
-            log.exception(
-                "Unexpected error updating route info for endpoint {} (session {}): {}",
-                endpoint_id,
-                session_id,
-                e,
-            )
-            # Don't fail the session transition, just log the error
+                    log.info(
+                        "Successfully updated route info and notified app proxy for endpoint {} (session {})",
+                        endpoint_id,
+                        session_id,
+                    )
+                except Exception as e:
+                    log.exception(
+                        "Unexpected error updating route info for endpoint {} (session {}): {}",
+                        endpoint_id,
+                        session_id,
+                        e,
+                    )
+                    # Don't fail the session transition, just log the error
 
     async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
         """Handle route deletion when inference session terminates."""
@@ -116,23 +125,32 @@ class InferenceSessionHook(AbstractSessionHook):
             )
             return
 
-        try:
-            # Update route info in Redis (removal)
-            await self._repository.update_endpoint_route_info(endpoint_id)
+        with RecorderContext[SessionId].entity(session_id):
+            recorder = RecorderContext[SessionId].current_recorder()
+            with recorder.step(
+                "cleanup_route",
+                success_detail=f"Cleaned up route for endpoint {endpoint_id}",
+            ):
+                try:
+                    # Update route info (removal)
+                    await self._repository.update_endpoint_route_info(endpoint_id)
 
-            # Send event to app proxy
-            await self._event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint_id))
+                    # Send event to app proxy
+                    await self._event_producer.anycast_event(
+                        EndpointRouteListUpdatedEvent(endpoint_id)
+                    )
 
-            log.info(
-                "Successfully updated route info and notified app proxy of route removal for endpoint {} (session {})",
-                endpoint_id,
-                session_id,
-            )
-        except Exception as e:
-            log.exception(
-                "Unexpected error updating route info for endpoint {} (session {}): {}",
-                endpoint_id,
-                session_id,
-                e,
-            )
+                    log.info(
+                        "Successfully updated route info and notified app proxy of route removal for endpoint {} (session {})",
+                        endpoint_id,
+                        session_id,
+                    )
+                except Exception as e:
+                    log.exception(
+                        "Unexpected error updating route info for endpoint {} (session {}): {}",
+                        endpoint_id,
+                        session_id,
+                        e,
+                    )
+                    # Don't fail the session transition, just log the error
             # Don't fail the session transition, just log the error

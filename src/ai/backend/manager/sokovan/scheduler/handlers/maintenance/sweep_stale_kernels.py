@@ -7,13 +7,14 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
@@ -103,7 +104,13 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
 
         # Delegate to Terminator's handler-specific method
         # Terminator now accepts SessionWithKernels directly
-        affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
+        with RecorderContext[SessionId].shared_phase(
+            "verify_kernel_liveness",
+            success_detail="Kernel liveness verified",
+        ):
+            affected_sessions = await self._terminator.sweep_stale_kernels_for_handler(
+                list(sessions)
+            )
 
         # Build scheduled data for affected sessions
         for session in affected_sessions:

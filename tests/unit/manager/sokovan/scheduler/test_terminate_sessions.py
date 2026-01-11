@@ -27,6 +27,7 @@ from ai.backend.manager.repositories.schedule.repository import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
@@ -145,8 +146,9 @@ class TestTerminateSessions:
         mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
         mock_agent.destroy_kernel.return_value = None  # Success
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope
+        with RecorderContext[SessionId].scope("terminate"):
+            result = await terminator.terminate_sessions()
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -195,8 +197,9 @@ class TestTerminateSessions:
 
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope
+        with RecorderContext[SessionId].scope("terminate"):
+            result = await terminator.terminate_sessions()
 
         # Verify
         # Returns empty result (status updates handled by events/sweep)
@@ -261,8 +264,9 @@ class TestTerminateSessions:
         mock_agent2 = mock_agent_client_pool.get_agent_client(agent_ids[1])
         mock_agent2.destroy_kernel.side_effect = Exception("Agent connection failed")
 
-        # Execute
-        result = await terminator.terminate_sessions()
+        # Execute - wrap in RecorderContext scope
+        with RecorderContext[SessionId].scope("terminate"):
+            result = await terminator.terminate_sessions()
 
         # Verify
         # Session should not be counted as terminated due to partial failure
@@ -323,11 +327,12 @@ class TestTerminateSessions:
             mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
             mock_agent.destroy_kernel.side_effect = delayed_destroy
 
-        # Execute
+        # Execute - wrap in RecorderContext scope
         import time
 
         start_time = time.time()
-        result = await terminator.terminate_sessions()
+        with RecorderContext[SessionId].scope("terminate"):
+            result = await terminator.terminate_sessions()
         elapsed = time.time() - start_time
 
         # Verify

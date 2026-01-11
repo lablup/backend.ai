@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.scheduler import (
     TerminatingSessionData,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
@@ -132,7 +133,15 @@ class SessionTerminator:
         log.info("Terminating {} kernels in parallel", len(all_tasks))
 
         # Use gather with return_exceptions to ensure partial failures don't block others
-        results = await asyncio.gather(*all_tasks, return_exceptions=True)
+        with RecorderContext[SessionId].shared_phase(
+            "kernel_destruction",
+            success_detail="Kernels terminating",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "destroy_kernels",
+                success_detail="Kernel destruction requested",
+            ):
+                results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
         # Log results but don't update DB (handled by events and sweep)
         success_count = 0
@@ -410,7 +419,7 @@ class SessionTerminator:
         if not sessions:
             return []
 
-        # 1. Extract kernel IDs and agent IDs, then check presence status in Redis
+        # 1. Extract kernel IDs and agent IDs, then check presence status
         running_kernel_ids: list[KernelId] = []
         agent_ids: set[AgentId] = set()
         for session in sessions:
@@ -422,10 +431,14 @@ class SessionTerminator:
         if not running_kernel_ids:
             return []
 
-        statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
-            running_kernel_ids,
-            agent_ids=agent_ids,
-        )
+        with RecorderContext[SessionId].shared_step(
+            "check_kernel_presence",
+            success_detail="Kernel presence checked",
+        ):
+            statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
+                running_kernel_ids,
+                agent_ids=agent_ids,
+            )
 
         # 2. Filter STALE kernels (None status or STALE presence)
         stale_kernel_id_set: set[UUID] = {
@@ -437,7 +450,7 @@ class SessionTerminator:
         if not stale_kernel_id_set:
             return []
 
-        # 3. Check with agent RPC - only explicit False terminates
+        # 3. Check with agent - only explicit False terminates
         dead_kernel_ids: list[str] = []
         affected_sessions: list[SessionWithKernels] = []
 
@@ -448,13 +461,19 @@ class SessionTerminator:
                 if not kernel_info.resource.agent:
                     continue
                 try:
-                    agent_id = AgentId(kernel_info.resource.agent)
-                    async with self._agent_client_pool.acquire(agent_id) as client:
-                        is_running = await client.check_running(str(kernel_info.id))
-                    if is_running is False:
-                        dead_kernel_ids.append(str(kernel_info.id))
-                        if session not in affected_sessions:
-                            affected_sessions.append(session)
+                    with RecorderContext[SessionId].entity(session.session_info.identity.id):
+                        recorder = RecorderContext[SessionId].current_recorder()
+                        with recorder.step(
+                            "confirm_with_agent",
+                            success_detail=f"Kernel {kernel_info.id} status confirmed",
+                        ):
+                            agent_id = AgentId(kernel_info.resource.agent)
+                            async with self._agent_client_pool.acquire(agent_id) as client:
+                                is_running = await client.check_running(str(kernel_info.id))
+                            if is_running is False:
+                                dead_kernel_ids.append(str(kernel_info.id))
+                                if session not in affected_sessions:
+                                    affected_sessions.append(session)
                 except Exception as e:
                     log.warning(
                         "Failed to check kernel {} status: {}. Skipping.",
