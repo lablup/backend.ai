@@ -52,22 +52,35 @@ class TestRescanGPUAllocMapsHandler:
         return client
 
     @pytest.fixture
-    def mock_agent_pool(self, mock_agent_client: MagicMock) -> MagicMock:
-        """Mock AgentPool."""
+    def mock_agent_client_pool(self, mock_agent_client: MagicMock) -> MagicMock:
+        """Mock AgentClientPool."""
         pool = MagicMock()
-        pool.get_agent_client = MagicMock(return_value=mock_agent_client)
+
+        # Create context manager for acquire()
+        class MockAcquireContextManager:
+            def __init__(self, agent_id: AgentId) -> None:
+                self.agent_id = agent_id
+                self.client = mock_agent_client
+
+            async def __aenter__(self) -> MagicMock:
+                return self.client
+
+            async def __aexit__(self, *args: object) -> None:
+                pass
+
+        pool.acquire = MagicMock(side_effect=lambda agent_id: MockAcquireContextManager(agent_id))
         return pool
 
     @pytest.fixture
     def handler(
         self,
         mock_agent_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
     ) -> RescanGPUAllocMapsHandler:
         """Create handler instance with mocked dependencies."""
         return RescanGPUAllocMapsHandler(
             agent_repository=mock_agent_repository,
-            agent_pool=mock_agent_pool,
+            agent_client_pool=mock_agent_client_pool,
         )
 
     def test_manifest_creation(self, sample_agent_id: AgentId) -> None:
@@ -100,7 +113,7 @@ class TestRescanGPUAllocMapsHandler:
         self,
         handler: RescanGPUAllocMapsHandler,
         mock_agent_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
         mock_agent_client: MagicMock,
         sample_agent_id: AgentId,
         sample_agent_data: MagicMock,
@@ -115,8 +128,8 @@ class TestRescanGPUAllocMapsHandler:
         # Verify repository.get_by_id was called
         mock_agent_repository.get_by_id.assert_called_once_with(sample_agent_id)
 
-        # Verify agent_pool.get_agent_client was called
-        mock_agent_pool.get_agent_client.assert_called_once_with(sample_agent_data.id)
+        # Verify agent_client_pool.acquire was called
+        mock_agent_client_pool.acquire.assert_called_once_with(sample_agent_data.id)
 
         # Verify agent_client.scan_gpu_alloc_map was called
         mock_agent_client.scan_gpu_alloc_map.assert_called_once()

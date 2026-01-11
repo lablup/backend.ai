@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
@@ -49,7 +49,7 @@ class AbstractSessionHook(ABC):
 class SessionHookArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
-    agent_pool: AgentPool
+    agent_client_pool: AgentClientPool
     event_producer: EventProducer
 
 
@@ -59,14 +59,14 @@ class SessionHook(AbstractSessionHook):
     _session_hook: AbstractSessionHook
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
     _event_producer: EventProducer
 
     def __init__(self, session_hook: AbstractSessionHook, args: SessionHookArgs) -> None:
         self._session_hook = session_hook
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
-        self._agent_pool = args.agent_pool
+        self._agent_client_pool = args.agent_client_pool
         self._event_producer = args.event_producer
 
     async def on_transition_to_running(self, session: SessionWithKernels) -> None:

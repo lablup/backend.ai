@@ -163,7 +163,7 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
-from .clients.agent.client import AgentClient
+from .clients.agent.legacy import LegacyAgentClient
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
@@ -316,23 +316,23 @@ class AgentRegistry:
         *,
         invoke_timeout: Optional[float] = None,
         order_key: Optional[str] = None,
-    ) -> AgentClient:
-        """Get an AgentClient for the given agent ID.
+    ) -> LegacyAgentClient:
+        """Get a LegacyAgentClient for the given agent ID.
 
         Args:
             agent_id: The agent ID to get the client for (AgentId or str)
 
         Returns:
-            AgentClient instance for the agent
+            LegacyAgentClient instance for the agent
 
         Raises:
             ValueError: If agent_id is None
         """
         if agent_id is None:
             raise ValueError("agent_id cannot be None")
-        # TODO: Apply AgentClient Pool
+        # TODO: Apply AgentClientPool
         _agent_id = AgentId(agent_id) if isinstance(agent_id, str) else agent_id
-        return AgentClient(
+        return LegacyAgentClient(
             self.agent_cache,
             _agent_id,
             invoke_timeout=invoke_timeout,

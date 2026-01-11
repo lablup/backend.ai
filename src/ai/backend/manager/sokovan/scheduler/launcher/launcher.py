@@ -29,7 +29,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -58,7 +58,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass
 class SessionLauncherArgs:
     repository: SchedulerRepository
-    agent_pool: AgentPool
+    agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
@@ -75,7 +75,7 @@ class SessionLauncher:
     """
 
     _repository: SchedulerRepository
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
     _valkey_schedule: ValkeyScheduleClient
@@ -83,7 +83,7 @@ class SessionLauncher:
 
     def __init__(self, args: SessionLauncherArgs) -> None:
         self._repository = args.repository
-        self._agent_pool = args.agent_pool
+        self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
@@ -181,10 +181,15 @@ class SessionLauncher:
                         agent_image_configs[agent_id][canonical] = image_config
 
         # Trigger image checking and pulling on each agent
+        async def pull_for_agent(
+            agent_id: AgentId, images: dict[str, ImageConfig]
+        ) -> Mapping[str, str]:
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                return await client.check_and_pull(images)
+
         pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-            pull_tasks.append(agent_client.check_and_pull(agent_images))
+            pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
             await asyncio.gather(*pull_tasks, return_exceptions=True)
@@ -361,12 +366,10 @@ class SessionLauncher:
                 image_configs_by_canonical[image_key] = image_config
 
             # Create kernels on each agent
-            create_tasks: list[Awaitable[Any]] = []
-            for agent_id, agent_kernels in kernels_by_agent.items():
-                agent_client = self._agent_pool.get_agent_client(
-                    agent_id, order_key=str(session.session_id)
-                )
-
+            async def create_kernels_on_agent(
+                agent_id: AgentId,
+                agent_kernels: list[KernelBindingData],
+            ) -> None:
                 # Prepare kernel creation configs
                 kernel_ids = [str(k.kernel_id) for k in agent_kernels]
                 kernel_configs: list[KernelCreationConfig] = []
@@ -464,16 +467,19 @@ class SessionLauncher:
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                 }
 
-                # Create the kernels
-                create_tasks.append(
-                    agent_client.create_kernels(
+                # Create the kernels using connection pool
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    await client.create_kernels(
                         str(session.session_id),
                         kernel_ids,
                         kernel_configs,
                         cluster_info,
                         kernel_image_refs,
                     )
-                )
+
+            create_tasks: list[Awaitable[None]] = []
+            for agent_id, agent_kernels in kernels_by_agent.items():
+                create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
             if create_tasks:
                 await asyncio.gather(*create_tasks, return_exceptions=True)
@@ -517,11 +523,9 @@ class SessionLauncher:
                 first_kernel = session.kernels[0]
                 if not first_kernel.agent_id:
                     raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
-                agent_client = self._agent_pool.get_agent_client(
-                    first_kernel.agent_id, order_key=str(session.session_id)
-                )
                 try:
-                    await agent_client.create_local_network(network_name)
+                    async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
+                        await client.create_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to create agent-local network {network_name}")
                     raise
@@ -572,10 +576,8 @@ class SessionLauncher:
                             f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
                         )
                         continue
-                    agent_client = self._agent_pool.get_agent_client(
-                        kernel.agent_id, order_key=str(session.session_id)
-                    )
-                    port = await agent_client.assign_port()
+                    async with self._agent_client_pool.acquire(kernel.agent_id) as client:
+                        port = await client.assign_port()
                     # Extract host from agent_addr
                     agent_addr = kernel.agent_addr or ""
                     agent_host = (
@@ -683,24 +685,19 @@ class SessionLauncher:
                     session_image_set.add(canonical)
             session_images[session.session_id] = session_image_set
 
-        # Check pulling status for each agent
+        # Check pulling status for each agent in parallel
+        check_tasks = [
+            self._check_agent_pulling_status(agent_id, images)
+            for agent_id, images in agent_images.items()
+        ]
+        results = await asyncio.gather(*check_tasks, return_exceptions=True)
+
         agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
-        for agent_id, images in agent_images.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-            pulling_status = {}
-            for image in images:
-                try:
-                    is_pulling = await agent_client.check_pulling(image)
-                    pulling_status[image] = is_pulling
-                except Exception as e:
-                    log.warning(
-                        "Failed to check pulling status for image {} on agent {}: {}",
-                        image,
-                        agent_id,
-                        e,
-                    )
-                    # If we can't check, assume it's stuck
-                    pulling_status[image] = False
+        for result in results:
+            if isinstance(result, BaseException):
+                log.warning("Failed to check pulling status: {}", result)
+                continue
+            agent_id, pulling_status = result
             agent_pulling_status[agent_id] = pulling_status
 
         # Determine truly stuck sessions
@@ -726,6 +723,37 @@ class SessionLauncher:
                 truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
+
+    async def _check_agent_pulling_status(
+        self,
+        agent_id: AgentId,
+        images: set[str],
+    ) -> tuple[AgentId, dict[str, bool]]:
+        """Check pulling status for all images on a single agent."""
+        pulling_status: dict[str, bool] = {}
+        try:
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                for image in images:
+                    try:
+                        is_pulling = await client.check_pulling(image)
+                        pulling_status[image] = is_pulling
+                    except Exception as e:
+                        log.warning(
+                            "Failed to check pulling status for image {} on agent {}: {}",
+                            image,
+                            agent_id,
+                            e,
+                        )
+                        pulling_status[image] = False
+        except Exception as e:
+            log.warning(
+                "Failed to acquire connection for agent {}: {}",
+                agent_id,
+                e,
+            )
+            for image in images:
+                pulling_status[image] = False
+        return agent_id, pulling_status
 
     async def retry_preparing_sessions(self) -> ScheduleResult:
         """
@@ -845,34 +873,51 @@ class SessionLauncher:
         :param sessions: List of potentially stuck sessions
         :return: List of sessions that are truly stuck
         """
+        if not sessions:
+            return []
+
+        # Check all sessions in parallel
+        check_tasks = [self._check_session_has_active_kernels(session) for session in sessions]
+        results = await asyncio.gather(*check_tasks, return_exceptions=True)
+
+        # Filter sessions that have no active kernels
         truly_stuck_sessions: list[SessionDataForStart] = []
-
-        for session in sessions:
-            # Check each kernel in the session
-            any_active = False
-            for kernel in session.kernels:
-                if kernel.agent_id:
-                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
-                    try:
-                        # Check if kernel is being created or already exists
-                        is_active = await agent_client.check_creating(str(kernel.kernel_id))
-                        if is_active:
-                            any_active = True
-                            break
-                    except Exception as e:
-                        log.warning(
-                            "Failed to check creating status for kernel {} on agent {}: {}",
-                            kernel.kernel_id,
-                            kernel.agent_id,
-                            e,
-                        )
-                        # If we can't check, assume it's stuck
-
-            if not any_active:
-                # No kernels are being created or existing, session is truly stuck
+        for session, result in zip(sessions, results, strict=True):
+            if isinstance(result, BaseException):
+                log.warning(
+                    "Failed to check session {} creating status: {}",
+                    session.session_id,
+                    result,
+                )
+                # If we can't check, assume it's stuck
+                truly_stuck_sessions.append(session)
+            elif not result:
+                # No active kernels, session is stuck
                 truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
+
+    async def _check_session_has_active_kernels(
+        self,
+        session: SessionDataForStart,
+    ) -> bool:
+        """Check if any kernel in the session is being created or already exists."""
+        for kernel in session.kernels:
+            if not kernel.agent_id:
+                continue
+            try:
+                async with self._agent_client_pool.acquire(kernel.agent_id) as client:
+                    is_active = await client.check_creating(str(kernel.kernel_id))
+                    if is_active:
+                        return True
+            except Exception as e:
+                log.warning(
+                    "Failed to check creating status for kernel {} on agent {}: {}",
+                    kernel.kernel_id,
+                    kernel.agent_id,
+                    e,
+                )
+        return False
 
     async def retry_creating_sessions(self) -> ScheduleResult:
         """

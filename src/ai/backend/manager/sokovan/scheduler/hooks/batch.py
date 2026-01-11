@@ -9,7 +9,7 @@ import logging
 
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 from .base import AbstractSessionHook
@@ -18,10 +18,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class BatchSessionHook(AbstractSessionHook):
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
 
-    def __init__(self, agent_pool: AgentPool) -> None:
-        self._agent_pool = agent_pool
+    def __init__(self, agent_client_pool: AgentClientPool) -> None:
+        self._agent_client_pool = agent_client_pool
 
     async def on_transition_to_running(self, session: SessionWithKernels) -> None:
         """Handle batch execution trigger using SessionWithKernels."""
@@ -32,16 +32,12 @@ class BatchSessionHook(AbstractSessionHook):
                 f"Main kernel has no agent assigned for session {session.session_info.identity.id}"
             )
 
-        async with self._agent_pool._agent_cache.rpc_context(
-            agent_id,
-            invoke_timeout=30,
-            order_key=str(main_kernel.id),
-        ) as rpc:
-            await rpc.call.trigger_batch_execution(
+        async with self._agent_client_pool.acquire(agent_id) as client:
+            await client.trigger_batch_execution(
                 str(session.session_info.identity.id),
                 str(main_kernel.id),
                 main_kernel.runtime.startup_command or "",
-                session.session_info.lifecycle.batch_timeout,
+                float(session.session_info.lifecycle.batch_timeout or 0),
             )
         log.info(
             "Successfully triggered batch execution for session {} on agent {}",

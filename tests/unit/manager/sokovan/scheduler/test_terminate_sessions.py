@@ -20,7 +20,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.clients.agent import AgentClient, AgentPool
+from ai.backend.manager.clients.agent import AgentClient, AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.schedule.repository import (
@@ -35,21 +35,33 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 
 @pytest.fixture
-def mock_agent_pool():
-    """Mock AgentPool for testing."""
-    mock_pool = MagicMock(spec=AgentPool)
+def mock_agent_client_pool():
+    """Mock AgentClientPool for testing."""
+    mock_pool = MagicMock(spec=AgentClientPool)
 
     # Create a dictionary to store agent clients
-    agent_clients = {}
+    agent_clients: dict[AgentId, MagicMock] = {}
 
     # Create mock agent clients
-    def get_or_create_mock_agent_client(agent_id, **kwargs):
+    def get_or_create_mock_agent_client(agent_id: AgentId) -> MagicMock:
         if agent_id not in agent_clients:
             mock_client = MagicMock(spec=AgentClient)
             mock_client.destroy_kernel = AsyncMock()
             agent_clients[agent_id] = mock_client
         return agent_clients[agent_id]
 
+    # Create context manager for acquire()
+    class MockAcquireContextManager:
+        def __init__(self, agent_id: AgentId) -> None:
+            self.agent_id = agent_id
+
+        async def __aenter__(self) -> MagicMock:
+            return get_or_create_mock_agent_client(self.agent_id)
+
+        async def __aexit__(self, *args: object) -> None:
+            pass
+
+    mock_pool.acquire = MagicMock(side_effect=lambda agent_id: MockAcquireContextManager(agent_id))
     mock_pool.get_agent_client = MagicMock(side_effect=get_or_create_mock_agent_client)
     mock_pool._clients = agent_clients  # Store for test access
     return mock_pool
@@ -65,13 +77,13 @@ def mock_repository():
 
 
 @pytest.fixture
-def terminator(mock_repository: MagicMock, mock_agent_pool: MagicMock) -> SessionTerminator:
+def terminator(mock_repository: MagicMock, mock_agent_client_pool: MagicMock) -> SessionTerminator:
     """Create SessionTerminator instance with mocked dependencies."""
     mock_valkey_schedule = MagicMock()
     return SessionTerminator(
         SessionTerminatorArgs(
             repository=mock_repository,
-            agent_pool=mock_agent_pool,
+            agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,
         )
     )
@@ -100,7 +112,7 @@ class TestTerminateSessions:
         self,
         terminator: SessionTerminator,
         mock_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
     ) -> None:
         """Test successful termination RPC call for a single session."""
         # Setup
@@ -130,7 +142,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
         # Configure agent client to succeed
-        mock_agent = mock_agent_pool.get_agent_client(agent_id)
+        mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
         mock_agent.destroy_kernel.return_value = None  # Success
 
         # Execute
@@ -153,7 +165,7 @@ class TestTerminateSessions:
         self,
         terminator: SessionTerminator,
         mock_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
     ) -> None:
         """Test termination RPC calls for a session with multiple kernels."""
         # Setup
@@ -193,7 +205,7 @@ class TestTerminateSessions:
 
         # Verify all kernels had RPC calls made
         for i in range(3):
-            mock_agent = mock_agent_pool.get_agent_client(agent_ids[i])
+            mock_agent = mock_agent_client_pool.get_agent_client(agent_ids[i])
             mock_agent.destroy_kernel.assert_called_once_with(
                 str(kernel_ids[i]),
                 str(session_id),
@@ -205,7 +217,7 @@ class TestTerminateSessions:
         self,
         terminator: SessionTerminator,
         mock_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
     ) -> None:
         """Test partial failure in kernel termination."""
         # Setup
@@ -243,10 +255,10 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = [terminating_session]
 
         # Configure first agent to succeed, second to fail
-        mock_agent1 = mock_agent_pool.get_agent_client(agent_ids[0])
+        mock_agent1 = mock_agent_client_pool.get_agent_client(agent_ids[0])
         mock_agent1.destroy_kernel.return_value = None  # Success
 
-        mock_agent2 = mock_agent_pool.get_agent_client(agent_ids[1])
+        mock_agent2 = mock_agent_client_pool.get_agent_client(agent_ids[1])
         mock_agent2.destroy_kernel.side_effect = Exception("Agent connection failed")
 
         # Execute
@@ -260,7 +272,7 @@ class TestTerminateSessions:
         self,
         terminator: SessionTerminator,
         mock_repository: MagicMock,
-        mock_agent_pool: MagicMock,
+        mock_agent_client_pool: MagicMock,
     ) -> None:
         """Test that kernel termination RPC calls are executed concurrently."""
         # Setup multiple sessions
@@ -308,7 +320,7 @@ class TestTerminateSessions:
             return
 
         for agent_id in all_agent_ids:
-            mock_agent = mock_agent_pool.get_agent_client(agent_id)
+            mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
             mock_agent.destroy_kernel.side_effect = delayed_destroy
 
         # Execute
@@ -325,7 +337,7 @@ class TestTerminateSessions:
 
         # Verify all RPC calls were made
         for i, agent_id in enumerate(all_agent_ids):
-            mock_agent = mock_agent_pool.get_agent_client(agent_id)
+            mock_agent = mock_agent_client_pool.get_agent_client(agent_id)
             assert mock_agent.destroy_kernel.call_count == 1
 
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)

@@ -12,7 +12,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckS
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
@@ -32,7 +32,7 @@ class SessionTerminatorArgs:
     """Arguments for SessionTerminator initialization."""
 
     repository: SchedulerRepository
-    agent_pool: AgentPool
+    agent_client_pool: AgentClientPool
     valkey_schedule: ValkeyScheduleClient
 
 
@@ -40,12 +40,12 @@ class SessionTerminator:
     """Handles termination and sweep operations for sessions and kernels."""
 
     _repository: SchedulerRepository
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
     _valkey_schedule: ValkeyScheduleClient
 
     def __init__(self, args: SessionTerminatorArgs) -> None:
         self._repository = args.repository
-        self._agent_pool = args.agent_pool
+        self._agent_client_pool = args.agent_client_pool
         self._valkey_schedule = args.valkey_schedule
 
     async def terminate_sessions(self) -> ScheduleResult:
@@ -172,10 +172,9 @@ class SessionTerminator:
         :return: KernelTerminationResult with success status
         """
         try:
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-
-            # Call agent's destroy_kernel RPC method with correct parameters
-            await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                # Call agent's destroy_kernel RPC method with correct parameters
+                await client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,
@@ -450,8 +449,8 @@ class SessionTerminator:
                     continue
                 try:
                     agent_id = AgentId(kernel_info.resource.agent)
-                    agent_client = self._agent_pool.get_agent_client(agent_id)
-                    is_running = await agent_client.check_running(str(kernel_info.id))
+                    async with self._agent_client_pool.acquire(agent_id) as client:
+                        is_running = await client.check_running(str(kernel_info.id))
                     if is_running is False:
                         dead_kernel_ids.append(str(kernel_info.id))
                         if session not in affected_sessions:
