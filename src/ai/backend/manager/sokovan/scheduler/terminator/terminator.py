@@ -431,14 +431,18 @@ class SessionTerminator:
         if not running_kernel_ids:
             return []
 
-        with RecorderContext[SessionId].shared_step(
-            "check_kernel_presence",
-            success_detail="Kernel presence checked",
+        with RecorderContext[SessionId].shared_phase(
+            "verify_kernel_liveness",
+            success_detail="Kernel liveness verification completed",
         ):
-            statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
-                running_kernel_ids,
-                agent_ids=agent_ids,
-            )
+            with RecorderContext[SessionId].shared_step(
+                "check_kernel_presence",
+                success_detail="Kernel presence checked",
+            ):
+                statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
+                    running_kernel_ids,
+                    agent_ids=agent_ids,
+                )
 
         # 2. Filter STALE kernels (None status or STALE presence)
         stale_kernel_id_set: set[UUID] = {

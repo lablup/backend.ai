@@ -193,7 +193,15 @@ class SessionLauncher:
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            await asyncio.gather(*pull_tasks, return_exceptions=True)
+            with RecorderContext[SessionId].shared_phase(
+                "prepare_images",
+                success_detail="Image preparation completed",
+            ):
+                with RecorderContext[SessionId].shared_step(
+                    "check_and_pull_images",
+                    success_detail="Image pull triggered",
+                ):
+                    await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions(self) -> ScheduleResult:
         """
