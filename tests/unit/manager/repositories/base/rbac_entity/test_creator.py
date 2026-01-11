@@ -9,11 +9,11 @@ from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -41,10 +41,12 @@ class RBACCreatorTestRow(Base):
     __tablename__ = "test_rbac_creator"
     __table_args__ = {"extend_existing": True}
 
-    id: UUID = sa.Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: str = sa.Column(sa.String(50), nullable=False)
-    owner_scope_type: str = sa.Column(sa.String(32), nullable=False)
-    owner_scope_id: str = sa.Column(sa.String(64), nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    owner_scope_type: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    owner_scope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
     def scope_id(self) -> ScopeId:
         return ScopeId(scope_type=ScopeType(self.owner_scope_type), scope_id=self.owner_scope_id)
@@ -62,11 +64,13 @@ class RBACFieldCreatorTestRow(Base):
     __tablename__ = "test_rbac_field_creator"
     __table_args__ = {"extend_existing": True}
 
-    id: UUID = sa.Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: str = sa.Column(sa.String(50), nullable=False)
-    owner_scope_type: str = sa.Column(sa.String(32), nullable=False)
-    owner_scope_id: str = sa.Column(sa.String(64), nullable=False)
-    parent_entity_id: str = sa.Column(sa.String(64), nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    owner_scope_type: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    owner_scope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    parent_entity_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
     def scope_id(self) -> ScopeId:
         return ScopeId(scope_type=ScopeType(self.owner_scope_type), scope_id=self.owner_scope_id)
@@ -156,7 +160,7 @@ async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC creator test tables."""
-    async with with_tables(database_connection, CREATOR_TABLES):
+    async with with_tables(database_connection, CREATOR_TABLES):  # type: ignore[arg-type]
         yield
 
 
