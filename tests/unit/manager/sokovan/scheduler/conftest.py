@@ -1,7 +1,10 @@
 """Common fixtures for sokovan scheduler tests."""
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -13,6 +16,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -22,6 +26,74 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+
+
+def _create_mock_session_with_kernels(
+    session_id: SessionId,
+    scaling_group: str = "default",
+    status: SessionStatus = SessionStatus.PREPARING,
+) -> MagicMock:
+    """Create a mock SessionWithKernels with nested attributes properly set."""
+    mock = MagicMock()
+    mock.session_info.identity.id = session_id
+    mock.session_info.identity.creation_id = str(uuid4())
+    mock.session_info.metadata.access_key = AccessKey("test-key")
+    mock.session_info.resource.scaling_group_name = scaling_group
+    mock.session_info.lifecycle.status = status
+    mock.session_id = session_id
+    mock.status = status
+    mock.scaling_group = scaling_group
+    mock.kernel_infos = []
+    return mock
+
+
+@pytest.fixture
+def sessions_for_multi_scaling_group_iteration() -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Three sessions in different scaling groups for testing scaling group iteration."""
+    return (
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg1"),
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg2"),
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg3"),
+    )
+
+
+@pytest.fixture
+def session_for_post_process_verification() -> MagicMock:
+    """Single session for verifying post_process callback behavior."""
+    return _create_mock_session_with_kernels(SessionId(uuid4()), "default")
+
+
+@pytest.fixture
+def sessions_for_parallel_processing_with_error() -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Three sessions for testing parallel processing where one fails."""
+    return (
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg1"),
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg2"),
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg3"),
+    )
+
+
+@pytest.fixture
+def sessions_for_independent_scaling_group_processing() -> tuple[MagicMock, MagicMock]:
+    """Two sessions for testing independent processing per scaling group."""
+    return (
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg1"),
+        _create_mock_session_with_kernels(SessionId(uuid4()), "sg2"),
+    )
+
+
+@pytest.fixture
+def session_for_empty_scaling_group_skip() -> MagicMock:
+    """Single session for testing that empty scaling groups are skipped."""
+    return _create_mock_session_with_kernels(SessionId(uuid4()), "sg2")
+
+
+@pytest.fixture
+def session_for_termination_handler() -> MagicMock:
+    """Session in TERMINATING status for handler tests."""
+    return _create_mock_session_with_kernels(
+        SessionId(uuid4()), "default", SessionStatus.TERMINATING
+    )
 
 
 @pytest.fixture
