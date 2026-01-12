@@ -4,12 +4,13 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import Optional
 
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.permission_group import PermissionGroupData
@@ -27,7 +28,11 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.types import ScopeIDListResult
+from ai.backend.manager.data.permission.types import (
+    ScopeIDData,
+    ScopeIDListResult,
+    ScopeType,
+)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
@@ -253,26 +258,41 @@ class PermissionControllerRepository:
             querier=querier,
         )
 
-    @permission_controller_repository_resilience.apply()
-    async def search_domain_scopes(
-        self,
-        querier: BatchQuerier,
-    ) -> ScopeIDListResult:
-        """Search all domains using BatchQuerier."""
-        return await self._db_source.search_domain_scopes(querier)
+    def _get_global_scope(self) -> ScopeIDListResult:
+        """Get the global scope as a static result."""
+        return ScopeIDListResult(
+            items=[
+                ScopeIDData(
+                    id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+                    name=GLOBAL_SCOPE_ID,
+                )
+            ],
+            total_count=1,
+            has_next_page=False,
+            has_previous_page=False,
+        )
 
     @permission_controller_repository_resilience.apply()
-    async def search_project_scopes(
+    async def search_scope_ids(
         self,
+        scope_type: ScopeType,
         querier: BatchQuerier,
     ) -> ScopeIDListResult:
-        """Search all projects using BatchQuerier."""
-        return await self._db_source.search_project_scopes(querier)
+        """Search scope IDs based on scope type.
 
-    @permission_controller_repository_resilience.apply()
-    async def search_user_scopes(
-        self,
-        querier: BatchQuerier,
-    ) -> ScopeIDListResult:
-        """Search all users using BatchQuerier."""
-        return await self._db_source.search_user_scopes(querier)
+        Args:
+            scope_type: The type of scope to search.
+            querier: BatchQuerier with conditions, orders, and pagination.
+
+        Returns:
+            ScopeIDListResult with matching scope IDs.
+        """
+        match scope_type:
+            case ScopeType.GLOBAL:
+                return self._get_global_scope()
+            case ScopeType.DOMAIN:
+                return await self._db_source.search_domain_scopes(querier)
+            case ScopeType.PROJECT:
+                return await self._db_source.search_project_scopes(querier)
+            case ScopeType.USER:
+                return await self._db_source.search_user_scopes(querier)

@@ -1,9 +1,7 @@
 import logging
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import ScopeIDData, ScopeIDListResult
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -207,36 +205,9 @@ class PermissionControllerService:
         )
         return UpdateRolePermissionsActionResult(role=result)
 
-    def _global_scope_result(self) -> ScopeIDListResult:
-        return ScopeIDListResult(
-            items=[
-                ScopeIDData(
-                    id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
-                    name=GLOBAL_SCOPE_ID,
-                )
-            ],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
     async def search_scope_ids(self, action: SearchScopeIDsAction) -> SearchScopeIDsActionResult:
-        """Search scope IDs based on scope type.
-
-        Dispatches to the appropriate repository method based on scope type,
-        passing the querier with pre-built conditions and pagination.
-        Global scope is handled directly in the service as it's a static value.
-        """
-        match action.scope_type:
-            case ScopeType.GLOBAL:
-                result = self._global_scope_result()
-            case ScopeType.DOMAIN:
-                result = await self._repository.search_domain_scopes(action.querier)
-            case ScopeType.PROJECT:
-                result = await self._repository.search_project_scopes(action.querier)
-            case ScopeType.USER:
-                result = await self._repository.search_user_scopes(action.querier)
-
+        """Search scope IDs based on scope type."""
+        result = await self._repository.search_scope_ids(action.scope_type, action.querier)
         return SearchScopeIDsActionResult(
             items=result.items,
             total_count=result.total_count,
