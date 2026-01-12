@@ -636,15 +636,12 @@ class UserRepository:
         return time_series_list
 
     # ==========================================
-    # Admin/Purge operations
+    # Purge operations
     # ==========================================
 
     @user_repository_resilience.apply()
     async def purge_user(self, email: str) -> None:
-        """
-        Completely purge user and all associated data.
-        Admin-only operation with no ownership validation.
-        """
+        """Completely purge user and all associated data."""
         async with self._db.begin() as conn:
             user_uuid = await self._get_user_uuid_by_email(conn, email)
             if not user_uuid:
@@ -661,10 +658,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
-        """
-        Check if user's vfolders are mounted to active kernels.
-        Admin-only operation that bypasses ownership validation.
-        """
+        """Check if user's vfolders are mounted to active kernels."""
         async with self._db.begin() as conn:
             return await self._user_vfolder_mounted_to_active_kernels(conn, user_uuid)
 
@@ -675,10 +669,7 @@ class UserRepository:
         target_user_uuid: UUID,
         target_user_email: str,
     ) -> int:
-        """
-        Migrate shared virtual folders ownership to target user.
-        Admin-only operation that bypasses ownership validation.
-        """
+        """Migrate shared virtual folders ownership to target user."""
         async with self._db.begin() as conn:
             return await self._migrate_shared_vfolders(
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
@@ -690,18 +681,12 @@ class UserRepository:
         user_uuid: UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
-        """
-        Delete user's all virtual folders and their physical data.
-        Admin-only operation.
-        """
+        """Delete user's all virtual folders and their physical data."""
         return await self._delete_vfolders(user_uuid, storage_manager)
 
     @user_repository_resilience.apply()
     async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
-        """
-        Retrieve active sessions for a user.
-        Admin-only operation that bypasses ownership validation.
-        """
+        """Retrieve active sessions for a user."""
         query_conditions: list[QueryCondition] = [
             by_user_id(user_uuid),
             by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
@@ -721,10 +706,7 @@ class UserRepository:
         user_uuid: UUID,
         valkey_stat_client: ValkeyStatClient,
     ) -> int:
-        """
-        Delete user's keypairs including Valkey concurrency cleanup.
-        Admin-only operation.
-        """
+        """Delete user's keypairs including Valkey concurrency cleanup."""
         async with self._db.begin() as conn:
             return await self._delete_keypairs_with_valkey(conn, valkey_stat_client, user_uuid)
 
@@ -735,10 +717,7 @@ class UserRepository:
         target_user_uuid: UUID,
         target_main_access_key: AccessKey,
     ) -> None:
-        """
-        Delegate endpoint ownership to another user.
-        Admin-only operation.
-        """
+        """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
             await EndpointRow.delegate_endpoint_ownership(
                 session, user_uuid, target_user_uuid, target_main_access_key
@@ -750,10 +729,7 @@ class UserRepository:
         user_uuid: UUID,
         delete_destroyed_only: bool = False,
     ) -> None:
-        """
-        Delete user's endpoints.
-        Admin-only operation.
-        """
+        """Delete user's endpoints."""
         async with self._db.begin_session() as session:
             await self._delete_endpoints(session, user_uuid, delete_destroyed_only)
 
@@ -762,34 +738,31 @@ class UserRepository:
         self,
         valkey_stat_client: ValkeyStatClient,
     ) -> list[dict]:
-        """
-        Get time-binned monthly statistics for all users.
-        Admin-only operation that bypasses ownership validation.
-        """
+        """Get time-binned monthly statistics for all users."""
         return await self._get_time_binned_monthly_stats(None, valkey_stat_client)
 
     # ==========================================
-    # Private helper methods for admin operations
+    # Private helper methods for purge operations
     # ==========================================
 
     async def _get_user_uuid_by_email(self, conn: SAConnection, email: str) -> Optional[UUID]:
-        """Private method to get user UUID by email."""
+        """Get user UUID by email."""
         result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
         row = result.first()
         return row.uuid if row else None
 
     async def _delete_error_logs(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Private method to delete user's error logs."""
+        """Delete user's error logs."""
         result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
         return result.rowcount
 
     async def _delete_keypairs(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Private method to delete user's keypairs."""
+        """Delete user's keypairs."""
         result = await conn.execute(sa.delete(keypairs).where(keypairs.c.user == user_uuid))
         return result.rowcount
 
     async def _delete_vfolder_permissions(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Private method to delete user's vfolder permissions."""
+        """Delete user's vfolder permissions."""
         result = await conn.execute(
             sa.delete(vfolder_permissions).where(vfolder_permissions.c.user == user_uuid)
         )

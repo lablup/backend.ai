@@ -193,7 +193,7 @@ class TestUserServiceCompatibility:
             return_value=mock_user_data
         )
 
-        # Mock other required methods (now on user_repository instead of admin_user_repository)
+        # Mock other required methods
         mock_dependencies[
             "user_repository"
         ].check_user_vfolder_mounted_to_active_kernels = AsyncMock(return_value=False)
