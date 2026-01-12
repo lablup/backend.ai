@@ -568,7 +568,7 @@ class KernelFilteringTestCase:
     """Test case for kernel filtering validation via actual_occupied_slots"""
 
     test_id: str
-    agent_id: str
+    agent_id: AgentId
     occupied_kernel_count: int
     non_occupied_kernel_count: int
     cpu_per_kernel: Decimal
@@ -832,16 +832,25 @@ class TestAgentDBSourceKernelFiltering:
 
         # Create a copy of test_case with the actual random agent_id
         test_case_with_random_id = copy(test_case)
-        test_case_with_random_id.agent_id = str(actual_agent_id)
+        test_case_with_random_id.agent_id = actual_agent_id
 
         yield test_case_with_random_id
+
+    @pytest.fixture
+    async def db_source(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[AgentDBSource, None]:
+        """Create AgentDBSource for testing"""
+        db_source = AgentDBSource(db=db_with_tables)
+        yield db_source
 
     @pytest.mark.parametrize(
         "agent_with_kernels",
         [
             KernelFilteringTestCase(
                 test_id="mixed_kernels",
-                agent_id="agent-mixed",
+                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
                 occupied_kernel_count=3,
                 non_occupied_kernel_count=2,
                 cpu_per_kernel=Decimal("1.0"),
@@ -849,7 +858,7 @@ class TestAgentDBSourceKernelFiltering:
             ),
             KernelFilteringTestCase(
                 test_id="only_occupied",
-                agent_id="agent-only-occupied",
+                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
                 occupied_kernel_count=4,
                 non_occupied_kernel_count=0,
                 cpu_per_kernel=Decimal("2.0"),
@@ -857,7 +866,7 @@ class TestAgentDBSourceKernelFiltering:
             ),
             KernelFilteringTestCase(
                 test_id="only_non_occupied",
-                agent_id="agent-only-non-occupied",
+                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
                 occupied_kernel_count=0,
                 non_occupied_kernel_count=5,
                 cpu_per_kernel=Decimal("1.0"),
@@ -865,7 +874,7 @@ class TestAgentDBSourceKernelFiltering:
             ),
             KernelFilteringTestCase(
                 test_id="no_kernels",
-                agent_id="agent-no-kernels",
+                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
                 occupied_kernel_count=0,
                 non_occupied_kernel_count=0,
                 cpu_per_kernel=Decimal("0.0"),
@@ -877,18 +886,14 @@ class TestAgentDBSourceKernelFiltering:
     )
     async def test_search_agents_validates_actual_occupied_slots(
         self,
-        db_with_tables: ExtendedAsyncSAEngine,
+        db_source: AgentDBSource,
         agent_with_kernels: KernelFilteringTestCase,
     ) -> None:
         """Test that actual_occupied_slots correctly reflects kernel filtering via with_loader_criteria"""
-        test_case = agent_with_kernels
-        db_source = AgentDBSource(db=db_with_tables)
-
         # Filter to only this test case's agent
-        agent_id_filter = test_case.agent_id
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=10),
-            conditions=[lambda: AgentRow.id == AgentId(agent_id_filter)],
+            conditions=[lambda: AgentRow.id == agent_with_kernels.agent_id],
         )
 
         result = await db_source.search_agents(querier)
@@ -898,4 +903,4 @@ class TestAgentDBSourceKernelFiltering:
 
         # Validate actual_occupied_slots reflects only resource-occupied kernels
         actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
-        assert Decimal(str(actual_cpu)) == test_case.expected_actual_occupied_cpu
+        assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
