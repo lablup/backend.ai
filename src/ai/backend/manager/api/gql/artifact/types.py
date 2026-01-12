@@ -532,6 +532,7 @@ class ScanArtifactsInput:
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
+    vfolder_id: ID | None = None
 
 
 @strawberry.input(description="Added in 25.15.0")

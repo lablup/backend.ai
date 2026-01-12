@@ -211,6 +211,7 @@ class APIHandler:
             action_result = await processors.artifact_revision.import_revision.wait_for_complete(
                 ImportArtifactRevisionAction(
                     artifact_revision_id=artifact_revision_id,
+                    vfolder_id=body.parsed.vfolder_id,
                 )
             )
             imported_revisions.append(action_result.result)
