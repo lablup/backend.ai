@@ -1,4 +1,4 @@
-"""Action to list all available export reports."""
+"""Action to get a specific export report."""
 
 from __future__ import annotations
 
@@ -12,24 +12,26 @@ from .base import ExportAction
 
 
 @dataclass
-class ListReportsAction(ExportAction):
-    """Action to list all available export reports."""
+class GetReportAction(ExportAction):
+    """Action to get a specific export report by key."""
+
+    report_key: str
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list_reports"
+        return "get_report"
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return self.report_key
 
 
 @dataclass
-class ListReportsActionResult(BaseActionResult):
-    """Result of listing export reports."""
+class GetReportActionResult(BaseActionResult):
+    """Result of getting an export report."""
 
-    reports: list[ReportDef]
+    report: ReportDef
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -15,6 +15,7 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
+from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
@@ -65,6 +66,7 @@ class Repositories:
     deployment: DeploymentRepositories
     domain: DomainRepositories
     error_log: ErrorLogRepositories
+    export: ExportRepositories
     group: GroupRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
@@ -100,6 +102,7 @@ class Repositories:
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
+        export_repositories = ExportRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
@@ -134,6 +137,7 @@ class Repositories:
             deployment=deployment_repositories,
             domain=domain_repositories,
             error_log=error_log_repositories,
+            export=export_repositories,
             group=group_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
