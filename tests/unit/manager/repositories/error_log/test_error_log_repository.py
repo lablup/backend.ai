@@ -42,7 +42,13 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkCreator,
+    Creator,
+    OffsetPagination,
+    execute_bulk_creator,
+)
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.testutils.db import with_tables
 
@@ -314,27 +320,27 @@ class TestErrorLogRepository:
     @pytest.fixture
     async def sample_error_logs_for_pagination(
         self,
-        error_log_repository: ErrorLogRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_id: uuid.UUID,
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 error logs for pagination testing"""
-        error_log_ids: list[uuid.UUID] = []
-
-        for i in range(25):
-            creator = Creator(
-                spec=ErrorLogCreatorSpec(
-                    severity=ErrorLogSeverity.ERROR,
-                    source=f"source_{i:02d}",
-                    user=test_user_id,
-                    message=f"Error message {i}",
-                    context_lang="en",
-                    context_env={},
-                )
+        specs = [
+            ErrorLogCreatorSpec(
+                severity=ErrorLogSeverity.ERROR,
+                source=f"source_{i:02d}",
+                user=test_user_id,
+                message=f"Error message {i}",
+                context_lang="en",
+                context_env={},
             )
-            result = await error_log_repository.create(creator)
-            error_log_ids.append(result.id)
+            for i in range(25)
+        ]
 
-        yield error_log_ids
+        async with db_with_cleanup.begin_session() as db_sess:
+            result = await execute_bulk_creator(db_sess, BulkCreator(specs=specs))
+            await db_sess.commit()
+
+        yield [row.id for row in result.rows]
 
     # =========================================================================
     # Tests - Search with filtering
