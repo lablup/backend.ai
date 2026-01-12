@@ -1390,30 +1390,45 @@ class TestCheckAndTransitStatus:
         """Create another user ID for ownership tests."""
         return uuid4()
 
-    async def test_check_and_transit_status_as_superadmin_success(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_session_id: SessionId,
-        sample_user_id: UUID,
-        other_user_id: UUID,
-    ) -> None:
-        """Test SUPERADMIN can transit status of other user's session."""
+    @pytest.fixture
+    def mock_session_for_transit(self, sample_session_id: SessionId) -> MagicMock:
+        """Create a mock session for transit status tests."""
         mock_session = MagicMock()
         mock_session.id = sample_session_id
-        mock_session.user_uuid = other_user_id  # Different user owns the session
         mock_session.status = SessionStatus.RUNNING
         mock_session.to_dataclass.return_value = MagicMock()
+        return mock_session
 
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
+    @pytest.fixture
+    def setup_transit_mocks(
+        self,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_session_for_transit: MagicMock,
+    ) -> MagicMock:
+        """Setup common mocks for transit status tests that expect successful transit."""
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
         mock_session_repository.get_session_owner = AsyncMock(return_value=None)
 
         mock_agent_registry.session_lifecycle_mgr = MagicMock()
         mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_session, True)]
+            return_value=[(mock_session_for_transit, True)]
         )
         mock_agent_registry.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
+
+        return mock_session_for_transit
+
+    async def test_check_and_transit_status_as_superadmin_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+        other_user_id: UUID,
+        setup_transit_mocks: MagicMock,
+    ) -> None:
+        """Test SUPERADMIN can transit status of other user's session."""
+        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,
@@ -1430,26 +1445,13 @@ class TestCheckAndTransitStatus:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
         sample_session_id: SessionId,
         sample_user_id: UUID,
         other_user_id: UUID,
+        setup_transit_mocks: MagicMock,
     ) -> None:
         """Test ADMIN can transit status of other user's session."""
-        mock_session = MagicMock()
-        mock_session.id = sample_session_id
-        mock_session.user_uuid = other_user_id  # Different user owns the session
-        mock_session.status = SessionStatus.RUNNING
-        mock_session.to_dataclass.return_value = MagicMock()
-
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
-        mock_session_repository.get_session_owner = AsyncMock(return_value=None)
-
-        mock_agent_registry.session_lifecycle_mgr = MagicMock()
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_session, True)]
-        )
-        mock_agent_registry.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
+        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,
@@ -1466,25 +1468,12 @@ class TestCheckAndTransitStatus:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
         sample_session_id: SessionId,
         sample_user_id: UUID,
+        setup_transit_mocks: MagicMock,
     ) -> None:
         """Test USER can transit status of their own session."""
-        mock_session = MagicMock()
-        mock_session.id = sample_session_id
-        mock_session.user_uuid = sample_user_id  # Same user owns the session
-        mock_session.status = SessionStatus.RUNNING
-        mock_session.to_dataclass.return_value = MagicMock()
-
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
-        mock_session_repository.get_session_owner = AsyncMock(return_value=None)
-
-        mock_agent_registry.session_lifecycle_mgr = MagicMock()
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_session, True)]
-        )
-        mock_agent_registry.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
+        setup_transit_mocks.user_uuid = sample_user_id  # Same user owns the session
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,
@@ -1505,15 +1494,11 @@ class TestCheckAndTransitStatus:
         sample_session_id: SessionId,
         sample_user_id: UUID,
         other_user_id: UUID,
+        mock_session_for_transit: MagicMock,
     ) -> None:
         """Test USER cannot transit status of other user's session (returns empty result)."""
-        mock_session = MagicMock()
-        mock_session.id = sample_session_id
-        mock_session.user_uuid = other_user_id  # Different user owns the session
-        mock_session.status = SessionStatus.RUNNING
-        mock_session.to_dataclass.return_value = MagicMock()
-
-        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
+        mock_session_for_transit.user_uuid = other_user_id  # Different user owns the session
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,
