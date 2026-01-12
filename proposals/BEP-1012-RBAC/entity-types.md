@@ -13,6 +13,16 @@ This document defines the entity types and field types managed by the Backend.AI
 
 Entity types are the primary targets of permission checks in the RBAC system. Each entity type supports standard operations (create, read, update, soft-delete, hard-delete).
 
+### Classification
+
+| Category | Examples | Description |
+|----------|----------|-------------|
+| Resources | VFolder, Compute Session, Image, etc. | Actual business objects that are protected by RBAC |
+| Scopes | Domain, Project, User | Organizational structures that define permission boundaries |
+| Meta-entities | Role, {Entity}:assignment | Entities that constitute the RBAC system itself |
+
+> **Note**: Update the checklist when the implementation is complete.
+
 | Entity Type | Description | Dual Role | Notes | Migration | Validator | Repo Patterns |
 |-------------|-------------|-----------|-------|:---------:|:---------:|:------------:|
 | Compute Session | Computational workloads and containers | Entity only | | [ ] | [ ] | [ ] |
@@ -53,6 +63,8 @@ When checking permissions for a field object:
 3. The operation type remains the same (e.g., `kernel:read` → `session:read`)
 
 ### Field Types Table
+
+> **Note**: Update the checklist when the implementation is complete.
 
 | Field Type | Entity Type | Description | Migration | Validator | Repo Patterns |
 |------------|-------------|-------------|:---------:|:---------:|:-------------:|
