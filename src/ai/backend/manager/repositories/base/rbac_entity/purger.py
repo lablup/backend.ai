@@ -68,7 +68,7 @@ async def _get_related_roles(
             ),
         )
     )
-    return role_scalars.unique().all()
+    return list(role_scalars.unique().all())
 
 
 def _perm_group_ids_to_delete_in_role(

@@ -62,7 +62,7 @@ async def _find_system_roles_for_scope(
             )
         )
     )
-    return result.all()
+    return list(result.all())
 
 
 async def _ensure_entity_scope_permission_group(
