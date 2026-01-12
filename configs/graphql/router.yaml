@@ -12,7 +12,7 @@ headers:
       # NOTE: Headers required for authentication when communicating with Manager
       - insert:
           name: "host"
-         # NOTE: localhost must be changed to the IP or hostname of the Manager
+         # NOTE: Set this to the address where the Manager is reachable from this component
           value: "localhost:8091"
       - insert:
           name: "X-Forwarded-URL"
