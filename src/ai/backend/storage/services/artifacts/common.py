@@ -33,7 +33,6 @@ from ai.backend.storage.services.artifacts.types import (
     VerifyStepResult,
 )
 from ai.backend.storage.storages.vfs_storage import VFSStorage
-from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
