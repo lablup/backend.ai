@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import uuid
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -163,7 +163,7 @@ class ScalingGroupRepository:
     async def check_scaling_group_user_group_association_exists(
         self,
         scaling_group: str,
-        user_group: uuid.UUID,
+        user_group: UUID,
     ) -> bool:
         """Checks if a scaling group is associated with a user group (project)."""
         return await self._db_source.check_scaling_group_user_group_association_exists(
