@@ -10852,6 +10852,115 @@
         "parameters": [],
         "description": "Search route history.\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/export/reports": {
+      "get": {
+        "operationId": "export.list_reports",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List available export reports.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/reports/{report_key}": {
+      "get": {
+        "operationId": "export.get_report",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific export report by key.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/users/csv": {
+      "post": {
+        "operationId": "export.export_csv",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export user data as CSV.\n\nPOST /export/users/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/sessions/csv": {
+      "post": {
+        "operationId": "export.export_csv.2",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export session data as CSV.\n\nPOST /export/sessions/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/projects/csv": {
+      "post": {
+        "operationId": "export.export_csv.3",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export project data as CSV.\n\nPOST /export/projects/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }
