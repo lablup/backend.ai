@@ -60,7 +60,6 @@ class ImageData:
     labels: ImageLabelsData
     resources: ImageResourcesData
     status: ImageStatus
-    owner_id: Optional[UUID] = field(default=None)
 
 
 @dataclass

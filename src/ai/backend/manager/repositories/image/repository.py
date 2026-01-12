@@ -225,6 +225,15 @@ class ImageRepository:
         return await self._db_source.fetch_image_by_id(image_id, load_aliases)
 
     @image_repository_resilience.apply()
+    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+        """
+        Validates that user owns the image.
+        Returns True if user owns the image, False otherwise.
+        Raises ImageNotFound if image doesn't exist.
+        """
+        return await self._db_source.check_image_ownership(image_id, user_id)
+
+    @image_repository_resilience.apply()
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
