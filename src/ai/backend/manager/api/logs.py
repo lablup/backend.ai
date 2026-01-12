@@ -21,12 +21,16 @@ from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
+from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -66,25 +70,24 @@ async def append(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
 
-    async with root_ctx.db.begin() as conn:
-        resp = {
-            "success": True,
-        }
-        query = error_logs.insert().values({
-            "severity": params["severity"].lower(),
-            "source": params["source"],
-            "user": requester_uuid,
-            "message": params["message"],
-            "context_lang": params["context_lang"],
-            "context_env": params["context_env"],
-            "request_url": params["request_url"],
-            "request_status": params["request_status"],
-            "traceback": params["traceback"],
-        })
-        result = await conn.execute(query)
-        if result.rowcount != 1:
-            raise DBOperationFailed("Failed to create error log")
-    return web.json_response(resp)
+    severity = ErrorLogSeverity(params["severity"].value.lower())
+    creator = Creator(
+        spec=ErrorLogCreatorSpec(
+            severity=severity,
+            source=params["source"],
+            user=requester_uuid,
+            message=params["message"],
+            context_lang=params["context_lang"],
+            context_env=params["context_env"],
+            request_url=params["request_url"],
+            request_status=params["request_status"],
+            traceback=params["traceback"],
+        )
+    )
+    action = CreateErrorLogAction(creator=creator)
+    await root_ctx.processors.error_log.create.wait_for_complete(action)
+
+    return web.json_response({"success": True})
 
 
 @auth_required
