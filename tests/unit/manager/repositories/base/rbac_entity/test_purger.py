@@ -31,7 +31,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac_entity.purger import (
     Purger,
     PurgerResult,
-    execute_purger,
+    execute_rbac_entity_purger,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -259,7 +259,7 @@ class TestRBACPurgerBasic:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            result = await execute_purger(db_sess, purger)
+            result = await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify result
             assert isinstance(result, PurgerResult)
@@ -293,7 +293,7 @@ class TestRBACPurgerBasic:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(nonexistent_uuid)),
                 field_id=None,
             )
-            result = await execute_purger(db_sess, purger)
+            result = await execute_rbac_entity_purger(db_sess, purger)
             assert result is None
 
 
@@ -445,7 +445,7 @@ class TestRBACPurgerWithObjectPermissions:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify object permissions deleted
             obj_perm_count = await db_sess.scalar(
@@ -469,7 +469,7 @@ class TestRBACPurgerWithObjectPermissions:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid1)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify only entity1's permissions deleted
             obj_perm_count = await db_sess.scalar(
@@ -576,7 +576,7 @@ class TestRBACPurgerFieldScoped:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=ctx.parent_entity_id),
                 field_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.field_uuid)),
             )
-            result = await execute_purger(db_sess, purger)
+            result = await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify result
             assert isinstance(result, PurgerResult)
@@ -610,7 +610,7 @@ class TestRBACPurgerFieldScoped:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=ctx.parent_entity_id),
                 field_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.field_uuid1)),
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify only field1's EntityFieldRow deleted
             entity_field_count = await db_sess.scalar(
@@ -772,7 +772,7 @@ class TestRBACPurgerPermissionGroupCleanup:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify empty permission group deleted
             perm_group_count = await db_sess.scalar(
@@ -796,7 +796,7 @@ class TestRBACPurgerPermissionGroupCleanup:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid1)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify permission group preserved (entity2 still has object_permission with same role)
             perm_group_count = await db_sess.scalar(
@@ -928,7 +928,7 @@ class TestRBACPurgerPermissionGroupCleanup:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify permission group is DELETED
             # (even though unrelated entity exists in same scope,
@@ -1122,7 +1122,7 @@ class TestRBACPurgerMultipleRoles:
                 ),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify roleA's permission_group is DELETED
             role_a_perm_group = await db_sess.scalar(
@@ -1199,7 +1199,7 @@ class TestRBACPurgerMultipleScopes:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify all associations deleted
             assoc_count = await db_sess.scalar(
@@ -1323,7 +1323,7 @@ class TestRBACPurgerPermissionRowPreservation:
                 entity_id=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(ctx.entity_uuid)),
                 field_id=None,
             )
-            await execute_purger(db_sess, purger)
+            await execute_rbac_entity_purger(db_sess, purger)
 
             # Verify object permission is deleted
             obj_perm_count = await db_sess.scalar(

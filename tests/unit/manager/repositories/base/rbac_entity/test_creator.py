@@ -22,7 +22,7 @@ from ai.backend.manager.repositories.base.rbac_entity.creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
-    execute_creator,
+    execute_rbac_entity_creator,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -188,7 +188,7 @@ class TestRBACCreatorBasic:
                 scope_id=user_id,
             )
             creator: Creator[RBACCreatorTestRow] = Creator(spec=spec)
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify result
             assert isinstance(result, CreatorResult)
@@ -230,7 +230,7 @@ class TestRBACCreatorBasic:
                 scope_id=project_id,
             )
             creator: Creator[RBACCreatorTestRow] = Creator(spec=spec)
-            await execute_creator(db_sess, creator)
+            await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify association has correct scope
             assoc_row = await db_sess.scalar(sa.select(AssociationScopesEntitiesRow))
@@ -254,7 +254,7 @@ class TestRBACCreatorBasic:
                     scope_id=user_id,
                 )
                 creator: Creator[RBACCreatorTestRow] = Creator(spec=spec)
-                result = await execute_creator(db_sess, creator)
+                result = await execute_rbac_entity_creator(db_sess, creator)
                 assert result.row.name == f"entity-{i}"
 
             # Verify counts
@@ -289,7 +289,7 @@ class TestRBACCreatorFieldScoped:
                 parent_entity_id=parent_entity_id,
             )
             creator: Creator[RBACFieldCreatorTestRow] = Creator(spec=spec)
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify result
             assert isinstance(result, CreatorResult)
@@ -331,7 +331,7 @@ class TestRBACCreatorFieldScoped:
                     parent_entity_id=parent_entity_id,
                 )
                 creator: Creator[RBACFieldCreatorTestRow] = Creator(spec=spec)
-                await execute_creator(db_sess, creator)
+                await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify counts
             entity_count = await db_sess.scalar(
@@ -369,7 +369,7 @@ class TestRBACCreatorIdempotent:
                 entity_id=entity_id,
             )
             creator1: Creator[RBACCreatorTestRow] = Creator(spec=spec1)
-            result1 = await execute_creator(db_sess, creator1)
+            result1 = await execute_rbac_entity_creator(db_sess, creator1)
             assert result1.row.id == entity_id
 
             # Verify one association created
@@ -431,7 +431,7 @@ class TestRBACCreatorIdempotent:
                 field_id=field_id,
             )
             creator: Creator[RBACFieldCreatorTestRow] = Creator(spec=spec)
-            await execute_creator(db_sess, creator)
+            await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify one EntityFieldRow created
             field_count = await db_sess.scalar(

@@ -52,7 +52,7 @@ class CreatorResult(BaseCreatorResult[TEntityRow]):
     pass
 
 
-async def execute_creator(
+async def execute_rbac_entity_creator(
     db_sess: SASession,
     creator: Creator[TEntityRow],
 ) -> CreatorResult[TEntityRow]:

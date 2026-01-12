@@ -212,7 +212,7 @@ async def _delete_rbac_field(
     )
 
 
-async def execute_purger(
+async def execute_rbac_entity_purger(
     db_sess: SASession,
     purger: Purger[TRow],
 ) -> PurgerResult[TRow] | None:

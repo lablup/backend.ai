@@ -131,7 +131,7 @@ async def _add_scope_entity_association(
     )
 
 
-async def execute_granter(
+async def execute_rbac_entity_granter(
     db_sess: SASession,
     granter: Granter,
 ) -> None:
