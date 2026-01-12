@@ -69,7 +69,6 @@ class TestBaseVolume:
         await base_volume.delete_vfolder(sample_vfolder_id)
         await base_volume.quota_model.delete_quota_scope(sample_vfolder_id.quota_scope_id)
 
-    @pytest.mark.asyncio
     async def test_add_file_writes_content_correctly(
         self,
         base_volume: BaseVolume,
