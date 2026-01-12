@@ -566,7 +566,7 @@ jobs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
       # We don't use `pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
+      # wheels after building them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
     - name: Extract stable release version
