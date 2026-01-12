@@ -229,6 +229,7 @@ class TestSessionUniqueNamePerUser:
             db_sess.add(session)
             await db_sess.flush()
 
+        assert session.name is not None
         yield SessionData(
             name=session.name,
             user_uuid=user_a.uuid,

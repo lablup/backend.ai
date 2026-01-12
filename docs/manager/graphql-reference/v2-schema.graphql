@@ -1086,6 +1086,65 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
+"""Deployment history record"""
+type DeploymentHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The deployment ID this history record belongs to."""
+  deploymentId: ID!
+}
+
+"""Deployment history connection"""
+type DeploymentHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentHistory!
+}
+
+"""Filter for deployment history"""
+input DeploymentHistoryFilter {
+  id: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for deployment history"""
+input DeploymentHistoryOrderBy {
+  field: DeploymentHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum DeploymentHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
+}
+
 """Added in 25.19.0"""
 input DeploymentOrderBy {
   field: DeploymentOrderField!
@@ -1464,7 +1523,7 @@ type ModelRevision implements Node {
   modelRuntimeConfig: ModelRuntimeConfig!
 
   """Model data mount configuration."""
-  modelMountConfig: ModelMountConfig!
+  modelMountConfig: ModelMountConfig
 
   """Additional volume folder mounts."""
   extraMounts: ExtraVFolderMountConnection!
@@ -2200,6 +2259,15 @@ type Query {
 
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
+
+  """List session scheduling history (superadmin only)"""
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+
+  """List deployment history (superadmin only)"""
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+
+  """List route history (superadmin only)"""
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
 }
 
 """
@@ -2410,7 +2478,7 @@ type Route implements Node {
   trafficRatio: Float!
 
   """The timestamp when the route was created."""
-  createdAt: DateTime!
+  createdAt: DateTime
 
   """Error data if the route is in a failed state."""
   errorData: JSONString
@@ -2452,6 +2520,69 @@ type RouteEdge {
 input RouteFilter {
   status: [RouteStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
+}
+
+"""Route history record"""
+type RouteHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The route ID this history record belongs to."""
+  routeId: ID!
+
+  """The deployment ID this route belongs to."""
+  deploymentId: ID!
+}
+
+"""Route history connection"""
+type RouteHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RouteHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RouteHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RouteHistory!
+}
+
+"""Filter for route history"""
+input RouteHistoryFilter {
+  id: UUIDFilter = null
+  routeId: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for route history"""
+input RouteHistoryOrderBy {
+  field: RouteHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum RouteHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
 }
 
 """Added in 25.19.0. Order by specification for routes."""
@@ -2802,6 +2933,13 @@ type SchedulingBroadcastEventPayload {
   session: ComputeSessionNode!
 }
 
+"""Scheduling result status"""
+enum SchedulingResult {
+  SUCCESS
+  FAILURE
+  STALE
+}
+
 """Status of session scheduling transitions"""
 enum SchedulingStatus {
   PENDING
@@ -2815,6 +2953,65 @@ enum SchedulingStatus {
   TERMINATED
   CANCELLED
   ERROR
+}
+
+"""Session scheduling history record"""
+type SessionSchedulingHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The session ID this history record belongs to."""
+  sessionId: ID!
+}
+
+"""Session scheduling history connection"""
+type SessionSchedulingHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionSchedulingHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SessionSchedulingHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionSchedulingHistory!
+}
+
+"""Filter for session scheduling history"""
+input SessionSchedulingHistoryFilter {
+  id: UUIDFilter = null
+  sessionId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for session scheduling history"""
+input SessionSchedulingHistoryOrderBy {
+  field: SessionSchedulingHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum SessionSchedulingHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
 }
 
 """
@@ -2888,6 +3085,16 @@ input StringFilter {
   iNotEquals: String = null
 }
 
+"""Sub-step result in scheduling history"""
+type SubStepResultGQL {
+  step: String!
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  startedAt: DateTime
+  endedAt: DateTime
+}
+
 type Subscription {
   """
   Added in 25.14.0.
@@ -2953,6 +3160,14 @@ input TrafficStatusFilter {
 }
 
 scalar UUID
+
+"""Added in 26.1.0. Filter for UUID fields."""
+input UUIDFilter {
+  equals: UUID = null
+  in: [UUID!] = null
+  notEquals: UUID = null
+  notIn: [UUID!] = null
+}
 
 """
 Added in 25.15.0.

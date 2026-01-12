@@ -10792,6 +10792,66 @@
         ],
         "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/scheduling-history/sessions/search": {
+      "post": {
+        "operationId": "scheduling-history.search_session_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search session scheduling history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/scheduling-history/deployments/search": {
+      "post": {
+        "operationId": "scheduling-history.search_deployment_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search deployment history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/scheduling-history/routes/search": {
+      "post": {
+        "operationId": "scheduling-history.search_route_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search route history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }

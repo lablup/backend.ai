@@ -118,10 +118,10 @@ class DomainService:
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
         if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
-            if union := action.sgroups_to_add | action.sgroups_to_remove:
+            if conflict := action.sgroups_to_add & action.sgroups_to_remove:
                 raise InvalidAPIParameters(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
-                    f"(sg:{union})."
+                    f"(sg:{conflict})."
                 )
 
         if action.user_info.role == UserRole.SUPERADMIN:

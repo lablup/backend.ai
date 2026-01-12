@@ -9,6 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
@@ -619,7 +620,7 @@ class ScheduleDBSource:
                 status_info=reason,
                 terminated_at=now,
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.CANCELLED.name: now.isoformat()},
                 ),
@@ -642,7 +643,7 @@ class ScheduleDBSource:
                     status_changed=now,
                     terminated_at=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
@@ -663,7 +664,7 @@ class ScheduleDBSource:
                 status=SessionStatus.TERMINATING,
                 status_info=reason,
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.TERMINATING.name: now.isoformat()},
                 ),
@@ -687,7 +688,7 @@ class ScheduleDBSource:
                     status=KernelStatus.TERMINATING,
                     status_info=reason,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.TERMINATING.name: now.isoformat()},
                     ),
@@ -731,7 +732,7 @@ class ScheduleDBSource:
                         kernel_id=str(kernel.id),
                         status=kernel.status,
                         container_id=kernel.container_id,
-                        agent_id=kernel.agent,
+                        agent_id=AgentId(kernel.agent) if kernel.agent else None,
                         agent_addr=kernel.agent_addr,
                         occupied_slots=kernel.occupied_slots,
                     )
@@ -741,8 +742,8 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=session_row.access_key,
-                        creation_id=session_row.creation_id,
+                        access_key=AccessKey(session_row.access_key or ""),
+                        creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
                         session_type=session_row.session_type,
@@ -895,7 +896,7 @@ class ScheduleDBSource:
                 status_data={},
                 status_changed_at=now,
                 status_history=sql_json_merge(
-                    SessionRow.status_history,
+                    SessionRow.__table__.c.status_history,
                     (),
                     {SessionStatus.SCHEDULED.name: now.isoformat()},
                 ),
@@ -906,7 +907,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_update_query)
 
         # Check if session was actually updated
-        if result.rowcount == 0:
+        if cast(CursorResult, result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping allocation",
                 allocation.session_id,
@@ -929,7 +930,7 @@ class ScheduleDBSource:
                     status_data={},
                     status_changed=now,
                     status_history=sql_json_merge(
-                        KernelRow.status_history,
+                        KernelRow.__table__.c.status_history,
                         (),
                         {KernelStatus.SCHEDULED.name: now.isoformat()},
                     ),
@@ -970,7 +971,7 @@ class ScheduleDBSource:
             .values(
                 status_info=failure.msg,
                 status_data=sql_json_merge(
-                    SessionRow.status_data,
+                    SessionRow.__table__.c.status_data,
                     ("scheduler",),
                     obj=status_data,
                 ),
@@ -979,7 +980,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_query)
 
         # Check if session was actually updated
-        if result.rowcount == 0:
+        if cast(CursorResult, result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping failure status update",
                 failure.session_id,
@@ -997,7 +998,7 @@ class ScheduleDBSource:
             )
             .values(
                 status_data=sql_json_merge(
-                    KernelRow.status_data,
+                    KernelRow.__table__.c.status_data,
                     ("scheduler",),
                     obj=status_data,
                 ),
@@ -1052,7 +1053,7 @@ class ScheduleDBSource:
                             status_changed=now,
                             terminated_at=now,
                             status_history=sql_json_merge(
-                                KernelRow.status_history,
+                                KernelRow.__table__.c.status_history,
                                 (),
                                 {KernelStatus.TERMINATED.name: now.isoformat()},
                             ),
@@ -1074,7 +1075,7 @@ class ScheduleDBSource:
                             status=SessionStatus.TERMINATED,
                             status_info=session_result.reason,
                             status_history=sql_json_merge(
-                                SessionRow.status_history,
+                                SessionRow.__table__.c.status_history,
                                 (),
                                 {SessionStatus.TERMINATED.name: now.isoformat()},
                             ),

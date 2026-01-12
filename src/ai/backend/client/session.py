@@ -255,6 +255,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "QuotaScope",
         "Resource",
         "ScalingGroup",
+        "SchedulingHistory",
         "ServerLog",
         "Service",
         "ServiceAutoScalingRule",
@@ -311,6 +312,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
+        from .func.scheduling_history import SchedulingHistory
         from .func.server_log import ServerLog
         from .func.service import Service
         from .func.service_auto_scaling_rule import ServiceAutoScalingRule
@@ -354,6 +356,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Network = Network
         self.UserResourcePolicy = UserResourcePolicy
         self.Notification = Notification
+        self.SchedulingHistory = SchedulingHistory
 
     @property
     def proxy_mode(self) -> bool:

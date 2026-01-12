@@ -29,7 +29,7 @@ from ai.backend.manager.models.utils import (
 )
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.types import UserScope
-from ai.backend.manager.utils import query_userinfo
+from ai.backend.manager.utils import query_userinfo_from_session
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -93,26 +93,34 @@ class ModelServingEventHandler:
                     sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
                 ).where(UserRow.uuid == endpoint.created_user)
                 created_user = (await db_sess.execute(query)).fetchone()
+                if created_user is None:
+                    raise ValueError(f"Created user not found for endpoint {endpoint.id}")
                 if endpoint.session_owner != endpoint.created_user:
                     query = sa.select(
                         sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
                     ).where(UserRow.uuid == endpoint.session_owner)
                     session_owner = (await db_sess.execute(query)).fetchone()
+                    if session_owner is None:
+                        raise ValueError(f"Session owner not found for endpoint {endpoint.id}")
                 else:
                     session_owner = created_user
 
-                _, group_id, resource_policy = await query_userinfo(
+                _, group_id, resource_policy = await query_userinfo_from_session(
                     db_sess,
                     created_user.uuid,
-                    created_user["access_key"],
+                    created_user.access_key,
                     created_user.role,
                     created_user.domain_name,
                     None,
                     endpoint.domain,
                     endpoint.project,
-                    query_on_behalf_of=session_owner["access_key"],
+                    query_on_behalf_of=session_owner.access_key,
                 )
 
+                if endpoint.image_row is None:
+                    raise ValueError(f"Image not found for endpoint {endpoint.id}")
+                if endpoint.model_row is None:
+                    raise ValueError(f"Model not found for endpoint {endpoint.id}")
                 image_row = await ImageRow.resolve(
                     db_sess,
                     [
@@ -121,7 +129,7 @@ class ModelServingEventHandler:
                     ],
                 )
 
-                environ = {**endpoint.environ}
+                environ = {**(endpoint.environ or {})}
                 if "BACKEND_MODEL_NAME" not in environ:
                     environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 
@@ -131,10 +139,10 @@ class ModelServingEventHandler:
                     UserScope(
                         domain_name=endpoint.domain,
                         group_id=group_id,
-                        user_uuid=session_owner["uuid"],
-                        user_role=session_owner["role"],
+                        user_uuid=session_owner.uuid,
+                        user_role=session_owner.role,
                     ),
-                    session_owner["access_key"],
+                    session_owner.access_key,
                     resource_policy,
                     SessionTypes.INFERENCE,
                     {

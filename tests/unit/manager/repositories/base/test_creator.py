@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
@@ -30,9 +31,9 @@ class CreatorTestRow(Base):
     __tablename__ = "test_creator_orm"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String(50), nullable=False)
-    value = sa.Column(sa.String(100), nullable=True)
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    value: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
 
 class SimpleCreatorSpec(CreatorSpec[CreatorTestRow]):
@@ -66,18 +67,20 @@ class TestCreatorBasic:
         """Test creating a single row with execute_creator."""
         async with database_connection.begin_session() as db_sess:
             # Verify table is empty
-            result = await db_sess.execute(sa.select(sa.func.count()).select_from(CreatorTestRow))
-            assert result.scalar() == 0
+            db_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(CreatorTestRow)
+            )
+            assert db_result.scalar() == 0
 
             spec = SimpleCreatorSpec(name="test-item", value="test-value")
             creator: Creator[CreatorTestRow] = Creator(spec=spec)
 
-            result = await execute_creator(db_sess, creator)
+            create_result = await execute_creator(db_sess, creator)
 
-            assert isinstance(result, CreatorResult)
-            assert result.row.name == "test-item"
-            assert result.row.value == "test-value"
-            assert result.row.id is not None
+            assert isinstance(create_result, CreatorResult)
+            assert create_result.row.name == "test-item"
+            assert create_result.row.value == "test-value"
+            assert create_result.row.id is not None
 
             # Verify row was inserted
             count_result = await db_sess.execute(

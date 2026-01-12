@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Optional, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -190,7 +190,7 @@ class ResourcePresetDBSource:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         scaling_group: Optional[str] = None,
     ) -> CheckPresetsDBData:
@@ -234,7 +234,7 @@ class ResourcePresetDBSource:
             association_groups_users.c.group_id == groups.c.id,
         )
         query = (
-            sa.select([groups.c.id, groups.c.total_resource_slots])
+            sa.select(groups.c.id, groups.c.total_resource_slots)
             .select_from(j)
             .where(
                 (association_groups_users.c.user_id == user_id)
@@ -247,7 +247,7 @@ class ResourcePresetDBSource:
         if row is None:
             raise ProjectNotFound(f"Project not found (name: {group_name})")
 
-        return row["id"], row["total_resource_slots"]
+        return row.id, row.total_resource_slots
 
     async def _get_domain_resource_slots(
         self,
@@ -262,9 +262,12 @@ class ResourcePresetDBSource:
         :param domain_name: Domain name
         :return: ResourceUsageData with domain resource slots
         """
-        query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
+        query = sa.select(domains.c.total_resource_slots).where(domains.c.name == domain_name)
         result = await db_sess.execute(query)
-        domain_resource_slots = result.first()[0]
+        row = result.first()
+        if row is None:
+            raise DomainNotFound(f"Domain not found (name: {domain_name})")
+        domain_resource_slots = row[0]
         if domain_resource_slots is None:
             raise DomainNotFound(f"Domain not found (name: {domain_name})")
         domain_resource_policy = {
@@ -304,7 +307,7 @@ class ResourcePresetDBSource:
 
         j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
-            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            sa.select(KernelRow.occupied_slots, SessionRow.scaling_group_name)
             .select_from(j)
             .where(
                 (KernelRow.user_uuid == user_id)
@@ -313,8 +316,8 @@ class ResourcePresetDBSource:
             )
         )
         async for row in await db_sess.stream(query):
-            if row["occupied_slots"]:
-                per_sgroup_occupancy[row["scaling_group_name"]] += row["occupied_slots"]
+            if row.occupied_slots:
+                per_sgroup_occupancy[row.scaling_group_name] += row.occupied_slots
 
         return per_sgroup_occupancy
 
@@ -388,10 +391,11 @@ class ResourcePresetDBSource:
         agent_slots = []
 
         for agent in agent_rows:
-            actual_occupied = agent_occupied[agent.id]
+            actual_occupied = agent_occupied[AgentId(agent.id)]
             remaining = agent.available_slots - actual_occupied
             agent_slots.append(remaining)
-            per_sgroup_remaining[agent.scaling_group] += remaining
+            if agent.scaling_group:
+                per_sgroup_remaining[agent.scaling_group] += remaining
 
         return per_sgroup_remaining, agent_slots
 
@@ -415,7 +419,7 @@ class ResourcePresetDBSource:
             for filter_obj in filters:
                 conditions.append(filter_obj.get_condition())
 
-        query = sa.select([KernelRow.occupied_slots]).where(sa.and_(*conditions))
+        query = sa.select(KernelRow.occupied_slots).where(sa.and_(*conditions))
 
         total = ResourceSlot.from_known_slots(known_slot_types)
         async for row in await db_sess.stream(query):
@@ -427,7 +431,7 @@ class ResourcePresetDBSource:
         self,
         db_sess: SASession,
         access_key: AccessKey,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceUsageData:
         """Get keypair resource usage (limits, occupied, remaining)."""
@@ -474,7 +478,7 @@ class ResourcePresetDBSource:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         scaling_group: Optional[str] = None,
     ) -> CheckPresetsDBData:
@@ -506,7 +510,9 @@ class ResourcePresetDBSource:
             )
 
         # Get scaling groups
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
+        # query_allowed_sgroups expects AsyncConnection, get it from session
+        db_conn = await conn.connection()
+        sgroups = await query_allowed_sgroups(db_conn, domain_name, group_id, str(access_key))
         sgroup_names = [sg.name for sg in sgroups]
         if scaling_group is not None:
             if scaling_group not in sgroup_names:

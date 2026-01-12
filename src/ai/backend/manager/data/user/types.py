@@ -71,21 +71,21 @@ class UserInfoContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str
+    username: Optional[str]
     email: str
-    need_password_change: bool
+    need_password_change: Optional[bool]
     full_name: Optional[str]
     description: Optional[str]
     is_active: bool  # legacy
     status: str
     status_info: Optional[str]
-    created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
-    domain_name: str
-    role: UserRole
+    created_at: Optional[datetime] = field(compare=False)
+    modified_at: Optional[datetime] = field(compare=False)
+    domain_name: Optional[str]
+    role: Optional[UserRole]
     resource_policy: str
     allowed_client_ip: Optional[list[str]]
-    totp_activated: bool
+    totp_activated: Optional[bool]
     totp_activated_at: Optional[datetime] = field(compare=False)
     sudo_session_enabled: bool
     main_access_key: Optional[str] = field(compare=False)

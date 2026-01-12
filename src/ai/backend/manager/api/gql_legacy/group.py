@@ -362,23 +362,21 @@ class Group(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            id=row["id"],
-            name=row["name"],
-            description=row["description"],
-            is_active=row["is_active"],
-            created_at=row["created_at"],
-            modified_at=row["modified_at"],
-            domain_name=row["domain_name"],
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
             total_resource_slots=(
-                row["total_resource_slots"].to_json()
-                if row["total_resource_slots"] is not None
-                else {}
+                row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
-            integration_id=row["integration_id"],
-            resource_policy=row["resource_policy"],
-            type=row["type"].name,
-            container_registry=row["container_registry"],
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
+            integration_id=row.integration_id,
+            resource_policy=row.resource_policy,
+            type=row.type.name,
+            container_registry=row.container_registry,
         )
 
     @classmethod
@@ -423,7 +421,7 @@ class Group(graphene.ObjectType):
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL]
-        query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
+        query = sa.select(groups).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
@@ -444,7 +442,7 @@ class Group(graphene.ObjectType):
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
     ) -> Sequence[Group | None]:
-        query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
+        query = sa.select(groups).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
@@ -456,7 +454,7 @@ class Group(graphene.ObjectType):
                 query,
                 cls,
                 group_ids,
-                lambda row: row["id"],
+                lambda row: row.id,
             )
 
     @classmethod
@@ -468,7 +466,7 @@ class Group(graphene.ObjectType):
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Group | None]]:
-        query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
+        query = sa.select(groups).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
@@ -480,7 +478,7 @@ class Group(graphene.ObjectType):
                 query,
                 cls,
                 group_names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
     @classmethod
@@ -502,7 +500,7 @@ class Group(graphene.ObjectType):
             groups.c.id == association_groups_users.c.group_id,
         )
         query = (
-            sa.select([groups, association_groups_users.c.user_id])
+            sa.select(groups, association_groups_users.c.user_id)
             .select_from(j)
             .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
@@ -515,7 +513,7 @@ class Group(graphene.ObjectType):
                 query,
                 cls,
                 user_ids,
-                lambda row: row["user_id"],
+                lambda row: row.user_id,
             )
 
     @classmethod
@@ -530,7 +528,7 @@ class Group(graphene.ObjectType):
             groups.c.id == association_groups_users.c.group_id,
         )
         query = (
-            sa.select([groups]).select_from(j).where(association_groups_users.c.user_id == user_id)
+            sa.select(groups).select_from(j).where(association_groups_users.c.user_id == user_id)
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return [

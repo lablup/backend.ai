@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
@@ -17,12 +17,11 @@ from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
 if TYPE_CHECKING:
-    pass
+    from ai.backend.manager.models.endpoint import EndpointRow
 
 __all__ = (
     "BlueGreenSpec",
@@ -70,18 +69,20 @@ class DeploymentPolicyRow(Base):
         sa.Index("ix_deployment_policies_endpoint", "endpoint"),
     )
 
-    id = IDColumn()
-    endpoint = sa.Column("endpoint", GUID, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
 
     # Deployment strategy
-    strategy = sa.Column(
+    strategy: Mapped[DeploymentStrategy] = mapped_column(
         "strategy",
         StrEnumType(DeploymentStrategy, use_name=False),
         nullable=False,
     )
 
     # Strategy-specific specification stored as JSONB
-    strategy_spec = sa.Column(
+    strategy_spec: Mapped[dict[str, object]] = mapped_column(
         "strategy_spec",
         pgsql.JSONB(),
         nullable=False,
@@ -89,7 +90,7 @@ class DeploymentPolicyRow(Base):
     )
 
     # Whether to rollback on deployment failure
-    rollback_on_failure = sa.Column(
+    rollback_on_failure: Mapped[bool] = mapped_column(
         "rollback_on_failure",
         sa.Boolean,
         nullable=False,
@@ -97,13 +98,13 @@ class DeploymentPolicyRow(Base):
     )
 
     # Timestamps
-    created_at = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         nullable=False,
     )
-    updated_at = sa.Column(
+    updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
@@ -112,7 +113,7 @@ class DeploymentPolicyRow(Base):
     )
 
     # Relationships (without FK constraints)
-    endpoint_row = relationship(
+    endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
         primaryjoin=_get_endpoint_join_condition,
@@ -146,8 +147,8 @@ class DeploymentPolicyRow(Base):
 class DeploymentPolicyData:
     """Data class for DeploymentPolicyRow."""
 
-    id: UUID
-    endpoint: UUID
+    id: uuid.UUID
+    endpoint: uuid.UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
     rollback_on_failure: bool

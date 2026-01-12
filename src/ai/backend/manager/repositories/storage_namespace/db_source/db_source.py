@@ -37,7 +37,7 @@ class StorageNamespaceDBSource:
                 StorageNamespaceRow.namespace == namespace,
             )
             result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise StorageNamespaceNotFoundError(
                     f"Storage namespace with namespace {namespace} not found."
@@ -53,7 +53,7 @@ class StorageNamespaceDBSource:
                 StorageNamespaceRow.id == storage_namespace_id
             )
             result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise StorageNamespaceNotFoundError(
                     f"Storage namespace ID {storage_namespace_id} not found."
@@ -96,7 +96,7 @@ class StorageNamespaceDBSource:
                 StorageNamespaceRow.storage_id == storage_id
             )
             result = await db_session.execute(query)
-            rows: list[StorageNamespaceRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:

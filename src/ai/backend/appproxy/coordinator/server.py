@@ -671,8 +671,11 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                     if access:
                         last_access_time = current_time - float(access.decode("utf-8"))
                     else:
+                        circuit_created_at = non_inference_http_circuits[idx].created_at
                         last_access_time = (
-                            current_time - non_inference_http_circuits[idx].created_at.timestamp()
+                            current_time - circuit_created_at.timestamp()
+                            if circuit_created_at
+                            else 0.0
                         )
                     if (
                         last_access_time

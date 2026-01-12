@@ -23,7 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SchedulingResult
+    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -325,7 +325,7 @@ class RouteInfo:
     session_id: Optional[SessionId]
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime
+    created_at: datetime | None
     revision_id: Optional[UUID]
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -407,15 +407,15 @@ class ModelRuntimeConfigData:
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID
-    mount_destination: str
+    vfolder_id: UUID | None
+    mount_destination: str | None
     definition_path: str
 
 
 @dataclass
 class ExtraVFolderMountData:
     vfolder_id: UUID
-    mount_destination: str
+    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass
@@ -504,6 +504,8 @@ class DeploymentHistoryData:
     error_code: Optional[str]
     message: str
 
+    sub_steps: list[SubStepResult]
+
     attempts: int
     created_at: datetime
     updated_at: datetime
@@ -524,6 +526,8 @@ class RouteHistoryData:
     result: SchedulingResult
     error_code: Optional[str]
     message: str
+
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime

@@ -3203,6 +3203,68 @@ class DeploymentConfig(BaseConfigSchema):
     ]
 
 
+class ExportConfig(BaseConfigSchema):
+    """Export-related configuration."""
+
+    max_rows: Annotated[
+        int,
+        Field(
+            default=100_000,
+            ge=1000,
+            le=1_000_000,
+            validation_alias=AliasChoices("max-rows", "max_rows"),
+            serialization_alias="max-rows",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of rows per export request. "
+                "Limits the amount of data that can be exported in a single request "
+                "to prevent memory exhaustion and timeout issues."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="100000", prod="100000"),
+        ),
+    ]
+
+    statement_timeout_sec: Annotated[
+        int,
+        Field(
+            default=300,
+            ge=60,
+            le=3600,
+            validation_alias=AliasChoices("statement-timeout-sec", "statement_timeout_sec"),
+            serialization_alias="statement-timeout-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Database statement timeout in seconds for export queries. "
+                "Long-running export queries will be cancelled after this duration."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="300", prod="300"),
+        ),
+    ]
+
+    max_concurrent_exports: Annotated[
+        int,
+        Field(
+            default=10,
+            ge=1,
+            le=50,
+            validation_alias=AliasChoices("max-concurrent-exports", "max_concurrent_exports"),
+            serialization_alias="max-concurrent-exports",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of concurrent export requests allowed. "
+                "Prevents system overload from too many simultaneous export operations."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="10", prod="10"),
+        ),
+    ]
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: Annotated[
@@ -3573,6 +3635,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and model definition handling."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    export: Annotated[
+        ExportConfig,
+        Field(default_factory=ExportConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Export API configuration. Controls CSV export functionality including "
+                "row limits, timeouts, and concurrency limits. These settings prevent "
+                "resource exhaustion from large export operations."
+            ),
+            added_version="26.1.0",
             composite=CompositeType.FIELD,
         ),
     ]

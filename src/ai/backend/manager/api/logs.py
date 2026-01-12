@@ -112,12 +112,12 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin() as conn:
         is_admin = True
         select_query = (
-            sa.select([error_logs])
+            sa.select(error_logs)
             .select_from(error_logs)
             .order_by(sa.desc(error_logs.c.created_at))
             .limit(params["page_size"])
         )
-        count_query = sa.select([sa.func.count()]).select_from(error_logs)
+        count_query = sa.select(sa.func.count()).select_from(error_logs)
         if params["page_no"] > 1:
             select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
         if request["is_superadmin"]:
@@ -125,9 +125,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
@@ -144,23 +142,23 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(select_query)
         for row in result:
             result_item = {
-                "log_id": str(row["id"]),
-                "created_at": datetime.timestamp(row["created_at"]),
-                "severity": row["severity"],
-                "source": row["source"],
-                "user": row["user"],
-                "is_read": row["is_read"],
-                "message": row["message"],
-                "context_lang": row["context_lang"],
-                "context_env": row["context_env"],
-                "request_url": row["request_url"],
-                "request_status": row["request_status"],
-                "traceback": row["traceback"],
+                "log_id": str(row.id),
+                "created_at": datetime.timestamp(row.created_at),
+                "severity": row.severity,
+                "source": row.source,
+                "user": row.user,
+                "is_read": row.is_read,
+                "message": row.message,
+                "context_lang": row.context_lang,
+                "context_env": row.context_env,
+                "request_url": row.request_url,
+                "request_status": row.request_status,
+                "traceback": row.traceback,
             }
             if result_item["user"] is not None:
                 result_item["user"] = str(result_item["user"])
             if is_admin:
-                result_item["is_cleared"] = row["is_cleared"]
+                result_item["is_cleared"] = row.is_cleared
             resp["logs"].append(result_item)
         resp["count"] = await conn.scalar(count_query)
         if params["mark_read"]:
@@ -190,9 +188,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()

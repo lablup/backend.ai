@@ -1,25 +1,28 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
+from ai.backend.common.data.notification import (
     NotificationChannelType,
-    NotificationRuleData,
     NotificationRuleType,
     WebhookConfig,
+)
+from ai.backend.manager.data.notification import (
+    NotificationChannelData,
+    NotificationRuleData,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
 )
 
 if TYPE_CHECKING:
-    pass
+    from ai.backend.manager.models.user import UserRow
 
 
 __all__ = (
@@ -48,28 +51,32 @@ def _get_notification_channel_creator_join_condition():
 class NotificationChannelRow(Base):
     __tablename__ = "notification_channels"
 
-    id = IDColumn()
-    name = sa.Column("name", sa.String(length=256), nullable=False)
-    description = sa.Column("description", sa.Text, nullable=True)
-    channel_type = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    channel_type: Mapped[str] = mapped_column(
         "channel_type",
         sa.String(length=64),
         nullable=False,
     )
-    config = sa.Column(
+    config: Mapped[dict[str, Any]] = mapped_column(
         "config",
         sa.JSON(none_as_null=True),
         nullable=False,
     )
-    enabled = sa.Column("enabled", sa.Boolean, nullable=False, default=True, index=True)
-    created_by = sa.Column("created_by", GUID, nullable=False)
-    created_at = sa.Column(
+    enabled: Mapped[bool] = mapped_column(
+        "enabled", sa.Boolean, nullable=False, default=True, index=True
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column("created_by", GUID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         nullable=False,
         default=sa.func.now(),
     )
-    updated_at = sa.Column(
+    updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
         nullable=False,
@@ -78,13 +85,13 @@ class NotificationChannelRow(Base):
     )
 
     # Relationships
-    rules = relationship(
+    rules: Mapped[list[NotificationRuleRow]] = relationship(
         "NotificationRuleRow",
         back_populates="channel",
         primaryjoin=_get_notification_channel_rules_join_condition,
         foreign_keys=[id],
     )
-    creator = relationship(
+    creator: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_notification_channel_creator_join_condition,
         foreign_keys=[created_by],
@@ -131,21 +138,27 @@ def _get_notification_rule_creator_join_condition():
 class NotificationRuleRow(Base):
     __tablename__ = "notification_rules"
 
-    id = IDColumn()
-    name = sa.Column("name", sa.String(length=256), nullable=False)
-    description = sa.Column("description", sa.Text, nullable=True)
-    rule_type = sa.Column("rule_type", sa.String(length=256), nullable=False, index=True)
-    channel_id = sa.Column("channel_id", GUID, nullable=False)
-    message_template = sa.Column("message_template", sa.Text, nullable=False)
-    enabled = sa.Column("enabled", sa.Boolean, nullable=False, default=True, index=True)
-    created_by = sa.Column("created_by", GUID, nullable=False)
-    created_at = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    rule_type: Mapped[str] = mapped_column(
+        "rule_type", sa.String(length=256), nullable=False, index=True
+    )
+    channel_id: Mapped[uuid.UUID] = mapped_column("channel_id", GUID, nullable=False)
+    message_template: Mapped[str] = mapped_column("message_template", sa.Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        "enabled", sa.Boolean, nullable=False, default=True, index=True
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column("created_by", GUID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         nullable=False,
         default=sa.func.now(),
     )
-    updated_at = sa.Column(
+    updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
         nullable=False,
@@ -154,13 +167,13 @@ class NotificationRuleRow(Base):
     )
 
     # Relationships
-    channel = relationship(
+    channel: Mapped[NotificationChannelRow] = relationship(
         "NotificationChannelRow",
         back_populates="rules",
         primaryjoin=_get_notification_rule_channel_join_condition,
         foreign_keys=[channel_id],
     )
-    creator = relationship(
+    creator: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_notification_rule_creator_join_condition,
         foreign_keys=[created_by],

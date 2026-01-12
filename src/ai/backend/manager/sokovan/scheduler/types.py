@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHPortMapping,
     ImageConfig,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -773,50 +774,6 @@ class KernelCreationInfo:
 
 
 @dataclass(frozen=True)
-class KernelTransitionData:
-    """Kernel information for state transitions."""
-
-    kernel_id: str
-    agent_id: AgentId
-    agent_addr: str
-    cluster_role: str  # DEFAULT_ROLE for main kernel
-    container_id: Optional[str]
-    startup_command: Optional[str]
-    status_info: Optional[str]
-    occupied_slots: Optional[ResourceSlot] = None
-
-
-@dataclass(frozen=True)
-class SessionTransitionData:
-    """
-    Session data for state transitions.
-    Contains all necessary information for hooks without exposing database rows.
-    """
-
-    session_id: SessionId
-    creation_id: str
-    session_name: str
-    session_type: SessionTypes
-    access_key: AccessKey
-    cluster_mode: ClusterMode
-    network_type: Optional[NetworkType]
-    network_id: Optional[str]
-    status_info: Optional[str]
-    kernels: list[KernelTransitionData]
-    batch_timeout: Optional[int]  # For batch sessions
-
-    @property
-    def main_kernel(self) -> KernelTransitionData:
-        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
-        main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
-        if len(main_kernels) > 1:
-            raise TooManyKernelsFound(f"Session {self.session_id} has more than 1 main kernel")
-        if len(main_kernels) == 0:
-            raise MainKernelNotFound(f"Session {self.session_id} has no main kernel")
-        return main_kernels[0]
-
-
-@dataclass(frozen=True)
 class SessionRunningData:
     """
     Data for updating a session to RUNNING state.
@@ -843,6 +800,18 @@ class SessionWithKernels:
 
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
+
+    @property
+    def main_kernel(self) -> KernelInfo:
+        """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
+        main_kernels = [k for k in self.kernel_infos if k.cluster.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise TooManyKernelsFound(
+                f"Session {self.session_info.identity.id} has more than 1 main kernel"
+            )
+        if len(main_kernels) == 0:
+            raise MainKernelNotFound(f"Session {self.session_info.identity.id} has no main kernel")
+        return main_kernels[0]
 
 
 @dataclass
@@ -880,3 +849,51 @@ class SchedulerExecutionResult:
     def has_successes(self) -> bool:
         """Check if there are any successful operations."""
         return len(self.successes) > 0
+
+
+@dataclass
+class KernelTerminationInfo:
+    """Information about a kernel to be terminated.
+
+    Used by SessionExecutionResult to communicate kernel terminations
+    that should be processed by the Coordinator together with session status changes.
+    """
+
+    kernel_id: KernelId
+    reason: str
+
+
+@dataclass
+class SweepStaleKernelsResult:
+    """Result of sweep_stale_kernels_for_handler operation.
+
+    Contains both the dead kernel IDs and affected sessions for the Coordinator
+    to process kernel terminations and session updates.
+    """
+
+    dead_kernel_ids: list[KernelId]
+    affected_sessions: list[SessionWithKernels]
+
+
+@dataclass
+class RetryUpdateResult:
+    """Result of batch_update_stuck_session_retries operation.
+
+    Used by repository to communicate which sessions should be retried
+    and which have exceeded max retries (for Coordinator to update status).
+    """
+
+    sessions_to_retry: list[SessionId]
+    sessions_exceeded: list[SessionId]
+
+
+@dataclass
+class RetryResult:
+    """Result of retry_*_for_handler operations in Launcher.
+
+    Used to communicate retried sessions and exceeded sessions to handlers
+    for Coordinator to process status changes.
+    """
+
+    retried_ids: list[SessionId]
+    exceeded_ids: list[SessionId]

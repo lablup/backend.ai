@@ -15,10 +15,11 @@ import graphene
 import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
@@ -36,19 +37,31 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.updaters import (
+    ScalingGroupDriverConfigUpdaterSpec,
+    ScalingGroupMetadataUpdaterSpec,
+    ScalingGroupNetworkConfigUpdaterSpec,
+    ScalingGroupSchedulerConfigUpdaterSpec,
+    ScalingGroupStatusUpdaterSpec,
+    ScalingGroupUpdaterSpec,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
 )
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
 )
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
     batch_multiresult,
     batch_multiresult_in_scalar_stream,
     batch_result,
-    set_if_set,
     simple_db_mutate,
 )
 from .gql_relay import (
@@ -316,7 +329,7 @@ class ScalingGroup(graphene.ObjectType):
             )
             for agent_row in agent_rows:
                 occupied_slots = await agent_row.get_occupied_slots(
-                    graph_ctx.db, agent_row.id, known_slot_types
+                    graph_ctx.db, AgentId(agent_row.id), known_slot_types
                 )
                 total_occupied_slots += occupied_slots
                 total_available_slots += agent_row.available_slots
@@ -397,18 +410,18 @@ class ScalingGroup(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            name=row["name"],
-            description=row["description"],
-            is_active=row["is_active"],
-            is_public=row["is_public"],
-            created_at=row["created_at"],
-            wsproxy_addr=row["wsproxy_addr"],
-            wsproxy_api_token=row["wsproxy_api_token"],
-            driver=row["driver"],
-            driver_opts=row["driver_opts"],
-            scheduler=row["scheduler"],
-            scheduler_opts=row["scheduler_opts"].to_json(),
-            use_host_network=row["use_host_network"],
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            is_public=row.is_public,
+            created_at=row.created_at,
+            wsproxy_addr=row.wsproxy_addr,
+            wsproxy_api_token=row.wsproxy_api_token,
+            driver=row.driver,
+            driver_opts=row.driver_opts,
+            scheduler=row.scheduler,
+            scheduler_opts=row.scheduler_opts.to_json(),
+            use_host_network=row.use_host_network,
         )
 
     @classmethod
@@ -448,7 +461,7 @@ class ScalingGroup(graphene.ObjectType):
         *,
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
-        query = sa.select([scaling_groups]).select_from(scaling_groups)
+        query = sa.select(scaling_groups).select_from(scaling_groups)
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
@@ -472,7 +485,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_domains.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_domains.c.domain == domain)
+            sa.select(scaling_groups).select_from(j).where(sgroups_for_domains.c.domain == domain)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -496,9 +509,7 @@ class ScalingGroup(graphene.ObjectType):
             sgroups_for_groups,
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
-        query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_groups.c.group == group)
-        )
+        query = sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
@@ -522,7 +533,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_keypairs.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups])
+            sa.select(scaling_groups)
             .select_from(j)
             .where(sgroups_for_keypairs.c.access_key == access_key)
         )
@@ -547,7 +558,7 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups, sgroups_for_groups.c.group])
+            sa.select(scaling_groups, sgroups_for_groups.c.group)
             .select_from(j)
             .where(sgroups_for_groups.c.group.in_(group_ids))
         )
@@ -558,7 +569,7 @@ class ScalingGroup(graphene.ObjectType):
                 query,
                 cls,
                 group_ids,
-                lambda row: row["group"],
+                lambda row: row.group,
             )
 
     @classmethod
@@ -568,7 +579,7 @@ class ScalingGroup(graphene.ObjectType):
         names: Sequence[str],
     ) -> Sequence[ScalingGroup | None]:
         query = (
-            sa.select([scaling_groups])
+            sa.select(scaling_groups)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name.in_(names))
         )
@@ -579,7 +590,7 @@ class ScalingGroup(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
 
@@ -607,6 +618,41 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
+
+    def to_updater(self, name: str) -> Updater[ScalingGroupRow]:
+        """Convert GraphQL input to Updater for scaling group modification."""
+        status_spec = ScalingGroupStatusUpdaterSpec(
+            is_active=OptionalState.from_graphql(self.is_active),
+            is_public=OptionalState.from_graphql(self.is_public),
+        )
+        metadata_spec = ScalingGroupMetadataUpdaterSpec(
+            description=TriState.from_graphql(self.description),
+        )
+        network_spec = ScalingGroupNetworkConfigUpdaterSpec(
+            wsproxy_addr=TriState.from_graphql(self.wsproxy_addr),
+            wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
+            use_host_network=OptionalState.from_graphql(self.use_host_network),
+        )
+        driver_spec = ScalingGroupDriverConfigUpdaterSpec(
+            driver=OptionalState.from_graphql(self.driver),
+            driver_opts=OptionalState.from_graphql(self.driver_opts),
+        )
+        scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
+            scheduler=OptionalState.from_graphql(self.scheduler),
+            scheduler_opts=OptionalState.from_graphql(
+                ScalingGroupOpts.from_json(self.scheduler_opts)
+                if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
+                else Undefined
+            ),
+        )
+        spec = ScalingGroupUpdaterSpec(
+            status=status_spec,
+            metadata=metadata_spec,
+            network=network_spec,
+            driver=driver_spec,
+            scheduler=scheduler_spec,
+        )
+        return Updater(spec=spec, pk_value=name)
 
 
 class CreateScalingGroup(graphene.Mutation):
@@ -685,21 +731,11 @@ class ModifyScalingGroup(graphene.Mutation):
         name: str,
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "is_public")
-        set_if_set(props, data, "wsproxy_addr")
-        set_if_set(props, data, "wsproxy_api_token")
-        set_if_set(props, data, "driver")
-        set_if_set(props, data, "driver_opts")
-        set_if_set(props, data, "scheduler")
-        set_if_set(
-            props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.scaling_group.modify_scaling_group.wait_for_complete(
+            ModifyScalingGroupAction(updater=props.to_updater(name))
         )
-        set_if_set(props, data, "use_host_network")
-        update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
-        return await simple_db_mutate(cls, info.context, update_query)
+        return cls(ok=True, msg="success")
 
 
 class DeleteScalingGroup(graphene.Mutation):

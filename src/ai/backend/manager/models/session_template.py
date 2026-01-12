@@ -160,14 +160,14 @@ async def query_accessible_session_templates(
         # Query user templates
         j = session_templates.join(users, session_templates.c.user_uuid == users.c.uuid)
         query = (
-            sa.select([
+            sa.select(
                 session_templates.c.name,
                 session_templates.c.id,
                 session_templates.c.created_at,
                 session_templates.c.user_uuid,
                 session_templates.c.group_id,
                 users.c.email,
-            ])
+            )
             .select_from(j)
             .where(
                 (session_templates.c.user_uuid == user_uuid)
@@ -193,7 +193,7 @@ async def query_accessible_session_templates(
         # Query group session_templates
         if user_role == UserRole.ADMIN or user_role == "admin":
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
@@ -202,23 +202,21 @@ async def query_accessible_session_templates(
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = session_templates.join(groups, session_templates.c.group_id == groups.c.id)
         query = (
             sa.select(
-                [
-                    session_templates.c.name,
-                    session_templates.c.id,
-                    session_templates.c.created_at,
-                    session_templates.c.user_uuid,
-                    session_templates.c.group_id,
-                    groups.c.name,
-                ],
-                use_labels=True,
+                session_templates.c.name,
+                session_templates.c.id,
+                session_templates.c.created_at,
+                session_templates.c.user_uuid,
+                session_templates.c.group_id,
+                groups.c.name,
             )
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 session_templates.c.group_id.in_(group_ids)

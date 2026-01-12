@@ -54,7 +54,7 @@ class ObjectStorage(Node):
             access_key=data.access_key,
             secret_key=data.secret_key,
             endpoint=data.endpoint,
-            region=data.region,
+            region=data.region or "",
         )
 
     @strawberry.field

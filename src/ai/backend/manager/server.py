@@ -281,6 +281,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".notification",
     ".deployment",
     ".rbac",
+    ".scheduling_history",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -1044,6 +1045,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     from .agent_cache import AgentRPCCache
+    from .clients.agent import AgentClientPool, AgentPoolSpec
     from .registry import AgentRegistry
 
     # Create scheduling controller first
@@ -1082,6 +1084,14 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
+    root_ctx.agent_client_pool = AgentClientPool(
+        root_ctx.agent_cache,
+        AgentPoolSpec(
+            health_check_interval=30.0,
+            failure_threshold=3,
+            recovery_timeout=60.0,
+        ),
+    )
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
@@ -1104,6 +1114,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.agent_client_pool.close()
         await root_ctx.registry.shutdown()
 
 
@@ -1197,20 +1208,15 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .clients.agent import AgentPool
-    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.scheduler.factory import create_default_scheduler_components
     from .sokovan.sokovan import SokovanOrchestrator
 
-    # Create agent pool for scheduler
-    agent_pool = AgentPool(root_ctx.agent_cache)
-
-    # Create scheduler with default components
-    scheduler = create_default_scheduler(
+    # Create scheduler components
+    scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
         root_ctx.config_provider,
-        root_ctx.distributed_lock_factory,
-        agent_pool,
+        root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,
         root_ctx.event_producer,
         root_ctx.valkey_schedule,
@@ -1254,7 +1260,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
 
     # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler=scheduler,
+        scheduler_components=scheduler_components,
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,

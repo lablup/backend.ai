@@ -1,5 +1,7 @@
 """Test concentrated agent selector implementation."""
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 
@@ -10,14 +12,13 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated imp
     ConcentratedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
+    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
     ResourceRequirements,
     SessionMetadata,
 )
-
-from .conftest import create_agent_info
 
 
 class TestConcentratedAgentSelector:
@@ -54,26 +55,9 @@ class TestConcentratedAgentSelector:
         selector: ConcentratedAgentSelector,
         basic_criteria: AgentSelectionCriteria,
         basic_config: AgentSelectionConfig,
+        agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
         """Test that concentrated selector prefers agents with less available resources."""
-        agents = [
-            create_agent_info(
-                agent_id="agent-low",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
-            ),
-            create_agent_info(
-                agent_id="agent-medium",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-            create_agent_info(
-                agent_id="agent-high",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
@@ -85,8 +69,9 @@ class TestConcentratedAgentSelector:
         # agent-medium: 4 CPU, 8192 memory
         # agent-high: 6 CPU, 12288 memory
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_with_varied_occupancy
+        ]
 
         selected = selector.select_tracker_by_strategy(
             trackers, resource_req, basic_criteria, basic_config
@@ -100,29 +85,9 @@ class TestConcentratedAgentSelector:
         selector: ConcentratedAgentSelector,
         basic_criteria: AgentSelectionCriteria,
         basic_config: AgentSelectionConfig,
+        agents_gpu_vs_cpu_only: list[AgentInfo],
     ) -> None:
         """Test preference for agents with fewer unutilized resource types."""
-        agents = [
-            create_agent_info(
-                agent_id="agent-gpu",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("0"),
-                },
-            ),
-            create_agent_info(
-                agent_id="agent-cpu-only",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-        ]
-
         # Request only CPU and memory (explicitly no GPU)
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
@@ -134,8 +99,7 @@ class TestConcentratedAgentSelector:
             required_architecture="x86_64",
         )
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_gpu_vs_cpu_only]
 
         selected = selector.select_tracker_by_strategy(
             trackers, resource_req, basic_criteria, basic_config
@@ -145,24 +109,14 @@ class TestConcentratedAgentSelector:
         assert selected.original_agent.agent_id == AgentId("agent-cpu-only")
 
     def test_respects_resource_priority_order(
-        self, basic_criteria: AgentSelectionCriteria, basic_config: AgentSelectionConfig
+        self,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+        agents_for_memory_priority: list[AgentInfo],
     ) -> None:
         """Test that resource priorities are respected in order."""
         # Create selector with memory prioritized over CPU
         selector = ConcentratedAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
-
-        agents = [
-            create_agent_info(
-                agent_id="low-mem-high-cpu",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("8192")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("6144")},
-            ),
-            create_agent_info(
-                agent_id="high-mem-low-cpu",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("4096")},
-            ),
-        ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
@@ -174,8 +128,7 @@ class TestConcentratedAgentSelector:
         # low-mem-high-cpu: 14 CPU, 2048 memory
         # high-mem-low-cpu: 2 CPU, 12288 memory
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_for_memory_priority]
 
         selected = selector.select_tracker_by_strategy(
             trackers, resource_req, basic_criteria, basic_config
@@ -184,7 +137,11 @@ class TestConcentratedAgentSelector:
         # Should select low-mem-high-cpu (less memory available, which is higher priority)
         assert selected.original_agent.agent_id == AgentId("low-mem-high-cpu")
 
-    def test_endpoint_replica_spreading_for_inference(self, selector):
+    def test_endpoint_replica_spreading_for_inference(
+        self,
+        selector: ConcentratedAgentSelector,
+        agents_for_inference_spreading: list[AgentInfo],
+    ) -> None:
         """Test special behavior for inference sessions with endpoint replica spreading."""
         # Create inference session criteria
         criteria = AgentSelectionCriteria(
@@ -207,66 +164,38 @@ class TestConcentratedAgentSelector:
             enforce_spreading_endpoint_replica=True,
         )
 
-        agents = [
-            create_agent_info(
-                agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-            create_agent_info(
-                agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-            create_agent_info(
-                agent_id="agent-3",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_for_inference_spreading
+        ]
 
         selected = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
 
         # Should select agent-3 (fewest kernels at endpoint)
         assert selected.original_agent.agent_id == AgentId("agent-3")
 
-    def test_tie_breaking_with_identical_resources(self, selector, basic_criteria, basic_config):
+    def test_tie_breaking_with_identical_resources(
+        self,
+        selector: ConcentratedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+        agents_with_identical_resources: list[AgentInfo],
+    ) -> None:
         """Test consistent tie-breaking when agents have identical resources."""
-        agents = [
-            create_agent_info(
-                agent_id="agent-b",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-            create_agent_info(
-                agent_id="agent-a",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-            create_agent_info(
-                agent_id="agent-c",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_with_identical_resources
+        ]
 
         # All agents have identical resources
         selected = selector.select_tracker_by_strategy(
@@ -287,37 +216,14 @@ class TestConcentratedAgentSelector:
             )
             assert result == selected
 
-    def test_handles_agents_with_gpu_resources(self, selector, basic_criteria, basic_config):
+    def test_handles_agents_with_gpu_resources(
+        self,
+        selector: ConcentratedAgentSelector,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+        agents_with_gpu_resources: list[AgentInfo],
+    ) -> None:
         """Test selection with GPU resources."""
-        agents = [
-            create_agent_info(
-                agent_id="gpu-busy",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                    "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("6"),
-                },
-            ),
-            create_agent_info(
-                agent_id="gpu-free",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                    "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("2"),
-                },
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
@@ -332,8 +238,7 @@ class TestConcentratedAgentSelector:
         # gpu-busy: 8 CPU, 16384 memory, 2 GPU
         # gpu-free: 12 CPU, 24576 memory, 6 GPU
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_with_gpu_resources]
 
         selected = selector.select_tracker_by_strategy(
             trackers, resource_req, basic_criteria, basic_config
@@ -342,40 +247,16 @@ class TestConcentratedAgentSelector:
         # Should select gpu-busy (less available resources)
         assert selected.original_agent.agent_id == AgentId("gpu-busy")
 
-    def test_custom_resource_priority(self, basic_criteria, basic_config):
+    def test_custom_resource_priority(
+        self,
+        basic_criteria: AgentSelectionCriteria,
+        basic_config: AgentSelectionConfig,
+        agents_for_gpu_priority: list[AgentInfo],
+    ) -> None:
         """Test with custom resource priorities including GPU."""
         selector = ConcentratedAgentSelector(
             agent_selection_resource_priority=["cuda.shares", "cpu", "mem"]
         )
-
-        agents = [
-            create_agent_info(
-                agent_id="low-gpu",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                    "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                    "cuda.shares": Decimal("3"),
-                },
-            ),
-            create_agent_info(
-                agent_id="high-gpu",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("6"),
-                    "mem": Decimal("12288"),
-                    "cuda.shares": Decimal("1"),
-                },
-            ),
-        ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
@@ -391,8 +272,7 @@ class TestConcentratedAgentSelector:
         # low-gpu: 14 CPU, 28672 memory, 1 GPU
         # high-gpu: 2 CPU, 4096 memory, 3 GPU
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_for_gpu_priority]
 
         selected = selector.select_tracker_by_strategy(
             trackers, resource_req, basic_criteria, basic_config

@@ -706,7 +706,9 @@ class Endpoint(graphene.ObjectType):
             created_user_email=creator.email if creator is not None else None,
             session_owner=row.session_owner,
             session_owner_id=row.session_owner,
-            session_owner_email=row.session_owner_row.email,
+            session_owner_email=row.session_owner_row.email
+            if row.session_owner_row is not None
+            else None,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,
@@ -779,7 +781,7 @@ class Endpoint(graphene.ObjectType):
         user_uuid: Optional[UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(
+        query = sa.select(sa.func.count()).select_from(
             sa.join(
                 EndpointRow,
                 UserRow,
@@ -1219,7 +1221,7 @@ class EndpointToken(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[UUID] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(EndpointTokenRow)
+        query = sa.select(sa.func.count()).select_from(EndpointTokenRow)
         if endpoint_id is not None:
             query = query.where(EndpointTokenRow.endpoint == endpoint_id)
         if project:

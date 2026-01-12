@@ -149,28 +149,28 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         if row is None:
             return None
 
-        if row["max_pending_session_resource_slots"] is not None:
-            max_pending_session_resource_slots = row["max_pending_session_resource_slots"].to_json()
+        if row.max_pending_session_resource_slots is not None:
+            max_pending_session_resource_slots = row.max_pending_session_resource_slots.to_json()
         else:
             max_pending_session_resource_slots = None
         return cls(
-            name=row["name"],
-            created_at=row["created_at"],
-            default_for_unspecified=row["default_for_unspecified"].name,
-            total_resource_slots=row["total_resource_slots"].to_json(),
-            max_session_lifetime=row["max_session_lifetime"],
-            max_concurrent_sessions=row["max_concurrent_sessions"],
-            max_concurrent_sftp_sessions=row["max_concurrent_sftp_sessions"],
-            max_containers_per_session=row["max_containers_per_session"],
-            idle_timeout=row["idle_timeout"],
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
-            max_pending_session_count=row["max_pending_session_count"],
+            name=row.name,
+            created_at=row.created_at,
+            default_for_unspecified=row.default_for_unspecified.name,
+            total_resource_slots=row.total_resource_slots.to_json(),
+            max_session_lifetime=row.max_session_lifetime,
+            max_concurrent_sessions=row.max_concurrent_sessions,
+            max_concurrent_sftp_sessions=row.max_concurrent_sftp_sessions,
+            max_containers_per_session=row.max_containers_per_session,
+            idle_timeout=row.idle_timeout,
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
+            max_pending_session_count=row.max_pending_session_count,
             max_pending_session_resource_slots=max_pending_session_resource_slots,
         )
 
     @classmethod
     async def load_all(cls, ctx: GraphQueryContext) -> Sequence[KeyPairResourcePolicy]:
-        query = sa.select([keypair_resource_policies]).select_from(keypair_resource_policies)
+        query = sa.select(keypair_resource_policies).select_from(keypair_resource_policies)
         async with ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -190,12 +190,12 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(j)
             .where(
                 keypairs.c.user_id
                 == (
-                    sa.select([keypairs.c.user_id])
+                    sa.select(keypairs.c.user_id)
                     .select_from(keypairs)
                     .where(keypairs.c.access_key == access_key)
                     .as_scalar()
@@ -216,7 +216,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         names: Sequence[str],
     ) -> Sequence[KeyPairResourcePolicy | None]:
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
             .where(keypair_resource_policies.c.name.in_(names))
             .order_by(keypair_resource_policies.c.name)
@@ -228,7 +228,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
     @classmethod
@@ -244,7 +244,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(j)
             .where(
                 (keypair_resource_policies.c.name.in_(names))
@@ -259,7 +259,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
     @classmethod
@@ -274,7 +274,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
             .order_by(keypair_resource_policies.c.name)

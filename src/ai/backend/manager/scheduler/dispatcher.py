@@ -596,12 +596,12 @@ class SchedulerDispatcher(aobject):
                     await self.event_producer.anycast_and_broadcast_event(
                         SessionCancelledAnycastEvent(
                             pending_sess.id,
-                            pending_sess.creation_id,
+                            pending_sess.creation_id or "",
                             reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                         ),
                         SessionCancelledBroadcastEvent(
                             pending_sess.id,
-                            pending_sess.creation_id,
+                            pending_sess.creation_id or "",
                             reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                         ),
                     )
@@ -748,7 +748,7 @@ class SchedulerDispatcher(aobject):
             agent = sess_ctx.main_kernel.agent_row
             agent_id: AgentId | None = None
             if agent is not None:
-                agent_id = agent.id
+                agent_id = AgentId(agent.id)
 
                 if agent_id is not None:
                     (
@@ -824,8 +824,8 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.anycast_and_broadcast_event(
-            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
-            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
         )
 
     async def _schedule_multi_node_session(
@@ -859,7 +859,7 @@ class SchedulerDispatcher(aobject):
                     (
                         available_slots,
                         occupied_slots,
-                    ) = await self.schedule_repository.get_agent_available_slots(agent.id)
+                    ) = await self.schedule_repository.get_agent_available_slots(AgentId(agent.id))
 
                     for key in available_slots.keys():
                         if (
@@ -876,7 +876,7 @@ class SchedulerDispatcher(aobject):
                                     f"remaining: {available_slots[key] - occupied_slots[key]})."
                                 ),
                             )
-                    agent_id = agent.id
+                    agent_id = AgentId(agent.id)
                 else:
                     # Each kernel may have different images and different architectures
                     compatible_candidate_agents = [
@@ -931,7 +931,7 @@ class SchedulerDispatcher(aobject):
 
                 async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                     await self.schedule_repository.update_kernel_scheduling_failure(
-                        sched_ctx, sess_ctx, kernel.id, exc.extra_msg
+                        sched_ctx, sess_ctx, str(kernel.id), exc.extra_msg
                     )
 
                 await execute_with_retry(partial(_update_sched_failure, sched_failure))
@@ -945,7 +945,7 @@ class SchedulerDispatcher(aobject):
 
                 async def _update_generic_failure() -> None:
                     await self.schedule_repository.update_multinode_kernel_generic_failure(
-                        sched_ctx, sess_ctx, kernel.id, exc_data
+                        sched_ctx, sess_ctx, str(kernel.id), exc_data
                     )
 
                 await execute_with_retry(_update_generic_failure)
@@ -971,8 +971,8 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.anycast_and_broadcast_event(
-            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
-            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id or ""),
         )
 
     async def check_precond(
@@ -1003,7 +1003,9 @@ class SchedulerDispatcher(aobject):
                             KernelAgentBinding(
                                 kernel=kernel,
                                 agent_alloc_ctx=AgentAllocationContext(
-                                    kernel.agent, kernel.agent_addr, kernel.scaling_group
+                                    AgentId(kernel.agent) if kernel.agent else None,
+                                    kernel.agent_addr or "",
+                                    kernel.scaling_group or "",
                                 ),
                                 allocated_host_ports=set(),
                             )
@@ -1011,7 +1013,7 @@ class SchedulerDispatcher(aobject):
                     await self.registry.event_producer.anycast_event(
                         SessionCheckingPrecondAnycastEvent(
                             scheduled_session.id,
-                            scheduled_session.creation_id,
+                            scheduled_session.creation_id or "",
                         ),
                     )
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
@@ -1068,11 +1070,11 @@ class SchedulerDispatcher(aobject):
                         await self.registry.event_producer.anycast_and_broadcast_event(
                             SessionPreparingAnycastEvent(
                                 scheduled_session.id,
-                                scheduled_session.creation_id,
+                                scheduled_session.creation_id or "",
                             ),
                             SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
-                                scheduled_session.creation_id,
+                                scheduled_session.creation_id or "",
                             ),
                         )
                         tg.create_task(
@@ -1251,12 +1253,12 @@ class SchedulerDispatcher(aobject):
                 await self.registry.event_producer.anycast_and_broadcast_event(
                     SessionCancelledAnycastEvent(
                         session.id,
-                        session.creation_id,
+                        session.creation_id or "",
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                     SessionCancelledBroadcastEvent(
                         session.id,
-                        session.creation_id,
+                        session.creation_id or "",
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
@@ -1294,12 +1296,12 @@ class SchedulerDispatcher(aobject):
             await self.event_producer.anycast_and_broadcast_event(
                 SessionCancelledAnycastEvent(
                     item.id,
-                    item.creation_id,
+                    item.creation_id or "",
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                 ),
                 SessionCancelledBroadcastEvent(
                     item.id,
-                    item.creation_id,
+                    item.creation_id or "",
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                 ),
             )
