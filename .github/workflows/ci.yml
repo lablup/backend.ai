@@ -526,30 +526,50 @@ jobs:
       uses: actions/download-artifact@v6
       with:
         name: wheels
-        path: dist
+        path: dist/wheels
     - name: Download scies
       uses: actions/download-artifact@v6
       with:
         pattern: scies-*
-        path: dist
+        path: dist/scies
         merge-multiple: true
     - name: Merge checksum files into one
       run: |
-        cat dist/checksum-*.txt > dist/checksum.txt
-        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
+        cat dist/scies/checksum-*.txt > dist/scies/checksum.txt
+        sort -u -k2 dist/scies/checksum.txt -o dist/scies/checksum.txt
+        rm -f dist/scies/checksum-*.txt
     - name: Download SBOM report
       continue-on-error: true
       uses: actions/download-artifact@v6
       with:
         name: SBOM report
-        path: dist
-    - name: Release to GitHub
+        path: dist/sbom
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*
+    - name: Upload wheels to Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        for f in dist/wheels/*; do
+          [ -e "$f" ] && gh release upload ${{ github.ref_name }} "$f" --clobber || true
+        done
+    - name: Upload scies to Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        for f in dist/scies/*; do
+          [ -e "$f" ] && gh release upload ${{ github.ref_name }} "$f" --clobber || true
+        done
+    - name: Upload SBOM to Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        for f in dist/sbom/*; do
+          [ -e "$f" ] && gh release upload ${{ github.ref_name }} "$f" --clobber || true
+        done
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -557,7 +577,7 @@ jobs:
       # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
-        twine upload dist/*.whl dist/*.tar.gz
+        twine upload dist/wheels/*.whl dist/wheels/*.tar.gz
     - name: Extract stable release version
       id: extract_stable_release_version
       run: |
