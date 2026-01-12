@@ -52,7 +52,15 @@ def _get_permission_join_condition():
 
 class PermissionGroupRow(Base):
     __tablename__ = "permission_groups"
-    __table_args__ = (sa.Index("ix_id_role_id_scope_id", "id", "role_id", "scope_id"),)
+    __table_args__ = (
+        sa.Index("ix_id_role_id_scope_id", "id", "role_id", "scope_id"),
+        sa.UniqueConstraint(
+            "role_id",
+            "scope_type",
+            "scope_id",
+            name="uq_permission_groups_role_scope",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")

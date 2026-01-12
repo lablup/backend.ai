@@ -19,6 +19,9 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
@@ -28,9 +31,29 @@ def _get_role_join_condition():
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
+def _get_scope_association_join_condition():
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+
+    return sa.and_(
+        ObjectPermissionRow.entity_type == foreign(AssociationScopesEntitiesRow.entity_type),
+        ObjectPermissionRow.entity_id == foreign(AssociationScopesEntitiesRow.entity_id),
+    )
+
+
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
-    __table_args__ = (sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),)
+    __table_args__ = (
+        sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),
+        sa.UniqueConstraint(
+            "role_id",
+            "entity_type",
+            "entity_id",
+            "operation",
+            name="uq_object_permissions_role_entity_op",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -50,6 +73,12 @@ class ObjectPermissionRow(Base):
         "RoleRow",
         back_populates="object_permission_rows",
         primaryjoin=_get_role_join_condition,
+    )
+    scope_association_rows: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
+        "AssociationScopesEntitiesRow",
+        primaryjoin=_get_scope_association_join_condition,
+        viewonly=True,
+        uselist=True,
     )
 
     def object_id(self) -> ObjectId:
