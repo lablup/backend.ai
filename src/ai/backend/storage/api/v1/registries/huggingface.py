@@ -37,13 +37,14 @@ from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     LegacyHuggingfaceConfig,
 )
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import StorageMappingResolver
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
     create_huggingface_import_pipeline,
 )
 from ai.backend.storage.utils import log_client_api_entry
+from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -53,9 +54,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
+    _storage_mapping_resolver: StorageMappingResolver
 
-    def __init__(self, huggingface_service: HuggingFaceService) -> None:
+    def __init__(
+        self,
+        huggingface_service: HuggingFaceService,
+        volume_pool: VolumePool,
+    ) -> None:
         self._huggingface_service = huggingface_service
+        self._storage_mapping_resolver = StorageMappingResolver(volume_pool)
 
     @api_handler
     async def scan_models(
@@ -175,13 +182,12 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
-        # Convert string mappings to StorageTarget instances
-        storage_step_mappings = {
-            step: StorageTarget.from_storage_name(storage_name)
-            for step, storage_name in body.parsed.storage_step_mappings.items()
-        }
+        storage_step_mappings = self._storage_mapping_resolver.resolve(
+            body.parsed.storage_step_mappings,
+            body.parsed.vfolder_id,
+            body.parsed.volume_name,
+        )
 
-        # Create import pipeline based on storage step mappings
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
@@ -235,7 +241,10 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service,
+        volume_pool=ctx.volume_pool,
+    )
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)

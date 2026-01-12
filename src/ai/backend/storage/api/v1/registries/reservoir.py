@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from aiohttp import web
 
@@ -19,13 +19,14 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import StorageMappingResolver
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
     create_reservoir_import_pipeline,
 )
 from ai.backend.storage.utils import log_client_api_entry
+from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -35,12 +36,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReservoirRegistryAPIHandler:
     _reservoir_service: ReservoirService
+    _storage_mapping_resolver: StorageMappingResolver
 
     def __init__(
         self,
         reservoir_service: ReservoirService,
+        volume_pool: VolumePool,
     ) -> None:
         self._reservoir_service = reservoir_service
+        self._storage_mapping_resolver = StorageMappingResolver(volume_pool)
 
     @api_handler
     async def import_models(
@@ -52,13 +56,12 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
-        # Convert string mappings to StorageTarget instances
-        storage_step_mappings = {
-            step: StorageTarget.from_storage_name(storage_name)
-            for step, storage_name in body.parsed.storage_step_mappings.items()
-        }
+        storage_step_mappings = self._storage_mapping_resolver.resolve(
+            body.parsed.storage_step_mappings,
+            body.parsed.vfolder_id,
+            body.parsed.volume_name,
+        )
 
-        # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
             registry_configs=self._reservoir_service._reservoir_registry_configs,
@@ -75,9 +78,7 @@ class ReservoirRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
-            artifact_revision_ids=[
-                uuid.UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids
-            ],
+            artifact_revision_ids=[UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids],
         )
 
         return APIResponse.build(
@@ -104,6 +105,7 @@ def create_app(ctx: RootContext) -> web.Application:
     )
     reservoir_api_handler = ReservoirRegistryAPIHandler(
         reservoir_service=reservoir_service,
+        volume_pool=ctx.volume_pool,
     )
 
     app.router.add_route("POST", "/import", reservoir_api_handler.import_models)

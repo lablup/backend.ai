@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors.common import InvalidStorageTargetError
+
+if TYPE_CHECKING:
+    from ai.backend.storage.volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -104,3 +109,68 @@ class ImportStepContext:
     storage_pool: AbstractStoragePool
     storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget]
     step_metadata: dict[str, Any]
+
+
+class StorageMappingResolver:
+    """
+    Resolves raw storage step mappings to StorageTarget objects,
+    optionally wrapping with VolumeStorageAdapter when vfolder_id is provided.
+    """
+
+    def __init__(self, volume_pool: VolumePool) -> None:
+        self._volume_pool = volume_pool
+
+    def resolve(
+        self,
+        raw_mappings: dict[ArtifactStorageImportStep, str] | None,
+        vfolder_id: VFolderID | None = None,
+        volume_name: str | None = None,
+    ) -> dict[ArtifactStorageImportStep, StorageTarget]:
+        """
+        Resolve raw string mappings to StorageTarget objects.
+
+        When vfolder_id and volume_name are provided, creates VolumeStorageAdapter
+        for all import steps, ignoring raw_mappings.
+
+        Args:
+            raw_mappings: Dict mapping import steps to storage names.
+                          Required when vfolder_id is not provided.
+            vfolder_id: Optional VFolder ID. If provided, creates VolumeStorageAdapter.
+            volume_name: Volume name (host) where the vfolder resides.
+                         Required when vfolder_id is provided.
+
+        Returns:
+            Dict mapping import steps to StorageTarget objects
+        """
+        # Avoid circular import
+        from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
+
+        # When vfolder_id is provided, use VolumeStorageAdapter for all steps
+        if vfolder_id is not None:
+            if volume_name is None:
+                raise ValueError("volume_name is required when vfolder_id is provided")
+
+            adapter_name = f"volume_storage_{current_request_id()}"
+            volume = self._volume_pool.get_volume_by_name_direct(volume_name)
+            adapter = VolumeStorageAdapter(
+                name=adapter_name,
+                volume=volume,
+                vfid=vfolder_id,
+            )
+
+            log.info(
+                "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
+                adapter_name,
+                vfolder_id,
+                volume_name,
+                type(volume).__name__,
+            )
+
+            # Create StorageTarget with adapter for all import steps
+            return {step: StorageTarget(adapter) for step in ArtifactStorageImportStep}
+
+        # When vfolder_id is not provided, use raw_mappings
+        if raw_mappings is None:
+            raise ValueError("storage_step_mappings is required when vfolder_id is not provided")
+
+        return {step: StorageTarget(name) for step, name in raw_mappings.items()}
