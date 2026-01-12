@@ -28,7 +28,6 @@ from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
@@ -56,21 +55,15 @@ class TestCreateUser:
         return MagicMock(spec=UserRepository)
 
     @pytest.fixture
-    def mock_admin_user_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminUserRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
     ) -> UserService:
         return UserService(
             storage_manager=MagicMock(),
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
-            admin_user_repository=mock_admin_user_repository,
         )
 
     @pytest.fixture
@@ -244,21 +237,15 @@ class TestModifyUser:
         return MagicMock(spec=UserRepository)
 
     @pytest.fixture
-    def mock_admin_user_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminUserRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
     ) -> UserService:
         return UserService(
             storage_manager=MagicMock(),
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
-            admin_user_repository=mock_admin_user_repository,
         )
 
     @pytest.fixture
@@ -352,21 +339,15 @@ class TestDeleteUser:
         return MagicMock(spec=UserRepository)
 
     @pytest.fixture
-    def mock_admin_user_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminUserRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
     ) -> UserService:
         return UserService(
             storage_manager=MagicMock(),
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
-            admin_user_repository=mock_admin_user_repository,
         )
 
     async def test_delete_existing_user_returns_success(
@@ -411,10 +392,6 @@ class TestPurgeUser:
         return MagicMock(spec=UserRepository)
 
     @pytest.fixture
-    def mock_admin_user_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminUserRepository)
-
-    @pytest.fixture
     def mock_agent_registry(self) -> MagicMock:
         return MagicMock()
 
@@ -422,7 +399,6 @@ class TestPurgeUser:
     def service(
         self,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         mock_agent_registry: MagicMock,
     ) -> UserService:
         return UserService(
@@ -430,7 +406,6 @@ class TestPurgeUser:
             valkey_stat_client=MagicMock(),
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
-            admin_user_repository=mock_admin_user_repository,
         )
 
     @pytest.fixture
@@ -477,19 +452,18 @@ class TestPurgeUser:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user without active vfolder mounts should succeed."""
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
-        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
-        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
-        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
             user_info_ctx=admin_user_info_ctx,
@@ -499,19 +473,18 @@ class TestPurgeUser:
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_admin_user_repository.purge_user_force.assert_called_once_with(purge_user_data.email)
+        mock_user_repository.purge_user.assert_called_once_with(purge_user_data.email)
 
     async def test_purge_user_fails_with_active_vfolder_mounts(
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with active vfolder mounts should raise UserPurgeFailure."""
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
-        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=True
         )
 
@@ -527,21 +500,20 @@ class TestPurgeUser:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with shared vfolders migration enabled should migrate vfolders."""
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
-        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
-        mock_admin_user_repository.migrate_shared_vfolders_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
-        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+        mock_user_repository.migrate_shared_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
             user_info_ctx=admin_user_info_ctx,
@@ -552,7 +524,7 @@ class TestPurgeUser:
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_admin_user_repository.migrate_shared_vfolders_force.assert_called_once_with(
+        mock_user_repository.migrate_shared_vfolders.assert_called_once_with(
             deleted_user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
             target_user_email=admin_user_info_ctx.email,
@@ -562,21 +534,20 @@ class TestPurgeUser:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with endpoint delegation enabled should delegate endpoints."""
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
-        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
-        mock_admin_user_repository.delegate_endpoint_ownership_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
-        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+        mock_user_repository.delegate_endpoint_ownership = AsyncMock(return_value=None)
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
             user_info_ctx=admin_user_info_ctx,
@@ -587,13 +558,13 @@ class TestPurgeUser:
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_admin_user_repository.delegate_endpoint_ownership_force.assert_called_once_with(
+        mock_user_repository.delegate_endpoint_ownership.assert_called_once_with(
             user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
             target_main_access_key=admin_user_info_ctx.main_access_key,
         )
-        # When delegating, delete_endpoints_force should be called with delete_destroyed_only=True
-        mock_admin_user_repository.delete_endpoints_force.assert_called_once_with(
+        # When delegating, delete_endpoints should be called with delete_destroyed_only=True
+        mock_user_repository.delete_endpoints.assert_called_once_with(
             user_uuid=purge_user_uuid,
             delete_destroyed_only=True,
         )
@@ -602,20 +573,19 @@ class TestPurgeUser:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        mock_admin_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user without endpoint delegation should delete all endpoints."""
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
-        mock_admin_user_repository.check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
-        mock_admin_user_repository.retrieve_active_sessions_force = AsyncMock(return_value=[])
-        mock_admin_user_repository.delete_endpoints_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.delete_user_vfolders_force = AsyncMock(return_value=None)
-        mock_admin_user_repository.purge_user_force = AsyncMock(return_value=None)
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
             user_info_ctx=admin_user_info_ctx,
@@ -625,7 +595,7 @@ class TestPurgeUser:
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_admin_user_repository.delete_endpoints_force.assert_called_once_with(
+        mock_user_repository.delete_endpoints.assert_called_once_with(
             user_uuid=purge_user_uuid,
             delete_destroyed_only=False,
         )

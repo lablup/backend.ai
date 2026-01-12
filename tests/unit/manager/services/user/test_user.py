@@ -16,7 +16,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
@@ -41,7 +40,6 @@ class TestUserServiceCompatibility:
         valkey_client = MagicMock(spec=ValkeyStatClient)
         agent_registry = MagicMock()
         user_repository = MagicMock(spec=UserRepository)
-        admin_user_repository = MagicMock(spec=AdminUserRepository)
         action_monitor = MagicMock(spec=ActionMonitor)
 
         return {
@@ -49,7 +47,6 @@ class TestUserServiceCompatibility:
             "valkey_client": valkey_client,
             "agent_registry": agent_registry,
             "user_repository": user_repository,
-            "admin_user_repository": admin_user_repository,
             "action_monitor": action_monitor,
         }
 
@@ -61,7 +58,6 @@ class TestUserServiceCompatibility:
             valkey_stat_client=mock_dependencies["valkey_client"],
             agent_registry=mock_dependencies["agent_registry"],
             user_repository=mock_dependencies["user_repository"],
-            admin_user_repository=mock_dependencies["admin_user_repository"],
         )
 
     @pytest.fixture
@@ -193,20 +189,18 @@ class TestUserServiceCompatibility:
         # Mock user data
         mock_user_data = MagicMock()
         mock_user_data.uuid = "test-uuid"
-        mock_dependencies["admin_user_repository"].get_by_email_force = AsyncMock(
+        mock_dependencies["user_repository"].get_by_email_validated = AsyncMock(
             return_value=mock_user_data
         )
 
         # Mock other required methods
         mock_dependencies[
-            "admin_user_repository"
-        ].check_user_vfolder_mounted_to_active_kernels_force = AsyncMock(return_value=False)
-        mock_dependencies["admin_user_repository"].retrieve_active_sessions_force = AsyncMock(
-            return_value=[]
-        )
-        mock_dependencies["admin_user_repository"].delete_endpoints_force = AsyncMock()
-        mock_dependencies["admin_user_repository"].delete_user_vfolders_force = AsyncMock()
-        mock_dependencies["admin_user_repository"].purge_user_force = AsyncMock()
+            "user_repository"
+        ].check_user_vfolder_mounted_to_active_kernels = AsyncMock(return_value=False)
+        mock_dependencies["user_repository"].retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_dependencies["user_repository"].delete_endpoints = AsyncMock()
+        mock_dependencies["user_repository"].delete_user_vfolders = AsyncMock()
+        mock_dependencies["user_repository"].purge_user = AsyncMock()
 
         action = PurgeUserAction(
             email="user@example.com",
@@ -218,7 +212,7 @@ class TestUserServiceCompatibility:
         )
 
         await user_service.purge_user(action)
-        mock_dependencies["admin_user_repository"].purge_user_force.assert_called_once()
+        mock_dependencies["user_repository"].purge_user.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_user_month_stats_action_structure(self, user_service, mock_dependencies):
@@ -243,9 +237,9 @@ class TestUserServiceCompatibility:
     async def test_admin_month_stats_action_structure(self, user_service, mock_dependencies):
         """Test that AdminMonthStatsAction works as expected."""
         mock_stats = {"total_users": 100, "total_cpu_time": 360000}
-        mock_dependencies[
-            "admin_user_repository"
-        ].get_admin_time_binned_monthly_stats_force = AsyncMock(return_value=mock_stats)
+        mock_dependencies["user_repository"].get_admin_time_binned_monthly_stats = AsyncMock(
+            return_value=mock_stats
+        )
 
         action = AdminMonthStatsAction()
 
@@ -253,8 +247,8 @@ class TestUserServiceCompatibility:
 
         assert result.stats == mock_stats
         mock_dependencies[
-            "admin_user_repository"
-        ].get_admin_time_binned_monthly_stats_force.assert_called_once()
+            "user_repository"
+        ].get_admin_time_binned_monthly_stats.assert_called_once()
 
     def test_user_creator_fields(self):
         """Test that UserCreator has all expected fields from test scenarios."""
