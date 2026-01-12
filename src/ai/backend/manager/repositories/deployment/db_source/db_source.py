@@ -89,6 +89,10 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
+from ai.backend.manager.models.scheduling_history import (
+    DeploymentHistoryRow,
+    RouteHistoryRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -99,6 +103,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
+from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
@@ -546,6 +551,38 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=new_status)
             )
             await db_sess.execute(query)
+
+    async def update_endpoint_lifecycle_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> int:
+        """Update lifecycle status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        if not batch_updaters:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # 1. Execute all status updates
+            for batch_updater in batch_updaters:
+                update_result = await execute_batch_updater(db_sess, batch_updater)
+                total_updated += update_result.updated_count
+
+            # 2. Record all histories (same transaction)
+            await execute_bulk_creator(db_sess, bulk_creator)
+
+            return total_updated
 
     async def delete_endpoint_with_routes(
         self,
@@ -1337,6 +1374,38 @@ class DeploymentDBSource:
                 .values(status=new_status)
             )
             await db_sess.execute(query)
+
+    async def update_route_status_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[RoutingRow]],
+        bulk_creator: BulkCreator[RouteHistoryRow],
+    ) -> int:
+        """Update route status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        if not batch_updaters:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # 1. Execute all status updates
+            for batch_updater in batch_updaters:
+                update_result = await execute_batch_updater(db_sess, batch_updater)
+                total_updated += update_result.updated_count
+
+            # 2. Record all histories (same transaction)
+            await execute_bulk_creator(db_sess, bulk_creator)
+
+            return total_updated
 
     async def mark_terminating_route_status_bulk(
         self,
