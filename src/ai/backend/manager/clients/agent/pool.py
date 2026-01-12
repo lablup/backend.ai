@@ -23,7 +23,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
 
 from .client import AgentClient
-from .legacy import LegacyAgentClient
 from .types import AgentPoolSpec
 
 if TYPE_CHECKING:
@@ -280,40 +279,3 @@ class AgentClientPool:
                 agent_id,
                 self._spec.recovery_timeout,
             )
-
-
-# Legacy exports for backward compatibility
-@dataclass
-class AgentPoolConfig:
-    """Configuration for AgentPool (deprecated, use AgentPoolSpec)."""
-
-    invoke_timeout: float | None = None
-
-
-class AgentPool:
-    """
-    Legacy pool for managing agent clients (deprecated).
-    Use AgentClientPool for connection pooling.
-    """
-
-    _agent_cache: AgentRPCCache
-    _config: AgentPoolConfig
-
-    def __init__(self, agent_cache: AgentRPCCache, config: AgentPoolConfig | None = None) -> None:
-        self._agent_cache = agent_cache
-        self._config = config or AgentPoolConfig()
-
-    def get_agent_client(
-        self,
-        agent_id: AgentId,
-        *,
-        invoke_timeout: float | None = None,
-        order_key: str | None = None,
-    ) -> LegacyAgentClient:
-        """Get a LegacyAgentClient for the given agent ID (deprecated)."""
-        return LegacyAgentClient(
-            self._agent_cache,
-            agent_id,
-            invoke_timeout=invoke_timeout or self._config.invoke_timeout,
-            order_key=order_key,
-        )

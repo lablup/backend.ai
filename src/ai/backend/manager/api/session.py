@@ -964,7 +964,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
         )
 
-        all_inst_ids = [inst_id async for inst_id in root_ctx.registry.enumerate_instances()]
+        all_inst_ids = await root_ctx.registry.enumerate_instances()
         await stats_monitor.report_metric(
             GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
         )

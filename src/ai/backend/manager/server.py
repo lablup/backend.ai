@@ -1097,6 +1097,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.config_provider,
         root_ctx.db,
         root_ctx.agent_cache,
+        root_ctx.agent_client_pool,
         root_ctx.valkey_stat,
         root_ctx.valkey_live,
         root_ctx.valkey_image,
