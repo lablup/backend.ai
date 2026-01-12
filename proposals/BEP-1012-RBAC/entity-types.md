@@ -20,7 +20,7 @@ Entity types are the primary targets of permission checks in the RBAC system. Ea
 | VFolder | Virtual folders for data storage | Entity only | | [ ] | [ ] | [ ] |
 | Image | Container images for sessions | Entity only | | [ ] | [ ] | [ ] |
 | Model Deployment | Model serving deployments | Entity only | | [ ] | [ ] | [ ] |
-| Model Artifact | Trained model files and metadata | Entity only | | [ ] | [ ] | [ ] |
+| Artifact | Models, packages, or images in artifact registries | Entity only | | [ ] | [ ] | [ ] |
 | Artifact Registry | Registry for storing and managing artifacts | Entity only | | [ ] | [ ] | [ ] |
 | Agent | Agent nodes providing computing resources | Entity only | | [ ] | [ ] | [ ] |
 | Resource Group | Logical groups of agents | Entity only | | [ ] | [ ] | [ ] |
@@ -63,7 +63,7 @@ When checking permissions for a field object:
 | Route | Model Deployment | Traffic routing configurations for model endpoints | [ ] | [ ] | [ ] |
 | Route History | Model Deployment | Historical records of routing changes | [ ] | [ ] | [ ] |
 | Endpoint Token | Model Deployment | Authentication tokens for model endpoints | [ ] | [ ] | [ ] |
-| Artifact Revision | Model Artifact | Version snapshots of artifacts | [ ] | [ ] | [ ] |
+| Artifact Revision | Artifact | Version snapshots of artifacts | [ ] | [ ] | [ ] |
 | Object Permission | Role | Object-level permission assignments | [ ] | [ ] | [ ] |
 | Permission | Role | Type-level permission definitions | [ ] | [ ] | [ ] |
 | Permission Group | Role | Grouped permissions by scope | [ ] | [ ] | [ ] |
