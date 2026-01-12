@@ -82,7 +82,8 @@ async def execute_creator(
     row = creator.spec.build_row()
     db_sess.add(row)
     await db_sess.flush()
-    await db_sess.refresh(row)
+    # Note: refresh() is not needed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
+    # to populate server_default values (id, created_at, etc.) after flush()
     return CreatorResult(row=row)
 
 
@@ -130,8 +131,6 @@ async def execute_bulk_creator(
     rows = [spec.build_row() for spec in bulk_creator.specs]
     db_sess.add_all(rows)
     await db_sess.flush()
-
-    for row in rows:
-        await db_sess.refresh(row)
-
+    # Note: refresh() loop removed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
+    # to populate server_default values (id, created_at, etc.) after flush()
     return BulkCreatorResult(rows=rows)
