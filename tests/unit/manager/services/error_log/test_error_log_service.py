@@ -14,12 +14,14 @@ import pytest
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
     ErrorLogData,
+    ErrorLogListResult,
     ErrorLogMeta,
     ErrorLogSeverity,
 )
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
+from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
 from ai.backend.manager.services.error_log.service import ErrorLogService
 
 
@@ -90,3 +92,94 @@ class TestErrorLogService:
 
         assert result.error_log_data == sample_error_log_data
         mock_repository.create.assert_called_once_with(creator)
+
+    # =========================================================================
+    # Tests - Search
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs(
+        self,
+        error_log_service: ErrorLogService,
+        mock_repository: MagicMock,
+        sample_error_log_data: ErrorLogData,
+    ) -> None:
+        """Test searching error logs with querier"""
+        mock_repository.search = AsyncMock(
+            return_value=ErrorLogListResult(
+                items=[sample_error_log_data],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchErrorLogsAction(querier=querier)
+        result = await error_log_service.search(action)
+
+        assert result.data == [sample_error_log_data]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_repository.search.assert_called_once_with(querier)
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_empty_result(
+        self,
+        error_log_service: ErrorLogService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test searching error logs when no results are found"""
+        mock_repository.search = AsyncMock(
+            return_value=ErrorLogListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchErrorLogsAction(querier=querier)
+        result = await error_log_service.search(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_with_pagination(
+        self,
+        error_log_service: ErrorLogService,
+        mock_repository: MagicMock,
+        sample_error_log_data: ErrorLogData,
+    ) -> None:
+        """Test searching error logs with pagination"""
+        mock_repository.search = AsyncMock(
+            return_value=ErrorLogListResult(
+                items=[sample_error_log_data],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchErrorLogsAction(querier=querier)
+        result = await error_log_service.search(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True

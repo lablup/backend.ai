@@ -21,7 +21,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_logs import ErrorLogRow, error_logs
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -42,7 +42,13 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkCreator,
+    Creator,
+    OffsetPagination,
+    execute_bulk_creator,
+)
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.testutils.db import with_tables
 
@@ -250,3 +256,267 @@ class TestErrorLogRepository:
         # Verify all IDs are unique
         ids = [log.id for log in created_logs]
         assert len(ids) == len(set(ids))
+
+    # =========================================================================
+    # Fixtures for search tests
+    # =========================================================================
+
+    @pytest.fixture
+    async def sample_error_logs_for_filtering(
+        self,
+        error_log_repository: ErrorLogRepository,
+        test_user_id: uuid.UUID,
+    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+        """Create sample error logs with different sources for filter testing"""
+        entity_map: dict[str, uuid.UUID] = {}
+
+        test_data = [
+            ("manager", ErrorLogSeverity.CRITICAL, "Manager critical error"),
+            ("agent", ErrorLogSeverity.ERROR, "Agent error occurred"),
+        ]
+
+        for source, severity, message in test_data:
+            creator = Creator(
+                spec=ErrorLogCreatorSpec(
+                    severity=severity,
+                    source=source,
+                    user=test_user_id,
+                    message=message,
+                    context_lang="en",
+                    context_env={},
+                )
+            )
+            result = await error_log_repository.create(creator)
+            entity_map[source] = result.id
+
+        yield entity_map
+
+    @pytest.fixture
+    async def sample_error_logs_for_ordering(
+        self,
+        error_log_repository: ErrorLogRepository,
+        test_user_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create sample error logs with predictable sources for ordering tests"""
+        error_log_ids: list[uuid.UUID] = []
+        sources = ["alpha-source", "beta-source", "gamma-source", "delta-source"]
+
+        for source in sources:
+            creator = Creator(
+                spec=ErrorLogCreatorSpec(
+                    severity=ErrorLogSeverity.ERROR,
+                    source=source,
+                    user=test_user_id,
+                    message=f"Error from {source}",
+                    context_lang="en",
+                    context_env={},
+                )
+            )
+            result = await error_log_repository.create(creator)
+            error_log_ids.append(result.id)
+
+        yield error_log_ids
+
+    @pytest.fixture
+    async def sample_error_logs_for_pagination(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_id: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 25 error logs for pagination testing"""
+        specs = [
+            ErrorLogCreatorSpec(
+                severity=ErrorLogSeverity.ERROR,
+                source=f"source_{i:02d}",
+                user=test_user_id,
+                message=f"Error message {i}",
+                context_lang="en",
+                context_env={},
+            )
+            for i in range(25)
+        ]
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            result = await execute_bulk_creator(db_sess, BulkCreator(specs=specs))
+            await db_sess.commit()
+
+        yield [row.id for row in result.rows]
+
+    # =========================================================================
+    # Tests - Search with filtering
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_filter_by_source(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_filtering: dict[str, uuid.UUID],
+    ) -> None:
+        """Test searching error logs filtered by source returns only matching error logs"""
+        target_source = "manager"
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                # TODO: Refactor after adding Condition type
+                lambda: error_logs.c.source == target_source,
+            ],
+            orders=[],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        result_ids = [log.id for log in result.items]
+        assert sample_error_logs_for_filtering["manager"] in result_ids
+        assert sample_error_logs_for_filtering["agent"] not in result_ids
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_filter_by_severity(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_filtering: dict[str, uuid.UUID],
+    ) -> None:
+        """Test searching error logs filtered by severity"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                # TODO: Refactor after adding Condition type
+                lambda: error_logs.c.severity == ErrorLogSeverity.CRITICAL.value,
+            ],
+            orders=[],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].content.severity == ErrorLogSeverity.CRITICAL
+
+    # =========================================================================
+    # Tests - Search with ordering
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_order_by_source_ascending(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_ordering: list[uuid.UUID],
+    ) -> None:
+        """Test searching error logs ordered by source ascending"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[error_logs.c.source.asc()],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        result_sources = [log.meta.source for log in result.items]
+        assert result_sources == sorted(result_sources)
+        assert result_sources[0] == "alpha-source"
+        assert result_sources[-1] == "gamma-source"
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_order_by_source_descending(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_ordering: list[uuid.UUID],
+    ) -> None:
+        """Test searching error logs ordered by source descending"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[error_logs.c.source.desc()],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        result_sources = [log.meta.source for log in result.items]
+        assert result_sources == sorted(result_sources, reverse=True)
+        assert result_sources[0] == "gamma-source"
+        assert result_sources[-1] == "alpha-source"
+
+    # =========================================================================
+    # Tests - Search with pagination
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_offset_pagination_first_page(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test first page of offset-based pagination"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        assert len(result.items) == 10
+        assert result.total_count == 25
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_offset_pagination_second_page(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test second page of offset-based pagination"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        assert len(result.items) == 10
+        assert result.total_count == 25
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_offset_pagination_last_page(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test last page of offset-based pagination with partial results"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=20),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        assert len(result.items) == 5
+        assert result.total_count == 25
+
+    # =========================================================================
+    # Tests - Search with combined query
+    # =========================================================================
+
+    @pytest.mark.asyncio
+    async def test_search_error_logs_with_pagination_filter_and_order(
+        self,
+        error_log_repository: ErrorLogRepository,
+        sample_error_logs_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test searching error logs with pagination, filter condition, and ordering combined"""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=5, offset=2),
+            conditions=[
+                # TODO: Refactor after adding Condition type
+                lambda: error_logs.c.severity == ErrorLogSeverity.ERROR.value,
+            ],
+            orders=[error_logs.c.source.asc()],
+        )
+
+        result = await error_log_repository.search(querier=querier)
+
+        assert result.total_count == 25
+        assert len(result.items) == 5
+
+        result_sources = [log.meta.source for log in result.items]
+        assert result_sources == sorted(result_sources)
