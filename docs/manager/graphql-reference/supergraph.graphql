@@ -3388,6 +3388,7 @@ input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
+  vfolderId: ID = null
 }
 
 """

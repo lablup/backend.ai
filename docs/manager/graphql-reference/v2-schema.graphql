@@ -1330,6 +1330,7 @@ SCANNED → PULLING → PULLED → AVAILABLE status progression.
 """
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
+  vfolderId: ID = null
 }
 
 """
