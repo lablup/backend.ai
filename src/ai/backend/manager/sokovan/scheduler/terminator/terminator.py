@@ -89,7 +89,7 @@ class SessionTerminator:
                     task = self._terminate_kernel(
                         kernel.agent_id,
                         kernel.kernel_id,
-                        str(session.session_id),
+                        session.session_id,
                         session.status_info,
                         kernel.occupied_slots,
                     )
@@ -150,7 +150,7 @@ class SessionTerminator:
         self,
         agent_id: AgentId,
         kernel_id: KernelId,
-        session_id: str,
+        session_id: SessionId,
         reason: str,
         occupied_slots: ResourceSlot,
     ) -> KernelTerminationResult:
@@ -318,7 +318,7 @@ class SessionTerminator:
                         ):
                             agent_id = AgentId(kernel_info.resource.agent)
                             async with self._agent_client_pool.acquire(agent_id) as client:
-                                is_running = await client.check_running(str(kernel_info.id))
+                                is_running = await client.check_running(kernel_info.id)
                             if is_running is False:
                                 dead_kernel_ids.append(KernelId(kernel_info.id))
                                 if session not in affected_sessions:

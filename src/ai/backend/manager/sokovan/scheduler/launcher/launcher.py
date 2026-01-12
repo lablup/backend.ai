@@ -294,7 +294,7 @@ class SessionLauncher:
                 agent_kernels: list[KernelBindingData],
             ) -> None:
                 # Prepare kernel creation configs
-                kernel_ids = [str(k.kernel_id) for k in agent_kernels]
+                kernel_ids = [k.kernel_id for k in agent_kernels]
                 kernel_configs: list[KernelCreationConfig] = []
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
@@ -393,7 +393,7 @@ class SessionLauncher:
                 # Create the kernels using connection pool
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     await client.create_kernels(
-                        str(session.session_id),
+                        session.session_id,
                         kernel_ids,
                         kernel_configs,
                         cluster_info,
@@ -773,7 +773,7 @@ class SessionLauncher:
                 continue
             try:
                 async with self._agent_client_pool.acquire(kernel.agent_id) as client:
-                    is_active = await client.check_creating(str(kernel.kernel_id))
+                    is_active = await client.check_creating(kernel.kernel_id)
                     if is_active:
                         return True
             except Exception as e:

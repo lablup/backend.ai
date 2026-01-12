@@ -452,7 +452,7 @@ class ScalingGroupInfo:
 class KernelBindingData:
     """Kernel-agent binding data for precondition checking and session starting."""
 
-    kernel_id: UUID
+    kernel_id: KernelId
     agent_id: Optional[AgentId]
     agent_addr: Optional[str]
     scaling_group: str

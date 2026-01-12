@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.common.types import (
     AccessKey,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -131,7 +132,7 @@ def create_session_with_kernels(
     kernel_infos = []
     for i in range(num_kernels):
         kernel_info = KernelInfo(
-            id=uuid4(),
+            id=KernelId(uuid4()),
             session=RelatedSessionInfo(
                 session_id=str(session_id),
                 creation_id=creation_id,

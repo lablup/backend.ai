@@ -45,8 +45,8 @@ class BatchSessionHook(AbstractSessionHook):
             ):
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     await client.trigger_batch_execution(
-                        str(session.session_info.identity.id),
-                        str(main_kernel.id),
+                        session.session_info.identity.id,
+                        main_kernel.id,
                         main_kernel.runtime.startup_command or "",
                         float(session.session_info.lifecycle.batch_timeout or 0),
                     )

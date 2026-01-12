@@ -119,7 +119,7 @@ class TestTerminateSessions:
         """Test successful termination RPC call for a single session."""
         # Setup
         session_id = SessionId(uuid4())
-        kernel_id = uuid4()
+        kernel_id = KernelId(uuid4())
         agent_id = AgentId("test-agent-1")
 
         terminating_session = TerminatingSessionData(
@@ -131,7 +131,7 @@ class TestTerminateSessions:
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=KernelId(kernel_id),
+                    kernel_id=kernel_id,
                     status=KernelStatus.TERMINATING,
                     container_id="container-123",
                     agent_id=agent_id,
@@ -157,9 +157,10 @@ class TestTerminateSessions:
         assert len(result.scheduled_sessions) == 0
 
         # Verify agent destroy_kernel was called with correct parameters
+        # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
         mock_agent.destroy_kernel.assert_called_once_with(
-            KernelId(kernel_id),
-            str(session_id),
+            kernel_id,
+            session_id,
             "USER_REQUESTED",
             suppress_events=False,
         )
@@ -173,7 +174,7 @@ class TestTerminateSessions:
         """Test termination RPC calls for a session with multiple kernels."""
         # Setup
         session_id = SessionId(uuid4())
-        kernel_ids = [uuid4() for _ in range(3)]
+        kernel_ids = [KernelId(uuid4()) for _ in range(3)]
         agent_ids = [AgentId(f"agent-{i}") for i in range(3)]
 
         terminating_session = TerminatingSessionData(
@@ -185,7 +186,7 @@ class TestTerminateSessions:
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
-                    kernel_id=KernelId(kernel_ids[i]),
+                    kernel_id=kernel_ids[i],
                     status=KernelStatus.TERMINATING,
                     container_id=f"container-{i}",
                     agent_id=agent_ids[i],
@@ -206,11 +207,12 @@ class TestTerminateSessions:
         assert len(result.scheduled_sessions) == 0
 
         # Verify all kernels had RPC calls made
+        # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
         for i in range(3):
             mock_agent = mock_agent_client_pool.get_agent_client(agent_ids[i])
             mock_agent.destroy_kernel.assert_called_once_with(
-                KernelId(kernel_ids[i]),
-                str(session_id),
+                kernel_ids[i],
+                session_id,
                 "FORCED_TERMINATION",
                 suppress_events=False,
             )

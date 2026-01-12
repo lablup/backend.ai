@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     ImageConfig,
     KernelCreationConfig,
     KernelId,
+    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -120,16 +121,16 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def create_kernels(
         self,
-        session_id: str,
-        kernel_ids: list[str],
+        session_id: SessionId,
+        kernel_ids: list[KernelId],
         kernel_configs: list[KernelCreationConfig],
         cluster_info: ClusterInfo,
         kernel_image_refs: Mapping[KernelId, ImageRef],
     ) -> Any:
         """Create kernels on the agent."""
         return await self._peer.call.create_kernels(
-            session_id,
-            kernel_ids,
+            str(session_id),
+            [str(kid) for kid in kernel_ids],
             kernel_configs,
             cluster_info,
             kernel_image_refs,
@@ -140,14 +141,14 @@ class AgentClient(BackendAIClient):
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
-        session_id: str,
+        session_id: SessionId,
         reason: str,
         suppress_events: bool = True,
     ) -> None:
         """Destroy a kernel on the agent."""
         await self._peer.call.destroy_kernel(
             str(kernel_id),
-            session_id,
+            str(session_id),
             reason,
             suppress_events=suppress_events,
             agent_id=self.agent_id,
@@ -156,24 +157,25 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def restart_kernel(
         self,
-        session_id: str,
-        kernel_id: str,
-        image_ref: Any,
+        session_id: SessionId,
+        kernel_id: KernelId,
+        image_ref: ImageRef,
         update_config: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         """Restart a kernel on the agent."""
         return await self._peer.call.restart_kernel(
-            session_id,
-            kernel_id,
+            str(session_id),
+            str(kernel_id),
             image_ref,
             update_config,
             agent_id=self.agent_id,
         )
 
     @agent_client_resilience.apply()
-    async def sync_kernel_registry(self, kernel_tuples: list[tuple[str, str]]) -> None:
+    async def sync_kernel_registry(self, kernel_tuples: list[tuple[KernelId, SessionId]]) -> None:
         """Sync kernel registry on the agent."""
-        return await self._peer.call.sync_kernel_registry(kernel_tuples, agent_id=self.agent_id)
+        raw_tuples = [(str(kid), str(sid)) for kid, sid in kernel_tuples]
+        return await self._peer.call.sync_kernel_registry(raw_tuples, agent_id=self.agent_id)
 
     @agent_client_resilience.apply()
     async def drop_kernel_registry(self, kernel_id_list: list[KernelId]) -> None:
@@ -187,12 +189,12 @@ class AgentClient(BackendAIClient):
         return await self._peer.call.check_pulling(image_name, agent_id=self.agent_id)
 
     @agent_client_resilience.apply()
-    async def check_creating(self, kernel_id: str) -> bool:
+    async def check_creating(self, kernel_id: KernelId) -> bool:
         """Check if a kernel is being created."""
         return await self._peer.call.check_creating(str(kernel_id), agent_id=self.agent_id)
 
     @agent_client_resilience.apply()
-    async def check_running(self, kernel_id: str) -> bool:
+    async def check_running(self, kernel_id: KernelId) -> bool:
         """Check if a kernel is running."""
         return await self._peer.call.check_running(str(kernel_id), agent_id=self.agent_id)
 
@@ -206,8 +208,8 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def execute(
         self,
-        session_id: str,
-        kernel_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         major_api_version: int,
         run_id: str,
         mode: str,
@@ -217,8 +219,8 @@ class AgentClient(BackendAIClient):
     ) -> Mapping[str, Any]:
         """Execute code on the agent."""
         return await self._peer.call.execute(
-            session_id,
-            kernel_id,
+            str(session_id),
+            str(kernel_id),
             major_api_version,
             run_id,
             mode,
@@ -229,22 +231,22 @@ class AgentClient(BackendAIClient):
         )
 
     @agent_client_resilience.apply()
-    async def interrupt_kernel(self, kernel_id: str) -> Mapping[str, Any]:
+    async def interrupt_kernel(self, kernel_id: KernelId) -> Mapping[str, Any]:
         """Interrupt a kernel on the agent."""
-        return await self._peer.call.interrupt_kernel(kernel_id, agent_id=self.agent_id)
+        return await self._peer.call.interrupt_kernel(str(kernel_id), agent_id=self.agent_id)
 
     @agent_client_resilience.apply()
     async def trigger_batch_execution(
         self,
-        session_id: str,
-        kernel_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         startup_command: str,
         batch_timeout: float,
     ) -> None:
         """Trigger batch execution on the agent."""
         await self._peer.call.trigger_batch_execution(
-            session_id,
-            kernel_id,
+            str(session_id),
+            str(kernel_id),
             startup_command,
             batch_timeout,
             agent_id=self.agent_id,
@@ -253,63 +255,71 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def get_completions(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         text: str,
         opts: Mapping[str, Any],
     ) -> dict[str, Any]:
         """Get code completions from the agent."""
-        return await self._peer.call.get_completions(kernel_id, text, opts, agent_id=self.agent_id)
+        return await self._peer.call.get_completions(
+            str(kernel_id), text, opts, agent_id=self.agent_id
+        )
 
     # Service management methods
     @agent_client_resilience.apply()
     async def start_service(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         """Start a service on the agent."""
-        return await self._peer.call.start_service(kernel_id, service, opts, agent_id=self.agent_id)
-
-    @agent_client_resilience.apply()
-    async def shutdown_service(self, kernel_id: str, service: str) -> None:
-        """Shutdown a service on the agent."""
-        await self._peer.call.shutdown_service(kernel_id, service, agent_id=self.agent_id)
-
-    # File management methods
-    @agent_client_resilience.apply()
-    async def upload_file(self, kernel_id: str, filename: str, payload: bytes) -> Mapping[str, Any]:
-        """Upload a file to the agent."""
-        return await self._peer.call.upload_file(
-            kernel_id, filename, payload, agent_id=self.agent_id
+        return await self._peer.call.start_service(
+            str(kernel_id), service, opts, agent_id=self.agent_id
         )
 
     @agent_client_resilience.apply()
-    async def download_file(self, kernel_id: str, filepath: str) -> bytes:
+    async def shutdown_service(self, kernel_id: KernelId, service: str) -> None:
+        """Shutdown a service on the agent."""
+        await self._peer.call.shutdown_service(str(kernel_id), service, agent_id=self.agent_id)
+
+    # File management methods
+    @agent_client_resilience.apply()
+    async def upload_file(
+        self, kernel_id: KernelId, filename: str, payload: bytes
+    ) -> Mapping[str, Any]:
+        """Upload a file to the agent."""
+        return await self._peer.call.upload_file(
+            str(kernel_id), filename, payload, agent_id=self.agent_id
+        )
+
+    @agent_client_resilience.apply()
+    async def download_file(self, kernel_id: KernelId, filepath: str) -> bytes:
         """Download a file from the agent."""
-        return await self._peer.call.download_file(kernel_id, filepath, agent_id=self.agent_id)
+        return await self._peer.call.download_file(str(kernel_id), filepath, agent_id=self.agent_id)
 
     @agent_client_resilience.apply()
-    async def download_single(self, kernel_id: str, filepath: str) -> bytes:
+    async def download_single(self, kernel_id: KernelId, filepath: str) -> bytes:
         """Download a single file from the agent."""
-        return await self._peer.call.download_single(kernel_id, filepath, agent_id=self.agent_id)
+        return await self._peer.call.download_single(
+            str(kernel_id), filepath, agent_id=self.agent_id
+        )
 
     @agent_client_resilience.apply()
-    async def list_files(self, kernel_id: str, path: str) -> Mapping[str, Any]:
+    async def list_files(self, kernel_id: KernelId, path: str) -> Mapping[str, Any]:
         """List files on the agent."""
-        return await self._peer.call.list_files(kernel_id, path, agent_id=self.agent_id)
+        return await self._peer.call.list_files(str(kernel_id), path, agent_id=self.agent_id)
 
     # Log management methods
     @agent_client_resilience.apply()
-    async def get_logs(self, kernel_id: str) -> Mapping[str, str]:
+    async def get_logs(self, kernel_id: KernelId) -> Mapping[str, str]:
         """Get logs from the agent."""
-        return await self._peer.call.get_logs(kernel_id, agent_id=self.agent_id)
+        return await self._peer.call.get_logs(str(kernel_id), agent_id=self.agent_id)
 
     # Image commit methods
     @agent_client_resilience.apply()
     async def commit(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         email: str,
         canonical: str | None = None,
         extra_labels: dict[str, str] | None = None,
@@ -325,7 +335,7 @@ class AgentClient(BackendAIClient):
             kwargs["filename"] = filename
         kwargs["agent_id"] = self.agent_id
 
-        return await self._peer.call.commit(kernel_id, email, **kwargs)
+        return await self._peer.call.commit(str(kernel_id), email, **kwargs)
 
     @agent_client_resilience.apply()
     async def push_image(self, image_ref: ImageRef, registry: Any) -> Mapping[str, Any]:
