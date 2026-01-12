@@ -99,7 +99,7 @@ BEP numbers start from 1000.
 | [1008](BEP-1008-RBAC.md) | RBAC | - | Draft |
 | [1009](BEP-1009-model-serving-registry.md) | Model Serving Registry | - | Draft |
 | [1010](BEP-1010-new-gql.md) | New GQL | - | Accepted |
-| [1012](BEP-1012-RBAC.md) | RBAC (detailed) | - | Draft |
+| [1012](BEP-1012-RBAC.md) | RBAC (detailed) | Sanghun Lee | Draft |
 | [1013](BEP-1013-GraphQL-schema-for-new-model-service.md) | GraphQL Schema for New Model Service | - | Accepted |
 | [1014](BEP-1014-preemption-of-low-priority-sessions.md) | Preemption of Low Priority Sessions | - | Draft |
 | [1015](BEP-1015-keypair-user-project-resource-policy-reorg.md) | Keypair/User/Project Resource Policy Reorg | - | Draft |
