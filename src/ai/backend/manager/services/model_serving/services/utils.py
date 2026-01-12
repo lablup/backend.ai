@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import RequesterCtx  # deprecated, use UserData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -40,7 +41,7 @@ async def verify_user_access_scopes(
 
 def validate_endpoint_access(
     endpoint_data: EndpointData,
-    ctx: RequesterCtx,
+    user_data: UserData,
 ) -> bool:
     """Validate user access to endpoint based on role.
 
@@ -54,13 +55,11 @@ def validate_endpoint_access(
     if endpoint_data.session_owner_id is None:
         return True
 
-    match ctx.user_role:
-        case UserRole.SUPERADMIN:
-            return True
-        case UserRole.ADMIN:
-            # ADMIN cannot access SUPERADMIN's resources
-            if endpoint_data.session_owner_role == UserRole.SUPERADMIN:
-                return False
-            return endpoint_data.domain == ctx.domain_name
-        case _:
-            return endpoint_data.session_owner_id == ctx.user_id
+    if user_data.is_superadmin:
+        return True
+    if user_data.is_admin:
+        # ADMIN cannot access SUPERADMIN's resources
+        if endpoint_data.session_owner_role == UserRole.SUPERADMIN:
+            return False
+        return endpoint_data.domain == user_data.domain_name
+    return endpoint_data.session_owner_id == user_data.user_id

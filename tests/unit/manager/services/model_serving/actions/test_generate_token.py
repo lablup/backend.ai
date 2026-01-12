@@ -7,8 +7,8 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
-from ai.backend.manager.data.user.types import UserRole
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import EndpointTokenData, UserRole
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
@@ -64,10 +64,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -90,10 +92,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
@@ -116,10 +120,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
@@ -160,7 +166,7 @@ class TestGenerateToken:
             id=action.service_id,
             status=EndpointStatus.READY,
             session_owner_id=expected.data.session_owner,
-            session_owner_role=action.requester_ctx.user_role,
+            session_owner_role=UserRole.USER,
             domain=expected.data.domain,
             project=expected.data.project,
             resource_group="default",

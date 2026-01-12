@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -41,7 +42,6 @@ from ai.backend.manager.data.model_serving.modifier import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
-    RequesterCtx,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.errors.common import (
@@ -328,10 +328,10 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     max_replicas = graphene.Int()
 
     def to_action(
-        self, requester_ctx: RequesterCtx, endpoint_id: EndpointId
+        self, user_data: UserData, endpoint_id: EndpointId
     ) -> CreateEndpointAutoScalingRuleAction:
         return CreateEndpointAutoScalingRuleAction(
-            requester_ctx=requester_ctx,
+            user_data=user_data,
             endpoint_id=endpoint_id,
             creator=EndpointAutoScalingRuleCreator(
                 metric_source=AutoScalingMetricSource(self.metric_source),
@@ -365,9 +365,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(
-        self, requester_ctx: RequesterCtx, id: RuleId
-    ) -> ModifyEndpointAutoScalingRuleAction:
+    def to_action(self, user_data: UserData, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
         def convert_to_decimal(
             value: Optional[str] | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
@@ -412,7 +410,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAutoScalingRuleAction(
-            requester_ctx=requester_ctx,
+            user_data=user_data,
             id=id,
             updater=Updater(spec=spec, pk_value=id),
         )
@@ -449,11 +447,14 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint")
 
+        user_role = info.context.user["role"]
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
+            user_data=UserData(
                 user_id=info.context.user["uuid"],
-                user_role=info.context.user["role"],
+                is_authorized=True,
+                is_admin=user_role == UserRole.ADMIN,
+                is_superadmin=user_role == UserRole.SUPERADMIN,
+                role=str(user_role.name).lower(),
                 domain_name=info.context.user["domain_name"],
             ),
             endpoint_id=_endpoint_id,
@@ -502,12 +503,15 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
         graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
 
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
+            user_data=UserData(
                 user_id=graph_ctx.user["uuid"],
-                user_role=graph_ctx.user["role"],
+                is_authorized=True,
+                is_admin=user_role == UserRole.ADMIN,
+                is_superadmin=user_role == UserRole.SUPERADMIN,
+                role=str(user_role.name).lower(),
                 domain_name=graph_ctx.user["domain_name"],
             ),
             id=_rule_id,
@@ -552,12 +556,15 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
 
         action = DeleteEndpointAutoScalingRuleAction(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
+            user_data=UserData(
                 user_id=graph_ctx.user["uuid"],
-                user_role=graph_ctx.user["role"],
+                is_authorized=True,
+                is_admin=user_role == UserRole.ADMIN,
+                is_superadmin=user_role == UserRole.SUPERADMIN,
+                role=str(user_role.name).lower(),
                 domain_name=graph_ctx.user["domain_name"],
             ),
             id=_rule_id,
@@ -1051,7 +1058,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
     def to_action(
-        self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID, info: graphene.ResolveInfo
+        self, user_data: UserData, endpoint_id: uuid.UUID, info: graphene.ResolveInfo
     ) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
             registry: OptionalState = OptionalState.nop()
@@ -1135,7 +1142,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAction(
-            requester_ctx=requester_ctx,
+            user_data=user_data,
             endpoint_id=endpoint_id,
             updater=Updater(spec=spec, pk_value=endpoint_id),
         )
@@ -1161,12 +1168,15 @@ class ModifyEndpoint(graphene.Mutation):
         props: ModifyEndpointInput,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
 
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
-                user_role=graph_ctx.user["role"],
+            user_data=UserData(
                 user_id=graph_ctx.user["uuid"],
+                is_authorized=True,
+                is_admin=user_role == UserRole.ADMIN,
+                is_superadmin=user_role == UserRole.SUPERADMIN,
+                role=str(user_role.name).lower(),
                 domain_name=graph_ctx.user["domain_name"],
             ),
             endpoint_id=endpoint_id,

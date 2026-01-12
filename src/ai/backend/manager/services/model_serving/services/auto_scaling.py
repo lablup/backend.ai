@@ -3,10 +3,9 @@ from __future__ import annotations
 import decimal
 import logging
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.errors.service import EndpointAccessForbiddenError
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.options import EndpointConditions
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
@@ -50,19 +49,19 @@ class AutoScalingService:
     ) -> None:
         self._repository = repository
 
-    async def check_requester_access(self, requester_ctx: RequesterCtx) -> None:
-        if requester_ctx.is_authorized is False:
+    async def check_requester_access(self, user_data: UserData) -> None:
+        if user_data.is_authorized is False:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
 
     async def scale_service_replicas(
         self, action: ScaleServiceReplicasAction
     ) -> ScaleServiceReplicasActionResult:
         # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
+        await self.check_requester_access(action.user_data)
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.user_data):
             raise EndpointAccessForbiddenError
 
         # Update replicas (access already validated)
@@ -87,7 +86,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(action.endpoint_id)
         if not endpoint_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.user_data):
             raise EndpointAccessForbiddenError
 
         # Create auto scaling rule (access already validated)
@@ -123,7 +122,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
         if not endpoint_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.user_data):
             raise EndpointAccessForbiddenError
 
         # Update auto scaling rule (access already validated)
@@ -148,7 +147,7 @@ class AutoScalingService:
         endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
         if not endpoint_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(endpoint_data, action.user_data):
             raise EndpointAccessForbiddenError
 
         # Delete auto scaling rule (access already validated)
@@ -164,20 +163,19 @@ class AutoScalingService:
         self, action: SearchAutoScalingRulesAction
     ) -> SearchAutoScalingRulesActionResult:
         """Searches endpoint auto scaling rules."""
-        await self.check_requester_access(action.requester_ctx)
+        await self.check_requester_access(action.user_data)
 
         # Apply access control conditions based on role
-        match action.requester_ctx.user_role:
-            case UserRole.SUPERADMIN:
-                pass  # No additional conditions for SUPERADMIN
-            case UserRole.ADMIN:
-                action.querier.conditions.append(
-                    EndpointConditions.by_domain(action.requester_ctx.domain_name)
-                )
-            case UserRole.USER | UserRole.MONITOR:
-                action.querier.conditions.append(
-                    EndpointConditions.by_session_owner(action.requester_ctx.user_id)
-                )
+        if action.user_data.is_superadmin:
+            pass  # No additional conditions for SUPERADMIN
+        elif action.user_data.is_admin:
+            action.querier.conditions.append(
+                EndpointConditions.by_domain(action.user_data.domain_name)
+            )
+        else:
+            action.querier.conditions.append(
+                EndpointConditions.by_session_owner(action.user_data.user_id)
+            )
 
         result = await self._repository.search_auto_scaling_rules(querier=action.querier)
 
