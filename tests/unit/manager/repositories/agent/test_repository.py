@@ -69,6 +69,21 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.testutils.db import with_tables
 
 
+@dataclass
+class ScalingGroupFixtureData:
+    """Data from scaling_group fixture"""
+
+    name: str
+
+
+@dataclass
+class AgentFixtureData:
+    """Data from agent fixtures (alive_agent, lost_agent)"""
+
+    agent_id: AgentId
+    scaling_group: str
+
+
 class TestAgentRepositoryDB:
     """Test cases for AgentRepository with real database"""
 
@@ -107,12 +122,12 @@ class TestAgentRepositoryDB:
             yield database_connection
 
     @pytest.fixture
-    def sample_agent_info(self) -> AgentInfo:
+    def sample_agent_info(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
         """Create sample agent info for testing"""
         return AgentInfo(
             ip="192.168.1.100",
             version="24.12.0",
-            scaling_group="default",
+            scaling_group=scaling_group.name,
             available_resource_slots=ResourceSlot({
                 SlotName("cpu"): "8",
                 SlotName("mem"): "32768",
@@ -134,12 +149,12 @@ class TestAgentRepositoryDB:
         )
 
     @pytest.fixture
-    def sample_agent_info_with_new_slots(self) -> AgentInfo:
+    def sample_agent_info_with_new_slots(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
         """Create sample agent info with additional slot types for testing resource slot updates"""
         return AgentInfo(
             ip="192.168.1.101",
             version="24.12.0",
-            scaling_group="default",
+            scaling_group=scaling_group.name,
             available_resource_slots=ResourceSlot({
                 SlotName("cpu"): "8",
                 SlotName("mem"): "32768",
@@ -209,9 +224,9 @@ class TestAgentRepositoryDB:
     async def scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
         """Create default scaling group in database"""
-        name = "default"
+        name = str(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
                 name=name,
@@ -225,23 +240,23 @@ class TestAgentRepositoryDB:
                 use_host_network=False,
             )
             db_sess.add(scaling_group)
-        yield name
+        yield ScalingGroupFixtureData(name=name)
 
     @pytest.fixture
     async def alive_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: str,
-    ) -> AsyncGenerator[AgentId, None]:
+        scaling_group: ScalingGroupFixtureData,
+    ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create an alive agent in database"""
-        agent_id = AgentId("agent-alive")
+        agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group,
+                scaling_group=scaling_group.name,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -256,23 +271,23 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield agent_id
+        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
 
     @pytest.fixture
     async def lost_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: str,
-    ) -> AsyncGenerator[AgentId, None]:
+        scaling_group: ScalingGroupFixtureData,
+    ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create a lost agent in database"""
-        agent_id = AgentId("agent-lost")
+        agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.LOST,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group,
+                scaling_group=scaling_group.name,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -287,21 +302,21 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield agent_id
+        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
 
     # ==================== get_by_id tests ====================
 
     async def test_get_by_id_existing_agent(
         self,
         agent_repository: AgentRepository,
-        alive_agent: AgentId,
+        alive_agent: AgentFixtureData,
     ) -> None:
         """Test getting an existing agent by ID"""
-        result = await agent_repository.get_by_id(alive_agent)
+        result = await agent_repository.get_by_id(alive_agent.agent_id)
 
-        assert result.id == alive_agent
+        assert result.id == alive_agent.agent_id
         assert result.status == AgentStatus.ALIVE
-        assert result.scaling_group == "default"
+        assert result.scaling_group == alive_agent.scaling_group
 
     async def test_get_by_id_nonexistent_agent(
         self,
@@ -316,7 +331,6 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_new_agent(
         self,
         agent_repository: AgentRepository,
-        scaling_group: str,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat creates a new agent"""
@@ -338,49 +352,69 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_existing_agent_alive(
         self,
         agent_repository: AgentRepository,
-        alive_agent: AgentId,
+        alive_agent: AgentFixtureData,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat updates an existing alive agent"""
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=alive_agent,
+            agent_id=alive_agent.agent_id,
             agent_info=sample_agent_info,
             heartbeat_received=datetime.now(tzutc()),
         )
 
-        result = await agent_repository.sync_agent_heartbeat(alive_agent, upsert_data)
+        result = await agent_repository.sync_agent_heartbeat(alive_agent.agent_id, upsert_data)
 
         assert result.was_revived is False
 
     async def test_sync_agent_heartbeat_revived_agent(
         self,
         agent_repository: AgentRepository,
-        lost_agent: AgentId,
+        lost_agent: AgentFixtureData,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat revives a previously lost agent"""
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=lost_agent,
+            agent_id=lost_agent.agent_id,
             agent_info=sample_agent_info,
             heartbeat_received=datetime.now(tzutc()),
         )
 
-        result = await agent_repository.sync_agent_heartbeat(lost_agent, upsert_data)
+        result = await agent_repository.sync_agent_heartbeat(lost_agent.agent_id, upsert_data)
 
         assert result.was_revived is True
-        agent = await agent_repository.get_by_id(lost_agent)
+        agent = await agent_repository.get_by_id(lost_agent.agent_id)
         assert agent.status == AgentStatus.ALIVE
 
     async def test_sync_agent_heartbeat_scaling_group_not_found(
         self,
         agent_repository: AgentRepository,
-        sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat raises ScalingGroupNotFound for non-existent scaling group"""
         agent_id = AgentId("agent-no-sgroup")
+        agent_info_with_nonexistent_sg = AgentInfo(
+            ip="192.168.1.100",
+            version="24.12.0",
+            scaling_group="nonexistent-scaling-group",
+            available_resource_slots=ResourceSlot({
+                SlotName("cpu"): "8",
+                SlotName("mem"): "32768",
+            }),
+            slot_key_and_units={
+                SlotName("cpu"): SlotTypes.COUNT,
+                SlotName("mem"): SlotTypes.BYTES,
+            },
+            compute_plugins={DeviceName("cpu"): {}},
+            addr="tcp://192.168.1.100:6001",
+            public_key=PublicKey(b"test-public-key"),
+            public_host="192.168.1.100",
+            images=b"\x82\xc4\x00\x00",
+            region="us-west-1",
+            architecture="x86_64",
+            auto_terminate_abusing_kernel=False,
+        )
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
             agent_id=agent_id,
-            agent_info=sample_agent_info,
+            agent_info=agent_info_with_nonexistent_sg,
             heartbeat_received=datetime.now(tzutc()),
         )
 
@@ -390,7 +424,6 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_with_new_resource_slots(
         self,
         agent_repository: AgentRepository,
-        scaling_group: str,
         sample_agent_info_with_new_slots: AgentInfo,
         mock_config_provider: MagicMock,
     ) -> None:
@@ -584,7 +617,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create default domain"""
-        domain_name = "default"
+        domain_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
                 name=domain_name,
@@ -601,7 +634,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create default project resource policy"""
-        policy_name = "default"
+        policy_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             policy = ProjectResourcePolicyRow(
                 name=policy_name,
@@ -639,7 +672,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create default scaling group"""
-        name = "default"
+        name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
                 name=name,
