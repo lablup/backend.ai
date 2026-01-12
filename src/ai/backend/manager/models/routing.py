@@ -30,7 +30,6 @@ from .base import (
     InferenceSessionError,
     Item,
     PaginatedList,
-    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -94,7 +93,7 @@ class RoutingRow(Base):
     revision = sa.Column("revision", GUID, nullable=True)
     traffic_status = sa.Column(
         "traffic_status",
-        StrEnumType(RouteTrafficStatus),
+        EnumValueType(RouteTrafficStatus),
         nullable=False,
         server_default=sa.text("'active'"),
         default=RouteTrafficStatus.ACTIVE,
