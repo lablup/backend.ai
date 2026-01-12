@@ -515,4 +515,3 @@ Predefined, reusable role definitions that can be instantiated across different 
 - [BEP-1008: Backend.AI Role-Based Access Control (RBAC)](./BEP-1008-RBAC.md) - Technical implementation details and architecture
 - [BEP-1012 RBAC Entity and Field Types](./entity-types.md) - Complete list of entity types and field types
 - [BEP-1012 RBAC Design Decisions](./design-decision.md) - Key design decisions made during specification development
-- [BEP-1012 RBAC Table Relations](./table-relations.md) - Database table structure and relationships
