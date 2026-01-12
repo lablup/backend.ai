@@ -7,6 +7,9 @@ from typing import Optional
 
 from ai.backend.client.request import Request
 from ai.backend.common.dto.manager.export import (
+    AuditLogExportCSVRequest,
+    AuditLogExportFilter,
+    AuditLogExportOrder,
     GetExportReportResponse,
     ListExportReportsResponse,
     ProjectExportCSVRequest,
@@ -179,6 +182,49 @@ class Export(BaseFunction):
         )
 
         rqst = Request("POST", "/export/projects/csv")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        if filename:
+            rqst.headers["X-Export-Filename"] = filename
+
+        async with rqst.fetch() as resp:
+            async for chunk in resp.content.iter_chunked(chunk_size):
+                yield chunk
+
+    # =========================================================================
+    # Audit Log Export
+    # =========================================================================
+
+    @api_function
+    @classmethod
+    async def stream_audit_logs_csv(
+        cls,
+        *,
+        fields: Optional[list[str]] = None,
+        filter: Optional[AuditLogExportFilter] = None,
+        order: Optional[list[AuditLogExportOrder]] = None,
+        encoding: str = "utf-8",
+        filename: Optional[str] = None,
+        chunk_size: int = 8192,
+    ) -> AsyncIterator[bytes]:
+        """
+        Stream audit log export as an async iterator of chunks.
+
+        :param fields: Optional list of field keys to include (default: all fields)
+        :param filter: Optional audit log-specific filter conditions
+        :param order: Optional list of audit log order specifications
+        :param encoding: CSV encoding (default: utf-8, also supports euc-kr)
+        :param filename: Optional filename for the export
+        :param chunk_size: Size of chunks to yield (default: 8192 bytes)
+        :yields: Chunks of CSV data as bytes
+        """
+        request = AuditLogExportCSVRequest(
+            fields=fields,
+            filter=filter,
+            order=order,
+            encoding=encoding,
+        )
+
+        rqst = Request("POST", "/export/audit-logs/csv")
         rqst.set_json(request.model_dump(mode="json", exclude_none=True))
         if filename:
             rqst.headers["X-Export-Filename"] = filename

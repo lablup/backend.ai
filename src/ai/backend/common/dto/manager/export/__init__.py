@@ -4,7 +4,7 @@ Common DTOs for export system used by both Client SDK and Manager.
 This package provides DTOs for the CSV export API:
 - Common types: OrderDirection, ExportFieldInfo, ExportReportInfo
 - Common request types: DateTimeRangeFilter
-- Report-specific DTOs: Users, Sessions, Projects
+- Report-specific DTOs: Users, Sessions, Projects, AuditLogs
 - Response DTOs: ListExportReportsResponse, GetExportReportResponse
 """
 
@@ -12,6 +12,12 @@ from __future__ import annotations
 
 from ai.backend.common.dto.manager.query import DateTimeRangeFilter
 
+from .audit_logs import (
+    AuditLogExportCSVRequest,
+    AuditLogExportFilter,
+    AuditLogExportOrder,
+    AuditLogExportOrderField,
+)
 from .projects import (
     BooleanFilter,
     ProjectExportCSVRequest,
@@ -66,6 +72,11 @@ __all__ = (
     "ProjectExportOrder",
     "ProjectExportOrderField",
     "ProjectExportCSVRequest",
+    # Audit Log Export DTOs
+    "AuditLogExportFilter",
+    "AuditLogExportOrder",
+    "AuditLogExportOrderField",
+    "AuditLogExportCSVRequest",
     # Response DTOs
     "GetExportReportResponse",
     "ListExportReportsResponse",

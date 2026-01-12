@@ -9,6 +9,8 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from .actions import (
+    ExportAuditLogsCSVAction,
+    ExportAuditLogsCSVActionResult,
     ExportProjectsCSVAction,
     ExportProjectsCSVActionResult,
     ExportSessionsCSVAction,
@@ -31,7 +33,7 @@ class ExportProcessors(AbstractProcessorPackage):
     Provides processors for:
     - Listing available reports
     - Getting report metadata
-    - Report-specific CSV exports (users, sessions, projects)
+    - Report-specific CSV exports (users, sessions, projects, audit-logs)
     """
 
     list_reports: ActionProcessor[ListReportsAction, ListReportsActionResult]
@@ -39,6 +41,7 @@ class ExportProcessors(AbstractProcessorPackage):
     export_users_csv: ActionProcessor[ExportUsersCSVAction, ExportUsersCSVActionResult]
     export_sessions_csv: ActionProcessor[ExportSessionsCSVAction, ExportSessionsCSVActionResult]
     export_projects_csv: ActionProcessor[ExportProjectsCSVAction, ExportProjectsCSVActionResult]
+    export_audit_logs_csv: ActionProcessor[ExportAuditLogsCSVAction, ExportAuditLogsCSVActionResult]
 
     def __init__(self, service: ExportService, action_monitors: list[ActionMonitor]) -> None:
         self.list_reports = ActionProcessor(service.list_reports, action_monitors)
@@ -46,6 +49,7 @@ class ExportProcessors(AbstractProcessorPackage):
         self.export_users_csv = ActionProcessor(service.export_users_csv, action_monitors)
         self.export_sessions_csv = ActionProcessor(service.export_sessions_csv, action_monitors)
         self.export_projects_csv = ActionProcessor(service.export_projects_csv, action_monitors)
+        self.export_audit_logs_csv = ActionProcessor(service.export_audit_logs_csv, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -55,4 +59,5 @@ class ExportProcessors(AbstractProcessorPackage):
             ExportUsersCSVAction.spec(),
             ExportSessionsCSVAction.spec(),
             ExportProjectsCSVAction.spec(),
+            ExportAuditLogsCSVAction.spec(),
         ]
