@@ -223,9 +223,7 @@ def coordinator_with_provisioning_routes(
     sample_route_data: RouteData,
 ) -> Generator[RouteCoordinator, None, None]:
     """Coordinator with PROVISIONING routes available."""
-    mock_deployment_repository.get_routes_by_statuses = AsyncMock(
-        return_value=[sample_route_data]
-    )
+    mock_deployment_repository.get_routes_by_statuses = AsyncMock(return_value=[sample_route_data])
 
     coordinator = RouteCoordinator(
         valkey_schedule=mock_valkey_schedule,
@@ -349,9 +347,7 @@ class TestProcessRouteLifecycle:
         mock_deployment_repository: AsyncMock,
     ) -> None:
         """History is not recorded when no routes to process."""
-        await coordinator_without_routes.process_route_lifecycle(
-            RouteLifecycleType.PROVISIONING
-        )
+        await coordinator_without_routes.process_route_lifecycle(RouteLifecycleType.PROVISIONING)
 
         mock_deployment_repository.update_route_status_bulk_with_history.assert_not_called()
 
