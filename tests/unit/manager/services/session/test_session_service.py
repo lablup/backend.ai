@@ -1406,7 +1406,7 @@ class TestCheckAndTransitStatus:
         mock_session.status = SessionStatus.RUNNING
         mock_session.to_dataclass.return_value = MagicMock()
 
-        mock_session_repository.get_session_by_id_for_status = AsyncMock(return_value=mock_session)
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
         mock_session_repository.get_session_owner = AsyncMock(return_value=None)
 
         mock_agent_registry.session_lifecycle_mgr = MagicMock()
@@ -1424,9 +1424,7 @@ class TestCheckAndTransitStatus:
 
         assert isinstance(result, CheckAndTransitStatusActionResult)
         assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id_for_status.assert_called_once_with(
-            sample_session_id
-        )
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
 
     async def test_check_and_transit_status_as_admin_success(
         self,
@@ -1444,7 +1442,7 @@ class TestCheckAndTransitStatus:
         mock_session.status = SessionStatus.RUNNING
         mock_session.to_dataclass.return_value = MagicMock()
 
-        mock_session_repository.get_session_by_id_for_status = AsyncMock(return_value=mock_session)
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
         mock_session_repository.get_session_owner = AsyncMock(return_value=None)
 
         mock_agent_registry.session_lifecycle_mgr = MagicMock()
@@ -1462,9 +1460,7 @@ class TestCheckAndTransitStatus:
 
         assert isinstance(result, CheckAndTransitStatusActionResult)
         assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id_for_status.assert_called_once_with(
-            sample_session_id
-        )
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
 
     async def test_check_and_transit_status_as_user_own_session_success(
         self,
@@ -1481,7 +1477,7 @@ class TestCheckAndTransitStatus:
         mock_session.status = SessionStatus.RUNNING
         mock_session.to_dataclass.return_value = MagicMock()
 
-        mock_session_repository.get_session_by_id_for_status = AsyncMock(return_value=mock_session)
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
         mock_session_repository.get_session_owner = AsyncMock(return_value=None)
 
         mock_agent_registry.session_lifecycle_mgr = MagicMock()
@@ -1499,9 +1495,7 @@ class TestCheckAndTransitStatus:
 
         assert isinstance(result, CheckAndTransitStatusActionResult)
         assert sample_session_id in result.result
-        mock_session_repository.get_session_by_id_for_status.assert_called_once_with(
-            sample_session_id
-        )
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
 
     async def test_check_and_transit_status_as_user_other_session_skipped(
         self,
@@ -1519,7 +1513,7 @@ class TestCheckAndTransitStatus:
         mock_session.status = SessionStatus.RUNNING
         mock_session.to_dataclass.return_value = MagicMock()
 
-        mock_session_repository.get_session_by_id_for_status = AsyncMock(return_value=mock_session)
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session)
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,
@@ -1531,9 +1525,7 @@ class TestCheckAndTransitStatus:
         assert isinstance(result, CheckAndTransitStatusActionResult)
         # Result should be empty when user tries to transit other's session
         assert result.result == {}
-        mock_session_repository.get_session_by_id_for_status.assert_called_once_with(
-            sample_session_id
-        )
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
         # transit_session_status should NOT be called
         mock_agent_registry.session_lifecycle_mgr.transit_session_status.assert_not_called()
 
@@ -1545,9 +1537,7 @@ class TestCheckAndTransitStatus:
         sample_user_id: UUID,
     ) -> None:
         """Test check_and_transit_status raises SessionNotFound for non-existent session."""
-        mock_session_repository.get_session_by_id_for_status = AsyncMock(
-            side_effect=SessionNotFound(f"Session not found (id:{sample_session_id})")
-        )
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=None)
 
         action = CheckAndTransitStatusAction(
             user_id=sample_user_id,

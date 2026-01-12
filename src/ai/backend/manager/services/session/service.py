@@ -1414,13 +1414,15 @@ class SessionService:
         session_id = action.session_id
 
         # Fetch session by ID without ownership check
-        session_row = await self._session_repository.get_session_by_id_for_status(session_id)
+        session_row = await self._session_repository.get_session_by_id(session_id)
+        if session_row is None:
+            raise SessionNotFound(f"Session not found (id:{session_id})")
 
         # Regular users can only transit their own sessions
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             if session_row.user_uuid != user_id:
                 log.warning(
-                    f"You are not allowed to transit others's sessions status, skip (s:{session_id})"
+                    f"You are not allowed to transit other user's session status, skip (s:{session_id})"
                 )
                 return CheckAndTransitStatusActionResult(
                     result={}, session_data=session_row.to_dataclass()
