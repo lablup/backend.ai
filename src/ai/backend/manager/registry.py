@@ -2836,9 +2836,7 @@ class AgentRegistry:
                         )
                     else:
                         try:
-                            async with self._agent_client_pool.acquire(
-                                AgentId(agent_id)
-                            ) as client:
+                            async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
@@ -2975,9 +2973,7 @@ class AgentRegistry:
                 major_api_version = 3
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.execute(
                     session.id,
@@ -2997,9 +2993,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.trigger_batch_execution(
                     session.id,
@@ -3015,9 +3009,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "execute", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.interrupt_kernel(session.main_kernel.id)
 
@@ -3031,9 +3023,7 @@ class AgentRegistry:
             # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 result = await client.get_completions(session.main_kernel.id, text, opts)
             return CodeCompletionResp.from_dict(result)
@@ -3047,9 +3037,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "execute", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.start_service(session.main_kernel.id, service, opts)
 
@@ -3061,9 +3049,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "shutdown_service", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.shutdown_service(session.main_kernel.id, service)
 
@@ -3076,9 +3062,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "upload_file", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.upload_file(session.main_kernel.id, filename, payload)
 
@@ -3091,9 +3075,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "download_file", kernel.session_id):
             agent_id = kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Kernel {kernel.id} has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.download_file(kernel.id, filepath)
 
@@ -3107,9 +3089,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "download_single", kernel.session_id):
             agent_id = kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Kernel {kernel.id} has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.download_single(kernel.id, filepath)
 
@@ -3121,9 +3101,7 @@ class AgentRegistry:
         async with handle_session_exception(self.db, "list_files", session.id):
             agent_id = session.main_kernel.agent
             if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Session {session.id} main kernel has no agent allocated"
-                )
+                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
                 return await client.list_files(session.main_kernel.id, path)
 
