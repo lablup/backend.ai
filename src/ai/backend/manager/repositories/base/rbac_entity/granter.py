@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -23,6 +24,10 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 
 from .utils import bulk_insert_on_conflict_do_nothing, insert_on_conflict_do_nothing
 
+# =============================================================================
+# Data Classes
+# =============================================================================
+
 
 @dataclass
 class Granter:
@@ -44,13 +49,16 @@ class Granter:
     operations: list[OperationType]
 
 
+# =============================================================================
+# Query Helpers
+# =============================================================================
+
+
 async def _find_system_roles_for_scope(
     db_sess: SASession,
     scope_id: ScopeId,
 ) -> list[RoleRow]:
-    """
-    Find system roles associated with the given scope via PermissionGroupRow.
-    """
+    """Find system roles associated with the given scope via PermissionGroupRow."""
     result = await db_sess.scalars(
         sa.select(RoleRow)
         .select_from(sa.join(RoleRow, PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id))
@@ -65,41 +73,42 @@ async def _find_system_roles_for_scope(
     return list(result.all())
 
 
-async def _ensure_entity_scope_permission_group(
+# =============================================================================
+# Insert Helpers
+# =============================================================================
+
+
+async def _insert_permission_groups(
     db_sess: SASession,
-    role_ids: list[UUID],
-    entity_scope_id: ScopeId,
+    role_ids: Collection[UUID],
+    scope_id: ScopeId,
 ) -> None:
     """
-    Ensure each role has a permission group for the granted entity's original scope.
+    Ensure each role has a permission group for the given scope.
 
     When granting access to an entity, the target role needs a permission group
     for the entity's original scope to properly access it.
-
-    Args:
-        db_sess: Async SQLAlchemy session.
-        role_ids: List of role IDs to ensure permission groups for.
-        entity_scope_id: The original scope of the granted entity.
     """
     await bulk_insert_on_conflict_do_nothing(
         db_sess,
         [
             PermissionGroupRow(
                 role_id=role_id,
-                scope_type=entity_scope_id.scope_type,
-                scope_id=entity_scope_id.scope_id,
+                scope_type=scope_id.scope_type,
+                scope_id=scope_id.scope_id,
             )
             for role_id in role_ids
         ],
     )
 
 
-async def _add_object_permissions(
+async def _insert_object_permissions(
     db_sess: SASession,
-    role_ids: list[UUID],
+    role_ids: Collection[UUID],
     entity_id: ObjectId,
-    operations: list[OperationType],
+    operations: Collection[OperationType],
 ) -> None:
+    """Insert object permissions for given roles, entity, and operations."""
     await bulk_insert_on_conflict_do_nothing(
         db_sess,
         [
@@ -115,20 +124,26 @@ async def _add_object_permissions(
     )
 
 
-async def _add_scope_entity_association(
+async def _insert_scope_entity_association(
     db_sess: SASession,
-    target_scope_id: ScopeId,
+    scope_id: ScopeId,
     entity_id: ObjectId,
 ) -> None:
+    """Insert a scope-entity association to link the entity with the target scope."""
     await insert_on_conflict_do_nothing(
         db_sess,
         AssociationScopesEntitiesRow(
-            scope_type=target_scope_id.scope_type,
-            scope_id=target_scope_id.scope_id,
+            scope_type=scope_id.scope_type,
+            scope_id=scope_id.scope_id,
             entity_type=entity_id.entity_type,
             entity_id=entity_id.entity_id,
         ),
     )
+
+
+# =============================================================================
+# Public API
+# =============================================================================
 
 
 async def execute_rbac_entity_granter(
@@ -148,28 +163,15 @@ async def execute_rbac_entity_granter(
         granter: Granter instance containing granted_entity_id, target_scope_id, and operations.
     """
     target_scope_id = granter.target_scope_id
-
     entity_scope_id = granter.granted_entity_scope_id
     entity_id = granter.granted_entity_id
 
-    # Find system roles for this scope
+    # Find system roles for the target scope
     system_roles = await _find_system_roles_for_scope(db_sess, target_scope_id)
     role_ids: list[UUID] = [role.id for role in system_roles]
 
-    await _ensure_entity_scope_permission_group(
-        db_sess,
-        role_ids,
-        entity_scope_id,
-    )
-    await _add_object_permissions(
-        db_sess,
-        role_ids,
-        entity_id,
-        granter.operations,
-    )
-    await _add_scope_entity_association(
-        db_sess,
-        target_scope_id,
-        entity_id,
-    )
+    # Grant permissions
+    await _insert_permission_groups(db_sess, role_ids, entity_scope_id)
+    await _insert_object_permissions(db_sess, role_ids, entity_id, granter.operations)
+    await _insert_scope_entity_association(db_sess, target_scope_id, entity_id)
     await db_sess.flush()
