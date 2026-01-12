@@ -23,6 +23,10 @@ from ai.backend.manager.repositories.base.purger import Purger as BasePurger
 from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurgerResult
 from ai.backend.manager.repositories.base.purger import TRow
 
+# =============================================================================
+# Data Classes
+# =============================================================================
+
 
 @dataclass
 class Purger(BasePurger[TRow]):
@@ -42,13 +46,21 @@ class PurgerResult(BasePurgerResult[TRow]):
     pass
 
 
+# =============================================================================
+# Query Helpers
+# =============================================================================
+
+
 async def _get_related_roles(
     db_sess: SASession,
     object_id: ObjectId,
 ) -> list[RoleRow]:
     """
-    Get all roles related to the given entity as object permissions.
-    Loads object_permissions with their scope_associations, and permission_groups with permissions.
+    Get all roles related to the given entity via object permissions.
+
+    Eagerly loads:
+    - object_permissions with their scope_associations
+    - permission_groups with their permissions
     """
     role_scalars = await db_sess.scalars(
         sa.select(RoleRow)
@@ -71,14 +83,19 @@ async def _get_related_roles(
     return list(role_scalars.unique().all())
 
 
-def _perm_group_ids_to_delete_in_role(
+# =============================================================================
+# ID Collection Helpers (Pure Functions)
+# =============================================================================
+
+
+def _find_orphaned_perm_groups_in_role(
     role_row: RoleRow,
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
     """
     Identify permission_groups to delete when an entity is removed from a role.
 
-    A permission_group is deleted if:
+    A permission_group is considered orphaned and should be deleted if:
     1. It has no remaining PermissionRow entries, AND
     2. No other object_permission entity in this role belongs to the same scope.
     """
@@ -104,23 +121,25 @@ def _perm_group_ids_to_delete_in_role(
     return perm_group_ids
 
 
-def _perm_group_ids_to_delete(
+def _find_orphaned_perm_groups(
     role_rows: Collection[RoleRow],
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
+    """Collect orphaned permission group IDs across all roles."""
     if not role_rows:
         return []
     permission_group_ids: list[UUID] = []
     for role_row in role_rows:
-        perm_group_ids = _perm_group_ids_to_delete_in_role(role_row, entity_to_delete)
+        perm_group_ids = _find_orphaned_perm_groups_in_role(role_row, entity_to_delete)
         permission_group_ids.extend(perm_group_ids)
     return permission_group_ids
 
 
-def _object_permission_ids_to_delete(
+def _find_object_permissions_for_entity(
     role_rows: Collection[RoleRow],
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
+    """Collect object permission IDs that reference the entity to be deleted."""
     if not role_rows:
         return []
     object_permission_ids: list[UUID] = []
@@ -132,10 +151,74 @@ def _object_permission_ids_to_delete(
     return object_permission_ids
 
 
-async def _delete_main_object_row(
+# =============================================================================
+# Deletion Helpers
+# =============================================================================
+
+
+async def _delete_object_permissions(
+    db_sess: SASession,
+    ids: Collection[UUID],
+) -> None:
+    """Delete ObjectPermissionRows by IDs."""
+    if not ids:
+        return
+    await db_sess.execute(
+        sa.delete(ObjectPermissionRow).where(
+            ObjectPermissionRow.id.in_(ids)  # type: ignore[attr-defined]
+        )
+    )
+
+
+async def _delete_permission_groups(
+    db_sess: SASession,
+    ids: Collection[UUID],
+) -> None:
+    """Delete PermissionGroupRows by IDs."""
+    if not ids:
+        return
+    await db_sess.execute(
+        sa.delete(PermissionGroupRow).where(
+            PermissionGroupRow.id.in_(ids)  # type: ignore[attr-defined]
+        )
+    )
+
+
+async def _delete_scope_associations(
+    db_sess: SASession,
+    entity_id: ObjectId,
+) -> None:
+    """Delete all scope associations for the given entity."""
+    await db_sess.execute(
+        sa.delete(AssociationScopesEntitiesRow).where(
+            sa.and_(
+                AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
+                AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+            )
+        )
+    )
+
+
+async def _delete_entity_field(
+    db_sess: SASession,
+    field_id: ObjectId,
+) -> None:
+    """Delete EntityFieldRow for the given field."""
+    await db_sess.execute(
+        sa.delete(EntityFieldRow).where(
+            sa.and_(
+                EntityFieldRow.field_id == field_id.entity_id,
+                EntityFieldRow.field_type == field_id.entity_type,
+            )
+        )
+    )
+
+
+async def _delete_main_row(
     db_sess: SASession,
     purger: Purger[TRow],
 ) -> TRow | None:
+    """Delete the main entity row by primary key and return the deleted row."""
     row_class = purger.row_class
     table = row_class.__table__  # type: ignore[attr-defined]
     pk_columns = list(table.primary_key.columns)
@@ -157,59 +240,56 @@ async def _delete_main_object_row(
     return deleted_row
 
 
-async def _delete_related_rows(
-    db_sess: SASession,
-    purger: Purger[TRow],
-) -> None:
-    entity_id = purger.entity_id
-    field_id = purger.field_id
-    if field_id is not None:
-        await _delete_rbac_field(db_sess, field_id)
-    else:
-        await _delete_rbac_entity(db_sess, entity_id)
+# =============================================================================
+# Orchestration
+# =============================================================================
 
 
 async def _delete_rbac_entity(
     db_sess: SASession,
     entity_id: ObjectId,
 ) -> None:
-    # Get all roles with object_permissions and their scope_associations eagerly loaded
+    """
+    Delete all RBAC entries related to an entity.
+
+    Deletion order:
+    1. ObjectPermissionRows - permissions granted on this entity
+    2. PermissionGroupRows - orphaned groups with no remaining permissions/entities
+    3. AssociationScopesEntitiesRows - scope-entity mappings
+    """
+    # Collect related data
     role_rows = await _get_related_roles(db_sess, entity_id)
-    object_permission_ids = _object_permission_ids_to_delete(role_rows, entity_id)
-    permission_group_ids = _perm_group_ids_to_delete(role_rows, entity_id)
+    object_permission_ids = _find_object_permissions_for_entity(role_rows, entity_id)
+    permission_group_ids = _find_orphaned_perm_groups(role_rows, entity_id)
 
     # Execute deletions
-    if object_permission_ids:
-        await db_sess.execute(
-            sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(object_permission_ids))  # type: ignore[attr-defined]
-        )
-    if permission_group_ids:
-        await db_sess.execute(
-            sa.delete(PermissionGroupRow).where(PermissionGroupRow.id.in_(permission_group_ids))  # type: ignore[attr-defined]
-        )
-    # Delete scope associations for the deleted entity
-    await db_sess.execute(
-        sa.delete(AssociationScopesEntitiesRow).where(
-            sa.and_(
-                AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
-                AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
-            )
-        )
-    )
+    await _delete_object_permissions(db_sess, object_permission_ids)
+    await _delete_permission_groups(db_sess, permission_group_ids)
+    await _delete_scope_associations(db_sess, entity_id)
 
 
 async def _delete_rbac_field(
     db_sess: SASession,
     field_id: ObjectId,
 ) -> None:
-    await db_sess.execute(
-        sa.delete(EntityFieldRow).where(
-            sa.and_(
-                EntityFieldRow.field_id == field_id.entity_id,
-                EntityFieldRow.field_type == field_id.entity_type,
-            )
-        )
-    )
+    """Delete RBAC entries for a field-scoped entity."""
+    await _delete_entity_field(db_sess, field_id)
+
+
+async def _delete_related_rbac_entries(
+    db_sess: SASession,
+    purger: Purger[TRow],
+) -> None:
+    """Delete RBAC entries based on whether it's an entity or field."""
+    if purger.field_id is not None:
+        await _delete_rbac_field(db_sess, purger.field_id)
+    else:
+        await _delete_rbac_entity(db_sess, purger.entity_id)
+
+
+# =============================================================================
+# Public API
+# =============================================================================
 
 
 async def execute_rbac_entity_purger(
@@ -218,23 +298,23 @@ async def execute_rbac_entity_purger(
 ) -> PurgerResult[TRow] | None:
     """
     Execute DELETE for a single row by primary key, along with related RBAC entries.
-    - Delete the main object row.
-    - Delete associated EntityFieldRow if field-scoped.
-    - Delete related ObjectPermissionRow and AssociationScopesEntitiesRow.
-    - Delete PermissionGroupRow if:
-        - It has no remaining PermissionRow entries.
-        - And the deleted object was the only one scoped to that permission group.
+
+    Operations performed:
+    - Delete associated EntityFieldRow if field-scoped
+    - Delete related ObjectPermissionRow entries
+    - Delete orphaned PermissionGroupRow entries (no remaining permissions/entities)
+    - Delete AssociationScopesEntitiesRow entries
+    - Delete the main object row
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable)
-        purger: Purger containing row_class and pk_value
+        purger: Purger containing row_class, pk_value, entity_id, and optional field_id
 
     Returns:
         PurgerResult containing the deleted row, or None if no row matched
     """
-
-    await _delete_related_rows(db_sess, purger)
-    deleted_row = await _delete_main_object_row(db_sess, purger)
+    await _delete_related_rbac_entries(db_sess, purger)
+    deleted_row = await _delete_main_row(db_sess, purger)
     if deleted_row is None:
         return None
     return PurgerResult(row=deleted_row)
