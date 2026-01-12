@@ -204,7 +204,7 @@ class AgentStatusInfoGQL:
             Will be null if the agent status has never changed since initial registration.
         """)
     )
-    first_contact: datetime = strawberry.field(
+    first_contact: datetime | None = strawberry.field(
         description=dedent_strip("""
             Timestamp when the agent first registered with the manager.
             This value remains constant throughout the agent's lifecycle and can be used
