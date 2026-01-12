@@ -1,4 +1,4 @@
-"""Export processors for action processing."""
+"""Processor package for export operations."""
 
 from __future__ import annotations
 
@@ -7,41 +7,52 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.services.export.actions.export_csv import (
-    ExportCsvAction,
-    ExportCsvActionResult,
-)
-from ai.backend.manager.services.export.actions.list_reports import (
+
+from .actions import (
+    ExportProjectsCSVAction,
+    ExportProjectsCSVActionResult,
+    ExportSessionsCSVAction,
+    ExportSessionsCSVActionResult,
+    ExportUsersCSVAction,
+    ExportUsersCSVActionResult,
+    GetReportAction,
+    GetReportActionResult,
     ListReportsAction,
     ListReportsActionResult,
 )
-from ai.backend.manager.services.export.service import ExportService
+from .service import ExportService
+
+__all__ = ("ExportProcessors",)
 
 
 class ExportProcessors(AbstractProcessorPackage):
-    """Processors for export service actions."""
+    """Processor package for export operations.
+
+    Provides processors for:
+    - Listing available reports
+    - Getting report metadata
+    - Report-specific CSV exports (users, sessions, projects)
+    """
 
     list_reports: ActionProcessor[ListReportsAction, ListReportsActionResult]
-    export_csv: ActionProcessor[ExportCsvAction, ExportCsvActionResult]
+    get_report: ActionProcessor[GetReportAction, GetReportActionResult]
+    export_users_csv: ActionProcessor[ExportUsersCSVAction, ExportUsersCSVActionResult]
+    export_sessions_csv: ActionProcessor[ExportSessionsCSVAction, ExportSessionsCSVActionResult]
+    export_projects_csv: ActionProcessor[ExportProjectsCSVAction, ExportProjectsCSVActionResult]
 
-    def __init__(
-        self,
-        service: ExportService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        """Initialize export processors.
-
-        Args:
-            service: Export service instance
-            action_monitors: List of action monitors for observability
-        """
+    def __init__(self, service: ExportService, action_monitors: list[ActionMonitor]) -> None:
         self.list_reports = ActionProcessor(service.list_reports, action_monitors)
-        self.export_csv = ActionProcessor(service.export_csv, action_monitors)
+        self.get_report = ActionProcessor(service.get_report, action_monitors)
+        self.export_users_csv = ActionProcessor(service.export_users_csv, action_monitors)
+        self.export_sessions_csv = ActionProcessor(service.export_sessions_csv, action_monitors)
+        self.export_projects_csv = ActionProcessor(service.export_projects_csv, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
-        """Return list of supported action specifications."""
         return [
             ListReportsAction.spec(),
-            ExportCsvAction.spec(),
+            GetReportAction.spec(),
+            ExportUsersCSVAction.spec(),
+            ExportSessionsCSVAction.spec(),
+            ExportProjectsCSVAction.spec(),
         ]

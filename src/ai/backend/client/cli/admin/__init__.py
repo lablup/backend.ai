@@ -13,6 +13,7 @@ from . import (  # noqa
     agent,
     domain,
     etcd,
+    export,
     group,
     image,
     keypair,

@@ -1,130 +1,145 @@
-"""Export service for CSV streaming export.
-
-This module provides the ExportService class that orchestrates
-CSV export operations with concurrency control.
-"""
+"""Export service for handling export operations."""
 
 from __future__ import annotations
 
-import asyncio
-import logging
-from collections.abc import AsyncIterator, Sequence
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.export import (
-    InvalidExportFieldKeys,
-    TooManyConcurrentExports,
-)
-from ai.backend.manager.repositories.base.export import (
-    ExportDataStream,
-    StreamingExportQuery,
-)
-from ai.backend.manager.repositories.export.repository import ExportRepository
-from ai.backend.manager.services.export.actions.export_csv import (
-    ExportCsvAction,
-    ExportCsvActionResult,
-)
-from ai.backend.manager.services.export.actions.list_reports import (
+from .actions import (
+    GetReportAction,
+    GetReportActionResult,
     ListReportsAction,
     ListReportsActionResult,
 )
+from .actions.export_projects_csv import ExportProjectsCSVAction, ExportProjectsCSVActionResult
+from .actions.export_sessions_csv import ExportSessionsCSVAction, ExportSessionsCSVActionResult
+from .actions.export_users_csv import ExportUsersCSVAction, ExportUsersCSVActionResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.export import ExportRepository
+
+__all__ = ("ExportService",)
 
 
 class ExportService:
-    """CSV Export service.
+    """Service for export operations.
 
-    Provides action-based methods for listing available reports and executing
-    CSV exports with concurrency control via semaphore.
+    Handles listing reports, getting report details, and executing CSV exports.
+    Each report type (users, sessions, projects) has its own export method.
     """
 
-    _export_repository: ExportRepository
+    _repository: ExportRepository
 
     def __init__(
         self,
-        export_repository: ExportRepository,
-        max_concurrent_exports: int,
+        repository: ExportRepository,
     ) -> None:
         """Initialize ExportService.
 
         Args:
-            export_repository: Repository for export operations
-            max_concurrent_exports: Maximum number of concurrent export operations
+            repository: Export repository for data access
         """
-        self._export_repository = export_repository
-        self._semaphore = asyncio.Semaphore(max_concurrent_exports)
+        self._repository = repository
 
     async def list_reports(self, action: ListReportsAction) -> ListReportsActionResult:
         """List all available export reports.
 
         Args:
-            action: List reports action
+            action: List reports action (no parameters needed)
 
         Returns:
-            ListReportsActionResult containing all registered reports
+            Action result containing list of report definitions
         """
-        log.info("Listing available export reports")
-        reports = self._export_repository.list_reports()
+        reports = self._repository.list_reports()
         return ListReportsActionResult(reports=reports)
 
-    async def export_csv(self, action: ExportCsvAction) -> ExportCsvActionResult:
-        """Export report to CSV.
+    async def get_report(self, action: GetReportAction) -> GetReportActionResult:
+        """Get a specific export report by key.
 
         Args:
-            action: Export CSV action containing report_key, query_params, field_keys, and filename
+            action: Get report action with report_key
 
         Returns:
-            ExportCsvActionResult containing the CSV streaming reader
+            Action result containing the report definition
 
         Raises:
             ExportReportNotFound: If report_key is not found
-            InvalidExportFieldKeys: If any field_keys are invalid
-            TooManyConcurrentExports: Concurrent export limit exceeded
         """
-        log.info("Starting CSV export for report: {}", action.report_key)
+        report = self._repository.get_report(action.report_key)
+        return GetReportActionResult(report=report)
 
-        # Get report (raises ExportReportNotFound if not found)
-        report = self._export_repository.get_report(action.report_key)
-
-        # Validate field keys
-        invalid_keys = report.validate_field_keys(action.field_keys)
-        if invalid_keys:
-            raise InvalidExportFieldKeys(invalid_keys)
-
-        # Get selected field definitions and build query
-        fields = report.get_fields_by_keys(action.field_keys)
-        query = StreamingExportQuery.from_params(action.query_params, report.select_from, fields)
-
-        # Check concurrent export limit (non-blocking)
-        if self._semaphore.locked():
-            raise TooManyConcurrentExports()
-
-        # Extract field names for header
-        field_names = [f.name for f in fields]
-
-        data_stream = ExportDataStream(
-            field_names=field_names,
-            reader=self._stream_row_values(query),
-        )
-
-        return ExportCsvActionResult(data_stream=data_stream)
-
-    async def _stream_row_values(
-        self,
-        query: StreamingExportQuery,
-    ) -> AsyncIterator[Sequence[Sequence[Any]]]:
-        """Stream row values with semaphore limiting concurrent exports.
-
-        Yields partitions of row values for efficient async processing.
+    async def export_users_csv(self, action: ExportUsersCSVAction) -> ExportUsersCSVActionResult:
+        """Execute user CSV export.
 
         Args:
-            query: Export query containing fields, conditions, and limits
+            action: Export users CSV action with pre-built query
 
-        Yields:
-            Partitions of row values (each row in query.fields order)
+        Returns:
+            Action result containing field names, row iterator, and filename
         """
-        async with self._semaphore:
-            async for partition in self._export_repository.execute_export(query):
-                yield partition
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"users-{timestamp}.csv"
+
+        field_names = [f.name for f in action.query.fields]
+        row_iterator = self._repository.execute_export(action.query)
+
+        return ExportUsersCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_sessions_csv(
+        self, action: ExportSessionsCSVAction
+    ) -> ExportSessionsCSVActionResult:
+        """Execute session CSV export.
+
+        Args:
+            action: Export sessions CSV action with pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"sessions-{timestamp}.csv"
+
+        field_names = [f.name for f in action.query.fields]
+        row_iterator = self._repository.execute_export(action.query)
+
+        return ExportSessionsCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_projects_csv(
+        self, action: ExportProjectsCSVAction
+    ) -> ExportProjectsCSVActionResult:
+        """Execute project CSV export.
+
+        Args:
+            action: Export projects CSV action with pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"projects-{timestamp}.csv"
+
+        field_names = [f.name for f in action.query.fields]
+        row_iterator = self._repository.execute_export(action.query)
+
+        return ExportProjectsCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )

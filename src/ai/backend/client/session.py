@@ -243,6 +243,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Domain",
         "Dotfile",
         "EtcdConfig",
+        "Export",
         "Group",
         "Image",
         "KeyPair",
@@ -301,6 +302,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.export import Export
         from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
@@ -357,6 +359,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.UserResourcePolicy = UserResourcePolicy
         self.Notification = Notification
         self.SchedulingHistory = SchedulingHistory
+        self.Export = Export
 
     @property
     def proxy_mode(self) -> bool:

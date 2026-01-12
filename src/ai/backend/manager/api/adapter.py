@@ -6,7 +6,7 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Optional
+from typing import Optional, final
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
@@ -16,6 +16,7 @@ from ai.backend.manager.repositories.base import QueryCondition
 class BaseFilterAdapter:
     """Base adapter providing common filter conversion utilities."""
 
+    @final
     def convert_string_filter(
         self,
         string_filter: StringFilter,
@@ -115,6 +116,7 @@ class BaseFilterAdapter:
 
         return None
 
+    @final
     def convert_uuid_filter(
         self,
         uuid_filter: UUIDFilter,
