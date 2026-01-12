@@ -703,17 +703,16 @@ class ModelServingRepository:
                         load_routes=True,
                         load_image=True,
                     )
-                    match action.requester_ctx.user_role:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = action.requester_ctx.domain_name
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = action.requester_ctx.user_id
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
+                    if action.user_data.is_superadmin:
+                        pass
+                    elif action.user_data.is_admin:
+                        domain_name = action.user_data.domain_name
+                        if endpoint_row.domain != domain_name:
+                            raise EndpointNotFound
+                    else:
+                        user_id = action.user_data.user_id
+                        if endpoint_row.session_owner != user_id:
+                            raise EndpointNotFound
                 except NoResultFound:
                     raise EndpointNotFound
                 if endpoint_row.lifecycle_stage in (
