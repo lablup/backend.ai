@@ -332,9 +332,9 @@ class DomainScopeConditions:
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = DomainRow.name.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = DomainRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = DomainRow.name.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = DomainRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -358,9 +358,9 @@ class DomainScopeConditions:
     def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = DomainRow.name.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = DomainRow.name.ilike(f"{spec.value}%")
             else:
-                condition = DomainRow.name.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = DomainRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -371,9 +371,9 @@ class DomainScopeConditions:
     def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = DomainRow.name.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = DomainRow.name.ilike(f"%{spec.value}")
             else:
-                condition = DomainRow.name.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = DomainRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -387,14 +387,14 @@ class DomainScopeOrders:
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return DomainRow.name.asc()  # type: ignore[attr-defined]
-        return DomainRow.name.desc()  # type: ignore[attr-defined]
+            return DomainRow.name.asc()
+        return DomainRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return DomainRow.created_at.asc()  # type: ignore[attr-defined]
-        return DomainRow.created_at.desc()  # type: ignore[attr-defined]
+            return DomainRow.created_at.asc()
+        return DomainRow.created_at.desc()
 
 
 class ProjectScopeConditions:
@@ -404,9 +404,9 @@ class ProjectScopeConditions:
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = GroupRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = GroupRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -430,9 +430,9 @@ class ProjectScopeConditions:
     def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = GroupRow.name.ilike(f"{spec.value}%")
             else:
-                condition = GroupRow.name.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = GroupRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -443,9 +443,9 @@ class ProjectScopeConditions:
     def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = GroupRow.name.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = GroupRow.name.ilike(f"%{spec.value}")
             else:
-                condition = GroupRow.name.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = GroupRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -459,14 +459,14 @@ class ProjectScopeOrders:
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.name.asc()  # type: ignore[attr-defined]
-        return GroupRow.name.desc()  # type: ignore[attr-defined]
+            return GroupRow.name.asc()
+        return GroupRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.created_at.asc()  # type: ignore[attr-defined]
-        return GroupRow.created_at.desc()  # type: ignore[attr-defined]
+            return GroupRow.created_at.asc()
+        return GroupRow.created_at.desc()
 
 
 class UserScopeConditions:
@@ -478,11 +478,11 @@ class UserScopeConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                username_cond = UserRow.username.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.ilike(f"%{spec.value}%")
+                email_cond = UserRow.email.ilike(f"%{spec.value}%")
             else:
-                username_cond = UserRow.username.like(f"%{spec.value}%")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.like(f"%{spec.value}%")
+                email_cond = UserRow.email.like(f"%{spec.value}%")
             condition = sa.or_(username_cond, email_cond)
             if spec.negated:
                 condition = sa.not_(condition)
@@ -514,11 +514,11 @@ class UserScopeConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                username_cond = UserRow.username.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.ilike(f"{spec.value}%")
+                email_cond = UserRow.email.ilike(f"{spec.value}%")
             else:
-                username_cond = UserRow.username.like(f"{spec.value}%")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.like(f"{spec.value}%")
+                email_cond = UserRow.email.like(f"{spec.value}%")
             condition = sa.or_(username_cond, email_cond)
             if spec.negated:
                 condition = sa.not_(condition)
@@ -532,11 +532,11 @@ class UserScopeConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                username_cond = UserRow.username.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.ilike(f"%{spec.value}")
+                email_cond = UserRow.email.ilike(f"%{spec.value}")
             else:
-                username_cond = UserRow.username.like(f"%{spec.value}")  # type: ignore[attr-defined]
-                email_cond = UserRow.email.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                username_cond = UserRow.username.like(f"%{spec.value}")
+                email_cond = UserRow.email.like(f"%{spec.value}")
             condition = sa.or_(username_cond, email_cond)
             if spec.negated:
                 condition = sa.not_(condition)
@@ -552,11 +552,11 @@ class UserScopeOrders:
     def name(ascending: bool = True) -> QueryOrder:
         """Order by username."""
         if ascending:
-            return UserRow.username.asc()  # type: ignore[attr-defined]
-        return UserRow.username.desc()  # type: ignore[attr-defined]
+            return UserRow.username.asc()
+        return UserRow.username.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return UserRow.created_at.asc()  # type: ignore[attr-defined]
-        return UserRow.created_at.desc()  # type: ignore[attr-defined]
+            return UserRow.created_at.asc()
+        return UserRow.created_at.desc()
