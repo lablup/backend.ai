@@ -19,6 +19,7 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
@@ -51,11 +52,17 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
+        # Convert string mappings to StorageTarget instances
+        storage_step_mappings = {
+            step: StorageTarget(storage_name)
+            for step, storage_name in body.parsed.storage_step_mappings.items()
+        }
+
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
             registry_configs=self._reservoir_service._reservoir_registry_configs,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             transfer_manager=self._reservoir_service._transfer_manager,
             artifact_verifier_ctx=self._reservoir_service._artifact_verifier_ctx,
             event_producer=self._reservoir_service._event_producer,
@@ -66,7 +73,7 @@ class ReservoirRegistryAPIHandler:
         task_id = await self._reservoir_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
             artifact_revision_ids=[
                 uuid.UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids

@@ -37,6 +37,7 @@ from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     LegacyHuggingfaceConfig,
 )
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
@@ -174,11 +175,17 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
+        # Convert string mappings to StorageTarget instances
+        storage_step_mappings = {
+            step: StorageTarget(storage_name)
+            for step, storage_name in body.parsed.storage_step_mappings.items()
+        }
+
         # Create import pipeline based on storage step mappings
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             artifact_verifier_ctx=self._huggingface_service._artifact_verifier_ctx,
             event_producer=self._huggingface_service._event_producer,
             redis_client=self._huggingface_service._redis_client,
@@ -187,7 +194,7 @@ class HuggingFaceRegistryAPIHandler:
         task_id = await self._huggingface_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=body.parsed.storage_step_mappings,
+            storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
         )
 
