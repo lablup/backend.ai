@@ -2,15 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import sqlalchemy as sa
+
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     Creator,
+    execute_batch_querier,
     execute_creator,
 )
 
@@ -45,3 +49,34 @@ class ErrorLogDBSource:
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
             return result.row.to_dataclass()
+
+    @error_log_db_source_resilience.apply()
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> ErrorLogListResult:
+        """Search error logs with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ErrorLogListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ErrorLogRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ErrorLogRow.to_dataclass() for row in result.rows]
+
+            return ErrorLogListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
