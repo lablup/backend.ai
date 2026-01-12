@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.1 (2026-01-12)
+
+### Fixes
+* change traffic_status column type to EnumValueType ([#7930](https://github.com/lablup/backend.ai/issues/7930))
+
+
 ## 25.19.0 (2025-12-31)
 
 ### Features
