@@ -24,9 +24,11 @@ from ai.backend.common.dto.manager.export import (
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.errors.export import InvalidExportFieldKeys
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
+    ExportFieldType,
     ReportDef,
     StreamingExportQuery,
 )
@@ -153,9 +155,21 @@ class ExportAdapter(BaseFilterAdapter):
         report: ReportDef,
         field_keys: list[str] | None,
     ) -> list[ExportFieldDef]:
-        """Select fields from report based on requested field keys."""
+        """Select fields from report based on requested field keys.
+
+        Preserves the order specified in field_keys.
+
+        Raises:
+            InvalidExportFieldKeys: If a field key is not found in the report.
+        """
         if field_keys:
-            return [f for f in report.fields if f.key in field_keys]
+            field_map = {f.key: f for f in report.fields}
+            selected: list[ExportFieldDef] = []
+            for key in field_keys:
+                if key not in field_map:
+                    raise InvalidExportFieldKeys([key])
+                selected.append(field_map[key])
+            return selected
         return list(report.fields)
 
     # =========================================================================
@@ -197,21 +211,19 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # role filter
+        # role filter (IN query)
         if filter.role is not None:
             field = report.get_field("role")
             if field:
-                cond = self._build_string_condition(filter.role, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.role, field)
+                conditions.append(cond)
 
-        # status filter
+        # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
             if field:
-                cond = self._build_string_condition(filter.status, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
 
         # created_at filter
         if filter.created_at is not None:
@@ -265,13 +277,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # session_type filter
+        # session_type filter (IN query)
         if filter.session_type is not None:
             field = report.get_field("session_type")
             if field:
-                cond = self._build_string_condition(filter.session_type, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.session_type, field)
+                conditions.append(cond)
 
         # domain_name filter
         if filter.domain_name is not None:
@@ -289,13 +300,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # status filter
+        # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
             if field:
-                cond = self._build_string_condition(filter.status, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
 
         # scaling_group_name filter
         if filter.scaling_group_name is not None:
@@ -480,13 +490,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # status filter
+        # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
             if field:
-                cond = self._build_string_condition(filter.status, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
 
         # triggered_by filter
         if filter.triggered_by is not None:
@@ -536,6 +545,24 @@ class ExportAdapter(BaseFilterAdapter):
     # =========================================================================
     # Common filter builders
     # =========================================================================
+
+    def _build_in_condition(
+        self,
+        values: list[str],
+        field_def: ExportFieldDef,
+    ) -> QueryCondition:
+        """Build IN condition for a field.
+
+        If the field type is ENUM, converts string values to enum values.
+        """
+        column = field_def.column
+
+        if field_def.field_type == ExportFieldType.ENUM:
+            enum_cls = column.type._enum_cls
+            enum_values = [enum_cls(v) for v in values]
+            return lambda: column.in_(enum_values)
+
+        return lambda: column.in_(values)
 
     def _build_string_condition(
         self,

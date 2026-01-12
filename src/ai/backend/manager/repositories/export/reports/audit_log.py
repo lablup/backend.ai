@@ -50,9 +50,9 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         key="status",
         name="Status",
         description="Operation status (success, failure, etc.)",
-        field_type=ExportFieldType.STRING,
+        field_type=ExportFieldType.ENUM,
         column=AuditLogRow.status,
-        formatter=lambda v: v.value if v else "",
+        formatter=lambda v: str(v) if v else "",
     ),
     ExportFieldDef(
         key="created_at",

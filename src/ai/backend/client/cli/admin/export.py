@@ -137,8 +137,8 @@ def export_users(
             username=StringFilter(contains=filter_username) if filter_username else None,
             email=StringFilter(contains=filter_email) if filter_email else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
-            role=StringFilter(equals=filter_role) if filter_role else None,
-            status=StringFilter(equals=filter_status) if filter_status else None,
+            role=[filter_role] if filter_role else None,
+            status=[filter_status] if filter_status else None,
             created_at=DateTimeRangeFilter(after=filter_after, before=filter_before)
             if filter_after or filter_before
             else None,
@@ -275,10 +275,10 @@ def export_sessions(
     ]):
         session_filter = SessionExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
-            session_type=StringFilter(equals=filter_type) if filter_type else None,
+            session_type=[filter_type] if filter_type else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
             access_key=StringFilter(contains=filter_access_key) if filter_access_key else None,
-            status=StringFilter(equals=filter_status) if filter_status else None,
+            status=[filter_status] if filter_status else None,
             scaling_group_name=StringFilter(contains=filter_scaling_group)
             if filter_scaling_group
             else None,
@@ -525,7 +525,7 @@ def export_audit_logs(
             entity_type=StringFilter(equals=filter_entity_type) if filter_entity_type else None,
             entity_id=StringFilter(contains=filter_entity_id) if filter_entity_id else None,
             operation=StringFilter(equals=filter_operation) if filter_operation else None,
-            status=StringFilter(equals=filter_status) if filter_status else None,
+            status=[filter_status] if filter_status else None,
             triggered_by=StringFilter(contains=filter_triggered_by)
             if filter_triggered_by
             else None,

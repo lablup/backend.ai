@@ -31,9 +31,9 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         key="session_type",
         name="Type",
         description="Session type",
-        field_type=ExportFieldType.STRING,
+        field_type=ExportFieldType.ENUM,
         column=SessionRow.session_type,
-        formatter=lambda v: v.value if v else "",
+        formatter=lambda v: str(v) if v else "",
     ),
     ExportFieldDef(
         key="domain_name",
@@ -53,9 +53,9 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         key="status",
         name="Status",
         description="Session status",
-        field_type=ExportFieldType.STRING,
+        field_type=ExportFieldType.ENUM,
         column=SessionRow.status,
-        formatter=lambda v: v.value if v else "",
+        formatter=lambda v: str(v) if v else "",
     ),
     ExportFieldDef(
         key="status_info",

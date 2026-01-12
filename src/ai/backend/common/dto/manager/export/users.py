@@ -98,18 +98,18 @@ class UserExportFilter(BaseRequestModel):
             "Use this to export users belonging to a specific domain."
         ),
     )
-    role: Optional[StringFilter] = Field(
+    role: Optional[list[str]] = Field(
         default=None,
         description=(
-            "Filter users by role (e.g., 'admin', 'user', 'monitor'). "
-            "Use exact match to filter by specific role type."
+            "Filter users by role(s). Accepts a list of role values "
+            "(e.g., ['admin', 'user', 'monitor']). Uses IN query."
         ),
     )
-    status: Optional[StringFilter] = Field(
+    status: Optional[list[str]] = Field(
         default=None,
         description=(
-            "Filter users by account status (e.g., 'active', 'inactive', 'deleted', 'before-verification'). "
-            "Use this to export only active users or find deactivated accounts."
+            "Filter users by account status(es). Accepts a list of status values "
+            "(e.g., ['active', 'inactive']). Uses IN query."
         ),
     )
     created_at: Optional[DateTimeRangeFilter] = Field(
