@@ -975,7 +975,9 @@ class PermissionDBSource:
             items = [
                 ScopeIDData(
                     id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.UserRow.uuid)),
-                    name=row.UserRow.username or row.UserRow.email,
+                    name=row.UserRow.username
+                    if row.UserRow.username is not None
+                    else row.UserRow.email,
                 )
                 for row in result.rows
             ]
