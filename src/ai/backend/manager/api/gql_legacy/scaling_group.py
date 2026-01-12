@@ -35,10 +35,20 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_keypairs,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.creators import (
+    ScalingGroupCreatorSpec,
+    ScalingGroupForDomainCreatorSpec,
+    ScalingGroupForKeypairsCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
+)
+from ai.backend.manager.repositories.scaling_group.purgers import (
+    ScalingGroupForDomainPurgerSpec,
+    ScalingGroupForKeypairsPurgerSpec,
+    ScalingGroupForProjectPurgerSpec,
+)
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
     ScalingGroupMetadataUpdaterSpec,
@@ -47,8 +57,26 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupStatusUpdaterSpec,
     ScalingGroupUpdaterSpec,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
+    AssociateScalingGroupWithDomainsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
+    AssociateScalingGroupWithKeypairsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupsAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
+    DisassociateScalingGroupWithDomainsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
+    DisassociateScalingGroupWithKeypairsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.modify import (
     ModifyScalingGroupAction,
@@ -781,11 +809,21 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> AssociateScalingGroupWithDomain:
-        insert_query = sa.insert(sgroups_for_domains).values({
-            "scaling_group": scaling_group,
-            "domain": domain,
-        })
-        return await simple_db_mutate(cls, info.context, insert_query)
+        graph_ctx: GraphQueryContext = info.context
+        action = AssociateScalingGroupWithDomainsAction(
+            bulk_creator=BulkCreator(
+                specs=[
+                    ScalingGroupForDomainCreatorSpec(
+                        scaling_group=scaling_group,
+                        domain=domain,
+                    )
+                ]
+            )
+        )
+        await graph_ctx.processors.scaling_group.associate_scaling_group_with_domains.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class AssociateScalingGroupsWithDomain(graphene.Mutation):
@@ -832,11 +870,20 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> DisassociateScalingGroupWithDomain:
-        delete_query = sa.delete(sgroups_for_domains).where(
-            (sgroups_for_domains.c.scaling_group == scaling_group)
-            & (sgroups_for_domains.c.domain == domain),
+        graph_ctx: GraphQueryContext = info.context
+        action = DisassociateScalingGroupWithDomainsAction(
+            purger=BatchPurger(
+                spec=ScalingGroupForDomainPurgerSpec(
+                    scaling_group=scaling_group,
+                    domain=domain,
+                ),
+                batch_size=1,
+            )
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class DisassociateScalingGroupsWithDomain(graphene.Mutation):
@@ -904,11 +951,21 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         scaling_group: str,
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupWithUserGroup:
-        insert_query = sa.insert(sgroups_for_groups).values({
-            "scaling_group": scaling_group,
-            "group": user_group,
-        })
-        return await simple_db_mutate(cls, info.context, insert_query)
+        graph_ctx: GraphQueryContext = info.context
+        action = AssociateScalingGroupWithUserGroupsAction(
+            bulk_creator=BulkCreator(
+                specs=[
+                    ScalingGroupForProjectCreatorSpec(
+                        scaling_group=scaling_group,
+                        project=user_group,
+                    )
+                ]
+            )
+        )
+        await graph_ctx.processors.scaling_group.associate_scaling_group_with_user_groups.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
@@ -956,11 +1013,20 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
         scaling_group: str,
         user_group: uuid.UUID,
     ) -> DisassociateScalingGroupWithUserGroup:
-        delete_query = sa.delete(sgroups_for_groups).where(
-            (sgroups_for_groups.c.scaling_group == scaling_group)
-            & (sgroups_for_groups.c.group == user_group),
+        graph_ctx: GraphQueryContext = info.context
+        action = DisassociateScalingGroupWithUserGroupsAction(
+            purger=BatchPurger(
+                spec=ScalingGroupForProjectPurgerSpec(
+                    scaling_group=scaling_group,
+                    project=user_group,
+                ),
+                batch_size=1,
+            )
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
@@ -1028,11 +1094,21 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         scaling_group: str,
         access_key: str,
     ) -> AssociateScalingGroupWithKeyPair:
-        insert_query = sa.insert(sgroups_for_keypairs).values({
-            "scaling_group": scaling_group,
-            "access_key": access_key,
-        })
-        return await simple_db_mutate(cls, info.context, insert_query)
+        graph_ctx: GraphQueryContext = info.context
+        action = AssociateScalingGroupWithKeypairsAction(
+            bulk_creator=BulkCreator(
+                specs=[
+                    ScalingGroupForKeypairsCreatorSpec(
+                        scaling_group=scaling_group,
+                        access_key=AccessKey(access_key),
+                    )
+                ]
+            )
+        )
+        await graph_ctx.processors.scaling_group.associate_scaling_group_with_keypairs.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
@@ -1080,11 +1156,20 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
         scaling_group: str,
         access_key: str,
     ) -> DisassociateScalingGroupWithKeyPair:
-        delete_query = sa.delete(sgroups_for_keypairs).where(
-            (sgroups_for_keypairs.c.scaling_group == scaling_group)
-            & (sgroups_for_keypairs.c.access_key == access_key),
+        graph_ctx: GraphQueryContext = info.context
+        action = DisassociateScalingGroupWithKeypairsAction(
+            purger=BatchPurger(
+                spec=ScalingGroupForKeypairsPurgerSpec(
+                    scaling_group=scaling_group,
+                    access_key=AccessKey(access_key),
+                ),
+                batch_size=1,
+            )
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+        await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_keypairs.wait_for_complete(
+            action
+        )
+        return cls(ok=True, msg="success")
 
 
 class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
