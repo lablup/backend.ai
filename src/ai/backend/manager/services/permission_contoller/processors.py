@@ -25,6 +25,14 @@ from .actions import (
     UpdateRolePermissionsAction,
     UpdateRolePermissionsActionResult,
 )
+from .actions.get_scope_types import (
+    GetScopeTypesAction,
+    GetScopeTypesActionResult,
+)
+from .actions.search_scope_ids import (
+    SearchScopeIDsAction,
+    SearchScopeIDsActionResult,
+)
 from .service import PermissionControllerService
 
 
@@ -44,6 +52,8 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     update_role_permissions: ActionProcessor[
         UpdateRolePermissionsAction, UpdateRolePermissionsActionResult
     ]
+    search_scope_ids: ActionProcessor[SearchScopeIDsAction, SearchScopeIDsActionResult]
+    get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
 
     def __init__(
         self, service: PermissionControllerService, action_monitors: list[ActionMonitor]
@@ -62,6 +72,8 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.update_role_permissions = ActionProcessor(
             service.update_role_permissions, action_monitors
         )
+        self.search_scope_ids = ActionProcessor(service.search_scope_ids, action_monitors)
+        self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -76,4 +88,6 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             SearchRolesAction.spec(),
             SearchUsersAssignedToRoleAction.spec(),
             UpdateRolePermissionsAction.spec(),
+            SearchScopeIDsAction.spec(),
+            GetScopeTypesAction.spec(),
         ]

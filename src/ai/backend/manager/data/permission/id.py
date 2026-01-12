@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Self
 
-from .types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 
 
 @dataclass(frozen=True)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import Optional
@@ -25,6 +27,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
     UserRoleRevocationInput,
 )
+from ai.backend.manager.data.permission.types import ScopeIDListResult
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
@@ -249,3 +252,27 @@ class PermissionControllerRepository:
         return await self._db_source.search_users_assigned_to_role(
             querier=querier,
         )
+
+    @permission_controller_repository_resilience.apply()
+    async def search_domain_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeIDListResult:
+        """Search all domains using BatchQuerier."""
+        return await self._db_source.search_domain_scopes(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_project_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeIDListResult:
+        """Search all projects using BatchQuerier."""
+        return await self._db_source.search_project_scopes(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_user_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeIDListResult:
+        """Search all users using BatchQuerier."""
+        return await self._db_source.search_user_scopes(querier)

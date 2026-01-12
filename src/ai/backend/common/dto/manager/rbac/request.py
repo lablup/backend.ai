@@ -22,6 +22,7 @@ from .types import (
     RoleOrderField,
     RoleSource,
     RoleStatus,
+    ScopeIDOrderField,
 )
 
 __all__ = (
@@ -34,7 +35,10 @@ __all__ = (
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
+    "ScopeIDFilter",
+    "ScopeIDOrder",
     "SearchRolesRequest",
+    "SearchScopeIDsRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -160,3 +164,25 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     status: PermissionStatus = Field(
         default=PermissionStatus.ACTIVE, description="Permission status"
     )
+
+
+class ScopeIDFilter(BaseRequestModel):
+    """Filter for scope IDs."""
+
+    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
+
+
+class ScopeIDOrder(BaseRequestModel):
+    """Order specification for scope IDs."""
+
+    field: ScopeIDOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
+
+
+class SearchScopeIDsRequest(BaseRequestModel):
+    """Request body for searching scope IDs with filters and pagination."""
+
+    filter: Optional[ScopeIDFilter] = Field(default=None, description="Filter conditions")
+    order: Optional[list[ScopeIDOrder]] = Field(default=None, description="Order specifications")
+    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")

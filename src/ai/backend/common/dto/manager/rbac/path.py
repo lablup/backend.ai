@@ -10,11 +10,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.permission.types import ScopeType
 
 __all__ = (
     "DeleteObjectPermissionPathParam",
     "DeletePermissionPathParam",
     "GetRolePathParam",
+    "SearchScopeIDsPathParam",
     "SearchUsersAssignedToRolePathParam",
     "UpdateRolePathParam",
 )
@@ -48,3 +50,9 @@ class DeleteObjectPermissionPathParam(BaseRequestModel):
     """Path parameter for deleting an object permission."""
 
     object_permission_id: UUID = Field(description="The object permission ID to delete")
+
+
+class SearchScopeIDsPathParam(BaseRequestModel):
+    """Path parameter for searching scope IDs."""
+
+    scope_type: ScopeType = Field(description="Scope type (domain, project, user, global)")

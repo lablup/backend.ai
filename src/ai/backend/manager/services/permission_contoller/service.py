@@ -1,6 +1,9 @@
 import logging
 
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import ScopeIDData, ScopeIDListResult
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -22,6 +25,10 @@ from ai.backend.manager.services.permission_contoller.actions.delete_role import
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
+    GetScopeTypesAction,
+    GetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.object_permission import (
     CreateObjectPermissionAction,
@@ -46,6 +53,10 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_scope_ids import (
+    SearchScopeIDsAction,
+    SearchScopeIDsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -195,3 +206,44 @@ class PermissionControllerService:
             input_data=action.input_data,
         )
         return UpdateRolePermissionsActionResult(role=result)
+
+    def _global_scope_result(self) -> ScopeIDListResult:
+        return ScopeIDListResult(
+            items=[
+                ScopeIDData(
+                    id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+                    name=GLOBAL_SCOPE_ID,
+                )
+            ],
+            total_count=1,
+            has_next_page=False,
+            has_previous_page=False,
+        )
+
+    async def search_scope_ids(self, action: SearchScopeIDsAction) -> SearchScopeIDsActionResult:
+        """Search scope IDs based on scope type.
+
+        Dispatches to the appropriate repository method based on scope type,
+        passing the querier with pre-built conditions and pagination.
+        Global scope is handled directly in the service as it's a static value.
+        """
+        match action.scope_type:
+            case ScopeType.GLOBAL:
+                result = self._global_scope_result()
+            case ScopeType.DOMAIN:
+                result = await self._repository.search_domain_scopes(action.querier)
+            case ScopeType.PROJECT:
+                result = await self._repository.search_project_scopes(action.querier)
+            case ScopeType.USER:
+                result = await self._repository.search_user_scopes(action.querier)
+
+        return SearchScopeIDsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def get_scope_types(self, action: GetScopeTypesAction) -> GetScopeTypesActionResult:
+        """Get all available scope types."""
+        return GetScopeTypesActionResult(scope_types=list(ScopeType))
