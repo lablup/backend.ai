@@ -11,6 +11,10 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_keypair im
     AssociateScalingGroupWithKeypairsAction,
     AssociateScalingGroupWithKeypairsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupsAction,
+    AssociateScalingGroupWithUserGroupsActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.create import (
     CreateScalingGroupAction,
     CreateScalingGroupActionResult,
@@ -22,6 +26,10 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
     DisassociateScalingGroupWithKeypairsAction,
     DisassociateScalingGroupWithKeypairsActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupsAction,
+    DisassociateScalingGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -57,6 +65,13 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     disassociate_scaling_group_with_keypairs: ActionProcessor[
         DisassociateScalingGroupWithKeypairsAction, DisassociateScalingGroupWithKeypairsActionResult
     ]
+    associate_scaling_group_with_user_groups: ActionProcessor[
+        AssociateScalingGroupWithUserGroupsAction, AssociateScalingGroupWithUserGroupsActionResult
+    ]
+    disassociate_scaling_group_with_user_groups: ActionProcessor[
+        DisassociateScalingGroupWithUserGroupsAction,
+        DisassociateScalingGroupWithUserGroupsActionResult,
+    ]
 
     def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
@@ -75,6 +90,12 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.disassociate_scaling_group_with_keypairs = ActionProcessor(
             service.disassociate_scaling_group_with_keypairs, action_monitors
         )
+        self.associate_scaling_group_with_user_groups = ActionProcessor(
+            service.associate_scaling_group_with_user_groups, action_monitors
+        )
+        self.disassociate_scaling_group_with_user_groups = ActionProcessor(
+            service.disassociate_scaling_group_with_user_groups, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -87,4 +108,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             DisassociateScalingGroupWithDomainsAction.spec(),
             AssociateScalingGroupWithKeypairsAction.spec(),
             DisassociateScalingGroupWithKeypairsAction.spec(),
+            AssociateScalingGroupWithUserGroupsAction.spec(),
+            DisassociateScalingGroupWithUserGroupsAction.spec(),
         ]

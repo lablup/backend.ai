@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -15,6 +16,7 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -142,4 +144,29 @@ class ScalingGroupRepository:
         """Checks if a scaling group is associated with a keypair."""
         return await self._db_source.check_scaling_group_keypair_association_exists(
             scaling_group_name, access_key
+        )
+
+    async def associate_scaling_group_with_user_groups(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a scaling group with multiple user groups (projects)."""
+        await self._db_source.associate_scaling_group_with_user_groups(bulk_creator)
+
+    async def disassociate_scaling_group_with_user_groups(
+        self,
+        purger: BatchPurger[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates a single scaling group from a user group (project)."""
+        await self._db_source.disassociate_scaling_group_with_user_groups(purger)
+
+    async def check_scaling_group_user_group_association_exists(
+        self,
+        scaling_group: str,
+        user_group: UUID,
+    ) -> bool:
+        """Checks if a scaling group is associated with a user group (project)."""
+        return await self._db_source.check_scaling_group_user_group_association_exists(
+            scaling_group=scaling_group,
+            user_group=user_group,
         )
