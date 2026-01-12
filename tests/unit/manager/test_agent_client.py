@@ -1,3 +1,4 @@
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from ai.backend.common.types import (
     ImageConfig,
     KernelCreationConfig,
     KernelId,
+    SessionId,
 )
 from ai.backend.manager.clients.agent.client import AgentClient
 
@@ -47,10 +49,12 @@ class TestAgentClientPassesAgentId:
         client = AgentClient(mock_peer, AgentId("agent-2"))
 
         mock_peer.call.create_kernels = AsyncMock(return_value={})
-        kernel_configs = [Mock(spec=KernelCreationConfig)]
-        cluster_info = Mock(spec=ClusterInfo)
+        kernel_configs = cast(list[KernelCreationConfig], [Mock(spec=KernelCreationConfig)])
+        cluster_info = cast(ClusterInfo, Mock(spec=ClusterInfo))
 
-        await client.create_kernels("session-1", ["kernel-1"], kernel_configs, cluster_info, {})  # type: ignore[arg-type]
+        await client.create_kernels(
+            SessionId(uuid4()), [KernelId(uuid4())], kernel_configs, cluster_info, {}
+        )
 
         args, kwargs = mock_peer.call.create_kernels.call_args
         assert kwargs["agent_id"] == AgentId("agent-2")
@@ -61,7 +65,7 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.destroy_kernel = AsyncMock()
 
-        await client.destroy_kernel(KernelId(uuid4()), "session-id", "test-reason")
+        await client.destroy_kernel(KernelId(uuid4()), SessionId(uuid4()), "test-reason")
 
         args, kwargs = mock_peer.call.destroy_kernel.call_args
         assert kwargs["agent_id"] == AgentId("agent-1")
@@ -73,7 +77,7 @@ class TestAgentClientPassesAgentId:
         mock_peer.call.execute = AsyncMock(return_value={})
 
         await client.execute(
-            "session-1", "kernel-1", 1, "run-1", "query", "print('hello')", {}, None
+            SessionId(uuid4()), KernelId(uuid4()), 1, "run-1", "query", "print('hello')", {}, None
         )
 
         args, kwargs = mock_peer.call.execute.call_args
@@ -121,10 +125,11 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.upload_file = AsyncMock(return_value={})
 
-        await client.upload_file("kernel-1", "test.py", b"data")
+        kernel_id = KernelId(uuid4())
+        await client.upload_file(kernel_id, "test.py", b"data")
 
         mock_peer.call.upload_file.assert_called_once_with(
-            "kernel-1", "test.py", b"data", agent_id=AgentId("file-agent")
+            str(kernel_id), "test.py", b"data", agent_id=AgentId("file-agent")
         )
 
     @pytest.mark.asyncio
@@ -133,10 +138,11 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.start_service = AsyncMock(return_value={})
 
-        await client.start_service("kernel-1", "jupyter", {})
+        kernel_id = KernelId(uuid4())
+        await client.start_service(kernel_id, "jupyter", {})
 
         mock_peer.call.start_service.assert_called_once_with(
-            "kernel-1", "jupyter", {}, agent_id=AgentId("service-agent")
+            str(kernel_id), "jupyter", {}, agent_id=AgentId("service-agent")
         )
 
     @pytest.mark.asyncio
