@@ -35,6 +35,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
@@ -467,7 +468,7 @@ class ReservoirService:
         registry_name: str,
         model: ModelTarget,
         reporter: ProgressReporter,
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
     ) -> None:
@@ -524,7 +525,7 @@ class ReservoirService:
         self,
         registry_name: str,
         models: list[ModelTarget],
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
     ) -> uuid.UUID:
@@ -634,11 +635,13 @@ class ReservoirDownloadStep(ImportStep[None]):
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
         # Get storage mapping for download step
-        download_storage_name = context.storage_step_mappings.get(
+        download_storage_target: StorageTarget | None = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
-        if not download_storage_name:
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
+
+        download_storage_name = download_storage_target.name
 
         # Get registry configuration
         registry_config = self._registry_configs.get(context.registry_name)
@@ -1051,9 +1054,9 @@ class ReservoirArchiveStep(ModelArchiveStep):
 
 
 def create_reservoir_import_pipeline(
-    storage_pool: StoragePool,
+    storage_pool: AbstractStoragePool,
     registry_configs: dict[str, Any],
-    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
@@ -1066,11 +1069,11 @@ def create_reservoir_import_pipeline(
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
         # Get the download storage object from the pool
-        download_storage_name = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
-        if not download_storage_name:
+        download_storage_target = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
-        download_storage = storage_pool.get_storage(download_storage_name)
+        download_storage = download_storage_target.resolve_storage(storage_pool)
         steps.append(
             ReservoirDownloadStep(
                 registry_configs,

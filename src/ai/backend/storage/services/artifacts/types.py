@@ -5,11 +5,12 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
-from ai.backend.common.artifact_storage import AbstractStorage, ImportStepContext
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.data.storage.types import ImportStepContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
