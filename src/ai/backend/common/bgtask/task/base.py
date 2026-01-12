@@ -3,7 +3,7 @@ from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from ..types import BgtaskNameBase
+from ai.backend.common.bgtask.types import BgtaskNameBase
 
 
 class BaseBackgroundTaskManifest(BaseModel):

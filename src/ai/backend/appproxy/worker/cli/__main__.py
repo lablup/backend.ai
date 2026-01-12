@@ -72,8 +72,7 @@ def generate_example_configuration(output: Path) -> None:
 
     from ai.backend.appproxy.common.config import generate_example_json
     from ai.backend.appproxy.common.utils import ensure_json_serializable
-
-    from ..config import ServerConfig
+    from ai.backend.appproxy.worker.config import ServerConfig
 
     generated_example = generate_example_json(ServerConfig)
     if output == "-" or output is None:
@@ -90,8 +89,7 @@ async def _generate() -> dict[str, Any]:
     from aiohttp import web
 
     from ai.backend.appproxy.common.openapi import generate_openapi
-
-    from ..server import global_subapp_pkgs
+    from ai.backend.appproxy.worker.server import global_subapp_pkgs
 
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(
@@ -138,6 +136,11 @@ def dependencies():
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.health:cli")
 def health():
     """Command set for health checking."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.config:cli")
+def config():
+    """Configuration management commands."""
 
 
 if __name__ == "__main__":

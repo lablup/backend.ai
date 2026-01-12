@@ -5,9 +5,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
-
-from typing_extensions import override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
@@ -43,9 +41,9 @@ class GroupData:
     id: uuid.UUID = field(compare=False)
     name: str
     description: Optional[str]
-    is_active: bool
-    created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
+    is_active: bool | None
+    created_at: datetime | None = field(compare=False)
+    modified_at: datetime | None = field(compare=False)
     integration_id: Optional[str]
     domain_name: str
     total_resource_slots: ResourceSlot

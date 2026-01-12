@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -12,38 +12,44 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
 if TYPE_CHECKING:
-    from ..role import RoleRow
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
+
+def _get_role_join_condition():
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
+    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
     __table_args__ = (sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),)
 
-    id: uuid.UUID = IDColumn()
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    entity_type: EntityType = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
+    entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
     )
-    entity_id: str = sa.Column(
+    entity_id: Mapped[str] = mapped_column(
         "entity_id", sa.String(64), nullable=False
     )  # e.g., "project_id", "user_id" etc.
-    operation: OperationType = sa.Column(
+    operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
 
-    role_row: Optional[RoleRow] = relationship(
+    role_row: Mapped[RoleRow | None] = relationship(
         "RoleRow",
         back_populates="object_permission_rows",
-        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+        primaryjoin=_get_role_join_condition,
     )
 
     def object_id(self) -> ObjectId:

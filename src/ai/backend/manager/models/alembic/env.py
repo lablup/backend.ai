@@ -22,16 +22,25 @@ if not logging_active.get():
     assert config.config_file_name is not None
     fileConfig(config.config_file_name)
 
-import ai.backend.manager.models.agent  # noqa
-import ai.backend.manager.models.kernel  # noqa
-import ai.backend.manager.models.keypair  # noqa
-import ai.backend.manager.models.vfolder  # noqa
-import ai.backend.manager.models.event_log  # noqa
-import ai.backend.manager.models.rbac_models  # noqa
+# Import all model modules to register tables with metadata.
+# Using pkgutil for automatic discovery to ensure all tables are included.
+# This handles both top-level modules (models/*.py) and subpackages (models/{domain}/).
+# Subpackages must export Row classes in their __init__.py.
+import importlib
+import pkgutil
 
-# Import the shared metadata and all models.
-# (We need to explicilty import models because model modules
-# should be executed to add table definitions to the metadata.)
+import ai.backend.manager.models
+
+# Subpackages to skip (not containing Row definitions)
+_SKIP_SUBPACKAGES = {"alembic", "hasher", "minilang", "rbac"}
+
+for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
+    if module_info.ispkg:
+        if module_info.name not in _SKIP_SUBPACKAGES:
+            importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+    else:
+        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+
 from ai.backend.manager.models.base import metadata
 
 target_metadata = metadata
@@ -69,8 +78,11 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
+    config_section = config.get_section(config.config_ini_section)
+    if config_section is None:
+        raise RuntimeError("Missing sqlalchemy configuration section")
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section),
+        config_section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

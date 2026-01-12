@@ -13,6 +13,8 @@ import ssl
 import sys
 import traceback
 from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
     Iterable,
     Mapping,
     MutableMapping,
@@ -20,14 +22,12 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
     Optional,
     cast,
@@ -281,6 +281,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".notification",
     ".deployment",
     ".rbac",
+    ".scheduling_history",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -334,8 +335,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
             return GenericBadRequest("Unsupported API version.")
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 def _debug_error_response(
@@ -392,10 +392,9 @@ async def exception_middleware(
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
-        elif len(ex.args) == 1:
+        if len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
-        else:
-            raise InvalidAPIParameters()
+        raise InvalidAPIParameters()
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -447,8 +446,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        else:
-            raise InternalServerError()
+        raise InternalServerError()
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
@@ -556,7 +554,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now()))
+        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -704,7 +702,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
-    audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    audit_log_monitor = AuditLogMonitor(root_ctx.repositories.audit_log.repository)
+
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -729,7 +728,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
-            )
+            ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
@@ -1046,6 +1045,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     from .agent_cache import AgentRPCCache
+    from .clients.agent import AgentClientPool, AgentPoolSpec
     from .registry import AgentRegistry
 
     # Create scheduling controller first
@@ -1084,6 +1084,14 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
+    root_ctx.agent_client_pool = AgentClientPool(
+        root_ctx.agent_cache,
+        AgentPoolSpec(
+            health_check_interval=30.0,
+            failure_threshold=3,
+            recovery_timeout=60.0,
+        ),
+    )
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
@@ -1106,6 +1114,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.agent_client_pool.close()
         await root_ctx.registry.shutdown()
 
 
@@ -1199,20 +1208,15 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .clients.agent import AgentPool
-    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.scheduler.factory import create_default_scheduler_components
     from .sokovan.sokovan import SokovanOrchestrator
 
-    # Create agent pool for scheduler
-    agent_pool = AgentPool(root_ctx.agent_cache)
-
-    # Create scheduler with default components
-    scheduler = create_default_scheduler(
+    # Create scheduler components
+    scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
         root_ctx.config_provider,
-        root_ctx.distributed_lock_factory,
-        agent_pool,
+        root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,
         root_ctx.event_producer,
         root_ctx.valkey_schedule,
@@ -1256,7 +1260,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
 
     # Create sokovan orchestrator with lock factory for timers
     root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler=scheduler,
+        scheduler_components=scheduler_components,
         event_producer=root_ctx.event_producer,
         valkey_schedule=root_ctx.valkey_schedule,
         lock_factory=root_ctx.distributed_lock_factory,
@@ -1576,7 +1580,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
@@ -1638,7 +1642,7 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 

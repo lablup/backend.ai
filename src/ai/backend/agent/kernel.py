@@ -13,24 +13,18 @@ import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, UserDict
 from collections.abc import (
+    Iterator,
     Mapping,
+    MutableMapping,
     Sequence,
 )
 from dataclasses import dataclass
 from typing import (
     Any,
-    Dict,
-    FrozenSet,
-    Iterator,
-    List,
     Literal,
-    MutableMapping,
     NotRequired,
     Optional,
-    Set,
-    Tuple,
     TypedDict,
-    Union,
     cast,
     overload,
 )
@@ -92,7 +86,7 @@ ConsoleItemType = Literal[
     "log",
     "completion",
 ]
-outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
+outgoing_msg_types: frozenset[ConsoleItemType] = frozenset([
     "stdout",
     "stderr",
     "media",
@@ -100,17 +94,17 @@ outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
     "log",
     "completion",
 ])
-ResultType = Union[
-    ConsoleItemType,
-    Literal[
+ResultType = (
+    ConsoleItemType
+    | Literal[
         "continued",
         "clean-finished",
         "build-finished",
         "finished",
         "exec-timeout",
         "waiting-input",
-    ],
-]
+    ]
+)
 
 
 class ClientFeatures(StringSetFlag):
@@ -134,7 +128,7 @@ def _dump_json_bytes(obj: Any) -> bytes:
 class RunEvent(Exception):
     data: Any
 
-    def __init__(self, data=None):
+    def __init__(self, data=None) -> None:
         super().__init__()
         self.data = data
 
@@ -190,8 +184,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
-    service_ports: List[ServicePort]
-    data: Dict[Any, Any]
+    service_ports: list[ServicePort]
+    data: dict[Any, Any]
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
@@ -200,7 +194,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     state: KernelLifecycleStatus
     session_type: SessionTypes
 
-    _tasks: Set[asyncio.Task]
+    _tasks: set[asyncio.Task]
 
     runner: Optional[AbstractCodeRunner]
 
@@ -214,7 +208,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
-        data: Dict[Any, Any],
+        data: dict[Any, Any],
         environ: Mapping[str, Any],
         session_type: SessionTypes = SessionTypes.INTERACTIVE,
     ) -> None:
@@ -315,9 +309,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self,
         event_producer: EventProducer,
         *,
-        client_features: FrozenSet[str],
+        client_features: frozenset[str],
         api_version: int,
-    ) -> "AbstractCodeRunner":
+    ) -> AbstractCodeRunner:
         raise NotImplementedError
 
     @abstractmethod
@@ -360,7 +354,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ):
         raise NotImplementedError
 
@@ -545,8 +539,7 @@ class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
     def __getitem__(self, key: KernelId | AgentKernelRegistryKey) -> AbstractKernel:
         if isinstance(key, AgentKernelRegistryKey):
             return self._registry[key]
-        else:
-            return self._global_registry[key]
+        return self._global_registry[key]
 
     def __setitem__(self, key: AgentKernelRegistryKey, value: AbstractKernel) -> None:
         self._registry[key] = value
@@ -622,7 +615,7 @@ class SocketPair:
     input_sock: RobustSocket
     output_sock: RobustSocket
 
-    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket):
+    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket) -> None:
         self.input_sock = input_sock
         self.output_sock = output_sock
 
@@ -632,7 +625,7 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.warning(
-                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {repr(e)})"
+                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {e!r})"
                 )
                 self.input_sock.recreate_socket()
                 self.output_sock.recreate_socket()
@@ -645,10 +638,9 @@ class SocketPair:
             return await self.output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {repr(e)})")
+                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
                 raise InvalidSocket
-            else:
-                raise
+            raise
 
     def close(self) -> None:
         self.input_sock.close()
@@ -662,7 +654,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     finished_at: Optional[float]
     exec_timeout: float
     max_record_size: int
-    client_features: FrozenSet[str]
+    client_features: frozenset[str]
 
     event_producer: EventProducer
 
@@ -676,7 +668,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     _is_socket_invalid: bool
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
-    pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
+    pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
     read_task: Optional[asyncio.Task]
     status_task: Optional[asyncio.Task]
@@ -691,7 +683,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: Optional[FrozenSet[str]] = None,
+        client_features: Optional[frozenset[str]] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
@@ -743,7 +735,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         loop = current_loop()
         self.read_task = loop.create_task(self.read_output())
 
-    def __getstate__(self):
+    def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["zctx"]
         del props["_sockets"]
@@ -762,7 +754,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["event_producer"]
         return props
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
         global _zctx
         self.__dict__.update(props)
         if _zctx is None:
@@ -939,7 +931,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
@@ -955,7 +947,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_shutdown_service(self, service_name: str):
@@ -969,7 +961,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"get-apps",
-            "".encode("utf8"),
+            b"",
         ])
         try:
             with timeout(10):
@@ -978,7 +970,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def watchdog(self) -> None:
@@ -1017,7 +1009,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-            console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
+            console_items: list[tuple[ConsoleItemType, str | tuple[str, str]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
@@ -1071,21 +1063,21 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     if rec.msg_type == "finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise RunFinished(data)
-                    elif rec.msg_type == "clean-finished":
+                    if rec.msg_type == "clean-finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise CleanFinished(data)
-                    elif rec.msg_type == "build-finished":
+                    if rec.msg_type == "build-finished":
                         data = load_json(rec.data) if rec.data else {}
                         raise BuildFinished(data)
-                    elif rec.msg_type == "waiting-input":
+                    if rec.msg_type == "waiting-input":
                         opts = load_json(rec.data) if rec.data else {}
                         raise InputRequestPending(opts)
-                    elif rec.msg_type == "exec-timeout":
+                    if rec.msg_type == "exec-timeout":
                         raise ExecTimeout
         except asyncio.CancelledError:
             self.resume_output_queue()
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = {
                 "runId": self.current_run_id,
                 "status": "continued",
@@ -1298,7 +1290,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 break
 
 
-def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
+def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
     """
     Find the latest or exactly matching entry from krunner_volumes mapping using the given distro
     string expression.
@@ -1309,7 +1301,7 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
 
-    def _extract_version(key: str) -> Tuple[int, ...]:
+    def _extract_version(key: str) -> tuple[int, ...]:
         m = rx_ver_suffix.search(key)
         if m is not None:
             return tuple(map(int, m.group(1).split(".")))

@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.role import SingleEntityPermissionCheckInput
 from ai.backend.manager.data.permission.types import EntityType
@@ -10,8 +11,6 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-
-from ...validator.single_entity import SingleEntityActionValidator
 
 
 class SingleEntityActionRBACValidator(SingleEntityActionValidator):

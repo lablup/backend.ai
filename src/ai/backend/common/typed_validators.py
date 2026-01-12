@@ -30,10 +30,10 @@ from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
     API_VFOLDER_LENGTH_LIMIT,
-    MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
 )
+from .meta import BackendAIConfigMeta, ConfigExample
 
 TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
 
@@ -57,7 +57,7 @@ class _TimeDurationPydanticAnnotation:
                 t = float(value)
                 assert cls.allow_negative or t >= 0, "value must be positive"
                 return datetime.timedelta(seconds=t)
-            elif value[-2:].isalpha():
+            if value[-2:].isalpha():
                 t = int(value[:-2])
                 assert cls.allow_negative or t >= 0, "value must be positive"
                 match value[-2:]:
@@ -102,10 +102,9 @@ class _TimeDurationPydanticAnnotation:
                 )
                 if value.years:
                     return f"{value.years}yr"
-                elif value.months:
+                if value.months:
                     return f"{value.months}mo"
-                else:
-                    raise AssertionError("Should not reach here")
+                raise AssertionError("Should not reach here")
             case _:
                 raise AssertionError("Not a valid type")
 
@@ -171,9 +170,11 @@ SESSION_NAME_MAX_LENGTH: Final[int] = 24
 
 
 def _vfolder_name_validator(name: str) -> str:
-    f"""
-    Although the length constraint of the `vfolders.name` column is {MODEL_VFOLDER_LENGTH_LIMIT},
-    we limit the length to {API_VFOLDER_LENGTH_LIMIT} in the create/rename API
+    """
+    Validate and return the VFolder name.
+
+    Although the length constraint of the ``vfolders.name`` column is 64 (MODEL_VFOLDER_LENGTH_LIMIT),
+    we limit the length to 48 (API_VFOLDER_LENGTH_LIMIT) in the create/rename API
     because we append a timestamp of deletion to the name when VFolders are deleted.
     """
     if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:
@@ -194,23 +195,32 @@ VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
 
 
 class HostPortPair(BaseModel):
-    host: str = Field(
-        description="""
-        Host address of the service.
-        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
-        """,
-        examples=["127.0.0.1"],
-    )
-    port: int = Field(
-        ge=1,
-        le=65535,
-        description="""
-        Port number of the service.
-        Must be between 1 and 65535.
-        Ports below 1024 require root/admin privileges.
-        """,
-        examples=[8080],
-    )
+    host: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Host address of the service. "
+                "Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to "
+                "all interfaces."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="127.0.0.1", prod="server.example.com"),
+        ),
+    ]
+    port: Annotated[
+        int,
+        Field(ge=1, le=65535),
+        BackendAIConfigMeta(
+            description=(
+                "Port number of the service. "
+                "Must be between 1 and 65535. "
+                "Ports below 1024 require root/admin privileges."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="8080", prod="8080"),
+        ),
+    ]
 
     _allow_blank_host: ClassVar[bool] = True
 
@@ -269,10 +279,9 @@ class HostPortPair(BaseModel):
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
@@ -349,17 +358,15 @@ class UserID(int):
         if value is None:
             if cls._default_uid is not None:
                 return cls._default_uid
-            else:
-                return os.getuid()
-        elif isinstance(value, int):
+            return os.getuid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getuid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_uid is not None:
                     return cls._default_uid
-                else:
-                    return os.getuid()
+                return os.getuid()
             try:
                 value = int(value)
             except ValueError:
@@ -402,17 +409,15 @@ class GroupID(int):
         if value is None:
             if cls._default_gid is not None:
                 return cls._default_gid
-            else:
-                return os.getgid()
-        elif isinstance(value, int):
+            return os.getgid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getgid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_gid is not None:
                     return cls._default_gid
-                else:
-                    return os.getgid()
+                return os.getgid()
             try:
                 value = int(value)
             except ValueError:

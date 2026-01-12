@@ -27,6 +27,8 @@ __all__ = [
     "DeleteRoleActionResult",
     "GetRoleDetailAction",
     "GetRoleDetailActionResult",
+    "PurgeRoleAction",
+    "PurgeRoleActionResult",
     "RevokeRoleAction",
     "RevokeRoleActionResult",
     "SearchRolesAction",
@@ -35,8 +37,6 @@ __all__ = [
     "SearchUsersAssignedToRoleActionResult",
     "UpdateRoleAction",
     "UpdateRoleActionResult",
-    "PurgeRoleAction",
-    "PurgeRoleActionResult",
     "UpdateRolePermissionsAction",
     "UpdateRolePermissionsActionResult",
 ]

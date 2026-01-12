@@ -81,9 +81,9 @@ class DeploymentFilterOptions:
     id: Optional[UUID] = None
 
     # Logical operations
-    AND: Optional[list["DeploymentFilterOptions"]] = None
-    OR: Optional[list["DeploymentFilterOptions"]] = None
-    NOT: Optional[list["DeploymentFilterOptions"]] = None
+    AND: Optional[list[DeploymentFilterOptions]] = None
+    OR: Optional[list[DeploymentFilterOptions]] = None
+    NOT: Optional[list[DeploymentFilterOptions]] = None
 
 
 @dataclass
@@ -96,9 +96,9 @@ class ModelRevisionFilterOptions:
     ids_in: Optional[list[UUID]] = None
 
     # Logical operations
-    AND: Optional[list["ModelRevisionFilterOptions"]] = None
-    OR: Optional[list["ModelRevisionFilterOptions"]] = None
-    NOT: Optional[list["ModelRevisionFilterOptions"]] = None
+    AND: Optional[list[ModelRevisionFilterOptions]] = None
+    OR: Optional[list[ModelRevisionFilterOptions]] = None
+    NOT: Optional[list[ModelRevisionFilterOptions]] = None
 
 
 class ReadinessStatusFilterType(Enum):
@@ -151,6 +151,6 @@ class ModelReplicaFilterOptions:
     ids_in: Optional[list[UUID]] = None
 
     # Logical operations
-    AND: Optional[list["ModelReplicaFilterOptions"]] = None
-    OR: Optional[list["ModelReplicaFilterOptions"]] = None
-    NOT: Optional[list["ModelReplicaFilterOptions"]] = None
+    AND: Optional[list[ModelReplicaFilterOptions]] = None
+    OR: Optional[list[ModelReplicaFilterOptions]] = None
+    NOT: Optional[list[ModelReplicaFilterOptions]] = None

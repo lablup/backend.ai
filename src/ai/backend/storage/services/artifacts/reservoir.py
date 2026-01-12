@@ -73,7 +73,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
         client: ManagerHTTPClient,
         storage_name: str,
         filepath: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._filepath = filepath
@@ -111,7 +111,7 @@ class ReservoirVFSFileDownloader:
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._redis_client = redis_client
@@ -197,7 +197,7 @@ class ReservoirVFSFileDownloader:
                         f"Network error during download: {e}, Downloaded {self._bytes_downloaded} bytes before failure"
                     )
                     raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.error(f"Timeout after downloading {self._bytes_downloaded} bytes")
                     raise
         except Exception as e:
@@ -269,7 +269,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._src_s3_client = src_s3_client
         self._key = key
         self._size = size
@@ -415,7 +415,7 @@ class ReservoirService:
     _manager_client_pool: ManagerHTTPClientPool
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
-    def __init__(self, args: ReservoirServiceArgs):
+    def __init__(self, args: ReservoirServiceArgs) -> None:
         self._background_task_manager = args.background_task_manager
         self._event_producer = args.event_producer
         self._reservoir_registry_configs = args.reservoir_registry_configs
@@ -572,7 +572,7 @@ class ReservoirService:
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{model_count}"
+                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
                         )
                         errors.append(str(e))
                     finally:
@@ -592,13 +592,12 @@ class ReservoirService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {str(e)}")
-                return DispatchResult.error(f"Batch import failed: {str(e)}")
+                log.error(f"Batch model import failed: {e!s}")
+                return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        return await self._background_task_manager.start(_import_models_batch)
 
 
 # Import Pipeline Steps
@@ -786,7 +785,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             return total_bytes
 
         except Exception as e:
-            log.error(f"VFS download failed for {model_prefix}: {str(e)}")
+            log.error(f"VFS download failed for {model_prefix}: {e!s}")
             raise
 
     async def _handle_object_storage_download(
@@ -955,7 +954,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 )
 
                 log.trace("[stream_bucket_to_bucket] done key={} bytes={}", key, size)
-                return size if size >= 0 else 0
+                return max(size, 0)
 
         # TODO: Replace this with global semaphore
         sizes = await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
@@ -1095,7 +1094,7 @@ class TarExtractor:
 
     _stream_reader: StreamReader
 
-    def __init__(self, stream_reader: StreamReader):
+    def __init__(self, stream_reader: StreamReader) -> None:
         self._stream_reader = stream_reader
 
     async def extract_to(self, target_dir: Path) -> int:

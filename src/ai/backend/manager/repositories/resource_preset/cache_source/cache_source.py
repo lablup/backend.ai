@@ -95,10 +95,9 @@ class ResourcePresetCacheSource:
         Get cached check presets data as JSON string.
         Returns the raw JSON string to avoid complex deserialization.
         """
-        data = await self._valkey_stat.get_resource_preset_check_data(
+        return await self._valkey_stat.get_resource_preset_check_data(
             str(access_key), group, domain, scaling_group
         )
-        return data
 
     async def set_check_presets_data(
         self,

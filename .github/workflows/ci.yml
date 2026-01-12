@@ -122,11 +122,12 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
@@ -191,9 +192,10 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Prepare DB
       run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
@@ -250,9 +252,10 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
       run: |
@@ -284,7 +287,7 @@ jobs:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
-    runs-on: [ubuntu-latest-8-cores]
+    runs-on: ubuntu-latest-8-cores
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -317,12 +320,13 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
-      timeout-minutes: 15
+      timeout-minutes: 60
       env:
         IS_RELEASE: ${{ needs.optimize-ci.outputs.release }}
       run: |
@@ -366,10 +370,10 @@ jobs:
       fail-fast: false
       matrix:
         # ubuntu-22.04: x86-64
-        # ubuntu-22.04-arm64: aarch64
-        # self-hosted-macos-14-x64: intel
+        # ubuntu-22.04-arm: aarch64
+        # macos-15-intel: intel
         # self-hosted-macos-14: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, self-hosted-macos-14-x64, self-hosted-macos-14]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15-intel, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
@@ -394,9 +398,10 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
       run: |
@@ -450,9 +455,10 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
-        named-caches-hash: ${{ github.sha }}
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
@@ -476,7 +482,7 @@ jobs:
     uses: ./.github/workflows/sbom.yml
 
   build-isla-sorna-image:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
 
@@ -491,7 +497,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    needs: [build-scies, build-wheels, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -533,6 +539,7 @@ jobs:
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
+      continue-on-error: true
       uses: actions/download-artifact@v6
       with:
         name: SBOM report

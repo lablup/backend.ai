@@ -1,4 +1,4 @@
-from ..types import AbstractGaudiDevice
+from ai.backend.accelerator.habana.types import AbstractGaudiDevice
 
 __all__ = ("Gaudi3Device",)
 

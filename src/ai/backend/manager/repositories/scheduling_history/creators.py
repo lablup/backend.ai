@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Optional, override
+from dataclasses import dataclass, field
+from typing import Optional, override
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
@@ -24,10 +24,10 @@ from ai.backend.manager.models.scheduling_history import (
 from ai.backend.manager.repositories.base import CreatorSpec
 
 __all__ = (
-    "SessionSchedulingHistoryCreatorSpec",
-    "KernelSchedulingHistoryCreatorSpec",
     "DeploymentHistoryCreatorSpec",
+    "KernelSchedulingHistoryCreatorSpec",
     "RouteHistoryCreatorSpec",
+    "SessionSchedulingHistoryCreatorSpec",
 )
 
 
@@ -42,13 +42,10 @@ class SessionSchedulingHistoryCreatorSpec(CreatorSpec[SessionSchedulingHistoryRo
     from_status: Optional[SessionStatus] = None
     to_status: Optional[SessionStatus] = None
     error_code: Optional[str] = None
-    sub_steps: Optional[list[SubStepResult]] = None
+    sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override
     def build_row(self) -> SessionSchedulingHistoryRow:
-        sub_steps_json: list[dict[str, Any]] | None = None
-        if self.sub_steps:
-            sub_steps_json = [s.model_dump(mode="json") for s in self.sub_steps]
         return SessionSchedulingHistoryRow(
             session_id=self.session_id,
             phase=self.phase,
@@ -57,7 +54,7 @@ class SessionSchedulingHistoryCreatorSpec(CreatorSpec[SessionSchedulingHistoryRo
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,
-            sub_steps=sub_steps_json,
+            sub_steps=self.sub_steps,  # PydanticListColumn handles serialization
             attempts=1,
         )
 
@@ -101,6 +98,7 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     from_status: Optional[ModelDeploymentStatus] = None
     to_status: Optional[ModelDeploymentStatus] = None
     error_code: Optional[str] = None
+    sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override
     def build_row(self) -> DeploymentHistoryRow:
@@ -112,6 +110,7 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=1,
         )
 
@@ -128,6 +127,7 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     from_status: Optional[RouteStatus] = None
     to_status: Optional[RouteStatus] = None
     error_code: Optional[str] = None
+    sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override
     def build_row(self) -> RouteHistoryRow:
@@ -140,5 +140,6 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=1,
         )

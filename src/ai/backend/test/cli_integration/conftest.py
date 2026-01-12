@@ -4,10 +4,10 @@ import os
 import re
 import secrets
 from collections import namedtuple
+from collections.abc import Callable, Generator, Iterator, Sequence
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Generator, Iterator, Sequence, Tuple
 
 import pexpect
 import pytest
@@ -88,7 +88,7 @@ def temp_domain(domain_name: str, run: ClientRunnerFunc) -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
-def users(n: int = 3) -> Tuple[User, ...]:
+def users(n: int = 3) -> tuple[User, ...]:
     fake = Faker()
     return tuple(
         User(
@@ -116,7 +116,7 @@ def gen_fullname() -> Callable[[], str]:
 
 
 @pytest.fixture(scope="module")
-def keypair_options() -> Tuple[KeypairOption, ...]:
+def keypair_options() -> tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=False, is_admin=True, rate_limit=25000, resource_policy="default"),
         KeypairOption(is_active=True, is_admin=False, rate_limit=None, resource_policy="default"),
@@ -125,7 +125,7 @@ def keypair_options() -> Tuple[KeypairOption, ...]:
 
 
 @pytest.fixture(scope="module")
-def new_keypair_options() -> Tuple[KeypairOption, ...]:
+def new_keypair_options() -> tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=True, is_admin=False, rate_limit=15000, resource_policy="default"),
         KeypairOption(is_active=False, is_admin=True, rate_limit=15000, resource_policy="default"),

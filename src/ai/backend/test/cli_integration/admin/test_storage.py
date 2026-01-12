@@ -1,7 +1,7 @@
 import json
 from contextlib import closing
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_list_storage(run_admin: ClientRunnerFunc):

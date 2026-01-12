@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.repositories.base.updater import UpdaterSpec

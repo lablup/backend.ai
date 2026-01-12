@@ -1,437 +1,739 @@
-# Backend.AI Agent Configuration Sample
+# Backend.AI Agent Configuration (PROD Environment)
 #
 # This is a sample configuration file for the Backend.AI Agent.
 # All configuration options are documented with their descriptions,
-# default values, and examples.
+# default values, and environment-specific examples.
 #
-# Generated automatically from the AgentUnifiedConfig schema.
+# Generated using BackendAIConfigMeta annotations.
 
-# Complete agent configuration (common + overridable).
+
+# Agent-specific configuration including network settings, identity, and
+# operational modes. In multi-agent mode (when 'agents' field is populated),
+# this serves as the default configuration that individual agents inherit and
+# can override.
+# Added in 25.12.0
 [agent]
-  # Agent ID
-  ## id = "agent-001"
-  # Agent socket port
+  # Unique identifier for this agent instance. If not specified, a random UUID
+  # is generated. In multi-agent mode, each agent must have a unique ID. Used
+  # for tracking, logging, and management.
+  # Added in 25.12.0
+  ## id = "agent-prod-001"
+  # Port number for the agent's socket communication with containers. Containers
+  # connect to this port for the kernel runner protocol. In multi-agent mode,
+  # each agent must use a unique port.
+  # Added in 25.12.0
   agent-sock-port = 6007
-  # Scaling group name
-  scaling-group = "default"
-  # Scaling group type
+  # Name of the scaling group this agent belongs to. Scaling groups organize
+  # agents into logical clusters for resource allocation. Users can target
+  # specific scaling groups when creating sessions.
+  # Added in 25.12.0
+  scaling-group = "gpu-cluster"
+  # Type of resource group this agent serves. 'compute' for general-purpose
+  # computation nodes. 'storage' for storage-optimized nodes. Determines how the
+  # agent is used in workload scheduling.
+  # Added in 25.12.0
   scaling-group-type = "compute"
-  # Whether to force terminate abusing containers
-  force-terminate-abusing-containers = false
-  # Kernel creation concurrency
-  kernel-creation-concurrency = 4
-  # Backend type for the agent.
-  # This determines how the agent interacts with the underlying infrastructure.
-  # Available options are:
-  # - `docker`: Uses Docker as the backend.
-  # - `kubernetes`: Uses Kubernetes as the backend.
-  # - `dummy`: A dummy backend for testing purposes.
+  # When enabled, automatically terminates containers that exceed resource
+  # limits or exhibit abusive behavior (e.g., crypto mining, excessive I/O). Use
+  # with caution as it may interrupt legitimate workloads.
+  # Added in 25.12.0
+  force-terminate-abusing-containers = true
+  # Maximum number of containers that can be created simultaneously. Higher
+  # values speed up bulk session creation but increase resource usage. Lower
+  # values reduce resource contention during container startup.
+  # Added in 25.12.0
+  kernel-creation-concurrency = 8
+  # Backend type for the agent determining how it interacts with the underlying
+  # container orchestration infrastructure. Available options: 'docker' uses
+  # Docker daemon for container management (default for most deployments);
+  # 'kubernetes' uses Kubernetes API for container management in K8s clusters;
+  # 'dummy' is a mock backend for testing without actual containers.
+  # Added in 25.12.0
   backend = "docker"
-  # RPC listen address and port
+  # Network address and port where the agent listens for RPC calls from the
+  # manager. The manager uses this endpoint to send commands like session
+  # creation, termination, and resource queries. Use '0.0.0.0' to listen on all
+  # interfaces.
+  # Added in 25.12.0
   rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
-  # Service address and port
-  service-addr = { host = "0.0.0.0", port = 6003 }
-  # Announce address and port
-  announce-addr = { host = "host.docker.internal", port = 6003 }
-  # Whether to enable SSL
-  ssl-enabled = false
-  # Path to SSL certificate file
-  ## ssl-cert = "/path/to/cert.pem"
-  # Path to SSL private key file
-  ## ssl-key = "/path/to/key.pem"
-  # Advertised RPC address and port
+  # Network address and port for internal services within the agent. Used for
+  # inter-process communication and internal API endpoints. This address is
+  # typically not exposed externally.
+  # Added in 25.12.0
+  internal-addr = { host = "0.0.0.0", port = 6003 }
+  # Address announced to containers for reaching the agent's internal services.
+  # Containers use this address to communicate back with the agent. Use
+  # 'host.docker.internal' for Docker on macOS/Windows, or the host's actual IP
+  # on Linux.
+  # Added in 25.12.0
+  announce-internal-addr = { host = "192.168.1.100", port = 6003 }
+  # Enables SSL/TLS encryption for RPC communication between the agent and
+  # manager. When enabled, requires ssl_cert and ssl_key to be configured with
+  # valid certificates. Recommended for production deployments to secure inter-
+  # component communication.
+  # Added in 25.12.0
+  ssl-enabled = true
+  # Path to the SSL/TLS certificate file (PEM format) for encrypted RPC
+  # communication. Required when ssl_enabled is true. The certificate should be
+  # valid for the agent's hostname and signed by a trusted CA or self-signed for
+  # internal use.
+  # Added in 25.12.0
+  ## ssl-cert = "/etc/backend.ai/ssl/agent.crt"
+  # Path to the SSL/TLS private key file (PEM format) corresponding to the
+  # ssl_cert. Required when ssl_enabled is true. The key file should have
+  # restricted permissions (e.g., 0600) and be readable only by the agent
+  # process.
+  # Added in 25.12.0
+  ## ssl-key = "/etc/backend.ai/ssl/agent.key"
+  # External address that the agent advertises to the manager for RPC callbacks.
+  # Use when the agent is behind NAT or a load balancer and the listen address
+  # differs from the externally reachable address. If not set, uses
+  # rpc_listen_addr.
+  # Added in 25.12.0
   ## advertised-rpc-addr = { host = "192.168.1.100", port = 6001 }
-  # Path to RPC auth manager public key
-  ## rpc-auth-manager-public-key = "/path/to/public.key"
-  # Path to RPC auth agent keypair
-  ## rpc-auth-agent-keypair = "/path/to/keypair.key"
-  # Base path for IPC
-  ipc-base-path = "/tmp/backend.ai/ipc"
-  # Base path for variable data
-  var-base-path = "var/lib/backend.ai"
-  # Mount path for containers
+  # Path to the manager's public key file for authenticating RPC messages. Used
+  # with ZeroMQ CURVE authentication to verify messages from the manager. Part
+  # of the RPC security mechanism for preventing unauthorized access.
+  # Added in 25.12.0
+  ## rpc-auth-manager-public-key = "/etc/backend.ai/keys/manager.pub"
+  # Path to the agent's keypair file for RPC authentication. Contains both
+  # public and private keys used for ZeroMQ CURVE authentication. The private
+  # key must be kept secure as it proves the agent's identity.
+  # Added in 25.12.0
+  ## rpc-auth-agent-keypair = "/etc/backend.ai/keys/agent.keypair"
+  # Base directory path for Unix domain sockets and other IPC mechanisms. Used
+  # for communication between the agent and its child processes. Directory is
+  # created automatically with appropriate permissions.
+  # Added in 25.12.0
+  ipc-base-path = "/var/run/backend.ai/ipc"
+  # Base directory for the agent's variable data including runtime state,
+  # temporary files, and data that persists across restarts but not upgrades.
+  # Ensure sufficient disk space and appropriate permissions.
+  # Added in 25.12.0
+  var-base-path = "/var/lib/backend.ai"
+  # Base directory path for mounting storage volumes into containers. Virtual
+  # folders and other storage mounts are placed under this path. Should be on a
+  # filesystem with sufficient space for user data.
+  # Added in 25.12.0
   ## mount-path = "/mnt/backend.ai"
-  # Whether to enable cohabiting storage proxy
+  # Indicates whether a storage proxy runs on the same host as the agent. When
+  # true, the agent uses local filesystem paths for storage operations,
+  # improving performance. When false, storage is accessed via network
+  # protocols.
+  # Added in 25.12.0
   cohabiting-storage-proxy = true
-  # Public host address
-  ## public-host = "backend.ai"
-  # Region name
+  # Public hostname or IP address for this agent node. Used for generating URLs
+  # that users can access to reach services running on this agent, such as web
+  # terminals or application proxies.
+  # Added in 25.12.0
+  ## public-host = "compute1.backend.ai"
+  # Cloud region identifier where this agent is deployed. Used for geographic
+  # resource allocation and displayed in admin interfaces. Use standard region
+  # codes like 'us-east-1', 'eu-west-1', or custom identifiers.
+  # Added in 25.12.0
   ## region = "us-east-1"
-  # Instance type
-  ## instance-type = "m5.large"
-  # Path to PID file
-  pid-file = "/dev/null"
-  # Event loop type
+  # Cloud instance type identifier for this agent's host machine. Used for cost
+  # tracking, capacity planning, and displayed in admin interfaces. Use cloud
+  # provider's instance type names like 'm5.large' or 'n1-standard-4'.
+  # Added in 25.12.0
+  ## instance-type = "m5.xlarge"
+  # Path to the PID file where the agent writes its process ID. Used by init
+  # systems and monitoring tools to track the agent process. Set to /dev/null to
+  # disable PID file creation.
+  # Added in 25.12.0
+  pid-file = "/var/run/backend.ai/agent.pid"
+  # Python async event loop implementation to use. 'asyncio' uses the standard
+  # library implementation (default, most compatible). 'uvloop' uses a faster
+  # libuv-based implementation (better performance, Linux only).
+  # Added in 25.12.0
   event-loop = "asyncio"
-  # Whether to skip manager detection
+  # Skips automatic detection of the manager during agent startup. When true,
+  # the agent starts without verifying manager connectivity. Useful for testing
+  # or when the manager becomes available after the agent starts.
+  # Added in 25.12.0
   skip-manager-detection = false
-  # Port for aiomonitor terminal UI
+  # Port for the aiomonitor terminal UI debugging interface. Provides real-time
+  # inspection of async tasks and event loop state. Connect via telnet to this
+  # port for interactive debugging.
+  # Added in 25.12.0
   aiomonitor-termui-port = 38200
-  # Port for aiomonitor web UI
+  # Port for the aiomonitor web UI debugging interface. Provides a browser-based
+  # interface for inspecting async tasks. Access via http://agent-host:port for
+  # visual debugging.
+  # Added in 25.12.0
   aiomonitor-webui-port = 39200
-  # Metadata server bind host
+  # Bind host for the container metadata server. Containers connect to this
+  # server to retrieve session metadata and configuration. Use '0.0.0.0' to
+  # listen on all interfaces or a specific IP for restricted access.
+  # Added in 25.12.0
   metadata-server-bind-host = "0.0.0.0"
-  # Metadata server port
+  # Port for the container metadata server. Containers access metadata like
+  # session ID, access key, and environment variables through this server.
+  # Similar to cloud provider instance metadata services.
+  # Added in 25.12.0
   metadata-server-port = 40128
-  # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
-  # Blocked compute plugins
-  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-  # Allowed network plugins
-  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Blocked network plugins
-  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Path for image commit
-  image-commit-path = "tmp/backend.ai/commit"
-  # Path for abuse reports
+  # Allowlist of compute plugin names that can be loaded by this agent. If set,
+  # only plugins in this list are loaded. If null/empty, all discovered plugins
+  # are loaded except those in block_compute_plugins. Plugin names use Python
+  # package notation (e.g., 'ai.backend.accelerator.cuda').
+  # Added in 25.12.0
+  ## allow-compute-plugins = "[\"ai.backend.accelerator.cuda\", \"ai.backend.accelerator.rocm\"]"
+  # Blocklist of compute plugin names that should not be loaded by this agent.
+  # Plugins in this list are excluded even if discovered. Use to disable
+  # specific accelerators or features on certain nodes.
+  # Added in 25.12.0
+  ## block-compute-plugins = "[\"ai.backend.accelerator.mock\"]"
+  # Allowlist of network plugin names that can be loaded by this agent. Network
+  # plugins provide custom networking configurations for containers. If set,
+  # only plugins in this list are loaded.
+  # Added in 25.12.0
+  ## allow-network-plugins = "[\"ai.backend.network.overlay\"]"
+  # Blocklist of network plugin names that should not be loaded by this agent.
+  # Use to disable specific network configurations on certain nodes.
+  # Added in 25.12.0
+  ## block-network-plugins = "[\"ai.backend.network.legacy\"]"
+  # Directory path for storing temporary image commit data. Used when users
+  # commit their running containers as new images. Requires sufficient disk
+  # space for container filesystem layers.
+  # Added in 25.12.0
+  image-commit-path = "/var/lib/backend.ai/commit"
+  # Directory path for storing container abuse reports. When suspicious or
+  # abusive behavior is detected in containers, detailed reports are written
+  # here for review by administrators.
+  # Added in 25.12.0
   ## abuse-report-path = "/var/log/backend.ai/abuse"
-  # Whether to use experimental Redis event dispatcher
+  # Enables the experimental Redis-based event dispatcher for agent-manager
+  # communication. Provides improved event delivery reliability and scalability.
+  # Requires Redis to be configured. Still in experimental phase.
+  # Added in 25.12.0
   use-experimental-redis-event-dispatcher = false
-  # Docker mode detected based on kernel version (linuxkit/native)
-  ## docker-mode = "linuxkit"
-  # Owner uid:gid of the mount directory
-  ## mount-path-uid-gid = "root:root"
+  # Docker runtime mode, auto-detected based on the kernel version. 'linuxkit'
+  # indicates Docker Desktop with LinuxKit VM (macOS/Windows). 'native'
+  # indicates native Docker on Linux. Affects filesystem and networking
+  # behavior.
+  # Added in 25.12.0
+  ## docker-mode = "native"
+  # Owner UID:GID for mounted directories in format 'user:group'. Controls
+  # ownership of files created in mounted volumes. Use 'root:root' for
+  # privileged containers or match container user for unprivileged.
+  # Added in 25.12.0
+  ## mount-path-uid-gid = "bai:bai"
 
-  # Container lifecycle synchronization config
+  # Configuration for container lifecycle synchronization between agent and
+  # manager. Ensures container states are consistent across the system.
+  # Added in 25.12.0
   [agent.sync-container-lifecycles]
-    # Whether to enable container lifecycle synchronization
+    # Controls whether the agent synchronizes container lifecycle states with
+    # the manager. When enabled, the agent periodically checks container states
+    # (running, stopped, etc.) and reports discrepancies to the manager for
+    # reconciliation. Useful for detecting orphaned containers or missed
+    # lifecycle events.
+    # Added in 25.12.0
     enabled = true
-    # Synchronization interval in seconds
-    interval = 10.0
+    # Time interval in seconds between container lifecycle synchronization
+    # checks. Lower values provide faster detection of container state changes
+    # but increase system overhead. Higher values reduce overhead but may delay
+    # detection of issues.
+    # Added in 25.12.0
+    interval = 30.0
 
-# Complete container configuration (common + overridable).
+# Container runtime configuration including execution modes, user settings, and
+# networking. In multi-agent mode (when 'agents' field is populated), this
+# serves as the default configuration that individual agents inherit and can
+# override.
+# Added in 25.12.0
 [container]
-  # Kernel user ID
-  kernel-uid = -1
-  # Kernel group ID
-  kernel-gid = -1
-  # Port range for containers.
-  # If multiple agents are used, user must ensure that the port ranges
-  # do not overlap between the agent, else it may cause subtle issues
-  # late into the agent's runtime.
-  port-range = [ 30000, 31000,]
-  # Statistics type
+  # User ID (UID) for processes running inside containers. Value of -1 uses the
+  # container image's default UID. Set to match the host user's UID for proper
+  # file permissions on mounted volumes.
+  # Added in 25.12.0
+  kernel-uid = "1000"
+  # Group ID (GID) for processes running inside containers. Value of -1 uses the
+  # container image's default GID. Set to match the host group's GID for proper
+  # file permissions on mounted volumes.
+  # Added in 25.12.0
+  kernel-gid = "1000"
+  # Range of host ports allocated to containers for network services. Format is
+  # [start, end] inclusive. Containers get ports from this range for SSH,
+  # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
+  # ranges.
+  # Added in 25.12.0
+  port-range = "[30000, 32000]"
+  # Method for collecting container resource statistics. 'docker' uses Docker's
+  # stats API (most compatible). 'cgroup' reads from cgroup filesystem directly
+  # (more accurate, requires root). 'null' disables statistics collection.
+  # Added in 25.12.0
   ## stats-type = "docker"
-  # Sandbox type
+  # Container sandbox implementation for process isolation. 'docker' uses Docker
+  # containers (standard). 'jail' uses lightweight jailed containers for faster
+  # startup (x86_64 Linux only). Jail provides better performance but with
+  # reduced isolation.
+  # Added in 25.12.0
   sandbox-type = "docker"
-  # Jail arguments
-  jail-args = [ "--mount", "/tmp",]
-  # Scratch type
+  # Additional command-line arguments passed to the jail sandbox. Only
+  # applicable when sandbox_type is 'jail'. Use to customize jail behavior like
+  # mount points or resource limits.
+  # Added in 25.12.0
+  jail-args = ["--mount=/data", "--limit-mem=4G"]
+  # Type of scratch space provided to containers for temporary data. 'hostdir'
+  # uses a directory on the host filesystem. 'hostfile' uses a loopback file
+  # with size limits (requires root). 'memory' uses RAM-backed tmpfs for fast
+  # but limited storage. 'k8s-nfs' uses NFS-backed storage for Kubernetes.
+  # Added in 25.12.0
   scratch-type = "hostdir"
-  # Scratch root directory
-  scratch-root = "scratches"
-  # Scratch size
-  scratch-size = "0"
-  # Scratch NFS address
-  ## scratch-nfs-address = "192.168.1.100:/export"
-  # Scratch NFS options
+  # Base directory for container scratch space storage. Each container gets a
+  # subdirectory under this path for temporary files. Should be on a fast
+  # filesystem with adequate space.
+  # Added in 25.12.0
+  scratch-root = "/var/lib/backend.ai/scratches"
+  # Size limit for each container's scratch space when using 'hostfile' type.
+  # Use binary size format (e.g., '1G', '500M'). Value of '0' means no limit
+  # (only effective with 'hostdir' type).
+  # Added in 25.12.0
+  scratch-size = "10G"
+  # NFS server address and export path for scratch storage. Required when
+  # scratch_type is 'k8s-nfs'. Format: 'server-ip:/export/path' or 'server-
+  # hostname:/export/path'.
+  # Added in 25.12.0
+  ## scratch-nfs-address = "192.168.1.50:/exports/scratch"
+  # NFS mount options for scratch storage. Required when scratch_type is
+  # 'k8s-nfs'. Common options: 'rw,sync', 'rw,async,soft'.
+  # Added in 25.12.0
   ## scratch-nfs-options = "rw,sync"
-  # Alternative bridge network
+  # Name of an alternative Docker bridge network for container networking. If
+  # not set, uses the default Docker bridge network. Use to isolate Backend.AI
+  # containers on a dedicated network.
+  # Added in 25.12.0
   ## alternative-bridge = "br-backend"
-  # Whether to enable Docker Swarm mode.
-  # This allows the agent to manage containers in a Docker Swarm cluster.
-  # When enabled, the agent will use Docker Swarm APIs to manage containers,
-  # networks, and services.
-  # This field is only used when backend is set to 'docker'.
+  # Enables Docker Swarm mode for container orchestration. When enabled, the
+  # agent uses Docker Swarm APIs for managing containers, networks, and services
+  # across multiple Docker hosts. Only applicable with Docker backend.
+  # Added in 25.12.0
   swarm-enabled = false
-  # Bind host for containers
-  bind-host = ""
-  # Advertised host for containers
+  # Host address that containers bind their network ports to. Empty string means
+  # binding to all available interfaces (equivalent to '0.0.0.0'). Specify a
+  # particular IP to restrict container network access.
+  # Added in 25.12.0
+  bind-host = "0.0.0.0"
+  # Host address advertised to clients for connecting to container services.
+  # Used when the bind address differs from the externally reachable address,
+  # such as when running behind NAT or in a cloud environment.
+  # Added in 25.12.0
   ## advertised-host = "192.168.1.100"
+  # KRunner volumes configuration mapping container paths to host paths.
+  # Specifies volumes to mount into containers for the kernel runner. This is
+  # typically set automatically by the agent based on environment detection and
+  # should not normally be configured manually.
+  # Added in 25.12.0
+  ## krunner-volumes = { /opt/krunner = "/opt/backend.ai/krunner" }
 
-# Resource configuration.
-# If agents field is populated, this field indicates the default values for all
-# agents.
+# Resource allocation configuration including CPU, memory, and accelerator
+# device settings. In multi-agent mode (when 'agents' field is populated), this
+# serves as the default configuration that individual agents inherit and can
+# override.
+# Added in 25.12.0
 [resource]
-  # The number of CPU cores reserved for the operating system and the agent
-  # service.
-  reserved-cpu = 1
-  # The memory space reserved for the operating system and the agent service. It
-  # is subtracted from the reported main memory size and not available for user
-  # workload allocation. Depending on the memory-align-size option and system
-  # configuration, this may not be the exact value but have slightly less or more
-  # values within the memory-align-size.
-  reserved-mem = "1G"
-  # The disk space reserved for the operating system and the agent service.
-  # Currently this value is unused. In future releases, it may be used to preserve
-  # the minimum disk space from the scratch disk allocation via loopback files.
-  reserved-disk = "8G"
-  # Resource allocation mode for multi-agent scenarios.
-  # - `shared`: All agents share the full resource pool (default, backward
-  # compatible).
-  # - `auto-split`: Automatically divide resources equally (1/N) among all agents.
-  # - `manual`: Manually specify per-agent resource allocations via config.
-  allocation-mode = "shared"
-  # The alignment of the reported main memory size to absorb tiny deviations from
-  # per-node firmware/hardware settings. Recommended to be multiple of the
-  # page/hugepage size (e.g., 2 MiB).
-  memory-align-size = "16M"
-  # Resource allocation order
-  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
-  # Affinity policy
+  # Number of CPU cores reserved for the operating system and agent process.
+  # These cores are not available for container workloads. Increase if the agent
+  # or system services need more resources.
+  # Added in 25.12.0
+  reserved-cpu = 2
+  # Amount of memory reserved for the operating system and agent process.
+  # Subtracted from total memory when reporting available resources to the
+  # manager. The actual reserved amount may vary slightly due to
+  # memory_align_size rounding.
+  # Added in 25.12.0
+  reserved-mem = "4G"
+  # Disk space reserved for the operating system and agent operations. Currently
+  # unused but reserved for future features like guaranteed minimum scratch
+  # space. Set based on expected system disk requirements.
+  # Added in 25.12.0
+  reserved-disk = "16G"
+  # Resource allocation strategy for multi-agent deployments. 'shared' allows
+  # all agents to see full resources (may overcommit). 'auto-split' divides
+  # resources equally among agents (N agents get 1/N each). 'manual' requires
+  # explicit resource allocation per agent via allocations config.
+  # Added in 25.12.0
+  allocation-mode = "auto-split"
+  # Memory alignment granularity for reported memory sizes. Absorbs small
+  # variations in available memory between nodes with similar hardware. Should
+  # be a multiple of the system page size (typically 2MB for huge pages).
+  # Added in 25.12.0
+  memory-align-size = "32M"
+  # Order in which resources are allocated to containers. Resources are
+  # allocated in this sequence, which can affect placement when multiple
+  # resource types compete for affinity (e.g., GPU and NUMA).
+  # Added in 25.12.0
+  allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+  # NUMA and device affinity policy for resource allocation. 'INTERLEAVED'
+  # spreads allocations across NUMA nodes for balance. 'PACKED' fills one NUMA
+  # node before moving to the next for locality. Affects performance
+  # characteristics of multi-socket systems.
+  # Added in 25.12.0
   affinity-policy = "INTERLEAVED"
 
-  # Resource allocations.
-  # Only used in MANUAL allocation mode.
+  # Manual resource allocation configuration for this agent. Required when
+  # allocation_mode is 'manual'. Specifies exact CPU, memory, and device
+  # allocations for this agent.
+  # Added in 25.12.0
   [resource.allocations]
-    # Hard CPU allocation for this agent (e.g., 8 cores).
-    # Only used in MANUAL allocation mode.
-    # All agents must specify this value when allocation-mode is MANUAL.
-    cpu = 8
-    # Hard memory allocation for this agent (e.g., "32G").
-    # Only used in MANUAL allocation mode.
-    # All agents must specify this value when allocation-mode is MANUAL.
-    mem = "32G"
+    # Number of CPU cores allocated to this agent for container workloads. Only
+    # used when resource allocation_mode is 'manual'. All agents in manual mode
+    # must specify this value. The total allocation across all agents should not
+    # exceed available cores.
+    # Added in 25.12.0
+    cpu = 16
+    # Amount of memory allocated to this agent for container workloads. Only
+    # used when resource allocation_mode is 'manual'. All agents in manual mode
+    # must specify this value. Use binary size format (e.g., '32G', '64G').
+    # Added in 25.12.0
+    mem = "64G"
+    # Device-specific resource allocations as key-value pairs. Only used when
+    # resource allocation_mode is 'manual'. Keys are slot names (e.g.,
+    # 'cuda.mem', 'cuda.shares'), values are decimal amounts. Use to allocate
+    # GPU memory, compute shares, and other accelerator resources.
+    # Added in 25.12.0
+    devices = { cuda.mem = "0.5", cuda.shares = "0.5" }
 
-    # Device-specific per-slot resource allocations.
-    # Only used in MANUAL allocation mode.
-    [resource.allocations.devices]
-
-# Pyroscope configuration
+# Pyroscope continuous profiling configuration for the agent. Pyroscope collects
+# CPU and memory profiles to help identify performance bottlenecks and memory
+# issues in the agent process.
+# Added in 25.12.0
 [pyroscope]
-  # Whether to enable Pyroscope profiling
-  enabled = false
-  # Application name to use in Pyroscope
-  ## app-name = "backendai-agent"
-  # Address of the Pyroscope server
-  ## server-addr = "http://localhost:4040"
-  # Sampling rate for Pyroscope profiling
-  ## sample-rate = 10
+  # Whether to enable Pyroscope profiling. When enabled, performance profiling
+  # data will be sent to a Pyroscope server. Useful for debugging performance
+  # issues, but adds some overhead.
+  # Added in 24.12.1
+  enabled = true
+  # Application name to use in Pyroscope. This name will identify this component
+  # instance in Pyroscope UI. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## app-name = "backendai-manager-prod"
+  # Address of the Pyroscope server. Must include the protocol (http or https)
+  # and port if non-standard. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## server-addr = "http://pyroscope:4040"
+  # Sampling rate for Pyroscope profiling. Higher values collect more data but
+  # increase overhead. Balance based on your performance monitoring needs.
+  # Added in 24.12.1
+  ## sample-rate = 100
 
-# Logging configuration
+# Logging configuration for the agent. Controls log levels, output destinations,
+# and log formatting. Proper logging setup is essential for debugging and
+# monitoring agent behavior in production environments.
+# Added in 25.12.0
 [logging]
   # The version used by logging.dictConfig().
+  # Added in 24.09.0
   version = 1
   # The main log level to filter messages from all loggers.
+  # Added in 24.09.0
   level = "INFO"
   # Disable the existing loggers when applying the config.
+  # Added in 24.09.0
   disable-existing-loggers = false
-  # The list of log drivers to activate.
-  drivers = [ "console",]
-
   # The mapping of log handler configurations.
-  [logging.handlers]
-
+  # Added in 24.09.0
+  handlers = {}
   # The mapping of per-namespace logger configurations.
-  [logging.loggers]
+  # Added in 24.09.0
+  loggers = {}
+  # The list of log drivers to activate.
+  # Added in 24.09.0
+  drivers = ["console", "file"]
+  # Override default log level for specific scope of package.
+  # Added in 24.09.0
+  pkg-ns = "{ \"\" = \"WARNING\", \"ai.backend\" = \"INFO\" }"
 
+  # Console logging driver configuration.
+  # Added in 24.09.0
   [logging.console]
     # Opt to print colorized log.
+    # Added in 24.09.0
     ## colored = true
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # File logging driver configuration.
+  # Added in 24.09.0
   [logging.file]
     # Path to store log.
+    # Added in 24.09.0
     path = "/var/log/backend.ai"
     # Log file name.
-    filename = "wsproxy.log"
+    # Added in 24.09.0
+    filename = "manager.log"
     # Number of outdated log files to retain.
-    backup-count = 5
+    # Added in 24.09.0
+    backup-count = 10
     # Maximum size for a single log file.
-    ## rotation-size = "..."  # |     # min=0
+    # Added in 24.09.0
+    rotation-size = "100MB"
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # Logstash logging driver configuration.
+  # Added in 24.09.0
   [logging.logstash]
-    # Connection information of logstash node.
-    endpoint = { host = "127.0.0.1", port = 8001 }
     # Protocol to communicate with logstash server.
+    # Added in 24.09.0
     protocol = "tcp"
     # Use TLS to communicate with logstash server.
+    # Added in 24.09.0
     ssl-enabled = true
     # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
     ssl-verify = true
 
+    # Connection information of logstash node.
+    # Added in 24.09.0
+    [logging.logstash.endpoint]
+
+  # Graylog logging driver configuration.
+  # Added in 24.09.0
   [logging.graylog]
     # Graylog hostname.
-    host = "127.0.0.1"
+    # Added in 24.09.0
+    host = "graylog-server"
     # Graylog server port number.
-    port = 8000
+    # Added in 24.09.0
+    port = 12201
     # Log level.
+    # Added in 24.09.0
     level = "INFO"
     # The custom source identifier. If not specified, fqdn will be used instead.
-    ## localname = "..."
-    # The fuly qualified domain name of the source.
-    ## fqdn = "..."
-    # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
+    ## localname = "prod-manager-01"
+    # The fully qualified domain name of the source.
+    # Added in 24.09.0
+    ## fqdn = "manager.backend.ai"
+    # Verify validity of TLS certificate when communicating with Graylog.
+    # Added in 24.09.0
     ssl-verify = true
     # Path to Root CA certificate file.
+    # Added in 24.09.0
     ## ca-certs = "/etc/ssl/ca.pem"
     # Path to TLS private key file.
+    # Added in 24.09.0
     ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
     # Path to TLS certificate file.
+    # Added in 24.09.0
     ## certfile = "/etc/backend.ai/graylog/cert.pem"
 
-  # Override default log level for specific scope of package
-  [logging.pkg_ns]
-
-# OpenTelemetry configuration
+# OpenTelemetry (OTEL) configuration for distributed tracing and metrics
+# collection. Enables integration with observability platforms like Jaeger,
+# Zipkin, or Prometheus for comprehensive monitoring of agent operations.
+# Added in 25.12.0
 [otel]
-  # Whether to enable OpenTelemetry
-  enabled = false
-  # Log level for OpenTelemetry
+  # Whether to enable OpenTelemetry for tracing or logging. When enabled, traces
+  # or logs will be collected and sent to the configured OTLP endpoint.
+  # Added in 25.7.0
+  enabled = true
+  # Log level for OpenTelemetry. Controls the verbosity of logs generated by
+  # OpenTelemetry. Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'.
+  # Added in 25.7.0
   log-level = "INFO"
-  # OTLP endpoint for sending traces
-  endpoint = "http://127.0.0.1:4317"
+  # OTLP endpoint for sending traces. Should include the host and port of the
+  # OTLP receiver.
+  # Added in 25.7.0
+  endpoint = "http://otel-collector:4317"
 
-# Service discovery configuration
+# Service discovery configuration for the agent to register itself and discover
+# other Backend.AI services in the cluster. Enables dynamic service mesh
+# integration and load balancing across multiple agents.
+# Added in 25.12.0
 [service-discovery]
-  # Type of service discovery to use
+  # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
+  # Added in 25.9.0
   type = "redis"
 
-# Debug configuration
+# Debug and development configuration for the agent. Enables features like
+# asynchronous debugging, memory leak detection, and core dump collection.
+# Should be carefully configured in production to avoid performance overhead.
+# Added in 25.12.0
 [debug]
-  # Master switch for debug mode
+  # Master switch for debug mode. When enabled, activates additional debugging
+  # features and verbose logging across the agent. This setting is typically
+  # overridden by command-line debug flag. Only enable in development or when
+  # troubleshooting issues.
+  # Added in 25.12.0
   enabled = false
-  # Whether to enable asyncio debug mode
+  # Enables Python asyncio debug mode which provides detailed information about
+  # unawaited coroutines, slow callbacks, and other async programming issues.
+  # Significantly impacts performance and should only be used for debugging
+  # async bugs.
+  # Added in 25.12.0
   asyncio = false
-  # Whether to enable kernel runner debug mode
+  # Enables debug mode for the kernel runner component which handles
+  # communication between the agent and session containers. Produces verbose
+  # logs about code execution requests, input/output handling, and container
+  # communication. Use for debugging session execution issues.
+  # Added in 25.12.0
   kernel-runner = false
-  # Enable enhanced task information in aiomonitor
+  # Enables enhanced task information in the aiomonitor debugging interface.
+  # Provides more detailed async task state information but adds overhead.
+  # Useful for diagnosing async task leaks or blocking issues.
+  # Added in 25.12.0
   enhanced-aiomonitor-task-info = false
-  # Whether to skip container deletion for debugging
+  # Prevents automatic container deletion after session termination. Useful for
+  # post-mortem debugging of container state, filesystem, and logs. Warning:
+  # containers will accumulate and consume resources. Only enable temporarily.
+  # Added in 25.12.0
   skip-container-deletion = false
-  # Whether to log statistics
+  # Enables logging of container resource statistics (CPU, memory, GPU usage).
+  # Produces verbose periodic logs showing resource consumption metrics. Useful
+  # for debugging resource tracking and quota enforcement issues.
+  # Added in 25.12.0
   log-stats = false
-  # Whether to log kernel configuration
+  # Logs the kernel configuration sent to containers at startup. Shows
+  # environment variables, mount points, and execution settings. Helpful for
+  # debugging container initialization or configuration issues.
+  # Added in 25.12.0
   log-kernel-config = false
-  # Whether to log allocation map
+  # Logs the resource allocation map showing which resources (CPU cores, GPUs)
+  # are assigned to which containers. Useful for debugging resource allocation
+  # conflicts or understanding how resources are distributed.
+  # Added in 25.12.0
   log-alloc-map = false
-  # Whether to log all internal events
+  # Logs all internal agent events including container lifecycle events,
+  # resource updates, and inter-component communication. Produces high volume of
+  # logs but valuable for understanding agent behavior during issues.
+  # Added in 25.12.0
   log-events = false
-  # Whether to log heartbeats
+  # Logs heartbeat messages sent between agent and manager. Heartbeats contain
+  # agent status and resource availability information. Use for debugging
+  # connectivity or status synchronization issues.
+  # Added in 25.12.0
   log-heartbeats = false
-  # Heartbeat interval in seconds
+  # Interval in seconds between heartbeat messages sent to the manager. The
+  # manager uses heartbeats to detect agent availability. Lower values provide
+  # faster detection of agent issues but increase network traffic.
+  # Added in 25.12.0
   heartbeat-interval = 20.0
-  # Whether to log Docker events
+  # Logs Docker daemon events received by the agent (container start/stop/die,
+  # etc.). Useful for debugging container lifecycle issues or understanding
+  # Docker behavior. Only applicable when using Docker backend.
+  # Added in 25.12.0
   log-docker-events = false
 
-  # Core dump configuration
+  # Configuration for container core dump collection. Core dumps help debug
+  # container crashes by providing memory snapshots at crash time.
+  # Added in 25.12.0
   [debug.coredump]
-    # Whether to enable core dump collection
+    # Enables collection of container core dumps when containers crash
+    # unexpectedly. When enabled, the agent captures core dump files for
+    # debugging crashed containers. Requires Linux with specific kernel
+    # settings. Only enable when debugging container crashes.
+    # Added in 25.12.0
     enabled = false
-    # Directory path for storing core dumps
-    path = "coredumps"
-    # Number of core dump backups to retain
-    backup-count = 10
-    # Maximum size limit for core dumps
-    size-limit = "64M"
+    # Directory path where container core dump files are stored. This directory
+    # is created automatically if it doesn't exist. Ensure sufficient disk space
+    # is available for storing core dumps.
+    # Added in 25.12.0
+    path = "/var/lib/backend.ai/coredumps"
+    # Maximum number of core dump backups to retain. When this limit is
+    # exceeded, older core dump files are automatically deleted to free up disk
+    # space. Increase this value if you need more historical dumps for
+    # debugging.
+    # Added in 25.12.0
+    backup-count = 20
+    # Maximum size limit for individual core dump files. Core dumps larger than
+    # this limit are truncated. Use binary size format (e.g., '64M', '128M',
+    # '1G'). Larger values capture more debugging information but require more
+    # storage.
+    # Added in 25.12.0
+    size-limit = "256M"
 
-# Etcd configuration
+# etcd connection configuration for the agent. etcd is used as the distributed
+# key-value store for cluster coordination, configuration sharing, and service
+# discovery. All agents in a cluster must connect to the same etcd cluster.
+# Added in 25.12.0
 [etcd]
-  # Etcd namespace
-  namespace = "local"
-  # Etcd address and port
-  ## addr = { host = "127.0.0.1", port = 2379 }  # | [ { host = "127.0.0.1", port = 2379 } ]
-  # Etcd username
+  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
+  # keys will be stored under this namespace.
+  # Added in 22.03.0
+  namespace = "backend"
+  # Network address of the etcd server. Default is the standard etcd port on
+  # localhost. In production, should point to one or more etcd instance
+  # endpoint(s).
+  # Added in 22.03.0
+  addr = { host = "etcd-cluster", port = 2379 }
+  # Username for authenticating with etcd. Optional if etcd doesn't require
+  # authentication. Should be set along with password for secure deployments.
+  # Added in 22.03.0
   ## user = "backend"
-  # Etcd password
-  ## password = "PASSWORD"
+  # Password for authenticating with etcd. Should be kept secret in production
+  # environments. Set together with the user field for authentication.
+  # Added in 22.03.0
+  ## password = "ETCD_PASSWORD"
 
-# Container logs configuration
+# Container log collection and retention configuration. Controls how container
+# stdout/stderr logs are collected, stored, and made available to users.
+# Important for debugging container applications.
+# Added in 25.12.0
 [container-logs]
-  # Maximum length of container logs
-  max-length = "10M"
-  # Chunk size for container logs
-  chunk-size = "64K"
+  # Maximum total size of container logs that the agent will retrieve and store.
+  # Logs exceeding this size are truncated from the beginning. Use binary size
+  # format (e.g., '10M', '50M').
+  # Added in 25.12.0
+  max-length = "50M"
+  # Size of chunks when reading container logs from Docker. Larger chunks
+  # improve throughput but use more memory. Use binary size format (e.g., '64K',
+  # '128K').
+  # Added in 25.12.0
+  chunk-size = "128K"
 
-# API configuration
+# API timeout configuration for container image operations. Defines timeout
+# values for pulling, committing, and pushing container images. Should be
+# adjusted based on image sizes and network conditions.
+# Added in 25.12.0
 [api]
-  # Image pull timeout in seconds
-  ## pull-timeout = 7200.0  # min=0
-  # Image commit timeout in seconds
-  ## commit-timeout = 7200.0  # min=0
-  # Image push timeout in seconds
-  ## push-timeout = 7200.0  # min=0
+  # Timeout in seconds for pulling container images from registries. Large
+  # images or slow networks may require longer timeouts. Default is 7200 seconds
+  # (2 hours).
+  # Added in 25.12.0
+  ## pull-timeout = 7200.0
+  # Timeout in seconds for committing containers to images. Used when users save
+  # their container state as a new image. Set to None for no timeout (may be
+  # needed for large containers).
+  # Added in 25.12.0
+  ## commit-timeout = 7200.0
+  # Timeout in seconds for pushing committed images to registries. Used when
+  # users push their committed images to external registries. Set to None for no
+  # timeout.
+  # Added in 25.12.0
+  ## push-timeout = 7200.0
 
-# Kernel lifecycles configuration
+# Kernel (container) lifecycle timing configuration. Controls polling intervals
+# and timeouts during container initialization. Affects how quickly the agent
+# detects container startup success or failure.
+# Added in 25.12.0
 [kernel-lifecycles]
-  # Number of init polling attempts
-  init-polling-attempt = 10
-  # Init polling timeout in seconds
-  init-polling-timeout-sec = 60.0
-  # Init timeout in seconds
-  init-timeout-sec = 60.0
+  # Number of attempts to poll for container readiness during initialization.
+  # The agent checks container health this many times before giving up. Increase
+  # for containers with slower initialization.
+  # Added in 25.12.0
+  init-polling-attempt = 20
+  # Maximum time in seconds to wait between polling attempts during container
+  # initialization. If the container doesn't respond within this time, the
+  # attempt fails. Total initialization time is approximately attempts *
+  # timeout.
+  # Added in 25.12.0
+  init-polling-timeout-sec = 120.0
+  # Overall timeout in seconds for container initialization. If the container is
+  # not ready within this time, it's considered failed. Should be large enough
+  # for containers with heavy startup processes.
+  # Added in 25.12.0
+  init-timeout-sec = 120.0
 
-# Configuration overrides for multiple agents.
-# Use this field only to define 2 or more agents, as defining only one
-# agent using this field is redundant. Use the fields agent, container,
-# and resource to define the configuration at a global level.
-# Any field populated in the agents config will be treated as an
-# override to the global default values. Thus the global fields must still
-# be provided when defining multiple agents.
-[[agents]]
-# Add multiple [[agents]] sections as needed
-  # Agent settings that can be overridden per-agent in multi-agent mode.
-  [agents.agent]
-    # Agent ID
-    ## id = "agent-001"
-    # Agent socket port
-    agent-sock-port = 6007
-    # Scaling group name
-    scaling-group = "default"
-    # Scaling group type
-    scaling-group-type = "compute"
-    # Whether to force terminate abusing containers
-    force-terminate-abusing-containers = false
-    # Kernel creation concurrency
-    kernel-creation-concurrency = 4
-
-    # Container lifecycle synchronization config
-    [agents.agent.sync-container-lifecycles]
-      # Whether to enable container lifecycle synchronization
-      enabled = true
-      # Synchronization interval in seconds
-      interval = 10.0
-
-  # Container settings that can be overridden per-agent in multi-agent mode.
-  [agents.container]
-    # Kernel user ID
-    kernel-uid = -1
-    # Kernel group ID
-    kernel-gid = -1
-    # Port range for containers.
-    # If multiple agents are used, user must ensure that the port ranges
-    # do not overlap between the agent, else it may cause subtle issues
-    # late into the agent's runtime.
-    port-range = [ 30000, 31000,]
-    # Statistics type
-    ## stats-type = "docker"
-    # Sandbox type
-    sandbox-type = "docker"
-    # Jail arguments
-    jail-args = [ "--mount", "/tmp",]
-    # Scratch type
-    scratch-type = "hostdir"
-    # Scratch root directory
-    scratch-root = "scratches"
-    # Scratch size
-    scratch-size = "0"
-    # Scratch NFS address
-    ## scratch-nfs-address = "192.168.1.100:/export"
-    # Scratch NFS options
-    ## scratch-nfs-options = "rw,sync"
-    # Alternative bridge network
-    ## alternative-bridge = "br-backend"
-    # Whether to enable Docker Swarm mode.
-    # This allows the agent to manage containers in a Docker Swarm cluster.
-    # When enabled, the agent will use Docker Swarm APIs to manage containers,
-    # networks, and services.
-    # This field is only used when backend is set to 'docker'.
-    swarm-enabled = false
-
-  # Resource config overrides for the individual agent
-  [agents.resource]
-    # Hard CPU allocation for this agent (e.g., 8 cores).
-    # Only used in MANUAL allocation mode.
-    # All agents must specify this value when allocation-mode is MANUAL.
-    cpu = 8
-    # Hard memory allocation for this agent (e.g., "32G").
-    # Only used in MANUAL allocation mode.
-    # All agents must specify this value when allocation-mode is MANUAL.
-    mem = "32G"
-
-    # Device-specific per-slot resource allocations.
-    # Only used in MANUAL allocation mode.
-    [agents.resource.devices]
+# Configuration overrides for running multiple agents from a single
+# configuration file. Use this field only when defining 2 or more agents;
+# defining only one agent here is redundant. When this field is populated, the
+# global 'agent', 'container', and 'resource' fields serve as default values
+# that each agent entry can override. Each agent entry must have a unique agent
+# ID.
+# Added in 25.12.0
+[agents]

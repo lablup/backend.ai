@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Protocol, final
+from typing import Protocol, final
 
 from ai.backend.test.tester.exporter import TestExporter
 

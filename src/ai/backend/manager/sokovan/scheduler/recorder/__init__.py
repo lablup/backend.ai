@@ -1,11 +1,13 @@
-from .context import RecorderContext
-from .recorder import TransitionRecorder
-from .types import ExecutionStep, PhaseDescriptor, StepDescriptor
+"""Session-specific recorder module for scheduler coordinator.
+
+This module provides session-specialized recorder types.
+For generic recorder types, import directly from sokovan.recorder.
+"""
+
+from .context import SessionRecorderContext
+from .recorder import SessionTransitionRecorder
 
 __all__ = [
-    "ExecutionStep",
-    "PhaseDescriptor",
-    "StepDescriptor",
-    "TransitionRecorder",
-    "RecorderContext",
+    "SessionRecorderContext",
+    "SessionTransitionRecorder",
 ]

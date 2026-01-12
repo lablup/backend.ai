@@ -40,7 +40,7 @@ class ReservoirRegistryClient:
     _secret_key: str
     _api_version: str
 
-    def __init__(self, registry_data: ReservoirRegistryData):
+    def __init__(self, registry_data: ReservoirRegistryData) -> None:
         self._id = registry_data.id
         self._name = registry_data.name
         self._endpoint = registry_data.endpoint

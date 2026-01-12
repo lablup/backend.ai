@@ -24,20 +24,20 @@ from .types import (
 
 __all__ = (
     "CreateNotificationChannelRequest",
-    "UpdateNotificationChannelRequest",
-    "ListNotificationChannelsRequest",
-    "SearchNotificationChannelsRequest",
     "CreateNotificationRuleRequest",
-    "UpdateNotificationRuleRequest",
+    "ListNotificationChannelsRequest",
     "ListNotificationRulesRequest",
+    "NotificationChannelFilter",
+    "NotificationChannelOrder",
+    "NotificationRuleFilter",
+    "NotificationRuleOrder",
+    "SearchNotificationChannelsRequest",
     "SearchNotificationRulesRequest",
+    "StringFilter",
+    "UpdateNotificationChannelRequest",
+    "UpdateNotificationRuleRequest",
     "ValidateNotificationChannelRequest",
     "ValidateNotificationRuleRequest",
-    "StringFilter",
-    "NotificationChannelFilter",
-    "NotificationRuleFilter",
-    "NotificationChannelOrder",
-    "NotificationRuleOrder",
 )
 
 
@@ -118,8 +118,8 @@ class SearchNotificationChannelsRequest(BaseRequestModel):
     filter: Optional[NotificationChannelFilter] = Field(
         default=None, description="Filter conditions"
     )
-    order: Optional[NotificationChannelOrder] = Field(
-        default=None, description="Order specification"
+    order: Optional[list[NotificationChannelOrder]] = Field(
+        default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
@@ -179,7 +179,9 @@ class SearchNotificationRulesRequest(BaseRequestModel):
     """Request body for searching notification rules with filters, orders, and pagination."""
 
     filter: Optional[NotificationRuleFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[NotificationRuleOrder] = Field(default=None, description="Order specification")
+    order: Optional[list[NotificationRuleOrder]] = Field(
+        default=None, description="Order specifications"
+    )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 

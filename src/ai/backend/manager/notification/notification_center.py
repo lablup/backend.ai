@@ -164,6 +164,4 @@ class NotificationCenter:
                 template=template_str,
                 error=str(e),
             )
-            raise NotificationTemplateRenderingFailure(
-                f"Failed to render template: {str(e)}"
-            ) from e
+            raise NotificationTemplateRenderingFailure(f"Failed to render template: {e!s}") from e

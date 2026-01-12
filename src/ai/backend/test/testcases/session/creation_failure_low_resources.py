@@ -14,7 +14,7 @@ class SessionCreationFailureLowResources(TestCode):
         image_dep = ImageContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         result = await client_session.Image.get(
             image_dep.name, image_dep.architecture, fields=[image_fields["labels"]]

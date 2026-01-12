@@ -1,5 +1,6 @@
 import functools
-from typing import Callable, Literal
+from collections.abc import Callable
+from typing import Literal
 
 import jwt
 from aiohttp import web

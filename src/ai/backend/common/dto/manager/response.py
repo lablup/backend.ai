@@ -5,8 +5,9 @@ from graphql import GraphQLFormattedError
 from graphql.language.location import FormattedSourceLocation
 from pydantic import Field
 
-from ...api_handlers import BaseResponseModel
-from ...bgtask.types import TaskID
+from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.bgtask.types import TaskID
+
 from .field import VFolderItemField
 
 

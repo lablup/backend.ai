@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.user import CreatedUserContext

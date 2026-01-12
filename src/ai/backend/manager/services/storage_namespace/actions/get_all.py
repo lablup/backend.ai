@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
@@ -20,7 +20,7 @@ class GetAllNamespacesAction(StorageNamespaceAction):
 
 @dataclass
 class GetAllNamespacesActionResult(BaseActionResult):
-    result: Dict[uuid.UUID, List[str]]
+    result: dict[uuid.UUID, list[str]]
 
     @override
     def entity_id(self) -> Optional[str]:

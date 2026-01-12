@@ -36,8 +36,8 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.utils import create_async_engine
+    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -87,9 +87,9 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.base import metadata_obj as metadata
-    from ..models.utils import create_async_engine
+    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
+    from ai.backend.appproxy.coordinator.models.base import metadata_obj as metadata
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)

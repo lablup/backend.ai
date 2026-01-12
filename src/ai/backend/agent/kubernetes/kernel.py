@@ -4,8 +4,9 @@ import lzma
 import os
 import shutil
 import textwrap
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, override
+from typing import Any, Optional, override
 
 import pkg_resources
 import zmq
@@ -15,6 +16,10 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
+from ai.backend.agent.errors import KernelRunnerNotInitializedError
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
@@ -22,11 +27,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..errors import KernelRunnerNotInitializedError
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -44,7 +44,7 @@ class KubernetesKernel(AbstractKernel):
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
-        data: Dict[str, Any],
+        data: dict[str, Any],
         environ: Mapping[str, Any],
     ) -> None:
         super().__init__(
@@ -67,7 +67,7 @@ class KubernetesKernel(AbstractKernel):
 
     @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
@@ -152,7 +152,7 @@ class KubernetesKernel(AbstractKernel):
                 return False
             for container in containers:
                 started = container.get("started")
-                if not container["ready"] or started is not None and not started:
+                if not container["ready"] or (started is not None and not started):
                     return False
         return True
 
@@ -167,8 +167,7 @@ class KubernetesKernel(AbstractKernel):
     async def check_status(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_and_get_status()
-        return result
+        return await self.runner.feed_and_get_status()
 
     @override
     async def get_logs(self):
@@ -199,21 +198,19 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service({
+        return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
             "options": opts,
         })
-        return result
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_start_model_service(model_service)
-        return result
+        return await self.runner.feed_start_model_service(model_service)
 
     @override
     async def shutdown_service(self, service: str):
@@ -225,8 +222,7 @@ class KubernetesKernel(AbstractKernel):
     async def get_service_apps(self):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        result = await self.runner.feed_service_apps()
-        return result
+        return await self.runner.feed_service_apps()
 
     @override
     async def check_duplicate_commit(self, kernel_id, subdir):
@@ -241,9 +237,11 @@ class KubernetesKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
         # TODO: Implement container commit on Kubernetes kernel.
+        if extra_labels is None:
+            extra_labels = {}
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
@@ -265,12 +263,7 @@ class KubernetesKernel(AbstractKernel):
             await loop.run_in_executor(None, _write_to_disk)
         except OSError as e:
             raise RuntimeError(
-                "{0}: writing uploaded file failed: {1} -> {2} ({3})".format(
-                    self.kernel_id,
-                    container_path,
-                    host_abspath,
-                    repr(e),
-                )
+                f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
             )
 
     @override
@@ -407,7 +400,7 @@ class KubernetesCodeRunner(AbstractCodeRunner):
 
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

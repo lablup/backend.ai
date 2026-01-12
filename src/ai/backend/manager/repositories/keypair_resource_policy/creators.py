@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, Optional, override
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.repositories.base import CreatorSpec

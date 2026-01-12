@@ -13,19 +13,13 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.errors.storage import VFolderOperationFailed
-from ai.backend.manager.models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    VFolderDeletionInfo,
-    VFolderRow,
-    VFolderStatusSet,
-    initiate_vfolder_deletion,
-    kernels,
-    vfolder_invitations,
-    vfolder_status_map,
-)
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    kernels,
+)
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -39,7 +33,16 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
-from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
+from ai.backend.manager.models.vfolder import (
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    initiate_vfolder_deletion,
+    vfolder_invitations,
+    vfolder_permissions,
+    vfolder_status_map,
+    vfolders,
+)
 
 user_repository_resilience = Resilience(
     policies=[
@@ -248,17 +251,17 @@ class AdminUserRepository:
         Check if no active kernel is using the user's virtual folders.
         """
         result = await conn.execute(
-            sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
+            sa.select(vfolders.c.id).select_from(vfolders).where(vfolders.c.user == user_uuid),
         )
         rows = result.fetchall()
         user_vfolder_ids = [row.id for row in rows]
         query = (
-            sa.select([kernels.c.mounts])
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
         async for row in await conn.stream(query):
-            for _mount in row["mounts"]:
+            for _mount in row.mounts:
                 try:
                     vfolder_id = UUID(_mount[2])
                     if vfolder_id in user_vfolder_ids:
@@ -281,7 +284,7 @@ class AdminUserRepository:
         """
         # Gather target user's virtual folders' names.
         query = (
-            sa.select([vfolders.c.name])
+            sa.select(vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == target_user_uuid)
         )
@@ -295,7 +298,7 @@ class AdminUserRepository:
             vfolder_permissions.c.vfolder == vfolders.c.id,
         )
         query = (
-            sa.select([vfolders.c.id, vfolders.c.name])
+            sa.select(vfolders.c.id, vfolders.c.name)
             .select_from(j)
             .where(vfolders.c.user == deleted_user_uuid)
         )
@@ -335,8 +338,7 @@ class AdminUserRepository:
                 result = await conn.execute(update_query)
                 rowcount += result.rowcount
             return rowcount
-        else:
-            return 0
+        return 0
 
     async def _delete_vfolders(
         self,
@@ -380,8 +382,7 @@ class AdminUserRepository:
         except VFolderOperationFailed:
             raise
 
-        deleted_count = len(target_vfs)
-        return deleted_count
+        return len(target_vfs)
 
     async def _delete_keypairs_with_valkey(
         self,
@@ -393,7 +394,7 @@ class AdminUserRepository:
         Delete user's all keypairs with Valkey cleanup.
         """
         ak_rows = await conn.execute(
-            sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
+            sa.select(keypairs.c.access_key).where(keypairs.c.user == user_uuid),
         )
         if (row := ak_rows.first()) and (access_key := row.access_key):
             # Log concurrency used only when there is at least one keypair.

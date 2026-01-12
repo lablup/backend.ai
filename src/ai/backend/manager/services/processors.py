@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -33,6 +33,8 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.audit_log.service import AuditLogService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -41,6 +43,8 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
@@ -80,6 +84,8 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
+from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -132,6 +138,7 @@ class Services:
     agent: AgentService
     app_config: AppConfigService
     domain: DomainService
+    error_log: ErrorLogService
     group: GroupService
     user: UserService
     image: ImageService
@@ -158,6 +165,8 @@ class Services:
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
+    audit_log: AuditLogService
+    scheduling_history: SchedulingHistoryService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -178,6 +187,9 @@ class Services:
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository
         )
+        error_log_service = ErrorLogService(
+            repository=repositories.error_log.repository,
+        )
         group_service = GroupService(
             args.storage_manager,
             args.config_provider,
@@ -197,7 +209,6 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
-            repositories.container_registry.admin_repository,
         )
         vfolder_service = VFolderService(
             args.config_provider,
@@ -325,11 +336,16 @@ class Services:
         storage_namespace_service = StorageNamespaceService(
             repositories.storage_namespace.repository
         )
+        audit_log_service = AuditLogService(repositories.audit_log.repository)
+        scheduling_history_service = SchedulingHistoryService(
+            repositories.scheduling_history.repository
+        )
 
         return cls(
             agent=agent_service,
             app_config=app_config_service,
             domain=domain_service,
+            error_log=error_log_service,
             group=group_service,
             user=user_service,
             image=image_service,
@@ -356,6 +372,8 @@ class Services:
             artifact_registry=artifact_registry_service,
             deployment=deployment_service,
             storage_namespace=storage_namespace_service,
+            audit_log=audit_log_service,
+            scheduling_history=scheduling_history_service,
         )
 
 
@@ -369,6 +387,7 @@ class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
+    error_log: ErrorLogProcessors
     group: GroupProcessors
     user: UserProcessors
     image: ImageProcessors
@@ -393,8 +412,10 @@ class Processors(AbstractProcessorPackage):
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
-    deployment: Optional[DeploymentProcessors]
+    deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
+    audit_log: AuditLogProcessors
+    scheduling_history: SchedulingHistoryProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -402,6 +423,7 @@ class Processors(AbstractProcessorPackage):
         agent_processors = AgentProcessors(services.agent, action_monitors)
         app_config_processors = AppConfigProcessors(services.app_config, action_monitors)
         domain_processors = DomainProcessors(services.domain, action_monitors)
+        error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
         user_processors = UserProcessors(services.user, action_monitors)
         image_processors = ImageProcessors(services.image, action_monitors)
@@ -451,19 +473,21 @@ class Processors(AbstractProcessorPackage):
             services.artifact_revision, action_monitors
         )
 
-        # Initialize deployment processors if service is available
-        deployment_processors = None
-        if services.deployment is not None:
-            deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+        deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
         storage_namespace_processors = StorageNamespaceProcessors(
             services.storage_namespace, action_monitors
+        )
+        audit_log_processors = AuditLogProcessors(services.audit_log, [])
+        scheduling_history_processors = SchedulingHistoryProcessors(
+            services.scheduling_history, action_monitors
         )
 
         return cls(
             agent=agent_processors,
             app_config=app_config_processors,
             domain=domain_processors,
+            error_log=error_log_processors,
             group=group_processors,
             user=user_processors,
             image=image_processors,
@@ -490,6 +514,8 @@ class Processors(AbstractProcessorPackage):
             artifact_revision=artifact_revision_processors,
             deployment=deployment_processors,
             storage_namespace=storage_namespace_processors,
+            audit_log=audit_log_processors,
+            scheduling_history=scheduling_history_processors,
         )
 
     @override
@@ -498,6 +524,7 @@ class Processors(AbstractProcessorPackage):
             *self.agent.supported_actions(),
             *self.app_config.supported_actions(),
             *self.domain.supported_actions(),
+            *self.error_log.supported_actions(),
             *self.group.supported_actions(),
             *self.user.supported_actions(),
             *self.image.supported_actions(),
@@ -524,4 +551,6 @@ class Processors(AbstractProcessorPackage):
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),
+            *self.audit_log.supported_actions(),
+            *self.scheduling_history.supported_actions(),
         ]

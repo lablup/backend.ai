@@ -9,20 +9,15 @@ import re
 import sys
 import uuid
 from collections import OrderedDict
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
 from datetime import timedelta
 from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Iterable,
-    Iterator,
-    Mapping,
     Optional,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 import aiofiles
@@ -82,7 +77,7 @@ def env_info() -> str:
     return f"{pyver} (env: {sys.prefix})"
 
 
-def odict(*args: Tuple[KT, VT]) -> OrderedDict[KT, VT]:
+def odict(*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
     """
     A short-hand for the constructor of OrderedDict.
     :code:`odict(('a',1), ('b',2))` is equivalent to
@@ -91,7 +86,7 @@ def odict(*args: Tuple[KT, VT]) -> OrderedDict[KT, VT]:
     return OrderedDict(args)
 
 
-def dict2kvlist(o: Mapping[KT, VT]) -> Iterable[Union[KT, VT]]:
+def dict2kvlist(o: Mapping[KT, VT]) -> Iterable[KT | VT]:
     """
     Serializes a dict-like object into a generator of the flatten list of
     repeating key-value pairs.  It is useful when using HMSET method in Redis.
@@ -281,13 +276,11 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    def __eq__(self, o):
+    def __eq__(self, o) -> bool:
         return str(self) == str(o)
 
-    def __str__(self):
-        return "{} {} {} {} {} {}".format(
-            self.device, self.mountpoint, self.fstype, self.options, self.d, self.p
-        )
+    def __str__(self) -> str:
+        return f"{self.device} {self.mountpoint} {self.fstype} {self.options} {self.d} {self.p}"
 
 
 class Fstab:
@@ -414,14 +407,14 @@ async def check_nfs_remote_server(
     except BaseNFSMountCheckFailed:
         raise
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
 
     except FileNotFoundError:
         raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
 
     except Exception as e:
-        raise NFSUnexpectedError(f"Unexpected error: {str(e)}") from e
+        raise NFSUnexpectedError(f"Unexpected error: {e!s}") from e
 
 
 async def mount(
@@ -508,7 +501,7 @@ async def umount(
             raw_out.decode("utf8")
             err = raw_err.decode("utf8")
             await proc.wait()
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise VolumeUnmountFailed(
             f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."
@@ -541,9 +534,7 @@ async def chown(path: Path | str, uid_gid: str, mount_prefix: Optional[str | Pat
 def is_ip_address_format(str: str) -> bool:
     try:
         url = yarl.URL("//" + str)
-        if url.host and ipaddress.ip_address(url.host):
-            return True
-        return False
+        return bool(url.host and ipaddress.ip_address(url.host))
     except ValueError:
         return False
 

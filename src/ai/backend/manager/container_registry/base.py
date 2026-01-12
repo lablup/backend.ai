@@ -4,17 +4,14 @@ import asyncio
 import copy
 import logging
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
     Final,
-    Mapping,
     Optional,
-    Sequence,
     cast,
 )
 
@@ -40,23 +37,26 @@ from ai.backend.common.json import read_json
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.data.image.types import (
+    ImageData,
+    ImageStatus,
+    ImageType,
+    RescanImagesResult,
+)
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
-
-from ..data.image.types import ImageStatus, ImageType
-from ..exceptions import ScanImageError, ScanTagError
-from ..models.image import ImageIdentifier, ImageRow
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.exceptions import ScanImageError, ScanTagError
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
-all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
+all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
 
 if TYPE_CHECKING:
-    from ..models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -65,8 +65,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
     max_concurrency_per_registry: int
-    base_hdrs: Dict[str, str]
-    credentials: Dict[str, str]
+    base_hdrs: dict[str, str]
+    credentials: dict[str, str]
     ssl_verify: bool
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
@@ -142,7 +142,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     try:
                         await fut
                     except Exception as e:
-                        errors.append(f"Failed to scan image! Detail: {str(e)}")
+                        errors.append(f"Failed to scan image! Detail: {e!s}")
 
             scanned_images = await self.commit_rescan_result()
             return RescanImagesResult(images=scanned_images, errors=errors)
@@ -509,7 +509,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -606,9 +606,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if _accels_str := labels.get("ai.backend.accelerators"):
             accels |= set(_accels_str.split(","))
         for key in labels.keys():
-            if key.startswith("ai.backend.resource.min") or key.startswith(
-                "ai.backend.resource.max"
-            ):
+            if key.startswith(("ai.backend.resource.min", "ai.backend.resource.max")):
                 accel = key.split(
                     "."
                 )[

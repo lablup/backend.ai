@@ -147,14 +147,13 @@ class BaseRevisionGenerator(RevisionGenerator):
         3. Runtime variant section in service definition
         4. API request (highest priority)
 
-        If service definition is None, validates and converts request to revision spec.
-        Otherwise, starts with service definition and applies request overrides.
+        If service definition is None, creates an empty one to ensure
+        default_architecture and other common logic is applied consistently.
         """
-        if service_definition is None:
-            # No service definition, validate and convert request directly
-            return ModelRevisionSpec.model_validate(draft_revision.model_dump(mode="python"))
-
-        return self._override_revision(draft_revision, service_definition, default_architecture)
+        effective_service_definition = service_definition or ModelServiceDefinition()
+        return self._override_revision(
+            draft_revision, effective_service_definition, default_architecture
+        )
 
     def _override_revision(
         self,

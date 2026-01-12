@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
@@ -166,11 +167,11 @@ class SessionEventPropagator(EventPropagator):
     ) -> Optional[tuple[str, Mapping[str, Any]]]:
         """Fetch kernel data from database."""
         try:
-            from ai.backend.manager.models import kernels
+            from ai.backend.manager.models.kernel import kernels
 
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 query = (
-                    sa.select([
+                    sa.select(
                         kernels.c.id,
                         kernels.c.session_id,
                         kernels.c.session_name,
@@ -180,7 +181,7 @@ class SessionEventPropagator(EventPropagator):
                         kernels.c.domain_name,
                         kernels.c.group_id,
                         kernels.c.user_uuid,
-                    ])
+                    )
                     .select_from(kernels)
                     .where(kernels.c.id == event.kernel_id)
                 )
@@ -252,7 +253,7 @@ class SessionEventPropagator(EventPropagator):
 
     async def _should_send_event(self, event_data: Mapping[str, Any]) -> bool:
         """Check if event should be sent based on filters."""
-        from ai.backend.manager.models import UserRole
+        from ai.backend.manager.models.user import UserRole
 
         user_role = self._filters.get("user_role")
         user_uuid = self._filters.get("user_uuid")

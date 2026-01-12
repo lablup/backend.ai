@@ -4,13 +4,14 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from functools import partial
 from typing import TYPE_CHECKING, Optional, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -27,6 +28,7 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
     KernelId,
     ResourceSlot,
     SessionId,
@@ -42,39 +44,36 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
 from ai.backend.manager.errors.resource import AgentNotFound, AllocationFailed, ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models import (
-    PRIVATE_SESSION_TYPES,
-    AgentRow,
-    DefaultForUnspecified,
-    DomainRow,
-    EndpointRow,
-    GroupRow,
-    KernelRow,
-    KernelStatistics,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    RoutingRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
-    recalc_agent_resource_occupancy,
-)
+from ai.backend.manager.models.agent import AgentRow, recalc_agent_resource_occupancy
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
+    EndpointRow,
     EndpointStatistics,
 )
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    KernelStatistics,
     recalc_concurrency_used,
 )
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
+    DefaultForUnspecified,
+    KeyPairResourcePolicyRow,
+)
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
+    PRIVATE_SESSION_TYPES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    SessionDependencyRow,
+    SessionRow,
     _build_session_fetch_query,
 )
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_increment,
@@ -359,27 +358,34 @@ class ScheduleRepository:
         filter_by_statuses: Iterable[KernelStatus],
     ) -> dict[AgentId, int]:
         # Optimized loading for kernel counting - load routing with session and kernels
-        routing_rows: list[RoutingRow] = (
-            await session.scalars(
-                sa.select(RoutingRow)
-                .options(
-                    selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels))
+        routing_rows = list(
+            (
+                await session.scalars(
+                    sa.select(RoutingRow)
+                    .options(
+                        selectinload(RoutingRow.session_row).options(
+                            selectinload(SessionRow.kernels)
+                        )
+                    )
+                    .where(
+                        RoutingRow.endpoint == endpoint_id,
+                    )
                 )
-                .where(
-                    RoutingRow.endpoint == endpoint_id,
-                )
-            )
-        ).all()
+            ).all()
+        )
 
         kernel_count_per_agent: dict[AgentId, int] = {}
 
         for routing_row in routing_rows:
-            session_row: SessionRow = routing_row.session_row
-            kernels: list[KernelRow] = session_row.kernels
+            sess_row = routing_row.session_row
+            if sess_row is None:
+                continue
+            kernels: list[KernelRow] = sess_row.kernels
 
             for kernel in kernels:
                 if kernel.status in filter_by_statuses:
-                    if agent_id := kernel.agent:
+                    if kernel.agent:
+                        agent_id = AgentId(kernel.agent)
                         kernel_count_per_agent[agent_id] = (
                             kernel_count_per_agent.get(agent_id, 0) + 1
                         )
@@ -408,6 +414,9 @@ class ScheduleRepository:
                 existings.extend(sessions)
                 continue
             for sess in sessions:
+                if sess.created_at is None:
+                    candidates.append(sess)
+                    continue
                 elapsed_pending_time = now - sess.created_at
                 if pending_timeout.total_seconds() > 0 and elapsed_pending_time >= pending_timeout:
                     cancelleds.append(sess)
@@ -438,8 +447,8 @@ class ScheduleRepository:
             .where(AgentRow.id == agent_id)
         )
         await session.execute(update_query)
-        query = sa.select(AgentRow.addr).where(AgentRow.id == agent_id)
-        agent_addr = await session.scalar(query)
+        addr_query = sa.select(AgentRow.addr).where(AgentRow.id == agent_id)
+        agent_addr = await session.scalar(addr_query)
         if agent_addr is None:
             raise AgentNotFound(f"Agent address not found for agent_id: {agent_id}")
         return AgentAllocationContext(agent_id, agent_addr, scaling_group)
@@ -492,7 +501,10 @@ class ScheduleRepository:
         sched_ctx: SchedulingContext,
         sess_row: SessionRow,
     ) -> None:
-        await recalc_concurrency_used(session, sched_ctx.registry.valkey_stat, sess_row.access_key)
+        if sess_row.access_key:
+            await recalc_concurrency_used(
+                session, sched_ctx.registry.valkey_stat, AccessKey(sess_row.access_key)
+            )
 
     async def _fetch_session_statuses(
         self,
@@ -737,7 +749,7 @@ class ScheduleRepository:
                         kernel_id=kernel.id,
                         status=kernel.status,
                         container_id=kernel.container_id,
-                        agent_id=kernel.agent,
+                        agent_id=AgentId(kernel.agent) if kernel.agent else None,
                         agent_addr=kernel.agent_addr,
                         occupied_slots=kernel.occupied_slots,
                     )
@@ -747,8 +759,10 @@ class ScheduleRepository:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=session_row.access_key,
-                        creation_id=session_row.creation_id,
+                        access_key=AccessKey(session_row.access_key)
+                        if session_row.access_key
+                        else AccessKey(""),
+                        creation_id=session_row.creation_id or "",
                         status=session_row.status,
                         status_info=session_row.status_info or "UNKNOWN",
                         session_type=session_row.session_type,
@@ -812,7 +826,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_schedulable_agents_by_sgroup(self, sgroup_name: str) -> list[AgentRow]:
         async with self._db.begin_readonly_session() as session:
-            from ai.backend.manager.models import list_schedulable_agents_by_sgroup
+            from ai.backend.manager.models.agent import list_schedulable_agents_by_sgroup
 
             result = await list_schedulable_agents_by_sgroup(session, sgroup_name)
             return list(result)
@@ -963,16 +977,17 @@ class ScheduleRepository:
         self, agent_id: AgentId
     ) -> tuple[ResourceSlot, ResourceSlot]:
         async with self._db.begin_readonly_session() as session:
-            result = (
+            rows = (
                 await session.execute(
-                    sa.select([AgentRow.available_slots, AgentRow.occupied_slots]).where(
+                    sa.select(AgentRow.available_slots, AgentRow.occupied_slots).where(
                         AgentRow.id == agent_id
                     )
                 )
-            ).fetchall()[0]
-            if result is None:
+            ).fetchall()
+            if not rows:
                 raise AgentNotFound(f"No such agent exist in DB: {agent_id}")
-            return result
+            row = rows[0]
+            return (row.available_slots, row.occupied_slots)
 
     @schedule_repository_resilience.apply()
     async def reserve_agent(
@@ -1051,7 +1066,7 @@ class ScheduleRepository:
                 status_changed_at=now,
             )
             session_row.scaling_group_name = sgroup_name
-            session_row.agent_ids = agent_ids
+            session_row.agent_ids = [str(aid) for aid in agent_ids]
 
     async def _update_session_scheduling_failure(
         self,
@@ -1136,7 +1151,7 @@ class ScheduleRepository:
             if agent_alloc_ctx.agent_id is not None:
                 agent_ids.append(agent_alloc_ctx.agent_id)
             session_row.scaling_group_name = sgroup_name
-            session_row.agent_ids = agent_ids
+            session_row.agent_ids = [str(aid) for aid in agent_ids]
 
     @schedule_repository_resilience.apply()
     async def update_kernel_scheduling_failure(
@@ -1183,7 +1198,7 @@ class ScheduleRepository:
         status_data: ErrorStatusInfo,
     ) -> None:
         async with self._db.begin_session() as db_session:
-            affected_agents = set(k.agent for k in session.kernels)
+            affected_agents = {k.agent for k in session.kernels}
             await self._rollback_predicate_mutations(db_session, sched_ctx, session)
             now = datetime.now(tzutc())
             update_query = (
@@ -1224,7 +1239,8 @@ class ScheduleRepository:
             )
             await db_session.execute(update_sess_query)
             for agent_id in affected_agents:
-                await recalc_agent_resource_occupancy(db_session, agent_id)
+                if agent_id is not None:
+                    await recalc_agent_resource_occupancy(db_session, AgentId(agent_id))
 
     @schedule_repository_resilience.apply()
     async def transit_scheduled_to_preparing(self) -> list[SessionRow]:
@@ -1232,7 +1248,7 @@ class ScheduleRepository:
             return await self._transit_scheduled_to_preparing(session)
 
     async def _transit_scheduled_to_preparing(self, session: SASession) -> list[SessionRow]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         scheduled_sessions = await SessionRow.get_sessions_by_status(
             session, SessionStatus.SCHEDULED, load_kernel_image=True
         )
@@ -1246,7 +1262,7 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def mark_sessions_and_kernels_creating(self) -> list[SessionRow]:
         async with self._db.begin_session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             session_rows = await SessionRow.get_sessions_by_status(session, SessionStatus.PREPARED)
             for row in session_rows:
                 for kernel_row in row.kernels:
@@ -1271,11 +1287,11 @@ class ScheduleRepository:
             result = await session.execute(query)
             zombie_routes = result.scalars().all()
             if len(zombie_routes) > 0:
-                query = sa.delete(RoutingRow).where(
+                delete_stmt = sa.delete(RoutingRow).where(
                     RoutingRow.id.in_([r.id for r in zombie_routes])
                 )
-                result = await session.execute(query)
-                return result.rowcount
+                delete_result = await session.execute(delete_stmt)
+                return cast(int, cast(CursorResult, delete_result).rowcount)
             return 0
 
     @schedule_repository_resilience.apply()
@@ -1312,8 +1328,10 @@ class ScheduleRepository:
                 .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
             )
             await session.execute(query)
-            query = sa.delete(RoutingRow).where(RoutingRow.session.in_(already_destroyed_sessions))
-            await session.execute(query)
+            delete_stmt = sa.delete(RoutingRow).where(
+                RoutingRow.session.in_(already_destroyed_sessions)
+            )
+            await session.execute(delete_stmt)
 
     @schedule_repository_resilience.apply()
     async def get_container_info_for_destroyed_kernels(self, session_id: SessionId) -> dict:
@@ -1322,7 +1340,7 @@ class ScheduleRepository:
                 KernelRow.session_id == session_id
             )
             rows = (await session.execute(query)).fetchall()
-            return {row["id"]: row["container_id"] for row in rows}
+            return {row.id: row.container_id for row in rows}
 
     @schedule_repository_resilience.apply()
     async def autoscale_endpoints(self) -> None:
@@ -1330,7 +1348,7 @@ class ScheduleRepository:
             await self._autoscale_endpoints(session)
 
     async def _autoscale_endpoints(self, session: SASession) -> None:
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         rules = await EndpointAutoScalingRuleRow.list(session)
 
         # Currently auto scaling supports two types of stat as source: kernel and endpoint
@@ -1338,22 +1356,26 @@ class ScheduleRepository:
         # we first need to collect every routings, and then the sessions tied to each routing,
         # and finally the child kernels of each session
         endpoints = await EndpointRow.batch_load(
-            session, [rule.endpoint for rule in rules], load_routes=True
+            session, [EndpointId(rule.endpoint) for rule in rules], load_routes=True
         )
-        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
-        metric_requested_sessions: list[SessionId] = []
+        endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
+            endpoint.id: endpoint for endpoint in endpoints
+        }
+        metric_requested_sessions: list[uuid.UUID] = []
         metric_requested_kernels: list[KernelId] = []
         metric_requested_endpoints: list[uuid.UUID] = []
 
         kernel_statistics_by_id: dict[KernelId, Mapping[str, object]] = {}
         endpoint_statistics_by_id: dict[uuid.UUID, Mapping[str, object]] = {}
-        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+        kernels_by_session_id: dict[uuid.UUID, list[KernelRow]] = defaultdict(list)
 
         for rule in rules:
             match rule.metric_source:
                 case AutoScalingMetricSource.KERNEL:
                     metric_requested_sessions += [
-                        route.session for route in endpoint_by_id[rule.endpoint].routings
+                        route.session
+                        for route in endpoint_by_id[rule.endpoint].routings
+                        if route.session is not None
                     ]
                 case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
                     metric_requested_endpoints.append(rule.endpoint)
@@ -1378,12 +1400,14 @@ class ScheduleRepository:
 
         kernel_statistics_by_id = {
             kernel_id: metric
-            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats, strict=True)
             if metric is not None
         }
         endpoint_statistics_by_id = {
             endpoint_id: metric
-            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+            for endpoint_id, metric in zip(
+                metric_requested_endpoints, endpoint_live_stats, strict=True
+            )
             if metric is not None
         }
 
@@ -1400,6 +1424,8 @@ class ScheduleRepository:
                     metric_aggregated_value = Decimal("0")
                     metric_found_kernel_count = 0
                     for route in endpoint_by_id[rule.endpoint].routings:
+                        if route.session is None:
+                            continue
                         for kernel in kernels_by_session_id[route.session]:
                             if not kernel_statistics_by_id.get(kernel.id):
                                 continue
@@ -1489,13 +1515,12 @@ class ScheduleRepository:
     @schedule_repository_resilience.apply()
     async def get_endpoints_for_scaling(self) -> list:
         async with self._db.begin_readonly_session() as session:
-            endpoints = await EndpointRow.list(
+            return await EndpointRow.list(
                 session,
                 load_image=True,
                 load_routes=True,
                 status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
             )
-            return endpoints
 
     @schedule_repository_resilience.apply()
     async def get_sessions_to_destroy_for_scaling(
@@ -1519,7 +1544,7 @@ class ScheduleRepository:
             SessionRow.id.in_(route_sessions), eager_loading_op=kernel_loading_op
         )
         result = await session.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     @schedule_repository_resilience.apply()
     async def delete_appproxy_endpoints_readonly(
@@ -1594,7 +1619,7 @@ class ScheduleRepository:
         result = await db_session.execute(query)
         agents = result.scalars().all()
 
-        return {agent.id: agent for agent in agents}
+        return {AgentId(agent.id): agent for agent in agents}
 
     async def _prefetch_session_rows(
         self, db_session: SASession, session_ids: set[SessionId]
@@ -1885,7 +1910,7 @@ class ScheduleRepository:
             status_changed_at=now,
         )
         session_row.scaling_group_name = allocation.scaling_group
-        session_row.agent_ids = agent_ids
+        session_row.agent_ids = [str(aid) for aid in agent_ids]
 
     async def _get_schedulable_agents(
         self, db_sess: SASession, scaling_group: str
@@ -2348,27 +2373,27 @@ class ScheduleRepository:
                 )
                 .where(UserRow.uuid.in_(user_uuids))
             )
-            for row in user_policy_result:
+            for policy_row in user_policy_result:
                 # Accept all policies, including those with empty ResourceSlot
                 # Empty ResourceSlot {} is valid and means no limits
-                if row.name:
+                if policy_row.name:
                     resource_policy_map = {
-                        "total_resource_slots": row.total_resource_slots,
-                        "default_for_unspecified": row.default_for_unspecified
+                        "total_resource_slots": policy_row.total_resource_slots,
+                        "default_for_unspecified": policy_row.default_for_unspecified
                         or DefaultForUnspecified.LIMITED,
                     }
                     total_resource_slots = ResourceSlot.from_policy(
                         resource_policy_map, known_slot_types
                     )
-                    user_policies[row.uuid] = UserResourcePolicy(
-                        name=row.name,
+                    user_policies[policy_row.uuid] = UserResourcePolicy(
+                        name=policy_row.name,
                         total_resource_slots=total_resource_slots,
                     )
                     log.debug(
                         "User policy for {}: name={}, slots={}",
-                        row.uuid,
-                        row.name,
-                        row.total_resource_slots,
+                        policy_row.uuid,
+                        policy_row.name,
+                        policy_row.total_resource_slots,
                     )
 
         # Get session dependencies
@@ -2474,7 +2499,7 @@ class ScheduleRepository:
         if agents:
             for agent in agents:
                 agent_info = AgentInfo(
-                    agent_id=agent.id,
+                    agent_id=AgentId(agent.id),
                     agent_addr=agent.addr,
                     architecture=agent.architecture,
                     available_slots=agent.available_slots,
@@ -2611,7 +2636,7 @@ class ScheduleRepository:
 
         from ai.backend.manager.data.session.types import SessionStatus
 
-        timed_out_sessions: list["SweptSessionInfo"] = []
+        timed_out_sessions: list[SweptSessionInfo] = []
         now = datetime.now(tzutc())
 
         async with self._db.begin_readonly_session() as db_sess:

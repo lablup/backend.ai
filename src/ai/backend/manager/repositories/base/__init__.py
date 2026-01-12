@@ -4,14 +4,29 @@ Re-exports all public APIs for backward compatibility.
 """
 
 from .creator import (
+    BulkCreator,
+    BulkCreatorResult,
     Creator,
     CreatorResult,
     CreatorSpec,
+    execute_bulk_creator,
     execute_creator,
+)
+from .export import (
+    ExportDataStream,
+    ExportFieldDef,
+    ExportFieldType,
+    ExportFormatter,
+    ExportLimitExceeded,
+    ExportQueryParams,
+    ReportDef,
+    StreamingExportQuery,
+    execute_streaming_export,
 )
 from .pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
+    NoPagination,
     OffsetPagination,
     PageInfoResult,
     QueryPagination,
@@ -64,8 +79,19 @@ __all__ = [
     "QueryCondition",
     "QueryOrder",
     "CursorConditionFactory",
+    # Export
+    "ExportDataStream",
+    "ExportFieldDef",
+    "ExportFieldType",
+    "ExportFormatter",
+    "ExportLimitExceeded",
+    "ExportQueryParams",
+    "ReportDef",
+    "StreamingExportQuery",
+    "execute_streaming_export",
     # Pagination
     "QueryPagination",
+    "NoPagination",
     "OffsetPagination",
     "CursorForwardPagination",
     "CursorBackwardPagination",
@@ -83,6 +109,10 @@ __all__ = [
     "Creator",
     "CreatorResult",
     "execute_creator",
+    # BulkCreator
+    "BulkCreator",
+    "BulkCreatorResult",
+    "execute_bulk_creator",
     # Updater
     "UpdaterSpec",
     "Updater",

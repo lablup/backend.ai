@@ -5,10 +5,11 @@ import hashlib
 import hmac
 import logging
 import secrets
+from collections.abc import Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
@@ -32,6 +33,19 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    InvalidAuthParameters,
+    InvalidClientIPConfig,
+)
+from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    keypair_resource_policies,
+    user_resource_policies,
+)
+from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
@@ -45,10 +59,6 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from ..errors.auth import AuthorizationFailed, InvalidAuthParameters, InvalidClientIPConfig
-from ..errors.common import RejectedByHook
-from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
-from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 
@@ -313,8 +323,7 @@ def _extract_auth_params(request):
 
     try:
         access_key, signature = params["credential"].split(":", 1)
-        ret = params["signMethod"], access_key, signature
-        return ret
+        return params["signMethod"], access_key, signature
     except (KeyError, ValueError):
         raise InvalidAuthParameters("Missing or malformed authorization parameters")
 
@@ -434,7 +443,8 @@ async def _query_cred_by_access_key(
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypairs, keypair_resource_policies], use_labels=True)
+            sa.select(keypairs, keypair_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
@@ -455,9 +465,10 @@ async def _query_cred_by_access_key(
             users.c.uuid == keypairs.c.user,
         )
         query = (
-            sa.select([users, user_resource_policies], use_labels=True)
+            sa.select(users, user_resource_policies)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
-            .where((keypairs.c.access_key == access_key))
+            .where(keypairs.c.access_key == access_key)
         )
         result = await conn.execute(query)
         user_row = result.first()
@@ -479,31 +490,35 @@ def _populate_auth_result(
     if not user_row or not keypair_row:
         return
 
+    keypair_mapping = keypair_row._mapping
+    user_mapping = user_row._mapping
+
     auth_result = {
         "is_authorized": True,
         "keypair": {
-            col.name: keypair_row[f"keypairs_{col.name}"]
+            col.name: keypair_mapping[f"keypairs_{col.name}"]
             for col in keypairs.c
             if col.name != "secret_key"
         },
         "user": {
-            col.name: user_row[f"users_{col.name}"]
+            col.name: user_mapping[f"users_{col.name}"]
             for col in users.c
             if col.name not in ("password", "description", "created_at")
         },
-        "is_admin": keypair_row["keypairs_is_admin"],
+        "is_admin": keypair_mapping["keypairs_is_admin"],
     }
 
     validate_ip(request, auth_result["user"])
 
     auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_row[f"keypair_resource_policies_{col.name}"]
+        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
         for col in keypair_resource_policies.c
     }
     auth_result["user"]["resource_policy"] = {
-        col.name: user_row[f"user_resource_policies_{col.name}"] for col in user_resource_policies.c
+        col.name: user_mapping[f"user_resource_policies_{col.name}"]
+        for col in user_resource_policies.c
     }
-    auth_result["user"]["id"] = keypair_row["keypairs_user_id"]  # legacy
+    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
     auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
 
     # Populate the result to the per-request state dict
@@ -551,7 +566,7 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in database")
 
         # 3. Validate JWT token using user's secret key
-        secret_key = keypair_row["keypairs_secret_key"]
+        secret_key = keypair_row.keypairs_secret_key
         root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
 
         # 4. Populate authentication result
@@ -604,7 +619,7 @@ async def _authenticate_via_hmac(
         raise AuthorizationFailed("Access key not found in HMAC")
 
     # 4. Verify HMAC signature
-    my_signature = await sign_request(sign_method, request, keypair_row["keypairs_secret_key"])
+    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")
@@ -892,9 +907,9 @@ async def signup(request: web.Request, params: Any) -> web.Response:
         domain_name=params["domain"],
         email=params["email"],
         password=params["password"],
-        username=params["username"] if "username" in params else None,
-        full_name=params["full_name"] if "full_name" in params else None,
-        description=params["description"] if "description" in params else None,
+        username=params.get("username"),
+        full_name=params.get("full_name"),
+        description=params.get("description"),
     )
     result = await root_ctx.processors.auth.signup.wait_for_complete(action)
 
@@ -1088,7 +1103,7 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
     app["api_versions"] = (1, 2, 3, 4)

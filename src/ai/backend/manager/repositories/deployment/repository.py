@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
@@ -28,20 +28,30 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
+from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.scale import (
+    AutoScalingRule,
+    AutoScalingRuleCreator,
+    ModelDeploymentAutoScalingRuleCreator,
+)
+from ai.backend.manager.data.deployment.scale_modifier import (
+    AutoScalingRuleModifier,
+    ModelDeploymentAutoScalingRuleModifier,
+)
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchResult,
+    AutoScalingRuleSearchResult,
     DefinitionFiles,
     DeploymentInfo,
+    DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     EndpointLifecycle,
+    ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
-    ScaleOutDecision,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
@@ -57,7 +67,7 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics, EndpointTokenRow
 from ai.backend.manager.models.kernel import KernelStatistics
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -65,7 +75,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -130,10 +140,36 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
+        creator: Creator[EndpointRow],
+        policy_config: DeploymentPolicyConfig | None = None,
+    ) -> DeploymentInfo:
+        """Create a new endpoint and return DeploymentInfo.
+
+        Args:
+            creator: Creator containing DeploymentCreatorSpec with resolved image_id
+            policy_config: Optional deployment policy configuration
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        return await self._db_source.create_endpoint(creator, policy_config)
+
+    @deployment_repository_resilience.apply()
+    async def create_endpoint_legacy(
+        self,
         creator: DeploymentCreator,
     ) -> DeploymentInfo:
-        """Create a new endpoint and return DeploymentInfo."""
-        return await self._db_source.create_endpoint(creator)
+        """Create a new endpoint using legacy DeploymentCreator.
+
+        This is for backward compatibility with legacy deployment creation flow.
+
+        Args:
+            creator: Legacy DeploymentCreator with ImageIdentifier
+
+        Returns:
+            DeploymentInfo for the created endpoint
+        """
+        return await self._db_source.create_endpoint_legacy(creator)
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
@@ -297,6 +333,41 @@ class DeploymentRepository:
         """Delete an autoscaling rule."""
         return await self._db_source.delete_autoscaling_rule(rule_id)
 
+    # Model Deployment Auto-scaling Rule operations (new types)
+
+    @deployment_repository_resilience.apply()
+    async def create_model_deployment_autoscaling_rule(
+        self,
+        creator: ModelDeploymentAutoScalingRuleCreator,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Create a new autoscaling rule using ModelDeployment types."""
+        return await self._db_source.create_model_deployment_autoscaling_rule(creator)
+
+    @deployment_repository_resilience.apply()
+    async def update_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+        modifier: ModelDeploymentAutoScalingRuleModifier,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Update an autoscaling rule using ModelDeployment types."""
+        return await self._db_source.update_model_deployment_autoscaling_rule(rule_id, modifier)
+
+    @deployment_repository_resilience.apply()
+    async def list_model_deployment_autoscaling_rules(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> list[ModelDeploymentAutoScalingRuleData]:
+        """List all autoscaling rules for an endpoint using ModelDeployment types."""
+        return await self._db_source.list_model_deployment_autoscaling_rules(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_model_deployment_autoscaling_rule(
+        self,
+        rule_id: uuid.UUID,
+    ) -> ModelDeploymentAutoScalingRuleData:
+        """Get a single autoscaling rule by ID using ModelDeployment types."""
+        return await self._db_source.get_model_deployment_autoscaling_rule(rule_id)
+
     # Data fetching operations
     @deployment_repository_resilience.apply()
     async def fetch_model_definition(
@@ -446,10 +517,10 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
-        scale_outs: Sequence[ScaleOutDecision],
-        scale_ins: Sequence[RouteInfo],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        await self._db_source.scale_routes(scale_outs, scale_ins)
+        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
 
     # Route operations
 
@@ -626,7 +697,9 @@ class DeploymentRepository:
             )
             kernel_statistics_by_id = {
                 kernel_id: metric
-                for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+                for kernel_id, metric in zip(
+                    metric_requested_kernels, kernel_live_stats, strict=True
+                )
             }
 
         if metric_requested_endpoints:
@@ -636,7 +709,9 @@ class DeploymentRepository:
             )
             endpoint_statistics_by_id = {
                 endpoint_id: metric
-                for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+                for endpoint_id, metric in zip(
+                    metric_requested_endpoints, endpoint_live_stats, strict=True
+                )
             }
 
         return AutoScalingMetricsData(
@@ -666,7 +741,7 @@ class DeploymentRepository:
         if not auto_scaling_rules:
             return None
 
-        current_datetime = datetime.now(timezone.utc)
+        current_datetime = datetime.now(UTC)
         current_replica_count = deployment.replica_spec.target_replica_count
         routes = metrics_data.routes_by_endpoint.get(deployment.id, [])
 
@@ -926,6 +1001,38 @@ class DeploymentRepository:
         return await self._db_source.get_revision(revision_id)
 
     @deployment_repository_resilience.apply()
+    async def get_revision_by_route_id(
+        self,
+        route_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get a deployment revision by route (replica) ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Raises:
+            RouteNotFound: If the route does not exist.
+            DeploymentRevisionNotFound: If the route has no revision linked.
+        """
+        return await self._db_source.get_revision_by_route_id(route_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Get the current revision of a deployment.
+
+        Args:
+            endpoint_id: ID of the deployment endpoint
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+            DeploymentRevisionNotFound: If the endpoint has no current revision.
+        """
+        return await self._db_source.get_current_revision(endpoint_id)
+
+    @deployment_repository_resilience.apply()
     async def search_revisions(
         self,
         querier: BatchQuerier,
@@ -948,9 +1055,29 @@ class DeploymentRepository:
     async def update_endpoint(
         self,
         updater: Updater[EndpointRow],
-    ) -> None:
-        """Update an endpoint using the provided updater spec."""
-        await self._db_source.update_endpoint(updater)
+    ) -> DeploymentInfo:
+        """Update an endpoint using the provided updater spec.
+
+        Returns:
+            DeploymentInfo: The updated endpoint information.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist.
+        """
+        return await self._db_source.update_endpoint(updater)
+
+    @deployment_repository_resilience.apply()
+    async def update_current_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        """Update the current revision of a deployment.
+
+        Returns:
+            The previous revision ID, or None if there was no previous revision.
+        """
+        return await self._db_source.update_current_revision(endpoint_id, revision_id)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
@@ -1089,3 +1216,82 @@ class DeploymentRepository:
             RouteSearchResult with items, total_count, and pagination info
         """
         return await self._db_source.search_routes(querier)
+
+    @deployment_repository_resilience.apply()
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> Optional[RouteInfo]:
+        """Get a route by ID.
+
+        Args:
+            route_id: ID of the route (replica)
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        return await self._db_source.get_route(route_id)
+
+    @deployment_repository_resilience.apply()
+    async def search_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            DeploymentInfoSearchResult with items, total_count, and pagination info
+        """
+        return await self._db_source.search_endpoints(querier)
+
+    # ========== Access Token Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def create_access_token(
+        self,
+        creator: Creator[EndpointTokenRow],
+    ) -> EndpointTokenRow:
+        """Create a new access token for a model deployment.
+
+        Args:
+            creator: Creator containing the EndpointTokenCreatorSpec.
+
+        Returns:
+            Created EndpointTokenRow.
+        """
+        return await self._db_source.create_access_token(creator)
+
+    # ========== Additional Search Operations ==========
+
+    @deployment_repository_resilience.apply()
+    async def search_auto_scaling_rules(
+        self,
+        querier: BatchQuerier,
+    ) -> AutoScalingRuleSearchResult:
+        """Search auto-scaling rules with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AutoScalingRuleSearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_auto_scaling_rules(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_access_tokens(
+        self,
+        querier: BatchQuerier,
+    ) -> AccessTokenSearchResult:
+        """Search access tokens with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            AccessTokenSearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_access_tokens(querier)

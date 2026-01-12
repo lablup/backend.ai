@@ -1,6 +1,8 @@
-from typing import List, Mapping, Optional
+from collections.abc import Mapping
+from typing import Optional
 
-from ..request import Request
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Dotfile",)
@@ -49,7 +51,7 @@ class Dotfile(BaseFunction):
         owner_access_key: Optional[str] = None,
         domain: Optional[str] = None,
         group: Optional[str] = None,
-    ) -> "List[Mapping[str, str]]":
+    ) -> "list[Mapping[str, str]]":
         params = {}
         if group:
             params["group"] = group
@@ -74,7 +76,7 @@ class Dotfile(BaseFunction):
         owner_access_key: Optional[str] = None,
         group: Optional[str] = None,
         domain: Optional[str] = None,
-    ):
+    ) -> None:
         self.path = path
         self.owner_access_key = owner_access_key
         self.group = group

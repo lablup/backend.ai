@@ -4,16 +4,13 @@ import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
-    Mapping,
     ParamSpec,
     TypeVar,
     overload,
@@ -27,7 +24,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -39,18 +36,16 @@ from tenacity import (
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import DatabaseError
+from ai.backend.appproxy.coordinator.config import DBConfig
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
-from ..config import DBConfig
-
 if TYPE_CHECKING:
     pass
 
+from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
-
-from ..defs import LockID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -71,8 +66,8 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -138,9 +133,8 @@ class ExtendedAsyncSAEngine(SAEngine):
     @actxmgr
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
-            async with self.connect() as _bind:
-                async with self._begin(_bind) as conn:
-                    yield conn
+            async with self.connect() as _bind, self._begin(_bind) as conn:
+                yield conn
         else:
             async with self._begin(bind) as conn:
                 yield conn
@@ -187,9 +181,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -208,9 +201,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
-                    yield sess
+            async with self.connect() as _conn, _begin_session(_conn) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -305,16 +297,14 @@ async def execute_with_txn_retry(
         ):
             with attempt:
                 try:
-                    async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn, *args, **kwargs)
+                    async with begin_trx(bind=connection) as session_or_conn:  # type: ignore[arg-type]
+                        result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):
                         raise TryAgain
                     raise
     except RetryError:
-        raise asyncio.TimeoutError(
-            f"DB serialization failed after {max_attempts} retry transactions"
-        )
+        raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
     if result is Sentinel.TOKEN:
         raise TransactionResultError("Transaction did not produce a result")
     return result

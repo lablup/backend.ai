@@ -5,10 +5,10 @@ import enum
 import logging
 import textwrap
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Optional, Self, Sequence, cast
+from typing import Optional, Self, cast
 
 from glide import (
     Batch,

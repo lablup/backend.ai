@@ -38,6 +38,13 @@ type AccessTokenEdge {
 }
 
 """Added in 25.16.0"""
+input AccessTokenFilter {
+  token: StringFilter = null
+  validUntil: DateTimeFilter = null
+  createdAt: DateTimeFilter = null
+}
+
+"""Added in 25.16.0"""
 input AccessTokenOrderBy {
   field: AccessTokenOrderField!
   direction: OrderDirection! = DESC
@@ -63,21 +70,15 @@ type ActivateRevisionPayload {
 }
 
 """
-Added in 25.16.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
+Added in 25.19.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
 """
 enum ActivenessStatus {
   ACTIVE
   INACTIVE
 }
 
-"""Added in 25.16.0"""
-input ActivenessStatusFilter {
-  in: [ActivenessStatus!] = null
-  equals: ActivenessStatus = null
-}
-
-"""Added in 25.16.0"""
-input AddModelRevisionInput {
+"""Added in 25.19.0"""
+input AddRevisionInput {
   name: String = null
   deploymentId: ID!
   clusterConfig: ClusterConfigInput!
@@ -88,8 +89,8 @@ input AddModelRevisionInput {
   extraMounts: [ExtraVFolderMountInput!]
 }
 
-"""Added in 25.16.0"""
-type AddModelRevisionPayload {
+"""Added in 25.19.0"""
+type AddRevisionPayload {
   revision: ModelRevision!
 }
 
@@ -551,29 +552,64 @@ type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 25.16.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
+  """Added in 25.19.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
   metricSource: AutoScalingMetricSource!
   metricName: String!
 
-  """Added in 25.16.0: The minimum threshold for scaling (e.g. 0.5)"""
+  """Added in 25.19.0: The minimum threshold for scaling (e.g. 0.5)"""
   minThreshold: Decimal
 
-  """Added in 25.16.0: The maximum threshold for scaling (e.g. 21.0)"""
+  """Added in 25.19.0: The maximum threshold for scaling (e.g. 21.0)"""
   maxThreshold: Decimal
 
-  """Added in 25.16.0: The step size for scaling (e.g. 1)."""
+  """Added in 25.19.0: The step size for scaling (e.g. 1)."""
   stepSize: Int!
 
-  """Added in 25.16.0: The time window (seconds) for scaling (e.g. 60)."""
+  """Added in 25.19.0: The time window (seconds) for scaling (e.g. 60)."""
   timeWindow: Int!
 
-  """Added in 25.16.0: The minimum number of replicas (e.g. 1)."""
+  """Added in 25.19.0: The minimum number of replicas (e.g. 1)."""
   minReplicas: Int
 
-  """Added in 25.16.0: The maximum number of replicas (e.g. 10)."""
+  """Added in 25.19.0: The maximum number of replicas (e.g. 10)."""
   maxReplicas: Int
   createdAt: DateTime!
   lastTriggeredAt: DateTime!
+}
+
+"""Added in 25.19.0"""
+type AutoScalingRuleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AutoScalingRuleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AutoScalingRuleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AutoScalingRule!
+}
+
+"""Added in 25.19.0"""
+input AutoScalingRuleFilter {
+  createdAt: DateTimeFilter = null
+  lastTriggeredAt: DateTimeFilter = null
+}
+
+"""Added in 25.19.0"""
+input AutoScalingRuleOrderBy {
+  field: AutoScalingRuleOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum AutoScalingRuleOrderField {
+  CREATED_AT
 }
 
 """Background task event payload"""
@@ -648,19 +684,21 @@ type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
-"""Added in 25.16.0"""
 type ClusterConfig {
+  """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
+
+  """Number of replicas in the cluster."""
   size: Int!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ClusterConfigInput {
   mode: ClusterMode!
   size: Int!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
@@ -700,6 +738,20 @@ type CreateAutoScalingRulePayload {
   autoScalingRule: AutoScalingRule!
 }
 
+"""Added in 25.19.0"""
+input CreateDeploymentInput {
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
+  defaultDeploymentStrategy: DeploymentStrategyInput!
+  desiredReplicaCount: Int!
+  initialRevision: CreateRevisionInput!
+}
+
+"""Added in 25.19.0"""
+type CreateDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
 """Added in 25.14.0"""
 input CreateHuggingFaceRegistryInput {
   url: String!
@@ -710,36 +762,6 @@ input CreateHuggingFaceRegistryInput {
 """Added in 25.14.0"""
 type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
-}
-
-"""Added in 25.16.0"""
-input CreateModelDeploymentInput {
-  metadata: ModelDeploymentMetadataInput!
-  networkAccess: ModelDeploymentNetworkAccessInput!
-  defaultDeploymentStrategy: DeploymentStrategyInput!
-  desiredReplicaCount: Int!
-  initialRevision: CreateModelRevisionInput!
-}
-
-"""Added in 25.16.0"""
-type CreateModelDeploymentPayload {
-  deployment: ModelDeployment!
-}
-
-"""Added in 25.16.0"""
-input CreateModelRevisionInput {
-  name: String = null
-  clusterConfig: ClusterConfigInput!
-  resourceConfig: ResourceConfigInput!
-  image: ImageInput!
-  modelRuntimeConfig: ModelRuntimeConfigInput!
-  modelMountConfig: ModelMountConfigInput!
-  extraMounts: [ExtraVFolderMountInput!]
-}
-
-"""Added in 25.16.0"""
-type CreateModelRevisionPayload {
-  revision: ModelRevision!
 }
 
 """Input for creating a notification channel"""
@@ -800,6 +822,24 @@ type CreateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
+"""
+Added in 25.19.0. Input for creating a revision without attaching to a deployment.
+"""
+input CreateRevisionInput {
+  name: String = null
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
+}
+
+"""Added in 25.16.0"""
+type CreateRevisionPayload {
+  revision: ModelRevision!
+}
+
 """Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput {
   name: String!
@@ -814,6 +854,13 @@ type CreateVFSStoragePayload {
 
 """Date with time (isoformat)"""
 scalar DateTime
+
+input DateTimeFilter {
+  before: DateTime = null
+  after: DateTime = null
+  equals: DateTime = null
+  notEquals: DateTime = null
+}
 
 """Decimal (fixed-point)"""
 scalar Decimal
@@ -925,6 +972,16 @@ type DeleteAutoScalingRulePayload {
   id: ID!
 }
 
+"""Added in 25.19.0"""
+input DeleteDeploymentInput {
+  id: ID!
+}
+
+"""Added in 25.19.0"""
+type DeleteDeploymentPayload {
+  id: ID!
+}
+
 """Added in 25.16.0. Input for deleting domain-level app configuration"""
 input DeleteDomainConfigInput {
   domainName: String!
@@ -946,16 +1003,6 @@ input DeleteHuggingFaceRegistryInput {
 
 """Added in 25.14.0"""
 type DeleteHuggingFaceRegistryPayload {
-  id: ID!
-}
-
-"""Added in 25.16.0"""
-input DeleteModelDeploymentInput {
-  id: ID!
-}
-
-"""Added in 25.16.0"""
-type DeleteModelDeploymentPayload {
   id: ID!
 }
 
@@ -1027,20 +1074,78 @@ type DeleteVFSStoragePayload {
   id: ID!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
-  id: ID = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
 }
 
-"""Added in 25.16.0"""
+"""Deployment history record"""
+type DeploymentHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The deployment ID this history record belongs to."""
+  deploymentId: ID!
+}
+
+"""Deployment history connection"""
+type DeploymentHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentHistory!
+}
+
+"""Filter for deployment history"""
+input DeploymentHistoryFilter {
+  id: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for deployment history"""
+input DeploymentHistoryOrderBy {
+  field: DeploymentHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum DeploymentHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 25.19.0"""
 input DeploymentOrderBy {
   field: DeploymentOrderField!
   direction: OrderDirection! = DESC
@@ -1063,7 +1168,7 @@ type DeploymentPolicy implements Node {
 }
 
 """
-Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.
+Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
 enum DeploymentStatus {
   PENDING
@@ -1074,18 +1179,17 @@ enum DeploymentStatus {
   STOPPED
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 type DeploymentStatusChangedPayload {
   deployment: ModelDeployment!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input DeploymentStatusFilter {
   in: [DeploymentStatus!] = null
   equals: DeploymentStatus = null
 }
 
-"""Added in 25.16.0"""
 type DeploymentStrategyGQL {
   type: DeploymentStrategyType!
 }
@@ -1108,7 +1212,7 @@ interface DeploymentStrategySpec {
 }
 
 """
-Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
 """
 enum DeploymentStrategyType {
   ROLLING
@@ -1145,7 +1249,7 @@ type ExtraVFolderMountEdge {
   node: ExtraVFolderMount!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ExtraVFolderMountInput {
   vfolderId: ID!
   mountDestination: String
@@ -1207,10 +1311,9 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ImageInput {
-  name: String!
-  architecture: String!
+  id: ID!
 }
 
 extend type ImageNode @key(fields: "id") {
@@ -1260,7 +1363,7 @@ scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads
 scalar JSONString
 
 """
-Added in 25.16.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
+Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
 enum LivenessStatus {
   NOT_CHECKED
@@ -1269,13 +1372,6 @@ enum LivenessStatus {
   DEGRADED
 }
 
-"""Added in 25.16.0"""
-input LivenessStatusFilter {
-  in: [LivenessStatus!] = null
-  equals: LivenessStatus = null
-}
-
-"""Added in 25.16.0"""
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1283,16 +1379,16 @@ type ModelDeployment implements Node {
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
   defaultDeploymentStrategy: DeploymentStrategyGQL!
+  replicaState: ReplicaState!
   createdUser: UserNode!
   scalingRule: ScalingRule!
-  replicaState: ReplicaState!
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 type ModelDeploymentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1311,7 +1407,6 @@ type ModelDeploymentEdge {
   node: ModelDeployment!
 }
 
-"""Added in 25.16.0"""
 type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
@@ -1322,7 +1417,7 @@ type ModelDeploymentMetadata {
   domain: DomainNode!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelDeploymentMetadataInput {
   projectId: ID!
   domainName: String!
@@ -1330,64 +1425,60 @@ input ModelDeploymentMetadataInput {
   tags: [String!] = null
 }
 
-"""Added in 25.16.0"""
 type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens(orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelDeploymentNetworkAccessInput {
   preferredDomainName: String = null
   openToPublic: Boolean! = false
 }
 
-"""Added in 25.16.0"""
 type ModelMountConfig {
+  """Path inside the container where the model is mounted."""
   mountDestination: String!
+
+  """Path to the model definition file within the mounted folder."""
   definitionPath: String!
   vfolder: VirtualFolderNode!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelMountConfigInput {
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String!
 }
 
-"""Added in 25.16.0"""
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """
-  This represents whether the replica has been checked and its health state.
-  """
+  """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
 
-  """
-  This represents whether the replica is currently running and able to serve requests.
-  """
+  """Whether the replica is currently running and able to serve requests."""
   livenessStatus: LivenessStatus!
 
-  """
-  This represents whether the replica is currently active and able to serve requests.
-  """
+  """Whether the replica is currently active and able to serve requests."""
   activenessStatus: ActivenessStatus!
+
+  """Traffic weight for load balancing between replicas."""
   weight: Int!
 
   """
-  Detailed information about the routing node. It can include both error messages and success messages.
+  Detailed information about the routing node including error or success messages.
   """
   detail: JSONString!
+
+  """Timestamp when the replica was created."""
   createdAt: DateTime!
 
-  """
-  live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
-  """
+  """Live statistics of the routing node (CPU utilization, etc.)."""
   liveStat: JSONString!
 
   """
@@ -1397,7 +1488,6 @@ type ModelReplica implements Node {
   revision: ModelRevision!
 }
 
-"""Added in 25.16.0"""
 type ModelReplicaConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1416,21 +1506,34 @@ type ModelReplicaEdge {
   node: ModelReplica!
 }
 
-"""Added in 25.16.0"""
 type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """The name identifier for this revision."""
   name: String!
+
+  """Cluster configuration for replica distribution."""
   clusterConfig: ClusterConfig!
+
+  """Compute resource allocation settings."""
   resourceConfig: ResourceConfig!
+
+  """Runtime configuration for the inference framework."""
   modelRuntimeConfig: ModelRuntimeConfig!
-  modelMountConfig: ModelMountConfig!
+
+  """Model data mount configuration."""
+  modelMountConfig: ModelMountConfig
+
+  """Additional volume folder mounts."""
   extraMounts: ExtraVFolderMountConnection!
+
+  """Timestamp when the revision was created."""
   createdAt: DateTime!
   image: ImageNode!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 type ModelRevisionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1449,17 +1552,16 @@ type ModelRevisionEdge {
   node: ModelRevision!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelRevisionFilter {
   name: StringFilter = null
   deploymentId: ID = null
-  id: ID = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelRevisionOrderBy {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
@@ -1470,18 +1572,20 @@ enum ModelRevisionOrderField {
   NAME
 }
 
-"""Added in 25.16.0"""
 type ModelRuntimeConfig {
+  """The inference runtime variant (e.g., vllm, triton)."""
   runtimeVariant: String!
+
+  """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
 
   """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
   """
   environ: JSONString
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ModelRuntimeConfigInput {
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON = null
@@ -1670,13 +1774,13 @@ type Mutation {
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
 
   """Added in 25.16.0"""
-  createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
+  createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload!
 
   """Added in 25.16.0"""
-  updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
+  updateModelDeployment(input: UpdateDeploymentInput!): UpdateDeploymentPayload!
 
   """Added in 25.16.0"""
-  deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
+  deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload!
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
@@ -1684,12 +1788,12 @@ type Mutation {
   syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
 
   """Added in 25.16.0"""
-  addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload!
+  addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
 
   """
   Added in 25.16.0. Create model revision which is not attached to any deployment.
   """
-  createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
+  createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
 
   """Create a new notification channel"""
   createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
@@ -2015,7 +2119,7 @@ type Query {
   Use filters to narrow down results by type, name, registry, or availability.
   Supports cursor-based pagination for efficient browsing of large datasets.
   """
-  artifacts(filter: ArtifactFilter = {type: null, name: null, registry: null, source: null, availability: [ALIVE], AND: null, OR: null, NOT: null}, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
 
   """
   Added in 25.14.0.
@@ -2155,21 +2259,24 @@ type Query {
 
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
+
+  """List session scheduling history (superadmin only)"""
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+
+  """List deployment history (superadmin only)"""
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+
+  """List route history (superadmin only)"""
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
 }
 
 """
-Added in 25.16.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
+Added in 25.19.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
 """
 enum ReadinessStatus {
   NOT_CHECKED
   HEALTHY
   UNHEALTHY
-}
-
-"""Added in 25.16.0"""
-input ReadinessStatusFilter {
-  in: [ReadinessStatus!] = null
-  equals: ReadinessStatus = null
 }
 
 """
@@ -2213,18 +2320,16 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ReplicaFilter {
-  readinessStatus: ReadinessStatusFilter = null
-  livenessStatus: LivenessStatusFilter = null
-  activenessStatus: ActivenessStatusFilter = null
-  id: ID = null
+  status: ReplicaStatusFilter = null
+  trafficStatus: TrafficStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ReplicaOrderBy {
   field: ReplicaOrderField!
   direction: OrderDirection! = DESC
@@ -2235,15 +2340,33 @@ enum ReplicaOrderField {
   ID
 }
 
-"""Added in 25.16.0"""
 type ReplicaState {
   desiredReplicaCount: Int!
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
 }
 
-"""Added in 25.16.0"""
+"""
+Added in 25.19.0. This enum represents the provisioning status of a replica.
+"""
+enum ReplicaStatus {
+  PROVISIONING
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+  TERMINATING
+  TERMINATED
+  FAILED_TO_START
+}
+
+"""Added in 25.19.0"""
 type ReplicaStatusChangedPayload {
   replica: ModelReplica!
+}
+
+"""Added in 25.19.0"""
+input ReplicaStatusFilter {
+  in: [ReplicaStatus!] = null
+  equals: ReplicaStatus = null
 }
 
 """Added in 25.14.0"""
@@ -2277,21 +2400,20 @@ type ReservoirRegistryEdge {
   node: ReservoirRegistry!
 }
 
-"""Added in 25.16.0"""
 type ResourceConfig {
   """
-  Resource Slots are a JSON string that describes the resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
   """
   resourceSlots: JSONString!
 
   """
-  Resource Options are a JSON string that describes additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  Additional resource options such as shared memory. Example: {"shmem": "64m"}.
   """
   resourceOpts: JSONString
   resourceGroup: ScalingGroupNode!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ResourceConfigInput {
   resourceGroup: ResourceGroupInput!
 
@@ -2306,7 +2428,7 @@ input ResourceConfigInput {
   resourceOpts: JSONString = null
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input ResourceGroupInput {
   name: String!
 }
@@ -2356,7 +2478,7 @@ type Route implements Node {
   trafficRatio: Float!
 
   """The timestamp when the route was created."""
-  createdAt: DateTime!
+  createdAt: DateTime
 
   """Error data if the route is in a failed state."""
   errorData: JSONString
@@ -2398,6 +2520,69 @@ type RouteEdge {
 input RouteFilter {
   status: [RouteStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
+}
+
+"""Route history record"""
+type RouteHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The route ID this history record belongs to."""
+  routeId: ID!
+
+  """The deployment ID this route belongs to."""
+  deploymentId: ID!
+}
+
+"""Route history connection"""
+type RouteHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RouteHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RouteHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RouteHistory!
+}
+
+"""Filter for route history"""
+input RouteHistoryFilter {
+  id: UUIDFilter = null
+  routeId: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for route history"""
+input RouteHistoryOrderBy {
+  field: RouteHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum RouteHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
 }
 
 """Added in 25.19.0. Order by specification for routes."""
@@ -2678,9 +2863,8 @@ type ScalingGroupV2Edge {
   node: ScalingGroupV2!
 }
 
-"""Added in 25.16.0"""
 type ScalingRule {
-  autoScalingRules: [AutoScalingRule!]!
+  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
 }
 
 """
@@ -2749,6 +2933,13 @@ type SchedulingBroadcastEventPayload {
   session: ComputeSessionNode!
 }
 
+"""Scheduling result status"""
+enum SchedulingResult {
+  SUCCESS
+  FAILURE
+  STALE
+}
+
 """Status of session scheduling transitions"""
 enum SchedulingStatus {
   PENDING
@@ -2762,6 +2953,65 @@ enum SchedulingStatus {
   TERMINATED
   CANCELLED
   ERROR
+}
+
+"""Session scheduling history record"""
+type SessionSchedulingHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The session ID this history record belongs to."""
+  sessionId: ID!
+}
+
+"""Session scheduling history connection"""
+type SessionSchedulingHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionSchedulingHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SessionSchedulingHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionSchedulingHistory!
+}
+
+"""Filter for session scheduling history"""
+input SessionSchedulingHistoryFilter {
+  id: UUIDFilter = null
+  sessionId: UUIDFilter = null
+  result: [SchedulingResult!] = null
+  errorCode: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+}
+
+"""Order by specification for session scheduling history"""
+input SessionSchedulingHistoryOrderBy {
+  field: SessionSchedulingHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum SessionSchedulingHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
 }
 
 """
@@ -2821,12 +3071,28 @@ input StringFilter {
   startsWith: String = null
   endsWith: String = null
   equals: String = null
+  notContains: String = null
+  notStartsWith: String = null
+  notEndsWith: String = null
   notEquals: String = null
   iContains: String = null
   iStartsWith: String = null
   iEndsWith: String = null
   iEquals: String = null
+  iNotContains: String = null
+  iNotStartsWith: String = null
+  iNotEndsWith: String = null
   iNotEquals: String = null
+}
+
+"""Sub-step result in scheduling history"""
+type SubStepResultGQL {
+  step: String!
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  startedAt: DateTime
+  endedAt: DateTime
 }
 
 type Subscription {
@@ -2852,8 +3118,8 @@ type Subscription {
   """
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
 
-  """Added in 25.16.0"""
-  deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
+  """Added in 25.16.0. Subscribe to deployment status changes"""
+  deploymentStatusChanged: DeploymentStatusChangedPayload!
 
   """Added in 25.16.0"""
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
@@ -2869,17 +3135,39 @@ type Subscription {
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 input SyncReplicaInput {
   modelDeploymentId: ID!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.19.0"""
 type SyncReplicaPayload {
   success: Boolean!
 }
 
+"""
+Added in 25.19.0. This enum represents the traffic status of a replica.
+"""
+enum TrafficStatus {
+  ACTIVE
+  INACTIVE
+}
+
+"""Added in 25.19.0"""
+input TrafficStatusFilter {
+  in: [TrafficStatus!] = null
+  equals: TrafficStatus = null
+}
+
 scalar UUID
+
+"""Added in 26.1.0. Filter for UUID fields."""
+input UUIDFilter {
+  equals: UUID = null
+  in: [UUID!] = null
+  notEquals: UUID = null
+  notIn: [UUID!] = null
+}
 
 """
 Added in 25.15.0.
@@ -2941,6 +3229,23 @@ type UpdateAutoScalingRulePayload {
   autoScalingRule: AutoScalingRule!
 }
 
+"""Added in 25.19.0"""
+input UpdateDeploymentInput {
+  id: ID!
+  openToPublic: Boolean = null
+  tags: [String!] = null
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
+  activeRevisionId: ID = null
+  desiredReplicaCount: Int = null
+  name: String = null
+  preferredDomainName: String = null
+}
+
+"""Added in 25.19.0"""
+type UpdateDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
 """Added in 25.14.0"""
 input UpdateHuggingFaceRegistryInput {
   id: ID!
@@ -2952,23 +3257,6 @@ input UpdateHuggingFaceRegistryInput {
 """Added in 25.14.0"""
 type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
-}
-
-"""Added in 25.16.0"""
-input UpdateModelDeploymentInput {
-  id: ID!
-  openToPublic: Boolean = null
-  tags: [String!] = null
-  defaultDeploymentStrategy: DeploymentStrategyInput = null
-  activeRevisionId: ID = null
-  desiredReplicaCount: Int = null
-  name: String = null
-  preferredDomainName: String = null
-}
-
-"""Added in 25.16.0"""
-type UpdateModelDeploymentPayload {
-  deployment: ModelDeployment!
 }
 
 """Input for updating a notification channel"""

@@ -97,6 +97,6 @@ ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]
 class ArtifactRegistryMetaConnection(Connection[ArtifactRegistryMeta]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs):
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count

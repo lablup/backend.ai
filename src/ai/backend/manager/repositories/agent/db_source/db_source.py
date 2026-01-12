@@ -16,8 +16,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models import agents
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -51,7 +50,7 @@ class AgentDBSource:
                 .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
                 .options(selectinload(ImageRow.aliases))
             )
-            image_rows: list[ImageRow] = (await db_session.scalars(query)).all()
+            image_rows = list((await db_session.scalars(query)).all())
             images_data: dict[ImageID, ImageDataWithDetails] = {}
             for image_row in image_rows:
                 images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
@@ -64,7 +63,7 @@ class AgentDBSource:
                 .where(ImageRow.config_digest.in_(digests))
                 .options(selectinload(ImageRow.aliases))
             )
-            results: list[ImageRow] = (await db_session.scalars(query)).all()
+            results = list((await db_session.scalars(query)).all())
             images_data: dict[ImageID, ImageDataWithDetails] = {}
             for image_row in results:
                 images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
@@ -73,7 +72,9 @@ class AgentDBSource:
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session() as db_session:
             agent_row: Optional[AgentRow] = await db_session.scalar(
-                sa.select(AgentRow).where(AgentRow.id == agent_id)
+                sa.select(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .options(selectinload(AgentRow.kernels))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)

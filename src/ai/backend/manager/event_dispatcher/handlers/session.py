@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -38,15 +38,14 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.registry import AgentRegistry
-
-from ...models.endpoint import EndpointRow
-from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
-from ...models.utils import (
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
+from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -237,11 +236,12 @@ class SessionEventHandler:
                                 update_data: dict[str, Any] = {
                                     "status": RouteStatus.FAILED_TO_START
                                 }
-                                if "error" in session.status_data:
-                                    if session.status_data["error"]["name"] == "MultiAgentError":
-                                        errors = session.status_data["error"]["collection"]
+                                status_data = session.status_data
+                                if status_data and "error" in status_data:
+                                    if status_data["error"]["name"] == "MultiAgentError":
+                                        errors = status_data["error"]["collection"]
                                     else:
-                                        errors = [session.status_data["error"]]
+                                        errors = [status_data["error"]]
                                     update_data["error_data"] = {
                                         "type": "session_cancelled",
                                         "errors": errors,
@@ -270,23 +270,23 @@ class SessionEventHandler:
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-                        query = sa.select([sa.func.count("*")]).where(
+                        query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
                             & (RoutingRow.status == RouteStatus.HEALTHY)
                         )
                         healthy_routes = await db_sess.scalar(query)
                         if endpoint.replicas == healthy_routes:
-                            query = (
+                            update_query = (
                                 sa.update(EndpointRow)
                                 .where(EndpointRow.id == endpoint.id)
                                 .values({"retries": 0})
                             )
-                            await db_sess.execute(query)
-                            query = sa.delete(RoutingRow).where(
+                            await db_sess.execute(update_query)
+                            delete_query = sa.delete(RoutingRow).where(
                                 (RoutingRow.endpoint == endpoint.id)
                                 & (RoutingRow.status == RouteStatus.FAILED_TO_START)
                             )
-                            await db_sess.execute(query)
+                            await db_sess.execute(delete_query)
 
                 await execute_with_retry(_clear_error)
         except NoResultFound:
@@ -301,7 +301,7 @@ class SessionEventHandler:
             "type": "session_lifecycle",
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
-            "when": datetime.now(timezone.utc).isoformat(),
+            "when": datetime.now(UTC).isoformat(),
         }
 
         self._registry.webhook_ptask_group.create_task(
@@ -379,7 +379,7 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     except asyncio.CancelledError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
     finally:

@@ -8,14 +8,11 @@ import json
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Hashable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Hashable,
-    Mapping,
     TypeAlias,
     TypeVar,
 )
@@ -48,7 +45,7 @@ def set_handler_attr(func, key, value):
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs
 
 
 def get_handler_attr(request, key, default=None):
@@ -139,8 +136,8 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)

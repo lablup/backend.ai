@@ -52,8 +52,8 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -162,7 +162,7 @@ def apply_missing_revisions(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
         try:
-            with open(f / f"{previous_version}.json", "r") as fr:
+            with open(f / f"{previous_version}.json") as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
@@ -225,9 +225,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.base import metadata
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+    from ai.backend.manager.models.utils import create_async_engine
+
+    ensure_all_tables_registered()
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -238,7 +240,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
-        head_rev = script.get_heads()[0]
+        heads = script.get_heads()
+        if not heads:
+            log.warning("No alembic migration heads found, skipping version stamping")
+            return
+        head_rev = heads[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 

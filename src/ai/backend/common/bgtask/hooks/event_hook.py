@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
-from ...events.dispatcher import EventProducer
-from ...events.event_types.bgtask.broadcast import BgtaskUpdatedEvent
-from ...events.types import EventCacheDomain
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.bgtask.broadcast import BgtaskUpdatedEvent
+from ai.backend.common.events.types import EventCacheDomain
+
 from .base import AbstractTaskHook, TaskContext
 
 
 class EventProducerHook(AbstractTaskHook):
     """Hook for producing task events."""
 
-    def __init__(self, event_producer: EventProducer):
+    def __init__(self, event_producer: EventProducer) -> None:
         self._event_producer = event_producer
 
     @asynccontextmanager

@@ -21,12 +21,13 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+    handle_allowed_groups_update,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -79,11 +80,11 @@ class ContainerRegistryRepository:
                 return reg_row.to_dataclass()
 
             session.expire(reg_row)  # Expire to get updated values after update
-            result = await execute_updater(session, updater)
-            if result is None:
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
-            reg_row = result.row
+            reg_row = update_result.row
             validator = ContainerRegistryValidator(
                 ContainerRegistryValidatorArgs(
                     type=reg_row.type,
@@ -93,6 +94,22 @@ class ContainerRegistryRepository:
             )
             validator.validate()
             return reg_row.to_dataclass()
+
+    async def delete_registry(self, purger: Purger[ContainerRegistryRow]) -> ContainerRegistryData:
+        """
+        Delete a container registry using a purger.
+        Returns the deleted registry data.
+        Raises ContainerRegistryNotFound if registry doesn't exist.
+        """
+        async with self._db.begin_session() as session:
+            result = await execute_purger(session, purger)
+
+            if result is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found (id:{purger.pk_value})"
+                )
+
+            return result.row.to_dataclass()
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(
@@ -113,7 +130,7 @@ class ContainerRegistryRepository:
                 ContainerRegistryRow.registry_name == registry_name
             )
             result = await session.execute(stmt)
-            rows: list[ContainerRegistryRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()
@@ -121,7 +138,7 @@ class ContainerRegistryRepository:
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
-            rows: list[ContainerRegistryRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()

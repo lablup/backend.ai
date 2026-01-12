@@ -64,11 +64,11 @@ class RouteOrder(BaseRequestModel):
 
 
 __all__ = (
-    "OrderDirection",
-    "DeploymentOrderField",
-    "RevisionOrderField",
-    "RouteOrderField",
     "DeploymentOrder",
+    "DeploymentOrderField",
+    "OrderDirection",
     "RevisionOrder",
+    "RevisionOrderField",
     "RouteOrder",
+    "RouteOrderField",
 )

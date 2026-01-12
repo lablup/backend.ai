@@ -23,7 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SchedulingResult
+    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -101,7 +101,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def active_route_statuses(cls) -> set["RouteStatus"]:
+    def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
             RouteStatus.HEALTHY,
@@ -111,7 +111,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def inactive_route_statuses(cls) -> set["RouteStatus"]:
+    def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:
@@ -289,6 +289,7 @@ class DeploymentInfo:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
+    current_revision_id: UUID | None = None
 
     def target_revision(self) -> Optional[ModelRevisionSpec]:
         if self.model_revisions:
@@ -306,6 +307,7 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
+    target_revision_id: UUID | None = None
 
 
 @dataclass
@@ -323,7 +325,7 @@ class RouteInfo:
     session_id: Optional[SessionId]
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime
+    created_at: datetime | None
     revision_id: Optional[UUID]
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -405,15 +407,15 @@ class ModelRuntimeConfigData:
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID
-    mount_destination: str
+    vfolder_id: UUID | None
+    mount_destination: str | None
     definition_path: str
 
 
 @dataclass
 class ExtraVFolderMountData:
     vfolder_id: UUID
-    mount_destination: str
+    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass
@@ -480,6 +482,10 @@ class AccessTokenOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
 
 
+class AutoScalingRuleOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+
+
 # ========== Scheduling History Types ==========
 
 
@@ -497,6 +503,8 @@ class DeploymentHistoryData:
     result: SchedulingResult
     error_code: Optional[str]
     message: str
+
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime
@@ -518,6 +526,8 @@ class RouteHistoryData:
     result: SchedulingResult
     error_code: Optional[str]
     message: str
+
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime
@@ -569,6 +579,36 @@ class DeploymentSearchResult:
     """Search result with pagination for deployments."""
 
     items: list[ModelDeploymentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentInfoSearchResult:
+    """Search result with pagination for deployment info."""
+
+    items: list[DeploymentInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AutoScalingRuleSearchResult:
+    """Search result with pagination for auto-scaling rules."""
+
+    items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AccessTokenSearchResult:
+    """Search result with pagination for access tokens."""
+
+    items: list[ModelDeploymentAccessTokenData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

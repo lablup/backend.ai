@@ -25,9 +25,9 @@ def pytest_configure(config: Config) -> None:
     markerexpr = getattr(config.option, "markexpr", "")
     if not config.option.integration:
         if markerexpr:
-            setattr(config.option, "markexpr", f"({markerexpr}) and not integration")
+            config.option.markexpr = f"({markerexpr}) and not integration"
         else:
-            setattr(config.option, "markexpr", "not integration")
+            config.option.markexpr = "not integration"
 
 
 @pytest.fixture(scope="session", autouse=True)

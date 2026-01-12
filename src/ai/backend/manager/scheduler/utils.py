@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING
 from ai.backend.common.types import (
     ResourceSlot,
 )
-
-from ..errors.common import GenericBadRequest
+from ai.backend.manager.errors.common import GenericBadRequest
 
 if TYPE_CHECKING:
-    from ..models.session import SessionRow
+    from ai.backend.manager.models.session import SessionRow
 
 
 def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:
@@ -44,9 +43,13 @@ def sort_requested_slots_by_priority(
 
 
 def get_requested_architecture(sess_ctx: SessionRow) -> str:
-    requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+    requested_architectures = {
+        k.architecture for k in sess_ctx.kernels if k.architecture is not None
+    }
     if len(requested_architectures) > 1:
         raise GenericBadRequest(
             "Cannot assign multiple kernels with different architectures' single node session",
         )
+    if not requested_architectures:
+        raise GenericBadRequest("No architecture specified in session kernels")
     return requested_architectures.pop()

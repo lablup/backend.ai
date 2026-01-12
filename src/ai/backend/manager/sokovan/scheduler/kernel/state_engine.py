@@ -30,7 +30,7 @@ class KernelStateEngine:
 
     _repository: SchedulerRepository
 
-    def __init__(self, repository: SchedulerRepository):
+    def __init__(self, repository: SchedulerRepository) -> None:
         """
         Initialize the KernelStateEngine with a repository.
 
@@ -229,3 +229,47 @@ class KernelStateEngine:
         await self._repository.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref
         )
+
+    async def reset_kernels_to_pending_for_sessions(
+        self,
+        session_ids: list[SessionId],
+        reason: str,
+    ) -> int:
+        """
+        Reset kernels to PENDING status for the given sessions.
+
+        This is used when sessions exceed max retries and need to be rescheduled.
+        Clears agent assignments and resets status_data for all kernels in the sessions.
+
+        :param session_ids: List of session IDs whose kernels should be reset
+        :param reason: The reason for the reset
+        :return: The number of kernels reset
+        """
+        if not session_ids:
+            return 0
+
+        log.debug("Resetting kernels to PENDING for {} sessions: {}", len(session_ids), reason)
+
+        return await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
+
+    async def update_kernels_to_creating_for_sessions(
+        self,
+        session_ids: list[SessionId],
+        reason: str,
+    ) -> int:
+        """
+        Update kernels to CREATING status for the given sessions.
+
+        This is used when sessions transition from PREPARED to CREATING.
+        Only updates kernels that are currently in PREPARED status.
+
+        :param session_ids: List of session IDs whose kernels should be updated
+        :param reason: The reason for the update
+        :return: The number of kernels updated
+        """
+        if not session_ids:
+            return 0
+
+        log.debug("Updating kernels to CREATING for {} sessions: {}", len(session_ids), reason)
+
+        return await self._repository.update_kernels_to_creating_for_sessions(session_ids, reason)

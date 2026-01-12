@@ -114,7 +114,7 @@ class SessionRepository:
     ) -> Optional[dict]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates.c.template])
+                sa.select(session_templates.c.template)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -129,7 +129,7 @@ class SessionRepository:
     ) -> Optional[dict]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates])
+                sa.select(session_templates)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -233,13 +233,11 @@ class SessionRepository:
     ) -> int:
         async with self._db.begin_readonly_session() as sess:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(ImageRow)
                 .where(
-                    (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{image_visibility}:{image_owner_id}"
-                    )
+                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                    == f"{image_visibility}:{image_owner_id}"
                 )
                 .where(ImageRow.status == ImageStatus.ALIVE)
             )
@@ -274,7 +272,7 @@ class SessionRepository:
     ) -> Optional[str]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([groups.c.name])
+                sa.select(groups.c.name)
                 .select_from(groups)
                 .where(
                     (groups.c.domain_name == domain_name) & (groups.c.id == group_id),
@@ -289,13 +287,13 @@ class SessionRepository:
     ) -> Optional[str]:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([scaling_groups.c.wsproxy_addr])
+                sa.select(scaling_groups.c.wsproxy_addr)
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
-            return sgroup["wsproxy_addr"] if sgroup else None
+            return sgroup.wsproxy_addr if sgroup else None
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
@@ -327,7 +325,7 @@ class SessionRepository:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
             session_row = cast(SessionRow, session_row)
 
-            if session_name:
+            if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(

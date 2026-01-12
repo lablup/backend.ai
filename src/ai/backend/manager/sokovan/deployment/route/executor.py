@@ -40,7 +40,7 @@ class RouteExecutor:
         client_pool: ClientPool,
         valkey_schedule: ValkeyScheduleClient,
         service_discovery: ServiceDiscovery,
-    ):
+    ) -> None:
         self._deployment_repo = deployment_repo
         self._scheduling_controller = scheduling_controller
         self._config_provider = config_provider

@@ -8,16 +8,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ....data.permission.id import ObjectId, ScopeId
-from ....data.permission.object_permission import (
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
 )
-from ....data.permission.permission import ScopedPermissionCreateInput
-from ....data.permission.permission_group import (
+from ai.backend.manager.data.permission.permission import ScopedPermissionCreateInput
+from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupCreatorBeforeRoleCreation,
 )
-from ....data.permission.role import (
+from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
     RoleListResult,
@@ -25,25 +25,27 @@ from ....data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ....data.permission.status import (
+from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ....data.permission.types import OperationType, ScopeType
-from ....errors.common import ObjectNotFound
-from ....errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
-from ....models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
-from ....models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ....models.rbac_models.permission.permission import PermissionRow
-from ....models.rbac_models.permission.permission_group import PermissionGroupRow
-from ....models.rbac_models.role import RoleRow
-from ....models.rbac_models.user_role import UserRoleRow
-from ....models.user import UserRow
-from ....models.utils import ExtendedAsyncSAEngine
-from ....repositories.base.creator import Creator, execute_creator
-from ....repositories.base.purger import Purger, execute_purger
-from ....repositories.base.querier import BatchQuerier, execute_batch_querier
-from ....repositories.base.updater import Updater, execute_updater
-from ..creators import (
+from ai.backend.manager.data.permission.types import OperationType, ScopeType
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     PermissionCreatorSpec,
     PermissionGroupCreatorSpec,
@@ -625,18 +627,18 @@ class PermissionDBSource:
             )
 
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def get_entity_mapped_scopes(
         self, target_object_id: ObjectId
     ) -> list[AssociationScopesEntitiesRow]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            stmt = sa.select(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
                 AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
             )
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def check_scope_permission_exist(
         self,
@@ -670,7 +672,7 @@ class PermissionDBSource:
         )
         async with self._db.begin_readonly_session() as db_session:
             result = await db_session.scalar(role_query)
-            return result
+            return result or False
 
     def _make_query_statement_for_object_permission(
         self,
@@ -777,13 +779,13 @@ class PermissionDBSource:
         object_ids: Iterable[ObjectId],
         operation: OperationType,
     ) -> dict[ObjectId, bool]:
-        result: dict[ObjectId, bool] = {object_id: False for object_id in object_ids}
+        result: dict[ObjectId, bool] = dict.fromkeys(object_ids, False)
         role_query = self._make_query_statement_for_object_permissions(
             user_id, object_ids, operation
         )
         async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
+            role_rows_result = await db_session.scalars(role_query)
+            role_rows = list(role_rows_result.all())
 
             for role in role_rows:
                 for op in role.object_permission_rows:
@@ -791,11 +793,10 @@ class PermissionDBSource:
                     result[object_id] = True
                 for pg in role.permission_group_rows:
                     if pg.scope_type == ScopeType.GLOBAL:
-                        return {obj_id: True for obj_id in object_ids}
-                    else:
-                        for object in pg.mapped_entities:
-                            object_id = object.object_id()
-                            result[object_id] = True
+                        return dict.fromkeys(object_ids, True)
+                    for object in pg.mapped_entities:
+                        object_id = object.object_id()
+                        result[object_id] = True
         return result
 
     async def search_roles(

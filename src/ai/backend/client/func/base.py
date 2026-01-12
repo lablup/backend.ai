@@ -1,9 +1,9 @@
 import functools
 import inspect
-from typing import Iterable
+from collections.abc import Iterable
 
-from ..output.types import FieldSet, FieldSpec
-from ..session import AsyncSession, api_session
+from ai.backend.client.output.types import FieldSet, FieldSpec
+from ai.backend.client.session import AsyncSession, api_session
 
 __all__ = (
     "APIFunctionMeta",
@@ -27,11 +27,9 @@ def _wrap_method(cls, orig_name, meth):
             )
         if isinstance(_api_session, AsyncSession):
             return coro
-        else:
-            if inspect.isasyncgen(coro):
-                return _api_session.worker_thread.execute_generator(coro)
-            else:
-                return _api_session.worker_thread.execute(coro)
+        if inspect.isasyncgen(coro):
+            return _api_session.worker_thread.execute_generator(coro)
+        return _api_session.worker_thread.execute(coro)
 
     return _method
 
@@ -40,7 +38,7 @@ def api_function(meth):
     """
     Mark the wrapped method as the API function method.
     """
-    setattr(meth, "_backend_api", True)
+    meth._backend_api = True
     return meth
 
 
@@ -68,8 +66,7 @@ def field_resolver(
                     for f in fields
                 )
                 kwargs["fields"] = resolved_fields
-            result = meth(*args, **kwargs)
-            return result
+            return meth(*args, **kwargs)
 
         return wrapper
 
@@ -85,7 +82,7 @@ class APIFunctionMeta(type):
 
     _async = True
 
-    def __init__(cls, name, bases, attrs, **kwargs):
+    def __init__(cls, name, bases, attrs, **kwargs) -> None:
         super().__init__(name, bases, attrs)
         for attr_name, attr_value in attrs.items():
             if hasattr(attr_value, "_backend_api"):

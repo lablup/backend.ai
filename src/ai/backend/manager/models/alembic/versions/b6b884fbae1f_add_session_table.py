@@ -7,7 +7,8 @@ Create Date: 2022-12-05 16:12:53.275671
 """
 
 from collections import defaultdict
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa

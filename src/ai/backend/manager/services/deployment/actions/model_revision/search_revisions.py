@@ -1,5 +1,3 @@
-"""Action for searching revisions."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,8 +13,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 @dataclass
 class SearchRevisionsAction(ModelRevisionBaseAction):
-    """Action to search revisions with filtering and pagination."""
-
     querier: BatchQuerier
 
     @override
@@ -31,9 +27,7 @@ class SearchRevisionsAction(ModelRevisionBaseAction):
 
 @dataclass
 class SearchRevisionsActionResult(BaseActionResult):
-    """Result of searching revisions."""
-
-    revisions: list[ModelRevisionData]
+    data: list[ModelRevisionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

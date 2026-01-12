@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
@@ -77,7 +78,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
-        session_name = f"test_session_{str(test_id)}"
+        session_name = f"test_session_{test_id!s}"
 
         session_id = await self._verify_session_creation(client_session, session_name)
         with CreatedSessionMetaContext.with_current(

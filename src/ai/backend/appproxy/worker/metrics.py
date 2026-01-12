@@ -135,7 +135,9 @@ async def gather_prometheus_inference_measures(
         aggregated_histogram_measurement = HistogramMeasurement(
             buckets={
                 label: Decimal(value)
-                for label, value in zip(histogram_metrics_labels[metric_name], aggregated_buckets)
+                for label, value in zip(
+                    histogram_metrics_labels[metric_name], aggregated_buckets, strict=True
+                )
             },
             count=aggregated_count,
             sum=aggregated_sum,
@@ -144,7 +146,9 @@ async def gather_prometheus_inference_measures(
             route_id: HistogramMeasurement(
                 buckets={
                     label: Decimal(value)
-                    for label, value in zip(histogram_metrics_labels[metric_name], values)
+                    for label, value in zip(
+                        histogram_metrics_labels[metric_name], values, strict=True
+                    )
                 },
                 count=count,
                 sum=sum,
@@ -160,6 +164,7 @@ async def gather_prometheus_inference_measures(
                     histogram_sum_metrics[metric_name].get(route_id)
                     for route_id in per_route_histogram_metrics.keys()
                 ],
+                strict=True,
             )
         }
         measures.append(
@@ -283,7 +288,7 @@ async def collect_inference_metric(root_ctx: RootContext, interval: float) -> No
         ]
 
         results = await asyncio.gather(*_tasks, return_exceptions=True)
-        for circuit, result in zip(inference_circuits, results):
+        for circuit, result in zip(inference_circuits, results, strict=True):
             if not result:  # Unsupported runtime variant (custom, Triton, ...)
                 continue
             if isinstance(result, BaseException):

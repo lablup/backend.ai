@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from ai.backend.common.types import AccessKey
@@ -89,8 +89,8 @@ class JWTClaims:
             ValueError: If claim values are invalid
         """
         return cls(
-            exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
-            iat=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
+            exp=datetime.fromtimestamp(payload["exp"], tz=UTC),
+            iat=datetime.fromtimestamp(payload["iat"], tz=UTC),
             access_key=AccessKey(payload["access_key"]),
             role=payload["role"],
         )

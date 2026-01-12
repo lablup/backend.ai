@@ -5,12 +5,12 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, override
 
+from ai.backend.agent.kernel_registry.types import KernelRecoveryData
+from ai.backend.agent.scratch.types import KernelRecoveryScratchData
+from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ...scratch.types import KernelRecoveryScratchData
-from ...scratch.utils import ScratchConfig, ScratchUtils
-from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 

@@ -48,7 +48,7 @@ class ManagerHTTPClient:
     _api_version: str
     _session: aiohttp.ClientSession
 
-    def __init__(self, registry_data: ManagerHTTPClientArgs):
+    def __init__(self, registry_data: ManagerHTTPClientArgs) -> None:
         self._name = registry_data.name
         self._endpoint = registry_data.endpoint
         self._access_key = registry_data.access_key

@@ -8,8 +8,8 @@ __all__ = [
     "AbstractLeaderElection",
     "AlreadyStartedError",
     "LeaderElectionError",
-    "LeadershipChecker",
     "LeaderTask",
+    "LeadershipChecker",
     "ValkeyLeaderElection",
     "ValkeyLeaderElectionConfig",
 ]

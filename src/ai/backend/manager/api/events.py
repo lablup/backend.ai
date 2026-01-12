@@ -3,15 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator, Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Final,
-    Iterable,
-    Mapping,
     Optional,
-    Tuple,
 )
 from weakref import WeakSet
 
@@ -52,15 +49,16 @@ from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
+from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
+from ai.backend.manager.exceptions import InvalidArgument
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.types import Sentinel
 
-from ..errors.common import GenericForbidden
-from ..errors.kernel import SessionNotFound
-from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
-from ..events.hub.propagators.session import SessionEventPropagator
-from ..exceptions import InvalidArgument
-from ..models import UserRole, groups
-from ..models.session import SessionRow
-from ..types import Sentinel
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
@@ -73,7 +71,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.TOKEN
 
-SessionEventInfo = Tuple[str, dict, str, Optional[int]]
+SessionEventInfo = tuple[str, dict, str, Optional[int]]
 
 
 @server_status_required(READ_ALLOWED)
@@ -140,12 +138,12 @@ async def push_session_events(
         group_id = WILDCARD
     else:
         async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
-            query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
+            query = sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
             if row is None:
                 raise ProjectNotFound
-            group_id = row["id"]
+            group_id = row.id
 
     filters = {
         "user_role": user_role,
@@ -306,7 +304,7 @@ async def events_shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "events"
     app["events.context"] = PrivateContext()

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePath
-from typing import Any, Final, Mapping, Optional, override
+from typing import Any, Final, Optional, override
 
 import attrs
 import trafaret as t
@@ -15,17 +15,17 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import QuotaConfig, StreamReader, VFolderID
 
 __all__ = (
-    "Sentinel",
     "SENTINEL",
-    "FSPerfMetric",
     "CapacityUsage",
-    "VolumeInfo",
-    "VFolderID",
-    "TreeUsage",
-    "QuotaConfig",
-    "Stat",
     "DirEntry",
     "DirEntryType",
+    "FSPerfMetric",
+    "QuotaConfig",
+    "Sentinel",
+    "Stat",
+    "TreeUsage",
+    "VFolderID",
+    "VolumeInfo",
 )
 
 

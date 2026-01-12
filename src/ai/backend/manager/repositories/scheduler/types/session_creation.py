@@ -23,8 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
-from ai.backend.manager.models import NetworkRow
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
 
@@ -105,6 +104,7 @@ class SessionCreationSpec:
     designated_agent_list: Optional[list[str]] = None
     internal_data: Optional[dict] = None
     public_sgroup_only: bool = True
+    startup_command: str | None = None
 
     @classmethod
     def from_deployment_info(
@@ -154,7 +154,7 @@ class SessionCreationSpec:
 
         return cls(
             session_creation_id=session_creation_id,
-            session_name=f"{deployment_info.metadata.name}-{str(route_id)}",
+            session_name=f"{deployment_info.metadata.name}-{route_id!s}",
             access_key=context.session_owner.access_key,
             user_scope=UserScope(
                 domain_name=deployment_info.metadata.domain,
@@ -279,6 +279,7 @@ class SessionEnqueueData:
     bootstrap_script: Optional[str] = None
     use_host_network: bool = False
     timeout: Optional[int] = None
+    startup_command: str | None = None
 
 
 @dataclass

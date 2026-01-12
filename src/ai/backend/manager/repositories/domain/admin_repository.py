@@ -21,9 +21,8 @@ from ai.backend.manager.errors.resource import (
     DomainHasGroups,
     DomainHasUsers,
 )
-from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.group import ProjectType, groups
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     kernels,
@@ -143,7 +142,7 @@ class AdminDomainRepository:
         Private method to check if domain has active kernels.
         """
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(kernels)
             .where(
                 (kernels.c.domain_name == domain_name)
@@ -151,21 +150,21 @@ class AdminDomainRepository:
             )
         )
         active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
+        return (active_kernel_count or 0) > 0
 
     async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get user count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(users.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(users.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get group count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(groups.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     @domain_repository_resilience.apply()
     async def create_domain_node_force(

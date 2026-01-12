@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -17,7 +18,6 @@ from ai.backend.manager.data.notification import (
     NotificationChannelListResult,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleType,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.updater import Updater

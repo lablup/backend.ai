@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, TypeVar
 
 import sqlalchemy as sa
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
-type QueryOrder = sa.sql.ClauseElement
+type QueryOrder = sa.sql.expression.UnaryExpression | sa.sql.expression.ColumnElement
 
 # Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
 type CursorConditionFactory = Callable[[str], QueryCondition]

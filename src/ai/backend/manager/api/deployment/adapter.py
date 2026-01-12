@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID, uuid4
@@ -70,7 +71,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -88,11 +88,11 @@ from ai.backend.manager.repositories.deployment.options import (
 )
 
 __all__ = (
+    "CreateDeploymentAdapter",
+    "CreateRevisionAdapter",
     "DeploymentAdapter",
     "RevisionAdapter",
     "RouteAdapter",
-    "CreateDeploymentAdapter",
-    "CreateRevisionAdapter",
 )
 
 
@@ -153,8 +153,10 @@ class DeploymentAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=DeploymentConditions.by_name_equals,
-                contains_fn=DeploymentConditions.by_name_contains,
+                contains_factory=DeploymentConditions.by_name_contains,
+                equals_factory=DeploymentConditions.by_name_equals,
+                starts_with_factory=DeploymentConditions.by_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -163,8 +165,10 @@ class DeploymentAdapter(BaseFilterAdapter):
         if filter.domain_name is not None:
             condition = self.convert_string_filter(
                 filter.domain_name,
-                equals_fn=DeploymentConditions.by_domain_name_equals,
-                contains_fn=DeploymentConditions.by_domain_name_contains,
+                contains_factory=DeploymentConditions.by_domain_name_contains,
+                equals_factory=DeploymentConditions.by_domain_name_equals,
+                starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
+                ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -181,10 +185,9 @@ class DeploymentAdapter(BaseFilterAdapter):
 
         if order.field == DeploymentOrderField.NAME:
             return DeploymentOrders.name(ascending=ascending)
-        elif order.field == DeploymentOrderField.CREATED_AT:
+        if order.field == DeploymentOrderField.CREATED_AT:
             return DeploymentOrders.created_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -211,8 +214,8 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
-                vfolder_id=data.model_mount_config.vfolder_id,
-                mount_destination=data.model_mount_config.mount_destination,
+                vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
+                mount_destination=data.model_mount_config.mount_destination or "",
                 definition_path=data.model_mount_config.definition_path,
             ),
             created_at=data.created_at,
@@ -243,8 +246,10 @@ class RevisionAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=RevisionConditions.by_name_equals,
-                contains_fn=RevisionConditions.by_name_contains,
+                contains_factory=RevisionConditions.by_name_contains,
+                equals_factory=RevisionConditions.by_name_equals,
+                starts_with_factory=RevisionConditions.by_name_starts_with,
+                ends_with_factory=RevisionConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -261,10 +266,9 @@ class RevisionAdapter(BaseFilterAdapter):
 
         if order.field == RevisionOrderField.NAME:
             return RevisionOrders.name(ascending=ascending)
-        elif order.field == RevisionOrderField.CREATED_AT:
+        if order.field == RevisionOrderField.CREATED_AT:
             return RevisionOrders.created_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -282,7 +286,7 @@ class RouteAdapter(BaseFilterAdapter):
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at,
+            created_at=data.created_at or datetime.now(tz=UTC),
             revision_id=data.revision_id,
             traffic_status=CommonRouteTrafficStatus(data.traffic_status.value),
             error_data=data.error_data,
@@ -340,12 +344,11 @@ class RouteAdapter(BaseFilterAdapter):
 
         if order.field == RouteOrderField.CREATED_AT:
             return RouteOrders.created_at(ascending=ascending)
-        elif order.field == RouteOrderField.STATUS:
+        if order.field == RouteOrderField.STATUS:
             return RouteOrders.status(ascending=ascending)
-        elif order.field == RouteOrderField.TRAFFIC_RATIO:
+        if order.field == RouteOrderField.TRAFFIC_RATIO:
             return RouteOrders.traffic_ratio(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -417,12 +420,6 @@ class CreateDeploymentAdapter:
         revision_input: Any,  # RevisionInput or CreateRevisionRequest
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
-        # Build image identifier
-        image_identifier = ImageIdentifier(
-            canonical=revision_input.image.name,
-            architecture=revision_input.image.architecture,
-        )
-
         # Build resource spec
         resource_spec = ResourceSpec(
             cluster_mode=ClusterMode(revision_input.cluster_config.mode),
@@ -470,7 +467,7 @@ class CreateDeploymentAdapter:
         )
 
         return ModelRevisionCreator(
-            image_identifier=image_identifier,
+            image_id=revision_input.image.id,
             resource_spec=resource_spec,
             mounts=mounts,
             execution=execution,

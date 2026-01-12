@@ -8,22 +8,18 @@ import logging
 import platform
 import re
 import resource
+from collections.abc import Mapping, MutableMapping
+from contextlib import AbstractAsyncContextManager
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    AsyncContextManager,
-    List,
-    Mapping,
-    MutableMapping,
+    Final,
     NamedTuple,
     Optional,
     Protocol,
-    Tuple,
-    Type,
     TypedDict,
     TypeVar,
-    Union,
     overload,
 )
 from uuid import UUID
@@ -31,7 +27,6 @@ from uuid import UUID
 import aiodocker
 import trafaret as t
 from aiodocker.docker import DockerContainer
-from typing_extensions import Final
 
 from ai.backend.common import identity
 from ai.backend.common.cgroup import (
@@ -47,8 +42,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 InOtherContainerPID: Final = ContainerPID(PID(-2))
 NotContainerPID: Final = ContainerPID(PID(-1))
@@ -62,7 +57,7 @@ class SupportsAsyncClose(Protocol):
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
-class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     """
     contextlib.closing calls close(), and aiotools.aclosing() calls aclose().
     This context manager calls close() as a coroutine.
@@ -106,8 +101,8 @@ def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
                         f"expected MutableMapping, got {type(v).__name__}."
                     )
                 update_nested_dict(dest[k], v)
-            elif isinstance(dest[k], List):
-                if not isinstance(v, List):
+            elif isinstance(dest[k], list):
+                if not isinstance(v, list):
                     raise TypeError(
                         f"Cannot extend non-list value into list for key '{k}': "
                         f"expected List, got {type(v).__name__}."
@@ -117,7 +112,7 @@ def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
                 dest[k] = v
 
 
-def numeric_list(s: str) -> List[int]:
+def numeric_list(s: str) -> list[int]:
     return [int(p) for p in s.split()]
 
 
@@ -126,26 +121,22 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(
-    path: Union[str, Path], type_: Type[bool], default: Optional[bool] = None
-) -> bool: ...
+def read_sysfs(path: str | Path, type_: type[bool], default: Optional[bool] = None) -> bool: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[int], default: Optional[int] = None) -> int: ...
+def read_sysfs(path: str | Path, type_: type[int], default: Optional[int] = None) -> int: ...
 
 
 @overload
-def read_sysfs(
-    path: Union[str, Path], type_: Type[float], default: Optional[float] = None
-) -> float: ...
+def read_sysfs(path: str | Path, type_: type[float], default: Optional[float] = None) -> float: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[str], default: Optional[str] = None) -> str: ...
+def read_sysfs(path: str | Path, type_: type[str], default: Optional[str] = None) -> str: ...
 
 
-def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] = None) -> Any:
+def read_sysfs(path: str | Path, type_: type[Any], default: Optional[Any] = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,
@@ -160,9 +151,8 @@ def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] 
         raw_str = Path(path).read_text().strip()
         if type_ is bool:
             return t.ToBool().check(raw_str)
-        else:
-            return type_(raw_str)
-    except IOError:
+        return type_(raw_str)
+    except OSError:
         return default
 
 
@@ -178,7 +168,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     return await loop.run_in_executor(None, _read_tail)
 
 
-async def get_kernel_id_from_container(val: Union[str, DockerContainer]) -> Optional[KernelId]:
+async def get_kernel_id_from_container(val: str | DockerContainer) -> Optional[KernelId]:
     if isinstance(val, DockerContainer):
         if "Name" not in val._container:
             await val.show()
@@ -220,7 +210,7 @@ class ProcessInfo(NamedTuple):
 async def get_host_process_table(
     docker: aiodocker.Docker,
     container_id: str,
-) -> List[ProcessInfo]:
+) -> list[ProcessInfo]:
     result = await docker._query_json(f"containers/{container_id}/top", method="GET")
     procs = result["Processes"]
     return [ProcessInfo(int(x[1]), x[7]) for x in procs]
@@ -229,7 +219,7 @@ async def get_host_process_table(
 async def get_container_process_table(
     docker: aiodocker.Docker,
     container_id: str,
-) -> List[ProcessInfo]:
+) -> list[ProcessInfo]:
     # Get process table from inside container (execute 'ps -aux' command from container).
     # Filter processes which have exactly the same COMMAND like above.
     result = await docker._query_json(
@@ -264,8 +254,8 @@ async def get_container_process_table(
 
 async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> ContainerPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
-        kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
+        kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # TODO: this should be deprecated when the minimun supported Linux kernel will be 4.1.
             #
@@ -341,8 +331,8 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
 
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
-        kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
+        kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # reverse implementation of host_pid_to_container_pid().
             try:
@@ -377,7 +367,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             if nspids[1] == str(container_pid):
                 return HostPID(PID(pid))
         return NotHostPID
-    except (ValueError, KeyError, IOError):
+    except (OSError, ValueError, KeyError):
         return NotHostPID
 
 

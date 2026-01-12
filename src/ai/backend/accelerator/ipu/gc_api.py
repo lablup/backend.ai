@@ -12,8 +12,7 @@ class GraphcoreAPI:
             stderr=asyncio.subprocess.DEVNULL,
         )
         out, _ = await proc.communicate()
-        graphcore_info = json.loads(out.decode("utf-8"))
-        return graphcore_info
+        return json.loads(out.decode("utf-8"))
 
     @classmethod
     async def get_poplar_version(cls):

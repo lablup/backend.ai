@@ -8,14 +8,13 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
     Final,
-    Iterable,
     Literal,
-    Mapping,
     NamedTuple,
     Optional,
     Self,
@@ -39,18 +38,18 @@ if TYPE_CHECKING:
     from .types import ImageConfig
 
 __all__ = (
+    "MAX_KERNELSPEC",
+    "MIN_KERNELSPEC",
+    "ImageRef",
+    "ParsedImageStr",
     "arch_name_aliases",
+    "common_image_label_schema",
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
-    "common_image_label_schema",
     "inference_image_label_schema",
-    "validate_image_labels",
     "login",
-    "MIN_KERNELSPEC",
-    "MAX_KERNELSPEC",
-    "ImageRef",
-    "ParsedImageStr",
+    "validate_image_labels",
 )
 
 # generalize architecture symbols to match docker API's norm
@@ -163,12 +162,12 @@ class DockerConnector:
     source: DockerConnectorSource
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_docker_context_host() -> str | None:
     try:
         docker_config_path = Path.home() / ".docker" / "config.json"
         docker_config = json.loads(docker_config_path.read_bytes())
-    except IOError:
+    except OSError:
         return None
     current_context_name = docker_config.get("currentContext", "default")
     for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
@@ -207,7 +206,7 @@ def parse_docker_host_url(
 
 
 # We may cache the connector type but not connector instances!
-@functools.lru_cache()
+@functools.lru_cache
 def _search_docker_socket_files_impl() -> tuple[
     Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
 ]:
@@ -309,11 +308,11 @@ async def login(
     if ping_status == 200:
         log.debug("docker-registry: {0} -> basic-auth", registry_url)
         return {"auth": basic_auth, "headers": {}}
-    elif ping_status == 404:
+    if ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
     # Check also 400 response since the AWS ECR Public server returns a 400 response
     # when given invalid credential authorization.
-    elif ping_status in [400, 401]:
+    if ping_status in [400, 401]:
         params = {
             "scope": scope,
             "offline_token": "true",
@@ -381,11 +380,11 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
-    def __str__(self):
-        return f"PlatformTagSet({str(self._data)})"
+    def __str__(self) -> str:
+        return f"PlatformTagSet({self._data!s})"
 
     def has(self, key: str, version: Optional[str] = None):
         if version is None:
@@ -393,16 +392,16 @@ class PlatformTagSet(Mapping):
         _v = self._data.get(key, None)
         return _v == version
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> str:
         return self._data[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
         return self._data == other
@@ -546,10 +545,9 @@ class ImageRef:
                 or is_ip_address_format(maybe_registry)
             ):
                 return (maybe_registry, maybe_project_and_image_name)
-            elif registry is None:
+            if registry is None:
                 return (default_registry, image_str)
-            else:
-                return (registry, image_str)
+            return (registry, image_str)
 
         registry_part, project_and_image_name_part = divide_parts(image_str, registry)
 
@@ -595,7 +593,7 @@ class ImageRef:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
-    def generate_aliases(self) -> Mapping[str, "ImageRef"]:
+    def generate_aliases(self) -> Mapping[str, ImageRef]:
         basename = self.name.split("/")[-1]
         possible_names = basename.rsplit("-")
         if len(possible_names) > 1:
@@ -626,7 +624,7 @@ class ImageRef:
         return ret
 
     @staticmethod
-    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, "ImageRef"]:
+    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, ImageRef]:
         ret = {}
         aliases_set_1, aliases_set_2 = set(genned_aliases_1.keys()), set(genned_aliases_2.keys())
         aliases_dup = aliases_set_1 & aliases_set_2

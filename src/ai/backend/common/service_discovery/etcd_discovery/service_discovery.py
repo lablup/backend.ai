@@ -1,10 +1,10 @@
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-
-from ..service_discovery import (
+from ai.backend.common.service_discovery.service_discovery import (
     MODEL_SERVICE_GROUP,
     ModelServiceMetadata,
     ServiceDiscovery,

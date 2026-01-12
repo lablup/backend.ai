@@ -53,10 +53,10 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
     def _verify_downloaded_file_identical(
         self, original_file_path: str, downloaded_file_path: str
     ) -> None:
-        with open(original_file_path, "r", encoding="utf-8") as original_file:
+        with open(original_file_path, encoding="utf-8") as original_file:
             original_content = original_file.read()
 
-        with open(downloaded_file_path, "r", encoding="utf-8") as downloaded_file:
+        with open(downloaded_file_path, encoding="utf-8") as downloaded_file:
             downloaded_content = downloaded_file.read()
 
         assert original_content == downloaded_content, (

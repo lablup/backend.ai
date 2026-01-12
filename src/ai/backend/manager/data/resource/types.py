@@ -25,7 +25,7 @@ class ProjectResourcePolicyData:
 @dataclass
 class KeyPairResourcePolicyData:
     name: str
-    created_at: datetime = field(compare=False)
+    created_at: datetime | None = field(compare=False)
     default_for_unspecified: DefaultForUnspecified
     total_resource_slots: ResourceSlot
     max_session_lifetime: int

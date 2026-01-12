@@ -34,17 +34,17 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "ScalingGroupStatusGQL",
+    "ScalingGroupDriverConfigGQL",
+    "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
     "ScalingGroupNetworkConfigGQL",
-    "ScalingGroupDriverConfigGQL",
-    "ScalingGroupSchedulerOptionsGQL",
-    "ScalingGroupSchedulerTypeGQL",
-    "ScalingGroupSchedulerConfigGQL",
-    "ScalingGroupV2GQL",
-    "ScalingGroupFilterGQL",
     "ScalingGroupOrderByGQL",
     "ScalingGroupOrderFieldGQL",
+    "ScalingGroupSchedulerConfigGQL",
+    "ScalingGroupSchedulerOptionsGQL",
+    "ScalingGroupSchedulerTypeGQL",
+    "ScalingGroupStatusGQL",
+    "ScalingGroupV2GQL",
 )
 
 
@@ -359,9 +359,9 @@ class ScalingGroupFilterGQL(GQLFilter):
     scheduler: Optional[str] = None
     use_host_network: Optional[bool] = None
 
-    AND: Optional[list["ScalingGroupFilterGQL"]] = None
-    OR: Optional[list["ScalingGroupFilterGQL"]] = None
-    NOT: Optional[list["ScalingGroupFilterGQL"]] = None
+    AND: Optional[list[ScalingGroupFilterGQL]] = None
+    OR: Optional[list[ScalingGroupFilterGQL]] = None
+    NOT: Optional[list[ScalingGroupFilterGQL]] = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -378,6 +378,8 @@ class ScalingGroupFilterGQL(GQLFilter):
             name_condition = self.name.build_query_condition(
                 contains_factory=ScalingGroupConditions.by_name_contains,
                 equals_factory=ScalingGroupConditions.by_name_equals,
+                starts_with_factory=ScalingGroupConditions.by_name_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_name_ends_with,
             )
             if name_condition:
                 field_conditions.append(name_condition)
@@ -387,6 +389,8 @@ class ScalingGroupFilterGQL(GQLFilter):
             description_condition = self.description.build_query_condition(
                 contains_factory=ScalingGroupConditions.by_description_contains,
                 equals_factory=ScalingGroupConditions.by_description_equals,
+                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
             )
             if description_condition:
                 field_conditions.append(description_condition)

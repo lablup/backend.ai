@@ -111,11 +111,15 @@ async def execute_upserter(
     insert_values = spec.build_insert_values()
     update_values = spec.build_update_values()
 
-    stmt = pg_insert(table).values(insert_values)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=index_elements,
-        set_=update_values,
-    ).returning(*table.columns)
+    stmt = (
+        pg_insert(table)
+        .values(insert_values)
+        .on_conflict_do_update(
+            index_elements=index_elements,
+            set_=update_values,
+        )
+        .returning(*table.columns)
+    )
 
     result = await db_sess.execute(stmt)
     row_data = result.fetchone()

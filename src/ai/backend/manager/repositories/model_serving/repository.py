@@ -16,6 +16,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
+    AccessKey,
     ClusterMode,
     MountPermission,
     MountTypes,
@@ -155,9 +156,7 @@ class ModelServingRepository:
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
-            data_list = [row.to_data() for row in rows]
-
-            return data_list
+            return [row.to_data() for row in rows]
 
     @model_serving_repository_resilience.apply()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
@@ -196,9 +195,7 @@ class ModelServingRepository:
             endpoint_row.url = await registry.create_appproxy_endpoint(
                 db_sess, endpoint_before_assign_url
             )
-            data = endpoint_row.to_data()
-
-        return data
+            return endpoint_row.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_validated(
@@ -256,17 +253,17 @@ class ModelServingRepository:
                 return False
 
             # Delete failed routes
-            query = sa.delete(RoutingRow).where(
+            delete_query = sa.delete(RoutingRow).where(
                 (RoutingRow.endpoint == endpoint_id)
                 & (RoutingRow.status == RouteStatus.FAILED_TO_START)
             )
-            await session.execute(query)
+            await session.execute(delete_query)
 
             # Reset retry count
-            query = (
+            update_query = (
                 sa.update(EndpointRow).values({"retries": 0}).where(EndpointRow.id == endpoint_id)
             )
-            await session.execute(query)
+            await session.execute(update_query)
 
         return True
 
@@ -366,14 +363,19 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token_validated(
-        self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
+        self,
+        creator: Creator[EndpointTokenRow],
+        user_id: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
     ) -> Optional[EndpointTokenData]:
         """
         Create endpoint token with access validation.
         Returns token data if created, None if no access to endpoint.
         """
         async with self._db.begin_session() as session:
-            endpoint = await self._get_endpoint_by_id(session, token_row.endpoint)
+            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
+            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
             if not endpoint:
                 return None
 
@@ -382,11 +384,8 @@ class ModelServingRepository:
             ):
                 return None
 
-            session.add(token_row)
-            await session.commit()
-            await session.refresh(token_row)
-
-            return token_row.to_dataclass()
+            result = await execute_creator(session, creator)
+            return result.row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
@@ -395,9 +394,9 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             query = (
-                sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+                sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await session.execute(query)
             row = result.first()
@@ -405,7 +404,7 @@ class ModelServingRepository:
                 return None
 
             return ScalingGroupData(
-                wsproxy_addr=row["wsproxy_addr"], wsproxy_api_token=row["wsproxy_api_token"]
+                wsproxy_addr=row.wsproxy_addr, wsproxy_api_token=row.wsproxy_api_token
             )
 
     @model_serving_repository_resilience.apply()
@@ -494,6 +493,9 @@ class ModelServingRepository:
         result = await session.execute(query)
         owner = result.scalar()
 
+        if owner is None:
+            return False
+
         match user_role:
             case UserRole.SUPERADMIN:
                 return True
@@ -531,7 +533,7 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session() as session:
             query = (
-                sa.select([keypair_resource_policies])
+                sa.select(keypair_resource_policies)
                 .select_from(keypair_resource_policies)
                 .where(keypair_resource_policies.c.name == policy_name)
             )
@@ -824,7 +826,13 @@ class ModelServingRepository:
                     )
                     endpoint_row.image = image_row.id
 
-                session_owner: UserRow = endpoint_row.session_owner_row
+                session_owner = endpoint_row.session_owner_row
+                if session_owner is None:
+                    raise InvalidAPIParameters("Session owner not found for endpoint")
+                if session_owner.main_access_key is None:
+                    raise InvalidAPIParameters("Session owner has no access key")
+                if session_owner.role is None:
+                    raise InvalidAPIParameters("Session owner has no role")
 
                 conn = await db_session.connection()
                 if conn is None:
@@ -833,7 +841,7 @@ class ModelServingRepository:
                 await ModelServiceHelper.check_scaling_group(
                     conn,
                     endpoint_row.resource_group,
-                    session_owner.main_access_key,
+                    AccessKey(session_owner.main_access_key),
                     endpoint_row.domain,
                     endpoint_row.project,
                 )
@@ -842,7 +850,7 @@ class ModelServingRepository:
                     domain_name=endpoint_row.domain,
                     group_id=endpoint_row.project,
                     user_uuid=session_owner.uuid,
-                    user_role=session_owner.role,
+                    user_role=session_owner.role.value,
                 )
 
                 resource_policy = await self.get_keypair_resource_policy(
@@ -870,6 +878,8 @@ class ModelServingRepository:
                         )
                         for mount in extra_mounts_input
                     }
+                    if endpoint_row.model is None:
+                        raise InvalidAPIParameters("Endpoint has no model")
                     vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
                         conn,
                         legacy_etcd_config_loader,
@@ -880,9 +890,11 @@ class ModelServingRepository:
                         user_scope,
                         resource_policy,
                     )
-                    endpoint_row.extra_mounts = vfolder_mounts
+                    endpoint_row.extra_mounts = list(vfolder_mounts)
 
                 if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    if endpoint_row.model_row is None:
+                        raise InvalidAPIParameters("Endpoint has no model row")
                     vfid = endpoint_row.model_row.vfid
                     yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                         storage_manager,
@@ -905,6 +917,8 @@ class ModelServingRepository:
                     )
 
                 # This needs to happen within the transaction for validation
+                if endpoint_row.image_row is None:
+                    raise InvalidAPIParameters("Endpoint has no image row")
                 image_row = await ImageRow.resolve(
                     db_session,
                     [
@@ -918,7 +932,7 @@ class ModelServingRepository:
                     "",
                     image_row.image_ref,
                     user_scope,
-                    session_owner.main_access_key,
+                    AccessKey(session_owner.main_access_key),
                     resource_policy,
                     SessionTypes.INFERENCE,
                     {
@@ -968,7 +982,7 @@ class ModelServingRepository:
         except StatementError as e:
             orig_exc = e.orig
             return MutationResult(success=False, message=str(orig_exc), data=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception:
             raise

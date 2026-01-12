@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import cast, override
 
 from ai.backend.common.artifact_storage import AbstractStorage
@@ -117,13 +117,13 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             dst_path = dst_storage.resolve_path(model_prefix)
-            verifier_start_time = datetime.now(timezone.utc)
+            verifier_start_time = datetime.now(UTC)
             log.info(
                 f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
             )
             try:
                 result = await verifier.verify(dst_path, context)
-                verifier_end_time = datetime.now(timezone.utc)
+                verifier_end_time = datetime.now(UTC)
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
 
                 # Create VerifierResult object
@@ -148,7 +148,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
             except Exception as e:
                 verification_success = False
-                verifier_end_time = datetime.now(timezone.utc)
+                verifier_end_time = datetime.now(UTC)
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
                 verifier_results[verifier_name] = VerifierResult(
                     success=False,

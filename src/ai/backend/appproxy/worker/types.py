@@ -4,22 +4,19 @@ import asyncio
 import dataclasses
 import enum
 import time
+from collections.abc import Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncContextManager,
-    Callable,
     Final,
-    FrozenSet,
     Generic,
-    Mapping,
     Optional,
     Self,
     TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -323,7 +320,7 @@ class RootContext:
     health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 
@@ -365,9 +362,9 @@ class Circuit(SerializableCircuit):
     runtime_variant: str | None
     "for initialization usage only; use `app_info` variable"
 
-    _app_inference_metrics: dict[MetricKey, "Metric | HistogramMetric"]
+    _app_inference_metrics: dict[MetricKey, Metric | HistogramMetric]
     _replica_inference_metrics: dict[
-        MetricKey, dict[UUID, "Metric | HistogramMetric"]
+        MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
     def __init__(self, *args, **kwargs) -> None:
@@ -376,7 +373,7 @@ class Circuit(SerializableCircuit):
         self._replica_inference_metrics = {}
 
     @classmethod
-    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> "Circuit":
+    def from_serialized_circuit(cls, circuit: SerializableCircuit) -> Circuit:
         frontend: PortFrontendInfo | SubdomainFrontendInfo
         app_info: InteractiveAppInfo | InferenceAppInfo
 
@@ -411,9 +408,7 @@ class Circuit(SerializableCircuit):
 
     @property
     def prometheus_metric_label(self) -> dict[str, str]:
-        metric_labels = {"protocol": self.protocol.name}
-
-        return metric_labels
+        return {"protocol": self.protocol.name}
 
 
 class MetricTypes(enum.Enum):
@@ -459,7 +454,7 @@ class HistogramMeasurement:
     sum: Optional[Decimal] = dataclasses.field(default=None)
 
 
-TMeasurement = TypeVar("TMeasurement", bound=Union[Measurement, HistogramMeasurement])
+TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
@@ -472,7 +467,7 @@ class InferenceMeasurement(Generic[TMeasurement]):
     type: MetricTypes
     per_app: TMeasurement
     per_replica: Mapping[UUID, TMeasurement]  # [Route Id: Measurement] pair
-    stats_filter: FrozenSet[str] = dataclasses.field(default_factory=frozenset)
+    stats_filter: frozenset[str] = dataclasses.field(default_factory=frozenset)
     unit_hint: str = dataclasses.field(default="count")
 
 
@@ -482,11 +477,11 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 class MovingStatistics:
     __slots__ = (
-        "_sum",
         "_count",
-        "_min",
-        "_max",
         "_last",
+        "_max",
+        "_min",
+        "_sum",
     )
     _sum: Decimal
     _count: int
@@ -494,7 +489,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None):
+    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -569,10 +564,10 @@ class Metric:
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
-    stats_filter: FrozenSet[str]
+    stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
 
     def update(self, value: Measurement):
         if value.capacity is not None:

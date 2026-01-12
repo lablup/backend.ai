@@ -22,7 +22,6 @@ from typing import (
     Any,
     Optional,
     TypedDict,
-    Union,
 )
 
 import attrs
@@ -50,7 +49,7 @@ class ServiceDefinition:
     env: Mapping[str, str] = attrs.Factory(dict)
     allowed_envs: list[str] = attrs.Factory(list)
     allowed_arguments: list[str] = attrs.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, list[str]]] = attrs.Factory(dict)
+    default_arguments: Mapping[str, None | str | list[str]] = attrs.Factory(dict)
 
 
 class ServiceParser:
@@ -71,7 +70,7 @@ class ServiceParser:
                     if "prestart" in raw_service_def:
                         raw_service_def["prestart_actions"] = raw_service_def["prestart"]
                         del raw_service_def["prestart"]
-            except IOError:
+            except OSError:
                 raise InvalidServiceDefinition(
                     f"could not read the service-def file: {service_def_file.name}"
                 )
@@ -146,7 +145,7 @@ class ServiceParser:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} not allowed for service {service_name}"
                     )
-                elif env_name in frozen_envs:
+                if env_name in frozen_envs:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} can't be overwritten"
                     )
@@ -203,9 +202,9 @@ class ServiceArgumentInterpolator:
                 if last_index < start:
                     yield TokenType.TEXT, s[last_index:start]
                 # the matched expression
-                if (token := match.group("expr1")) is not None:
-                    yield TokenType.EXPR, token
-                elif (token := match.group("expr2")) is not None:
+                if (token := match.group("expr1")) is not None or (
+                    token := match.group("expr2")
+                ) is not None:
                     yield TokenType.EXPR, token
                 last_index = end
             # the rest of string

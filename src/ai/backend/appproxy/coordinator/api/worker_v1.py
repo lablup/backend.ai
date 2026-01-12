@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import Annotated
 
 import aiohttp_cors
 from aiohttp import web
@@ -14,10 +15,10 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.models import Worker
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Worker
-from ..types import RootContext
 from .utils import auth_required
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -54,8 +55,8 @@ class WorkerResponseModel(BaseModel):
         ),
     ]
 
-    created: datetime
-    updated: datetime
+    created: datetime | None
+    updated: datetime | None
 
 
 @auth_required("worker")

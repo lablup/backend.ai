@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission_group import (
@@ -15,47 +15,70 @@ from ai.backend.manager.data.permission.permission_group import (
 from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
-
-from ...base import (
+from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
 if TYPE_CHECKING:
-    from ..association_scopes_entities import AssociationScopesEntitiesRow
-    from ..role import RoleRow
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
     from .permission import PermissionRow
+
+
+def _get_role_join_condition():
+    from ai.backend.manager.models.rbac_models.role import RoleRow
+
+    return RoleRow.id == foreign(PermissionGroupRow.role_id)
+
+
+def _get_association_scopes_entities_join_condition():
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+
+    return PermissionGroupRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)
+
+
+def _get_permission_join_condition():
+    from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+
+    return PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)
 
 
 class PermissionGroupRow(Base):
     __tablename__ = "permission_groups"
     __table_args__ = (sa.Index("ix_id_role_id_scope_id", "id", "role_id", "scope_id"),)
 
-    id: uuid.UUID = IDColumn()
-    role_id: uuid.UUID = sa.Column("role_id", GUID, nullable=False)
-    scope_type: ScopeType = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
+    scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", StrEnumType(ScopeType, length=32), nullable=False
     )
-    scope_id: str = sa.Column(
+    scope_id: Mapped[str] = mapped_column(
         "scope_id", sa.String(64), nullable=False
     )  # e.g., "project_id", "user_id" etc.
 
-    role_row: Optional[RoleRow] = relationship(
+    role_row: Mapped[RoleRow | None] = relationship(
         "RoleRow",
         back_populates="permission_group_rows",
-        primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
+        primaryjoin=_get_role_join_condition,
     )
-    mapped_entities: list[AssociationScopesEntitiesRow] = relationship(
+    mapped_entities: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
         "AssociationScopesEntitiesRow",
-        primaryjoin="PermissionGroupRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
+        primaryjoin=_get_association_scopes_entities_join_condition,
         viewonly=True,
     )
-    permission_rows: list[PermissionRow] = relationship(
+    permission_rows: Mapped[list[PermissionRow]] = relationship(
         "PermissionRow",
         back_populates="permission_group_row",
-        primaryjoin="PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)",
+        primaryjoin=_get_permission_join_condition,
     )
 
     def parsed_scope_id(self) -> ScopeId:

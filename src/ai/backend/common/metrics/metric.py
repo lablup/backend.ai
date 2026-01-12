@@ -406,9 +406,11 @@ class LayerType(enum.StrEnum):
     AUTH_REPOSITORY = "auth_repository"
     ARTIFACT_REPOSITORY = "artifact_repository"
     ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
+    AUDIT_LOG_REPOSITORY = "audit_log_repository"
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
     DOMAIN_REPOSITORY = "domain_repository"
+    ERROR_LOG_REPOSITORY = "error_log_repository"
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
     IMAGE_REPOSITORY = "image_repository"
@@ -433,9 +435,11 @@ class LayerType(enum.StrEnum):
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
 
     # DB Source layers
+    AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    ERROR_LOG_DB_SOURCE = "error_log_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
     RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
     SCHEDULE_DB_SOURCE = "schedule_db_source"

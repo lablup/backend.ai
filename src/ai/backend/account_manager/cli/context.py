@@ -3,10 +3,9 @@ from typing import Self
 
 import click
 
+from ai.backend.account_manager.config import ServerConfig
+from ai.backend.account_manager.config import load as load_config
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
-
-from ..config import ServerConfig
-from ..config import load as load_config
 
 
 class CLIContext:

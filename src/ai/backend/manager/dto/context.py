@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Mapping, Self, override
+from collections.abc import Mapping
+from typing import Any, Self, override
 
 from aiohttp import web
 from pydantic import ConfigDict

@@ -8,10 +8,9 @@ from typing import Generic, TypeVar
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
+from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext, TCircuitKey
 from ai.backend.logging import BraceStyleAdapter
-
-from ..backend.base import BaseBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

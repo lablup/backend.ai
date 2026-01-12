@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .api.context import RootContext
@@ -22,18 +23,15 @@ async def manager_bgtask_registry_ctx(root_ctx: RootContext) -> AsyncIterator[No
     from .bgtask.tasks.purge_images import PurgeImagesHandler
     from .bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsHandler
     from .bgtask.tasks.rescan_images import RescanImagesHandler
-    from .clients.agent.pool import AgentPool
 
     registry = BackgroundTaskHandlerRegistry()
     registry.register(RescanImagesHandler(root_ctx.processors))
     registry.register(PurgeImagesHandler(root_ctx.processors))
 
-    # Create AgentPool from agent_cache
-    agent_pool = AgentPool(root_ctx.agent_cache)
     registry.register(
         RescanGPUAllocMapsHandler(
             agent_repository=root_ctx.repositories.agent.repository,
-            agent_pool=agent_pool,
+            agent_client_pool=root_ctx.agent_client_pool,
         )
     )
     registry.register(

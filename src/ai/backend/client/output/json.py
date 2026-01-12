@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Mapping, Optional, Sequence, TypeVar
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Optional, TypeVar
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ResultSet

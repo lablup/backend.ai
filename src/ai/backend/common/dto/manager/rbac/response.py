@@ -16,23 +16,23 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
 __all__ = (
-    "RoleDTO",
+    "AssignRoleResponse",
     "AssignedUserDTO",
-    "PermissionDTO",
+    "CreateObjectPermissionResponse",
+    "CreatePermissionResponse",
+    "CreateRoleResponse",
+    "DeleteObjectPermissionResponse",
+    "DeletePermissionResponse",
+    "DeleteRoleResponse",
+    "GetRoleResponse",
     "ObjectPermissionDTO",
     "PaginationInfo",
-    "CreateRoleResponse",
-    "GetRoleResponse",
-    "UpdateRoleResponse",
-    "DeleteRoleResponse",
-    "SearchRolesResponse",
-    "AssignRoleResponse",
+    "PermissionDTO",
     "RevokeRoleResponse",
+    "RoleDTO",
+    "SearchRolesResponse",
     "SearchUsersAssignedToRoleResponse",
-    "CreatePermissionResponse",
-    "DeletePermissionResponse",
-    "CreateObjectPermissionResponse",
-    "DeleteObjectPermissionResponse",
+    "UpdateRoleResponse",
 )
 
 

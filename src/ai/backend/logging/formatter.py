@@ -5,7 +5,7 @@ import pprint
 import time
 import traceback
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any, TypeAlias, cast
 
@@ -27,8 +27,7 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
             s = "".join(traceback.format_exception(*ei))
         case _:
             s = "<exception-info-unavailable>"
-    s = s.rstrip("\n")
-    return s
+    return s.rstrip("\n")
 
 
 class SerializedExceptionFormatter(logging.Formatter):
@@ -45,9 +44,8 @@ class ConsoleFormatter(logging.Formatter):
         if datefmt:
             datefmt = datefmt.replace("%f", f"{int(record.msecs):03d}")
             return time.strftime(datefmt, ct)
-        else:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-            return f"{t}.{int(record.msecs):03d}"
+        t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+        return f"{t}.{int(record.msecs):03d}"
 
 
 class CustomJsonFormatter(JsonFormatter):
@@ -63,7 +61,7 @@ class CustomJsonFormatter(JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         if not log_record.get("timestamp"):
             # this doesn't use record.created, so it is slightly off
-            now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             log_record["timestamp"] = now
         if loglevel := log_record.get("level"):
             log_record["level"] = loglevel.upper()

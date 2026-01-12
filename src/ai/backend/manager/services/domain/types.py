@@ -15,8 +15,8 @@ __all__ = [
     "DomainData",
     "DomainModifier",
     "DomainNodeModifier",
-    "UserInfo",
     "OptionalState",
     "PartialModifier",
     "TriState",
+    "UserInfo",
 ]

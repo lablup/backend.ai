@@ -8,7 +8,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
+from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class SokovanOrchestrator:
 
     def __init__(
         self,
-        scheduler: Scheduler,
+        scheduler_components: SchedulerComponents,
         event_producer: EventProducer,
         valkey_schedule: ValkeyScheduleClient,
         lock_factory: "DistributedLockFactory",
@@ -47,11 +47,10 @@ class SokovanOrchestrator:
         # Initialize schedule coordinator
         self._schedule_coordinator = ScheduleCoordinator(
             valkey_schedule=valkey_schedule,
-            scheduler=scheduler,
+            components=scheduler_components,
             scheduling_controller=scheduling_controller,
             event_producer=event_producer,
             lock_factory=lock_factory,
-            config_provider=scheduler._config_provider,
         )
 
         self._event_producer = event_producer

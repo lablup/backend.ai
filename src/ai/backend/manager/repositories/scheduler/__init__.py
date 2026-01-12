@@ -6,16 +6,20 @@ from .types.session import (
     KernelTerminationResult,
     MarkTerminatingResult,
     SessionTerminationResult,
+    SweptSessionInfo,
     TerminatingKernelData,
     TerminatingKernelWithAgentData,
+    TerminatingSessionData,
 )
 
 __all__ = [
-    "SchedulerRepository",
-    "SchedulingData",
     "KernelTerminationResult",
     "MarkTerminatingResult",
+    "SchedulerRepository",
+    "SchedulingData",
     "SessionTerminationResult",
+    "SweptSessionInfo",
     "TerminatingKernelData",
     "TerminatingKernelWithAgentData",
+    "TerminatingSessionData",
 ]

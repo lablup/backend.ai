@@ -8,29 +8,29 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.object_storage import ObjectStorageCreatorSpec
+from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdaterSpec
+from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
 )
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...data.object_storage.types import ObjectStorageData
-from ...models.object_storage import ObjectStorageRow
-from ...repositories.base.creator import Creator
-from ...repositories.base.updater import Updater
-from ...repositories.object_storage import ObjectStorageCreatorSpec
-from ...repositories.object_storage.updaters import ObjectStorageUpdaterSpec
-from ...services.object_storage.actions.create import CreateObjectStorageAction
-from ...services.object_storage.actions.delete import DeleteObjectStorageAction
-from ...services.object_storage.actions.get import GetObjectStorageAction
-from ...services.object_storage.actions.list import ListObjectStorageAction
-from ...services.object_storage.actions.update import UpdateObjectStorageAction
-from ...types import OptionalState
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
 
@@ -54,7 +54,7 @@ class ObjectStorage(Node):
             access_key=data.access_key,
             secret_key=data.secret_key,
             endpoint=data.endpoint,
-            region=data.region,
+            region=data.region or "",
         )
 
     @strawberry.field
@@ -76,10 +76,7 @@ class ObjectStorage(Node):
         )
 
         nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
-        edges = [
-            StorageNamespaceEdge(node=node, cursor=to_global_id(StorageNamespace, node.id))
-            for node in nodes
-        ]
+        edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
         return StorageNamespaceConnection(
             edges=edges,
@@ -129,9 +126,7 @@ async def object_storages(
     )
 
     nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
-    edges = [
-        ObjectStorageEdge(node=node, cursor=to_global_id(ObjectStorage, node.id)) for node in nodes
-    ]
+    edges = [ObjectStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ObjectStorageConnection(
         edges=edges,

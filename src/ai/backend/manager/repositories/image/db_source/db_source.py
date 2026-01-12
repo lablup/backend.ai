@@ -59,8 +59,7 @@ class ImageDBSource:
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
-            data = row.to_dataclass()
-        return data
+            return row.to_dataclass()
 
     async def fetch_images_batch(
         self, identifier_lists: list[list[ImageIdentifier]]
@@ -77,8 +76,7 @@ class ImageDBSource:
                     session, cast(list[ImageAlias | ImageRef | ImageIdentifier], identifiers)
                 )
                 rows.append(row)
-            data_list = [row.to_dataclass() for row in rows]
-        return data_list
+            return [row.to_dataclass() for row in rows]
 
     async def _resolve_image(
         self,
@@ -143,7 +141,7 @@ class ImageDBSource:
 
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(query)
-            image_rows: list[ImageRow] = result.scalars().all()
+            image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
     async def query_image_details_by_identifier(
@@ -163,8 +161,7 @@ class ImageDBSource:
                 )
         except UnknownImageReference:
             raise ImageNotFound
-        data = image_row.to_detailed_dataclass()
-        return data
+        return image_row.to_detailed_dataclass()
 
     async def query_image_details_by_id(
         self,
@@ -179,8 +176,7 @@ class ImageDBSource:
                 )
             except UnknownImageReference:
                 raise ImageNotFound()
-            data = row.to_detailed_dataclass()
-        return data
+            return row.to_detailed_dataclass()
 
     async def query_all_images(
         self, status_filter: Optional[list[ImageStatus]] = None
@@ -203,8 +199,7 @@ class ImageDBSource:
             if not row.is_owned_by(user_id):
                 raise ForgetImageForbiddenError()
             await row.mark_as_deleted(session)
-            data = row.to_dataclass()
-        return data
+            return row.to_dataclass()
 
     async def mark_image_deleted_by_id(
         self,
@@ -219,8 +214,7 @@ class ImageDBSource:
         async with self._db.begin_session() as session:
             image_row = await self._validate_image_ownership(session, image_id, user_id)
             await image_row.mark_as_deleted(session)
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     async def validate_and_fetch_image_ownership(
         self, image_id: UUID, user_id: UUID, load_aliases: bool = False
@@ -233,8 +227,7 @@ class ImageDBSource:
             image_row = await self._validate_image_ownership(
                 session, image_id, user_id, load_aliases
             )
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
@@ -247,7 +240,7 @@ class ImageDBSource:
                 image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
                 image_row.aliases.append(image_alias)
                 row_id = image_row.id
-                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias)
+                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
             return row_id, alias_data
         except ValueError:
             raise AliasImageActionValueError
@@ -257,14 +250,13 @@ class ImageDBSource:
     async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
-            data = ImageAliasData(id=row.id, alias=row.alias)
-        return data
+            return ImageAliasData(id=row.id, alias=row.alias or "")
 
     async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
-            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias)
+            alias_data = ImageAliasData(id=existing_alias.id, alias=existing_alias.alias or "")
             await session.delete(existing_alias)
         return image_id, alias_data
 
@@ -296,9 +288,7 @@ class ImageDBSource:
                 raise RegistryNotFoundForImage(f"Registry not found for image {image_canonical}")
 
             # Call the original scan function
-            result = await scan_single_image(self._db, registry_key, registry_row, image_canonical)
-
-        return result
+            return await scan_single_image(self._db, registry_key, registry_row, image_canonical)
 
     async def remove_tag_from_registry(self, image_id: UUID) -> ImageData:
         async with self._db.begin_readonly_session() as session:
@@ -306,8 +296,7 @@ class ImageDBSource:
             if not image_row:
                 raise ImageNotFound()
             await image_row.untag_image_from_registry(self._db, session)
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     async def modify_image_properties(self, updater: Updater[ImageRow]) -> ImageData:
         try:
@@ -327,8 +316,7 @@ class ImageDBSource:
                 session, [ImageIdentifier(image_canonical, architecture)]
             )
             image_row._resources = {}
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     async def remove_tag_from_registry_with_validation(
         self, image_id: UUID, user_id: UUID
@@ -342,8 +330,7 @@ class ImageDBSource:
                 session, image_id, user_id, load_aliases=True
             )
             await image_row.untag_image_from_registry(self._db, session)
-            data = image_row.to_dataclass()
-        return data
+            return image_row.to_dataclass()
 
     async def remove_image_and_aliases_with_validation(
         self, image_id: UUID, user_id: UUID

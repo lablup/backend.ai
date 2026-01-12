@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey, CIStrEnum
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -17,8 +18,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-from ..keypair.types import KeyPairData
 
 
 class UserStatus(enum.StrEnum):
@@ -72,21 +71,21 @@ class UserInfoContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str
+    username: Optional[str]
     email: str
-    need_password_change: bool
+    need_password_change: Optional[bool]
     full_name: Optional[str]
     description: Optional[str]
     is_active: bool  # legacy
     status: str
     status_info: Optional[str]
-    created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
-    domain_name: str
-    role: UserRole
+    created_at: Optional[datetime] = field(compare=False)
+    modified_at: Optional[datetime] = field(compare=False)
+    domain_name: Optional[str]
+    role: Optional[UserRole]
     resource_policy: str
     allowed_client_ip: Optional[list[str]]
-    totp_activated: bool
+    totp_activated: Optional[bool]
     totp_activated_at: Optional[datetime] = field(compare=False)
     sudo_session_enabled: bool
     main_access_key: Optional[str] = field(compare=False)
@@ -124,7 +123,7 @@ class UserData:
             need_password_change=row.need_password_change,
             full_name=row.full_name,
             description=row.description,
-            is_active=True if row.status == UserStatus.ACTIVE else False,
+            is_active=row.status == UserStatus.ACTIVE,
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,

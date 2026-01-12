@@ -125,8 +125,10 @@ class RoleAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                equals_fn=RoleConditions.by_name_equals,
-                contains_fn=RoleConditions.by_name_contains,
+                contains_factory=RoleConditions.by_name_contains,
+                equals_factory=RoleConditions.by_name_equals,
+                starts_with_factory=RoleConditions.by_name_starts_with,
+                ends_with_factory=RoleConditions.by_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -147,12 +149,11 @@ class RoleAdapter(BaseFilterAdapter):
 
         if order.field == RoleOrderField.NAME:
             return RoleOrders.name(ascending=ascending)
-        elif order.field == RoleOrderField.CREATED_AT:
+        if order.field == RoleOrderField.CREATED_AT:
             return RoleOrders.created_at(ascending=ascending)
-        elif order.field == RoleOrderField.UPDATED_AT:
+        if order.field == RoleOrderField.UPDATED_AT:
             return RoleOrders.updated_at(ascending=ascending)
-        else:
-            raise ValueError(f"Unknown order field: {order.field}")
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

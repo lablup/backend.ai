@@ -1,7 +1,8 @@
 import base64
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping, Optional, Self, cast
+from typing import Optional, Self, cast
 
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
