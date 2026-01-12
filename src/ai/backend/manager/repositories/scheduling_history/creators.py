@@ -6,9 +6,8 @@ from dataclasses import dataclass, field
 from typing import Optional, override
 from uuid import UUID
 
-from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import EndpointLifecycle, RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -95,8 +94,8 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     phase: str  # DeploymentLifecycleType value
     result: SchedulingResult
     message: str
-    from_status: Optional[ModelDeploymentStatus] = None
-    to_status: Optional[ModelDeploymentStatus] = None
+    from_status: Optional[EndpointLifecycle] = None
+    to_status: Optional[EndpointLifecycle] = None
     error_code: Optional[str] = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
@@ -105,8 +104,8 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
         return DeploymentHistoryRow(
             deployment_id=self.deployment_id,
             phase=self.phase,
-            from_status=str(self.from_status) if self.from_status else None,
-            to_status=str(self.to_status) if self.to_status else None,
+            from_status=str(self.from_status.value) if self.from_status else None,
+            to_status=str(self.to_status.value) if self.to_status else None,
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,
