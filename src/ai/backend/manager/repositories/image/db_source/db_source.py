@@ -205,7 +205,7 @@ class ImageDBSource:
             image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
 
-    async def check_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
         """
         Checks if user owns the image.
         Returns True if user owns the image, False otherwise.

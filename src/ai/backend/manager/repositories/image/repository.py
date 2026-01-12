@@ -231,7 +231,7 @@ class ImageRepository:
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        return await self._db_source.check_image_ownership(image_id, user_id)
+        return await self._db_source.validate_image_ownership(image_id, user_id)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
