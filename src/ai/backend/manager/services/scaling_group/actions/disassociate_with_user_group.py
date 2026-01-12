@@ -19,7 +19,7 @@ class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "disassociate_with_user_group"
+        return "disassociate_with_user_groups"
 
     @override
     def entity_id(self) -> Optional[str]:
