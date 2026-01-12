@@ -9,6 +9,8 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.dto.manager.export import (
+    AuditLogExportFilter,
+    AuditLogExportOrder,
     BooleanFilter,
     DateTimeRangeFilter,
     OrderDirection,
@@ -22,9 +24,11 @@ from ai.backend.common.dto.manager.export import (
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.errors.export import InvalidExportFieldKeys
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
+    ExportFieldType,
     ReportDef,
     StreamingExportQuery,
 )
@@ -151,9 +155,21 @@ class ExportAdapter(BaseFilterAdapter):
         report: ReportDef,
         field_keys: list[str] | None,
     ) -> list[ExportFieldDef]:
-        """Select fields from report based on requested field keys."""
+        """Select fields from report based on requested field keys.
+
+        Preserves the order specified in field_keys.
+
+        Raises:
+            InvalidExportFieldKeys: If a field key is not found in the report.
+        """
         if field_keys:
-            return [f for f in report.fields if f.key in field_keys]
+            field_map = {f.key: f for f in report.fields}
+            selected: list[ExportFieldDef] = []
+            for key in field_keys:
+                if key not in field_map:
+                    raise InvalidExportFieldKeys([key])
+                selected.append(field_map[key])
+            return selected
         return list(report.fields)
 
     # =========================================================================
@@ -195,21 +211,19 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # role filter
+        # role filter (IN query)
         if filter.role is not None:
             field = report.get_field("role")
             if field:
-                cond = self._build_string_condition(filter.role, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.role, field)
+                conditions.append(cond)
 
-        # status filter
+        # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
             if field:
-                cond = self._build_string_condition(filter.status, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
 
         # created_at filter
         if filter.created_at is not None:
@@ -263,13 +277,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # session_type filter
+        # session_type filter (IN query)
         if filter.session_type is not None:
             field = report.get_field("session_type")
             if field:
-                cond = self._build_string_condition(filter.session_type, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.session_type, field)
+                conditions.append(cond)
 
         # domain_name filter
         if filter.domain_name is not None:
@@ -287,13 +300,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # status filter
+        # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
             if field:
-                cond = self._build_string_condition(filter.status, field)
-                if cond:
-                    conditions.append(cond)
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
 
         # scaling_group_name filter
         if filter.scaling_group_name is not None:
@@ -405,8 +417,152 @@ class ExportAdapter(BaseFilterAdapter):
         return result
 
     # =========================================================================
+    # Audit Log-specific query builder, conditions and orders
+    # =========================================================================
+
+    def build_audit_log_query(
+        self,
+        report: ReportDef,
+        fields: list[str] | None,
+        filter: AuditLogExportFilter | None,
+        order: list[AuditLogExportOrder] | None,
+        max_rows: int,
+        statement_timeout_sec: int,
+    ) -> StreamingExportQuery:
+        """Build StreamingExportQuery for audit log export.
+
+        Args:
+            report: Audit log report definition
+            fields: Field keys to include (None = all fields)
+            filter: Audit log-specific filter conditions
+            order: Audit log-specific order specifications
+            max_rows: Maximum rows to export
+            statement_timeout_sec: Query timeout in seconds
+
+        Returns:
+            StreamingExportQuery ready for execution
+        """
+        selected_fields = self._select_fields(report, fields)
+        conditions = self._build_audit_log_conditions(report, filter)
+        orders = self._build_audit_log_orders(report, order)
+
+        return StreamingExportQuery(
+            select_from=report.select_from,
+            fields=selected_fields,
+            conditions=conditions,
+            orders=orders,
+            max_rows=max_rows,
+            statement_timeout_sec=statement_timeout_sec,
+        )
+
+    def _build_audit_log_conditions(
+        self,
+        report: ReportDef,
+        filter: AuditLogExportFilter | None,
+    ) -> list[QueryCondition]:
+        """Convert AuditLogExportFilter to list of QueryCondition."""
+        if filter is None:
+            return []
+
+        conditions: list[QueryCondition] = []
+
+        # entity_type filter
+        if filter.entity_type is not None:
+            field = report.get_field("entity_type")
+            if field:
+                cond = self._build_string_condition(filter.entity_type, field)
+                if cond:
+                    conditions.append(cond)
+
+        # entity_id filter
+        if filter.entity_id is not None:
+            field = report.get_field("entity_id")
+            if field:
+                cond = self._build_string_condition(filter.entity_id, field)
+                if cond:
+                    conditions.append(cond)
+
+        # operation filter
+        if filter.operation is not None:
+            field = report.get_field("operation")
+            if field:
+                cond = self._build_string_condition(filter.operation, field)
+                if cond:
+                    conditions.append(cond)
+
+        # status filter (IN query)
+        if filter.status is not None:
+            field = report.get_field("status")
+            if field:
+                cond = self._build_in_condition(filter.status, field)
+                conditions.append(cond)
+
+        # triggered_by filter
+        if filter.triggered_by is not None:
+            field = report.get_field("triggered_by")
+            if field:
+                cond = self._build_string_condition(filter.triggered_by, field)
+                if cond:
+                    conditions.append(cond)
+
+        # request_id filter
+        if filter.request_id is not None:
+            field = report.get_field("request_id")
+            if field:
+                cond = self._build_string_condition(filter.request_id, field)
+                if cond:
+                    conditions.append(cond)
+
+        # created_at filter
+        if filter.created_at is not None:
+            field = report.get_field("created_at")
+            if field:
+                conditions.extend(self._build_datetime_conditions(filter.created_at, field))
+
+        return conditions
+
+    def _build_audit_log_orders(
+        self,
+        report: ReportDef,
+        orders: list[AuditLogExportOrder] | None,
+    ) -> list[QueryOrder]:
+        """Convert AuditLogExportOrder list to QueryOrder list."""
+        if not orders:
+            return []
+
+        result: list[QueryOrder] = []
+        for order in orders:
+            field_def = report.get_field(order.field.value)
+            if field_def is None:
+                continue
+            if order.direction == OrderDirection.ASC:
+                result.append(field_def.column.asc())
+            else:
+                result.append(field_def.column.desc())
+
+        return result
+
+    # =========================================================================
     # Common filter builders
     # =========================================================================
+
+    def _build_in_condition(
+        self,
+        values: list[str],
+        field_def: ExportFieldDef,
+    ) -> QueryCondition:
+        """Build IN condition for a field.
+
+        If the field type is ENUM, converts string values to enum values.
+        """
+        column = field_def.column
+
+        if field_def.field_type == ExportFieldType.ENUM:
+            enum_cls = column.type._enum_cls
+            enum_values = [enum_cls(v) for v in values]
+            return lambda: column.in_(enum_values)
+
+        return lambda: column.in_(values)
 
     def _build_string_condition(
         self,

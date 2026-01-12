@@ -10961,6 +10961,26 @@
         "parameters": [],
         "description": "Export project data as CSV.\n\nPOST /export/projects/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/export/audit-logs/csv": {
+      "post": {
+        "operationId": "export.export_csv.4",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export audit log data as CSV.\n\nPOST /export/audit-logs/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }

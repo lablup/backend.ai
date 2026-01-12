@@ -20,7 +20,7 @@ def export() -> None:
     """
     CSV export administration commands.
 
-    Supports report-specific exports: users, sessions, projects.
+    Supports report-specific exports: users, sessions, projects, audit-logs.
     """
 
 
@@ -137,8 +137,8 @@ def export_users(
             username=StringFilter(contains=filter_username) if filter_username else None,
             email=StringFilter(contains=filter_email) if filter_email else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
-            role=StringFilter(equals=filter_role) if filter_role else None,
-            status=StringFilter(equals=filter_status) if filter_status else None,
+            role=[filter_role] if filter_role else None,
+            status=[filter_status] if filter_status else None,
             created_at=DateTimeRangeFilter(after=filter_after, before=filter_before)
             if filter_after or filter_before
             else None,
@@ -275,10 +275,10 @@ def export_sessions(
     ]):
         session_filter = SessionExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
-            session_type=StringFilter(equals=filter_type) if filter_type else None,
+            session_type=[filter_type] if filter_type else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
             access_key=StringFilter(contains=filter_access_key) if filter_access_key else None,
-            status=StringFilter(equals=filter_status) if filter_status else None,
+            status=[filter_status] if filter_status else None,
             scaling_group_name=StringFilter(contains=filter_scaling_group)
             if filter_scaling_group
             else None,
@@ -441,6 +441,138 @@ def export_projects(
                     fields=field_list,
                     filter=project_filter,
                     order=project_orders,
+                    encoding=encoding,
+                ):
+                    sys.stdout.buffer.write(chunk)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# Audit Logs Export
+# =============================================================================
+
+
+@export.command(name="audit-logs")
+@pass_ctx_obj
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path.")
+@click.option("--fields", type=str, default=None, help="Comma-separated field keys.")
+@click.option(
+    "--filter-entity-type", type=str, default=None, help="Filter by entity type (equals)."
+)
+@click.option("--filter-entity-id", type=str, default=None, help="Filter by entity ID (contains).")
+@click.option("--filter-operation", type=str, default=None, help="Filter by operation (equals).")
+@click.option("--filter-status", type=str, default=None, help="Filter by status (equals).")
+@click.option(
+    "--filter-triggered-by", type=str, default=None, help="Filter by triggered_by (contains)."
+)
+@click.option(
+    "--filter-request-id", type=str, default=None, help="Filter by request ID (contains)."
+)
+@click.option(
+    "--filter-after", type=click.DateTime(), default=None, help="Filter created_at after."
+)
+@click.option(
+    "--filter-before", type=click.DateTime(), default=None, help="Filter created_at before."
+)
+@click.option(
+    "--order", "-O", "orders", type=str, multiple=True, help="Order by field (format: 'field:asc')."
+)
+@click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
+def export_audit_logs(
+    ctx: CLIContext,
+    output: Optional[str],
+    fields: Optional[str],
+    filter_entity_type: Optional[str],
+    filter_entity_id: Optional[str],
+    filter_operation: Optional[str],
+    filter_status: Optional[str],
+    filter_triggered_by: Optional[str],
+    filter_request_id: Optional[str],
+    filter_after: Optional[datetime],
+    filter_before: Optional[datetime],
+    orders: tuple[str, ...],
+    encoding: str,
+) -> None:
+    """
+    Export audit logs as CSV.
+    """
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.export import (
+        AuditLogExportFilter,
+        AuditLogExportOrder,
+        AuditLogExportOrderField,
+        OrderDirection,
+    )
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+
+    field_list = [f.strip() for f in fields.split(",")] if fields else None
+
+    # Build filter
+    audit_log_filter: Optional[AuditLogExportFilter] = None
+    if any([
+        filter_entity_type,
+        filter_entity_id,
+        filter_operation,
+        filter_status,
+        filter_triggered_by,
+        filter_request_id,
+        filter_after,
+        filter_before,
+    ]):
+        audit_log_filter = AuditLogExportFilter(
+            entity_type=StringFilter(equals=filter_entity_type) if filter_entity_type else None,
+            entity_id=StringFilter(contains=filter_entity_id) if filter_entity_id else None,
+            operation=StringFilter(equals=filter_operation) if filter_operation else None,
+            status=[filter_status] if filter_status else None,
+            triggered_by=StringFilter(contains=filter_triggered_by)
+            if filter_triggered_by
+            else None,
+            request_id=StringFilter(contains=filter_request_id) if filter_request_id else None,
+            created_at=DateTimeRangeFilter(after=filter_after, before=filter_before)
+            if filter_after or filter_before
+            else None,
+        )
+
+    # Build orders
+    audit_log_orders: Optional[list[AuditLogExportOrder]] = None
+    if orders:
+        audit_log_orders = []
+        for order_spec in orders:
+            if ":" in order_spec:
+                field, direction = order_spec.rsplit(":", 1)
+                direction = direction.lower()
+            else:
+                field = order_spec
+                direction = "asc"
+            if direction not in ("asc", "desc"):
+                click.echo(f"Invalid order direction: {direction}", err=True)
+                sys.exit(ExitCode.FAILURE)
+            audit_log_orders.append(
+                AuditLogExportOrder(
+                    field=AuditLogExportOrderField(field), direction=OrderDirection(direction)
+                )
+            )
+
+    with Session() as session:
+        try:
+            if output:
+                with open(output, "wb") as f:
+                    f.writelines(
+                        session.Export.stream_audit_logs_csv(
+                            fields=field_list,
+                            filter=audit_log_filter,
+                            order=audit_log_orders,
+                            encoding=encoding,
+                        )
+                    )
+                click.echo(f"Exported to {output}")
+            else:
+                for chunk in session.Export.stream_audit_logs_csv(
+                    fields=field_list,
+                    filter=audit_log_filter,
+                    order=audit_log_orders,
                     encoding=encoding,
                 ):
                     sys.stdout.buffer.write(chunk)
