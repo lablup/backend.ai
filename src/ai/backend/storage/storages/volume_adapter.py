@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VolumeAsyncIteratorStreamReader(StreamReader):
+class VolumeDownloadStreamReader(StreamReader):
     """
     StreamReader wrapper for AsyncIterator[bytes] from AbstractVolume.read_file().
 
@@ -172,7 +172,7 @@ class VolumeStorageAdapter(AbstractStorage):
             # read_file returns AsyncIterator[bytes]
             iterator = self._volume.read_file(self._vfid, relpath)
 
-            return VolumeAsyncIteratorStreamReader(iterator, content_type)
+            return VolumeDownloadStreamReader(iterator, content_type)
 
         except Exception as e:
             raise FileStreamDownloadError(f"Download via volume adapter failed: {e!s}") from e
