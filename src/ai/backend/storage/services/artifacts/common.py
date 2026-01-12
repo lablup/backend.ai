@@ -114,11 +114,11 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         )
 
         dst_storage = dst_storage_target.resolve_storage(context.storage_pool)
-        if not isinstance(dst_storage, (VFSStorage, VolumeStorageAdapter)):
+        if not isinstance(dst_storage, VFSStorage):
             raise ArtifactVerifyStorageTypeInvalid(
                 "Verify step requires VFS or VolumeStorageAdapter storage type"
             )
-        dst_storage = cast(VFSStorage | VolumeStorageAdapter, dst_storage)
+        dst_storage = cast(VFSStorage, dst_storage)
 
         # Collect verification results from all verifiers
         verifier_results: dict[str, VerifierResult] = {}
