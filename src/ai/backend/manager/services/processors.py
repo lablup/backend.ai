@@ -201,7 +201,6 @@ class Services:
             args.valkey_stat_client,
             args.agent_registry,
             repositories.user.repository,
-            repositories.user.admin_repository,
         )
         image_service = ImageService(
             args.agent_registry, repositories.image.repository, repositories.image.admin_repository
