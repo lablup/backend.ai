@@ -104,6 +104,8 @@ from .gql_relay import (
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
+_DISASSOCIATE_ALL_BATCH_SIZE = 1000
+
 __all__ = (
     "AssociateScalingGroupWithDomain",
     "AssociateScalingGroupWithKeyPair",
@@ -960,7 +962,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
                 spec=AllScalingGroupsForDomainPurgerSpec(
                     domain=domain,
                 ),
-                batch_size=1000,
+                batch_size=_DISASSOCIATE_ALL_BATCH_SIZE,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -1134,7 +1136,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
                 spec=AllScalingGroupsForProjectPurgerSpec(
                     project=user_group,
                 ),
-                batch_size=1000,
+                batch_size=_DISASSOCIATE_ALL_BATCH_SIZE,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
