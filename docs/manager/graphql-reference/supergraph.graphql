@@ -390,7 +390,7 @@ type AgentStatusInfo
   This value remains constant throughout the agent's lifecycle and can be used
   to track the agent's age or identify when it was initially deployed.
   """
-  firstContact: DateTime!
+  firstContact: DateTime
 
   """
   Timestamp when the agent was marked as lost or unreachable.
@@ -401,8 +401,8 @@ type AgentStatusInfo
 
   """
   Indicates whether the agent is available for scheduling new compute sessions.
-  An agent may be non-schedulable if it's being drained, under maintenance,
-  or manually disabled by administrators while remaining in ALIVE status.
+  An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
+  When false, no new sessions will be assigned to this agent.
   """
   schedulable: Boolean!
 }
@@ -6212,7 +6212,7 @@ type Query
   """Added in 25.15.0"""
   agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.19.0"""
+  """Added in 26.1.0"""
   agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
 
   """
