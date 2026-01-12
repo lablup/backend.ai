@@ -13,32 +13,33 @@ This document defines the entity types and field types managed by the Backend.AI
 
 Entity types are the primary targets of permission checks in the RBAC system. Each entity type supports standard operations (create, read, update, soft-delete, hard-delete).
 
-| Entity Type | Description | Dual Role | Notes | Migration | Validator |
-|-------------|-------------|-----------|-------|:---------:|:---------:|
-| Compute Session | Computational workloads and containers | Entity only | | [ ] | [ ] |
-| Session Template | Predefined session configurations | Entity only | | [ ] | [ ] |
-| VFolder | Virtual folders for data storage | Entity only | | [ ] | [ ] |
-| Image | Container images for sessions | Entity only | | [ ] | [ ] |
-| Model Deployment | Model serving deployments | Entity only | | [ ] | [ ] |
-| Model Artifact | Trained model files and metadata | Entity only | | [ ] | [ ] |
-| Artifact Registry | Registry for storing and managing artifacts | Entity only | | [ ] | [ ] |
-| Agent | Agent nodes providing computing resources | Entity only | | [ ] | [ ] |
-| Resource Group | Logical groups of agents | Entity only | | [ ] | [ ] |
-| Storage Host | Storage backend hosts | Entity only | | [ ] | [ ] |
-| App Config | Application configuration items | Entity only | | [ ] | [ ] |
-| Notification Channel | Channels for delivering notifications | Entity only | | [ ] | [ ] |
-| Notification Rule | Rules for triggering notifications | Entity only | | [ ] | [ ] |
-| Domain | Administrative domain grouping | Entity & Scope | | [ ] | [ ] |
-| Project | Project grouping within domains | Entity & Scope | | [ ] | [ ] |
-| User | User accounts | Entity & Scope | | [ ] | [ ] |
-| Role | Permission set definitions | Entity only | | [ ] | [ ] |
-| {Entity}:assignment | Mappings for sharing specific entities with other users | Entity only | e.g., vfolder:assignment, compute_session:assignment | [ ] | [ ] |
+| Entity Type | Description | Dual Role | Notes | Migration | Validator | Repo Patterns |
+|-------------|-------------|-----------|-------|:---------:|:---------:|:------------:|
+| Compute Session | Computational workloads and containers | Entity only | | [ ] | [ ] | [ ] |
+| Session Template | Predefined session configurations | Entity only | | [ ] | [ ] | [ ] |
+| VFolder | Virtual folders for data storage | Entity only | | [ ] | [ ] | [ ] |
+| Image | Container images for sessions | Entity only | | [ ] | [ ] | [ ] |
+| Model Deployment | Model serving deployments | Entity only | | [ ] | [ ] | [ ] |
+| Model Artifact | Trained model files and metadata | Entity only | | [ ] | [ ] | [ ] |
+| Artifact Registry | Registry for storing and managing artifacts | Entity only | | [ ] | [ ] | [ ] |
+| Agent | Agent nodes providing computing resources | Entity only | | [ ] | [ ] | [ ] |
+| Resource Group | Logical groups of agents | Entity only | | [ ] | [ ] | [ ] |
+| Storage Host | Storage backend hosts | Entity only | | [ ] | [ ] | [ ] |
+| App Config | Application configuration items | Entity only | | [ ] | [ ] | [ ] |
+| Notification Channel | Channels for delivering notifications | Entity only | | [ ] | [ ] | [ ] |
+| Notification Rule | Rules for triggering notifications | Entity only | | [ ] | [ ] | [ ] |
+| Domain | Administrative domain grouping | Entity & Scope | | [ ] | [ ] | [ ] |
+| Project | Project grouping within domains | Entity & Scope | | [ ] | [ ] | [ ] |
+| User | User accounts | Entity & Scope | | [ ] | [ ] | [ ] |
+| Role | Permission set definitions | Entity only | | [ ] | [ ] | [ ] |
+| {Entity}:assignment | Mappings for sharing specific entities with other users | Entity only | e.g., vfolder:assignment, compute_session:assignment | [ ] | [ ] | [ ] |
 
 **Notes**:
 - **Dual Role**: Domain, Project, and User serve as both manageable entities and permission scopes.
 - **{Entity}:assignment**: These are meta-entities that represent sharing relationships between users and specific entity instances.
 - **Migration**: Indicates whether the RBAC migration for this entity type is complete.
 - **Validator**: Indicates whether the RBAC permission validator for this entity type is implemented.
+- **Repo Patterns**: Indicates whether the RBAC repository patterns (Creator/Granter/Purger) are implemented.
 
 ## Field Types
 
@@ -53,23 +54,24 @@ When checking permissions for a field object:
 
 ### Field Types Table
 
-| Field Type | Entity Type | Description | Migration | Validator |
-|------------|-------------|-------------|:---------:|:---------:|
-| Kernel | Compute Session | Individual container instances within a session | [ ] | [ ] |
-| Session History | Compute Session | Historical records of session execution | [ ] | [ ] |
-| Model Revision | Model Deployment | Version snapshots of model deployments | [ ] | [ ] |
-| Deployment History | Model Deployment | Historical records of deployment changes | [ ] | [ ] |
-| Route | Model Deployment | Traffic routing configurations for model endpoints | [ ] | [ ] |
-| Route History | Model Deployment | Historical records of routing changes | [ ] | [ ] |
-| Endpoint Token | Model Deployment | Authentication tokens for model endpoints | [ ] | [ ] |
-| Artifact Revision | Model Artifact | Version snapshots of artifacts | [ ] | [ ] |
-| Object Permission | Role | Object-level permission assignments | [ ] | [ ] |
-| Permission | Role | Type-level permission definitions | [ ] | [ ] |
-| Permission Group | Role | Grouped permissions by scope | [ ] | [ ] |
+| Field Type | Entity Type | Description | Migration | Validator | Repo Patterns |
+|------------|-------------|-------------|:---------:|:---------:|:-------------:|
+| Kernel | Compute Session | Individual container instances within a session | [ ] | [ ] | [ ] |
+| Session History | Compute Session | Historical records of session execution | [ ] | [ ] | [ ] |
+| Model Revision | Model Deployment | Version snapshots of model deployments | [ ] | [ ] | [ ] |
+| Deployment History | Model Deployment | Historical records of deployment changes | [ ] | [ ] | [ ] |
+| Route | Model Deployment | Traffic routing configurations for model endpoints | [ ] | [ ] | [ ] |
+| Route History | Model Deployment | Historical records of routing changes | [ ] | [ ] | [ ] |
+| Endpoint Token | Model Deployment | Authentication tokens for model endpoints | [ ] | [ ] | [ ] |
+| Artifact Revision | Model Artifact | Version snapshots of artifacts | [ ] | [ ] | [ ] |
+| Object Permission | Role | Object-level permission assignments | [ ] | [ ] | [ ] |
+| Permission | Role | Type-level permission definitions | [ ] | [ ] | [ ] |
+| Permission Group | Role | Grouped permissions by scope | [ ] | [ ] | [ ] |
 
 **Notes**:
 - **Migration**: Indicates whether the RBAC migration for this field type is complete.
 - **Validator**: Indicates whether the RBAC permission validator for this field type is implemented.
+- **Repo Patterns**: Indicates whether the RBAC repository patterns (Creator/Granter/Purger) are implemented.
 
 ### Example: Kernel Permission Check
 
