@@ -37,6 +37,7 @@ class ExportFieldType(StrEnum):
     DATETIME = "datetime"
     UUID = "uuid"
     JSON = "json"
+    ENUM = "enum"
 
 
 # Formatter type definition - converts any value to string for CSV

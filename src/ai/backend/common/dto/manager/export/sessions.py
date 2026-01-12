@@ -85,11 +85,11 @@ class SessionExportFilter(BaseRequestModel):
             "Can be case-insensitive and/or negated."
         ),
     )
-    session_type: Optional[StringFilter] = Field(
+    session_type: Optional[list[str]] = Field(
         default=None,
         description=(
-            "Filter sessions by type (e.g., 'interactive', 'batch', 'inference'). "
-            "Use exact match (equals) to filter by specific session type."
+            "Filter sessions by type(s). Accepts a list of type values "
+            "(e.g., ['interactive', 'batch', 'inference']). Uses IN query."
         ),
     )
     domain_name: Optional[StringFilter] = Field(
@@ -106,11 +106,11 @@ class SessionExportFilter(BaseRequestModel):
             "Use this to export sessions created by a specific user/keypair."
         ),
     )
-    status: Optional[StringFilter] = Field(
+    status: Optional[list[str]] = Field(
         default=None,
         description=(
-            "Filter sessions by status (e.g., 'PENDING', 'RUNNING', 'TERMINATED'). "
-            "Use this to export sessions in specific lifecycle states."
+            "Filter sessions by status(es). Accepts a list of status values "
+            "(e.g., ['PENDING', 'RUNNING', 'TERMINATED']). Uses IN query."
         ),
     )
     scaling_group_name: Optional[StringFilter] = Field(

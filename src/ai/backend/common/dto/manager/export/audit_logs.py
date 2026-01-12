@@ -92,11 +92,11 @@ class AuditLogExportFilter(BaseRequestModel):
             "Use exact match (equals) to filter by specific operation."
         ),
     )
-    status: Optional[StringFilter] = Field(
+    status: Optional[list[str]] = Field(
         default=None,
         description=(
-            "Filter audit logs by status (e.g., 'success', 'failure'). "
-            "Use exact match (equals) to filter by specific status."
+            "Filter audit logs by status(es). Accepts a list of status values "
+            "(e.g., ['success', 'failure']). Uses IN query."
         ),
     )
     triggered_by: Optional[StringFilter] = Field(
