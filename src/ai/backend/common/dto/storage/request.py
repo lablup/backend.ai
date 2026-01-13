@@ -349,6 +349,15 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
             },
         ],
     )
+    target_prefix: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported models.
+        If not specified (None), uses the default path: {model_id}/{revision}.
+        If set to empty string "", files will be stored at the root.
+        """,
+        examples=["my-models", "custom/path", ""],
+    )
 
 
 class HuggingFaceGetCommitHashReqPathParam(BaseRequestModel):
@@ -435,6 +444,15 @@ class ReservoirImportModelsReq(BaseRequestModel):
     # Must have 1:1 correspondence with the models list.
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
+    )
+    target_prefix: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported models.
+        If not specified (None), uses the default path: {model_id}/{revision}.
+        If set to empty string "", files will be stored at the root.
+        """,
+        examples=["my-models", "custom/path", ""],
     )
 
 

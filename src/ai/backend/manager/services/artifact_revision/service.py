@@ -470,6 +470,7 @@ class ArtifactRevisionService:
                                 if vfolder_target is not None
                                 else reservoir_config.resolve_storage_step_selection()
                             ),
+                            target_prefix=action.target_prefix,
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -581,6 +582,7 @@ class ArtifactRevisionService:
                                     else reservoir_config.resolve_storage_step_selection()
                                 ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
+                                target_prefix=action.target_prefix,
                             )
                         )
 

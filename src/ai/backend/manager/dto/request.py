@@ -130,6 +130,14 @@ class ImportArtifactsReq(BaseRequestModel):
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
     )
+    target_prefix: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported models.
+        If not specified (None), uses the default path: {model_id}/{revision}.
+        If set to empty string "", files will be stored at the root.
+        """,
+    )
 
 
 class UpdateArtifactReqPathParam(BaseRequestModel):

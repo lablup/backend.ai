@@ -471,6 +471,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
+        target_prefix: Optional[str] = None,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -482,6 +483,9 @@ class ReservoirService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
             artifact_revision_id: The artifact revision ID for verification result lookup
+            target_prefix: Custom prefix path for storing imported models.
+                If None, uses default path: {model_id}/{revision}.
+                If empty string, stores files at root.
         """
         success = False
         verification_result: Optional[VerificationStepResult] = None
@@ -496,6 +500,7 @@ class ReservoirService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
+                target_prefix=target_prefix,
             )
 
             # Execute import pipeline
@@ -528,6 +533,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
+        target_prefix: Optional[str] = None,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -564,6 +570,7 @@ class ReservoirService:
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
                             artifact_revision_id=artifact_revision_id,
+                            target_prefix=target_prefix,
                         )
 
                         successful_models += 1
@@ -655,7 +662,17 @@ class ReservoirDownloadStep(ImportStep[None]):
         # In a real implementation, you'd query the database to get this information
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        model_prefix = f"{model.model_id}/{revision}"
+
+        # Determine model_prefix based on target_prefix
+        if context.target_prefix is None:
+            # Default behavior: use model_id/revision prefix
+            model_prefix = f"{model.model_id}/{revision}"
+        elif context.target_prefix == "":
+            # Empty string: store at root
+            model_prefix = ""
+        else:
+            # Custom prefix
+            model_prefix = context.target_prefix
 
         # Determine storage type based on the actual download storage object type
         if isinstance(self._download_storage, VFSStorage):
@@ -670,9 +687,11 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         if storage_type == "vfs":
             # Handle VFS storage type
-            dest_path = (
-                cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
-            )
+            base_path = cast(VFSStorage, self._download_storage).base_path
+            if model_prefix:
+                dest_path = base_path / model_prefix
+            else:
+                dest_path = base_path
             bytes_copied = await self._handle_vfs_download(
                 registry_config, context, model_prefix, dest_path
             )

@@ -11,6 +11,7 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 class ImportArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
     vfolder_id: uuid.UUID | None = None
+    target_prefix: Optional[str] = None
 
     @override
     def entity_id(self) -> Optional[str]:

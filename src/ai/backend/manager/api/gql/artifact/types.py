@@ -532,7 +532,20 @@ class ScanArtifactsInput:
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
-    vfolder_id: ID | None = None
+    vfolder_id: ID | None = strawberry.field(
+        default=None,
+        description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
+    )
+    target_prefix: Optional[str] = strawberry.field(
+        default=None,
+        description=dedent_strip("""
+        Added in 26.1.0.
+
+        Custom prefix path for storing imported models.
+        If not specified (None), uses the default path: {model_id}/{revision}.
+        If set to empty string "", files will be stored at the root.
+        """),
+    )
 
 
 @strawberry.input(description="Added in 25.15.0")
