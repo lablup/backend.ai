@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
-from ai.backend.common.dto.storage.request import StorageMappingResolverData, VFolderStorageTarget
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep, VFolderStorageTarget
+from ai.backend.common.dto.storage.request import StorageMappingResolverData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
 

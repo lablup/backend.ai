@@ -7,7 +7,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep, VFolderStorageTarget
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import QuotaConfig
 
@@ -246,17 +246,6 @@ class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
         examples=["huggingface", "my-huggingface-registry"],
     )
     revision: str = Field(description="The model revision to scan from the registry.")
-
-
-class VFolderStorageTarget(BaseRequestModel):
-    """Target for direct import to a specific virtual folder."""
-
-    vfolder_id: VFolderIDField = Field(
-        description="VFolder ID for direct import to a specific virtual folder.",
-    )
-    volume_name: str = Field(
-        description="Volume name (host) where the vfolder resides.",
-    )
 
 
 class StorageMappingResolverData(BaseRequestModel):
