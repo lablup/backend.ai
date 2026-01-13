@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseFieldModel
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -53,6 +52,7 @@ from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
     MountOption,
+    RequesterCtx,
     ServiceConfig,
     ServiceInfo,
 )
@@ -313,14 +313,11 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         "SERVE.GET_INFO (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    user_role = request["user"]["role"]
     action = GetModelServiceInfoAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,
@@ -841,15 +838,12 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         )
         return SuccessResponseModel(success=deployment_result.success)
     # Fall back to model_serving
-    user_role = request["user"]["role"]
     action = DeleteModelServiceAction(
         service_id=service_id,
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
     )
@@ -872,15 +866,12 @@ async def sync(request: web.Request) -> SuccessResponseModel:
 
     log.info("SERVE.SYNC (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id)
 
-    user_role = request["user"]["role"]
     action = ForceSyncAction(
         service_id=service_id,
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
     )
@@ -914,14 +905,11 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         "SERVE.SCALE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    user_role = request["user"]["role"]
     action = ScaleServiceReplicasAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         max_session_count_per_model_session=request["user"]["resource_policy"][
@@ -966,14 +954,11 @@ async def update_route(
         route_id,
     )
 
-    user_role = request["user"]["role"]
     action = UpdateRouteAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,
@@ -1005,14 +990,11 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         service_id,
     )
 
-    user_role = request["user"]["role"]
     action = DeleteRouteAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,
@@ -1075,14 +1057,11 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
         service_id,
     )
 
-    user_role = request["user"]["role"]
     action = GenerateTokenAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,
@@ -1127,14 +1106,11 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
         service_id,
     )
 
-    user_role = request["user"]["role"]
     action = ListErrorsAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,
@@ -1165,14 +1141,11 @@ async def clear_error(request: web.Request) -> web.Response:
         service_id,
     )
 
-    user_role = request["user"]["role"]
     action = ClearErrorAction(
-        user_data=UserData(
-            user_id=request["user"]["uuid"],
+        requester_ctx=RequesterCtx(
             is_authorized=request["is_authorized"],
-            is_admin=user_role == UserRole.ADMIN,
-            is_superadmin=user_role == UserRole.SUPERADMIN,
-            role=str(user_role.name).lower(),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
             domain_name=request["user"]["domain_name"],
         ),
         service_id=service_id,

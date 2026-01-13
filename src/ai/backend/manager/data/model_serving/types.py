@@ -231,10 +231,6 @@ class CompactServiceInfo:
 
 @dataclass
 class RequesterCtx:
-    """
-    Deprecated: Use ai.backend.common.data.user.types.UserData instead.
-    """
-
     is_authorized: Optional[bool]
     user_id: uuid.UUID
     user_role: UserRole

@@ -2,9 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.model_serving.types import EndpointData, RequesterCtx
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
@@ -12,7 +11,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class ModifyEndpointAction(ModelServiceAction):
-    user_data: UserData
+    requester_ctx: RequesterCtx
     endpoint_id: uuid.UUID
     updater: Updater[EndpointRow]
 

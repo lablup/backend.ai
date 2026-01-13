@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.user.types import UserData
-from ai.backend.manager.data.model_serving.types import UserRole
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.errors.service import ModelServiceNotFound
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
@@ -53,12 +53,10 @@ class TestDeleteModelService:
                 "successful model deletion (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                 ),
@@ -70,12 +68,10 @@ class TestDeleteModelService:
                 "non-existent model (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                 ),
@@ -85,12 +81,10 @@ class TestDeleteModelService:
                 "successful model deletion (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role="superadmin",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        user_role=UserRole.SUPERADMIN,
                         domain_name="default",
                     ),
                 ),
@@ -102,12 +96,10 @@ class TestDeleteModelService:
                 "non-existent model (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role="superadmin",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        user_role=UserRole.SUPERADMIN,
                         domain_name="default",
                     ),
                 ),
@@ -127,9 +119,9 @@ class TestDeleteModelService:
         action = scenario.input
         mock_endpoint = MagicMock(
             routings=[],
-            session_owner_id=action.user_data.user_id,
-            session_owner_role=UserRole.USER,
-            domain=action.user_data.domain_name,
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
         )
 
         # Mock repository responses based on scenario

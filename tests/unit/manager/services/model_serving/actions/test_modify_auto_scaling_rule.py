@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     RuleId,
 )
-from ai.backend.manager.data.model_serving.types import UserRole
+from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.updaters import (
     EndpointAutoScalingRuleUpdaterSpec,
@@ -75,12 +75,10 @@ class TestModifyAutoScalingRule:
             ScenarioBase.success(
                 "Modify threshold",
                 ModifyEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
@@ -99,12 +97,10 @@ class TestModifyAutoScalingRule:
             ScenarioBase.success(
                 "Modify min/max replicas",
                 ModifyEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000006"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000006"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
@@ -124,12 +120,10 @@ class TestModifyAutoScalingRule:
             ScenarioBase.success(
                 "Disable rule",
                 ModifyEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000007"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000007"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
@@ -146,12 +140,10 @@ class TestModifyAutoScalingRule:
             ScenarioBase.failure(
                 "Rule not found",
                 ModifyEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000008"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000008"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
@@ -167,12 +159,10 @@ class TestModifyAutoScalingRule:
             ScenarioBase.success(
                 "SUPERADMIN modify all parameters",
                 ModifyEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role="superadmin",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
+                        user_role=UserRole.SUPERADMIN,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
@@ -235,9 +225,9 @@ class TestModifyAutoScalingRule:
             # Mock endpoint for access validation
             mock_endpoint = MagicMock(
                 id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                session_owner_id=action.user_data.user_id,
-                session_owner_role=UserRole.USER,
-                domain=action.user_data.domain_name,
+                session_owner_id=action.requester_ctx.user_id,
+                session_owner_role=action.requester_ctx.user_role,
+                domain=action.requester_ctx.domain_name,
             )
             mock_get_endpoint_by_id_modify.return_value = mock_endpoint
             mock_modify_auto_scaling_rule.return_value = mock_rule

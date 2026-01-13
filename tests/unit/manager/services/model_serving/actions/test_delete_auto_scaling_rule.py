@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
-from ai.backend.manager.data.model_serving.types import UserRole
+from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
@@ -64,12 +64,10 @@ class TestDeleteAutoScalingRule:
             ScenarioBase.success(
                 "Normal delete",
                 DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
@@ -81,12 +79,10 @@ class TestDeleteAutoScalingRule:
             ScenarioBase.failure(
                 "Rule not found",
                 DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000010"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role="user",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000010"),
+                        user_role=UserRole.USER,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
@@ -96,12 +92,10 @@ class TestDeleteAutoScalingRule:
             ScenarioBase.success(
                 "SUPERADMIN delete",
                 DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000013"),
+                    requester_ctx=RequesterCtx(
                         is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role="superadmin",
+                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000013"),
+                        user_role=UserRole.SUPERADMIN,
                         domain_name="default",
                     ),
                     id=RuleId(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
@@ -137,9 +131,9 @@ class TestDeleteAutoScalingRule:
 
             mock_endpoint = MagicMock(
                 id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                session_owner_id=action.user_data.user_id,
-                session_owner_role=UserRole.USER,
-                domain=action.user_data.domain_name,
+                session_owner_id=action.requester_ctx.user_id,
+                session_owner_role=action.requester_ctx.user_role,
+                domain=action.requester_ctx.domain_name,
             )
             mock_get_endpoint_by_id_delete_rule.return_value = mock_endpoint
             mock_delete_auto_scaling_rule.return_value = True

@@ -2,15 +2,15 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class DeleteModelServiceAction(ModelServiceAction):
     service_id: uuid.UUID
-    user_data: UserData
+    requester_ctx: RequesterCtx
 
     @override
     def entity_id(self) -> Optional[str]:
