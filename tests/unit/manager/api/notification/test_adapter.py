@@ -172,10 +172,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -186,10 +188,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -200,10 +204,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.CREATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.CREATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -214,10 +220,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.CREATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.CREATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -228,10 +236,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.UPDATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.UPDATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -242,10 +252,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.UPDATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.UPDATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -271,10 +283,12 @@ class TestNotificationChannelAdapter:
                 name=StringFilter(contains="Test"),
                 enabled=True,
             ),
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.ASC,
-            ),
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ],
             limit=20,
             offset=10,
         )
@@ -415,10 +429,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -429,10 +445,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -443,10 +461,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.CREATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.CREATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -457,10 +477,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.CREATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.CREATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -471,10 +493,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.UPDATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.UPDATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -485,10 +509,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.UPDATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.UPDATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -514,10 +540,12 @@ class TestNotificationRuleAdapter:
                 name=StringFilter(contains="Test"),
                 enabled=True,
             ),
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.ASC,
-            ),
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ],
             limit=20,
             offset=10,
         )

@@ -2,11 +2,14 @@
 Deployment coordinator for managing deployment lifecycle.
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Optional
+from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -19,8 +22,20 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.deployment import (
+    DeploymentConditions,
+    DeploymentRepository,
+)
+from ai.backend.manager.repositories.deployment.creators import EndpointLifecycleBatchUpdaterSpec
+from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
+from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
+from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -36,7 +51,7 @@ from .handlers import (
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
-from .types import DeploymentLifecycleType
+from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -160,25 +175,107 @@ class DeploymentCoordinator:
                 log.trace("No deployments to process for handler: {}", handler.name())
                 return
             log.info("handler: {} - processing {} deployments", handler.name(), len(deployments))
-            result = await handler.execute(deployments)
-            next_status = handler.next_status()
-            if next_status is not None:
-                await self._deployment_repository.update_endpoint_lifecycle_bulk(
-                    [d.id for d in result.successes],
-                    handler.target_statuses(),
-                    next_status,
-                )
-            failure_status = handler.failure_status()
-            if failure_status is not None:
-                await self._deployment_repository.update_endpoint_lifecycle_bulk(
-                    [e.deployment_info.id for e in result.errors],
-                    handler.target_statuses(),
-                    failure_status,
-                )
+
+            # Execute handler with recorder context
+            deployment_ids = [d.id for d in deployments]
+            with DeploymentRecorderContext.scope(
+                lifecycle_type.value, entity_ids=deployment_ids
+            ) as pool:
+                result = await handler.execute(deployments)
+                all_records = pool.get_all_records()
+
+                # Handle status transitions with history recording
+                await self._handle_status_transitions(handler, result, all_records)
+
             try:
                 await handler.post_process(result)
             except Exception as e:
                 log.error("Error during post-processing: {}", e)
+
+    async def _handle_status_transitions(
+        self,
+        handler: DeploymentHandler,
+        result: DeploymentExecutionResult,
+        records: Mapping[UUID, ExecutionRecord],
+    ) -> None:
+        """Handle status transitions with history recording.
+
+        All transitions (success and failure) are processed in a single transaction
+        to ensure atomicity.
+
+        Args:
+            handler: The deployment handler that was executed
+            result: The result of the handler execution
+            records: Execution records from the recorder context
+        """
+        handler_name = handler.name()
+        target_statuses = handler.target_statuses()
+        from_status = target_statuses[0] if target_statuses else None
+
+        # Collect all batch updaters and history specs
+        batch_updaters: list[BatchUpdater[EndpointRow]] = []
+        all_history_specs: list[DeploymentHistoryCreatorSpec] = []
+
+        # Handle success transitions
+        next_status = handler.next_status()
+        if next_status is not None and result.successes:
+            endpoint_ids = [d.id for d in result.successes]
+            success_history_specs = [
+                DeploymentHistoryCreatorSpec(
+                    deployment_id=d.id,
+                    phase=handler_name,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{handler_name} completed successfully",
+                    from_status=from_status,
+                    to_status=next_status,
+                    sub_steps=extract_sub_steps_for_entity(d.id, records),
+                )
+                for d in result.successes
+            ]
+            batch_updaters.append(
+                BatchUpdater(
+                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=next_status),
+                    conditions=[
+                        DeploymentConditions.by_ids(endpoint_ids),
+                        DeploymentConditions.by_lifecycle_stages(target_statuses),
+                    ],
+                )
+            )
+            all_history_specs.extend(success_history_specs)
+
+        # Handle failure transitions
+        failure_status = handler.failure_status()
+        if failure_status is not None and result.errors:
+            endpoint_ids = [e.deployment_info.id for e in result.errors]
+            failure_history_specs = [
+                DeploymentHistoryCreatorSpec(
+                    deployment_id=e.deployment_info.id,
+                    phase=handler_name,
+                    result=SchedulingResult.FAILURE,
+                    message=e.reason,
+                    from_status=from_status,
+                    to_status=failure_status,
+                    error_code=None,  # DeploymentExecutionError doesn't have error_code
+                    sub_steps=extract_sub_steps_for_entity(e.deployment_info.id, records),
+                )
+                for e in result.errors
+            ]
+            batch_updaters.append(
+                BatchUpdater(
+                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=failure_status),
+                    conditions=[
+                        DeploymentConditions.by_ids(endpoint_ids),
+                        DeploymentConditions.by_lifecycle_stages(target_statuses),
+                    ],
+                )
+            )
+            all_history_specs.extend(failure_history_specs)
+
+        # Execute all updates in a single transaction
+        if batch_updaters:
+            await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+                batch_updaters, BulkCreator(specs=all_history_specs)
+            )
 
     async def process_if_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """

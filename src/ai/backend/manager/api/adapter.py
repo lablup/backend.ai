@@ -6,16 +6,17 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Optional
+from typing import Optional, final
 
-from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.repositories.base import QueryCondition
 
 
 class BaseFilterAdapter:
     """Base adapter providing common filter conversion utilities."""
 
+    @final
     def convert_string_filter(
         self,
         string_filter: StringFilter,
@@ -112,5 +113,37 @@ class BaseFilterAdapter:
             return ends_with_factory(
                 StringMatchSpec(string_filter.i_not_ends_with, case_insensitive=True, negated=True)
             )
+
+        return None
+
+    @final
+    def convert_uuid_filter(
+        self,
+        uuid_filter: UUIDFilter,
+        equals_factory: Callable[[UUIDEqualMatchSpec], QueryCondition],
+        in_factory: Callable[[UUIDInMatchSpec], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """
+        Convert UUIDFilter to QueryCondition using provided factory callables.
+
+        Args:
+            uuid_filter: The UUID filter to convert
+            equals_factory: Factory for equality operations (=, !=)
+            in_factory: Factory for IN operations (IN, NOT IN)
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        # Equality operations
+        if uuid_filter.equals is not None:
+            return equals_factory(UUIDEqualMatchSpec(value=uuid_filter.equals, negated=False))
+        if uuid_filter.not_equals is not None:
+            return equals_factory(UUIDEqualMatchSpec(value=uuid_filter.not_equals, negated=True))
+
+        # IN operations
+        if uuid_filter.in_ is not None:
+            return in_factory(UUIDInMatchSpec(values=uuid_filter.in_, negated=False))
+        if uuid_filter.not_in is not None:
+            return in_factory(UUIDInMatchSpec(values=uuid_filter.not_in, negated=True))
 
         return None

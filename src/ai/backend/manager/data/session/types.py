@@ -260,7 +260,7 @@ class SessionInfo:
 class SchedulingResult(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
-    SKIPPED = "SKIPPED"
+    STALE = "STALE"
 
 
 class SubStepResult(BaseModel):
@@ -270,6 +270,8 @@ class SubStepResult(BaseModel):
     result: SchedulingResult
     error_code: Optional[str] = None
     message: Optional[str] = None
+    started_at: datetime
+    ended_at: datetime
 
 
 @dataclass
@@ -287,7 +289,7 @@ class SessionSchedulingHistoryData:
     error_code: Optional[str]
     message: str
 
-    sub_steps: Optional[list[SubStepResult]]
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime

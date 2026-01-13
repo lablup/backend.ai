@@ -2,34 +2,37 @@
 Scheduler operation handlers.
 """
 
-from .base import SchedulerHandler
-from .lifecycle.schedule_sessions import ScheduleSessionsHandler
-from .lifecycle.start_sessions import StartSessionsHandler
-from .lifecycle.terminate_sessions import TerminateSessionsHandler
-from .maintenance.sweep_lost_agent_kernels import SweepLostAgentKernelsHandler
-from .maintenance.sweep_sessions import SweepSessionsHandler
-from .maintenance.sweep_stale_kernels import SweepStaleKernelsHandler
-from .progress.check_creating_progress import CheckCreatingProgressHandler
-from .progress.check_precondition import CheckPreconditionHandler
-from .progress.check_pulling_progress import CheckPullingProgressHandler
-from .progress.check_running_session_termination import CheckRunningSessionTerminationHandler
-from .progress.check_terminating_progress import CheckTerminatingProgressHandler
-from .recovery.retry_creating import RetryCreatingHandler
-from .recovery.retry_preparing import RetryPreparingHandler
+from .base import SessionLifecycleHandler
+from .lifecycle.schedule_sessions import ScheduleSessionsLifecycleHandler
+from .lifecycle.start_sessions import StartSessionsLifecycleHandler
+from .lifecycle.terminate_sessions import TerminateSessionsLifecycleHandler
+from .maintenance.sweep_lost_agent_kernels import SweepLostAgentKernelsLifecycleHandler
+from .maintenance.sweep_sessions import SweepSessionsLifecycleHandler
+from .maintenance.sweep_stale_kernels import SweepStaleKernelsLifecycleHandler
+from .progress.check_creating_progress import CheckCreatingProgressLifecycleHandler
+from .progress.check_precondition import CheckPreconditionLifecycleHandler
+from .progress.check_pulling_progress import CheckPullingProgressLifecycleHandler
+from .progress.check_running_session_termination import (
+    CheckRunningSessionTerminationLifecycleHandler,
+)
+from .progress.check_terminating_progress import CheckTerminatingProgressLifecycleHandler
+from .recovery.retry_creating import RetryCreatingLifecycleHandler
+from .recovery.retry_preparing import RetryPreparingLifecycleHandler
 
 __all__ = [
-    "CheckCreatingProgressHandler",
-    "CheckPreconditionHandler",
-    "CheckPullingProgressHandler",
-    "CheckRunningSessionTerminationHandler",
-    "CheckTerminatingProgressHandler",
-    "RetryCreatingHandler",
-    "RetryPreparingHandler",
-    "ScheduleSessionsHandler",
-    "SchedulerHandler",
-    "StartSessionsHandler",
-    "SweepLostAgentKernelsHandler",
-    "SweepSessionsHandler",
-    "SweepStaleKernelsHandler",
-    "TerminateSessionsHandler",
+    # Session lifecycle handlers (SessionLifecycleHandler interface)
+    "SessionLifecycleHandler",
+    "CheckCreatingProgressLifecycleHandler",
+    "CheckPreconditionLifecycleHandler",
+    "CheckPullingProgressLifecycleHandler",
+    "CheckRunningSessionTerminationLifecycleHandler",
+    "CheckTerminatingProgressLifecycleHandler",
+    "RetryCreatingLifecycleHandler",
+    "RetryPreparingLifecycleHandler",
+    "ScheduleSessionsLifecycleHandler",
+    "StartSessionsLifecycleHandler",
+    "SweepLostAgentKernelsLifecycleHandler",
+    "SweepSessionsLifecycleHandler",
+    "SweepStaleKernelsLifecycleHandler",
+    "TerminateSessionsLifecycleHandler",
 ]

@@ -232,7 +232,7 @@ class Metadata:
 
 @dataclass
 class KernelInfo:
-    id: UUID  # Kernel UUID
+    id: KernelId
     session: RelatedSessionInfo
     user_permission: UserPermission
     image: ImageInfo

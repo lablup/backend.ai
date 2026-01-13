@@ -29,10 +29,8 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -43,11 +41,12 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData, ScheduleResult
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
     KernelBindingData,
     NetworkSetup,
+    RetryResult,
     SessionDataForPull,
     SessionDataForStart,
 )
@@ -58,7 +57,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass
 class SessionLauncherArgs:
     repository: SchedulerRepository
-    agent_pool: AgentPool
+    agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
@@ -75,7 +74,7 @@ class SessionLauncher:
     """
 
     _repository: SchedulerRepository
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
     _valkey_schedule: ValkeyScheduleClient
@@ -83,52 +82,28 @@ class SessionLauncher:
 
     def __init__(self, args: SessionLauncherArgs) -> None:
         self._repository = args.repository
-        self._agent_pool = args.agent_pool
+        self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
-    async def check_preconditions(self) -> ScheduleResult:
+    async def trigger_image_pulling(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
         """
-        Check preconditions for scheduled sessions.
-        Transitions sessions from SCHEDULED to PREPARING and triggers image pulling.
+        Trigger image checking and pulling on agents for the given sessions.
 
-        :return: ScheduleResult with the count of sessions transitioned
+        Public method for SessionLifecycleHandler pattern.
+        Used by CheckPreconditionLifecycleHandler to trigger image pulling
+        after coordinator queries sessions.
+
+        :param sessions: List of sessions with kernels
+        :param image_configs: Image configurations indexed by image name
         """
-        # Get scheduled sessions for image pulling
-        result = await self._repository.get_sessions_for_pull(
-            [SessionStatus.SCHEDULED],
-            [
-                KernelStatus.SCHEDULED,
-            ],
-        )
-        scheduled_sessions = result.sessions
-        image_configs = result.image_configs
-
-        if not scheduled_sessions:
-            return ScheduleResult()
-
-        # Extract session IDs for status update
-        session_ids = [s.session_id for s in scheduled_sessions]
-
-        # Update sessions to PREPARING status
-        await self._repository.update_sessions_to_preparing(session_ids)
-
-        # Trigger image checking and pulling on agents
-        await self._trigger_image_pulling_for_sessions(scheduled_sessions, image_configs)
-
-        # Convert to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="passed-preconditions",
-            )
-            for session in scheduled_sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
+        await self._trigger_image_pulling_for_sessions(sessions, image_configs)
 
     async def _trigger_image_pulling_for_sessions(
         self,
@@ -137,6 +112,8 @@ class SessionLauncher:
     ) -> None:
         """
         Trigger image checking and pulling on agents for the given sessions.
+
+        Internal implementation method.
 
         :param sessions: List of sessions with kernels
         :param image_configs: Image configurations indexed by image name
@@ -162,53 +139,42 @@ class SessionLauncher:
                         agent_image_configs[agent_id][canonical] = image_config
 
         # Trigger image checking and pulling on each agent
+        async def pull_for_agent(
+            agent_id: AgentId, images: dict[str, ImageConfig]
+        ) -> Mapping[str, str]:
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                return await client.check_and_pull(images)
+
         pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-            pull_tasks.append(agent_client.check_and_pull(agent_images))
+            pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            await asyncio.gather(*pull_tasks, return_exceptions=True)
+            # Note: shared_phase should be provided by the caller (e.g., handler)
+            with RecorderContext[SessionId].shared_step(
+                "check_and_pull_images",
+                success_detail="Image pull triggered",
+            ):
+                await asyncio.gather(*pull_tasks, return_exceptions=True)
 
-    async def start_sessions(self) -> ScheduleResult:
+    async def start_sessions_for_handler(
+        self,
+        sessions: list[SessionDataForStart],
+        image_configs: dict[str, ImageConfigData],
+    ) -> None:
         """
-        Start sessions that have passed precondition checks.
-        Transitions sessions from PREPARED to CREATING and starts kernels on agents.
+        Start sessions on agents for the given sessions.
 
-        :return: ScheduleResult with the count of sessions started
+        Public method for SessionLifecycleHandler pattern.
+        Used by StartSessionsLifecycleHandler to start sessions
+        after coordinator queries sessions with user data.
+
+        Note: Status transition is handled by the Coordinator, not here.
+
+        :param sessions: List of sessions with full data for starting
+        :param image_configs: Image configurations indexed by image name
         """
-        # Get prepared sessions for starting
-        sessions_with_images = await self._repository.get_sessions_for_start(
-            [SessionStatus.PREPARED],
-            [
-                KernelStatus.PREPARED,
-            ],
-        )
-        prepared_sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
-
-        if not prepared_sessions:
-            return ScheduleResult()
-        # Extract session IDs for status update
-        session_ids = [s.session_id for s in prepared_sessions]
-
-        # Update sessions and kernels to CREATING status
-        await self._repository.update_sessions_and_kernels_to_creating(session_ids)
-
-        # Start sessions concurrently
-        await self._start_sessions_concurrently(prepared_sessions, image_configs)
-
-        # Convert prepared sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
-            )
-            for session in prepared_sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
+        await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
@@ -323,14 +289,12 @@ class SessionLauncher:
                 image_configs_by_canonical[image_key] = image_config
 
             # Create kernels on each agent
-            create_tasks: list[Awaitable[Any]] = []
-            for agent_id, agent_kernels in kernels_by_agent.items():
-                agent_client = self._agent_pool.get_agent_client(
-                    agent_id, order_key=str(session.session_id)
-                )
-
+            async def create_kernels_on_agent(
+                agent_id: AgentId,
+                agent_kernels: list[KernelBindingData],
+            ) -> None:
                 # Prepare kernel creation configs
-                kernel_ids = [str(k.kernel_id) for k in agent_kernels]
+                kernel_ids = [k.kernel_id for k in agent_kernels]
                 kernel_configs: list[KernelCreationConfig] = []
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
@@ -426,16 +390,19 @@ class SessionLauncher:
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                 }
 
-                # Create the kernels
-                create_tasks.append(
-                    agent_client.create_kernels(
-                        str(session.session_id),
+                # Create the kernels using connection pool
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    await client.create_kernels(
+                        session.session_id,
                         kernel_ids,
                         kernel_configs,
                         cluster_info,
                         kernel_image_refs,
                     )
-                )
+
+            create_tasks: list[Awaitable[None]] = []
+            for agent_id, agent_kernels in kernels_by_agent.items():
+                create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
             if create_tasks:
                 await asyncio.gather(*create_tasks, return_exceptions=True)
@@ -479,11 +446,9 @@ class SessionLauncher:
                 first_kernel = session.kernels[0]
                 if not first_kernel.agent_id:
                     raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
-                agent_client = self._agent_pool.get_agent_client(
-                    first_kernel.agent_id, order_key=str(session.session_id)
-                )
                 try:
-                    await agent_client.create_local_network(network_name)
+                    async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
+                        await client.create_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to create agent-local network {network_name}")
                     raise
@@ -534,10 +499,8 @@ class SessionLauncher:
                             f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
                         )
                         continue
-                    agent_client = self._agent_pool.get_agent_client(
-                        kernel.agent_id, order_key=str(session.session_id)
-                    )
-                    port = await agent_client.assign_port()
+                    async with self._agent_client_pool.acquire(kernel.agent_id) as client:
+                        port = await client.assign_port()
                     # Extract host from agent_addr
                     agent_addr = kernel.agent_addr or ""
                     agent_host = (
@@ -645,126 +608,85 @@ class SessionLauncher:
                     session_image_set.add(canonical)
             session_images[session.session_id] = session_image_set
 
-        # Check pulling status for each agent
+        # Check pulling status for each agent in parallel
+        check_tasks = [
+            self._check_agent_pulling_status(agent_id, images)
+            for agent_id, images in agent_images.items()
+        ]
+        results = await asyncio.gather(*check_tasks, return_exceptions=True)
+
         agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
-        for agent_id, images in agent_images.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-            pulling_status = {}
-            for image in images:
-                try:
-                    is_pulling = await agent_client.check_pulling(image)
-                    pulling_status[image] = is_pulling
-                except Exception as e:
-                    log.warning(
-                        "Failed to check pulling status for image {} on agent {}: {}",
-                        image,
-                        agent_id,
-                        e,
-                    )
-                    # If we can't check, assume it's stuck
-                    pulling_status[image] = False
+        for result in results:
+            if isinstance(result, BaseException):
+                log.warning("Failed to check pulling status: {}", result)
+                continue
+            agent_id, pulling_status = result
             agent_pulling_status[agent_id] = pulling_status
 
         # Determine truly stuck sessions
+        pool = RecorderContext[SessionId].current_pool()
         for session in sessions:
-            images_to_check = session_images[session.session_id]
-            if not images_to_check:
-                # No images to check, consider it stuck
-                truly_stuck_sessions.append(session)
-                continue
+            recorder = pool.recorder(session.session_id)
+            with recorder.phase(
+                "verify_pull_status",
+                success_detail="Image pull status verified",
+            ):
+                with recorder.step(
+                    "check_pull_progress",
+                    success_detail="Image pull progress checked",
+                ):
+                    images_to_check = session_images[session.session_id]
+                    if not images_to_check:
+                        # No images to check, consider it stuck
+                        truly_stuck_sessions.append(session)
+                        continue
 
-            # Check if any image for this session is actively being pulled
-            any_pulling = False
-            for kernel in session.kernels:
-                if kernel.agent_id and kernel.image in image_configs:
-                    img_cfg = image_configs[kernel.image]
-                    canonical = img_cfg.canonical
-                    if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
-                        any_pulling = True
-                        break
+                    # Check if any image for this session is actively being pulled
+                    any_pulling = False
+                    for kernel in session.kernels:
+                        if kernel.agent_id and kernel.image in image_configs:
+                            img_cfg = image_configs[kernel.image]
+                            canonical = img_cfg.canonical
+                            if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
+                                any_pulling = True
+                                break
 
-            if not any_pulling:
-                # No images are being pulled, session is truly stuck
-                truly_stuck_sessions.append(session)
+                    if not any_pulling:
+                        # No images are being pulled, session is truly stuck
+                        truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
-    async def retry_preparing_sessions(self) -> ScheduleResult:
-        """
-        Retry PREPARING/PULLING sessions that appear stuck.
-        Re-triggers check_and_pull operations for their images.
-
-        :return: ScheduleResult with number of sessions retried
-        """
-        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
-
-        # Get sessions with PREPARING and PULLING statuses
-        sessions_with_images = await self._repository.get_sessions_for_pull(
-            [
-                SessionStatus.PREPARING,
-                SessionStatus.PULLING,
-            ],
-            [
-                KernelStatus.SCHEDULED,
-                KernelStatus.PREPARING,
-                KernelStatus.PULLING,
-            ],
-        )
-        sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
-
-        if not sessions:
-            log.trace("No sessions found with PREPARING/PULLING status")
-            return ScheduleResult()
-
-        # Filter sessions that haven't changed status for threshold time
-        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
-
-        if not stuck_sessions:
-            return ScheduleResult()
-
-        # Check which sessions are actually stuck (not actively pulling)
-        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
-            stuck_sessions, image_configs
-        )
-
-        if not truly_stuck_sessions:
-            log.debug("All sessions are actively pulling, no retry needed")
-            return ScheduleResult()
-
-        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
-
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return ScheduleResult()
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
-        ]
-
-        # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
-
-        # Convert retried sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
+    async def _check_agent_pulling_status(
+        self,
+        agent_id: AgentId,
+        images: set[str],
+    ) -> tuple[AgentId, dict[str, bool]]:
+        """Check pulling status for all images on a single agent."""
+        pulling_status: dict[str, bool] = {}
+        try:
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                for image in images:
+                    try:
+                        is_pulling = await client.check_pulling(image)
+                        pulling_status[image] = is_pulling
+                    except Exception as e:
+                        log.warning(
+                            "Failed to check pulling status for image {} on agent {}: {}",
+                            image,
+                            agent_id,
+                            e,
+                        )
+                        pulling_status[image] = False
+        except Exception as e:
+            log.warning(
+                "Failed to acquire connection for agent {}: {}",
+                agent_id,
+                e,
             )
-            for session in sessions_to_retry
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
+            for image in images:
+                pulling_status[image] = False
+        return agent_id, pulling_status
 
     def _filter_stuck_sessions_for_start(
         self,
@@ -807,102 +729,184 @@ class SessionLauncher:
         :param sessions: List of potentially stuck sessions
         :return: List of sessions that are truly stuck
         """
-        truly_stuck_sessions: list[SessionDataForStart] = []
+        if not sessions:
+            return []
 
-        for session in sessions:
-            # Check each kernel in the session
-            any_active = False
-            for kernel in session.kernels:
-                if kernel.agent_id:
-                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
-                    try:
-                        # Check if kernel is being created or already exists
-                        is_active = await agent_client.check_creating(str(kernel.kernel_id))
-                        if is_active:
-                            any_active = True
-                            break
-                    except Exception as e:
+        # Check all sessions in parallel
+        check_tasks = [self._check_session_has_active_kernels(session) for session in sessions]
+        results = await asyncio.gather(*check_tasks, return_exceptions=True)
+
+        # Filter sessions that have no active kernels
+        truly_stuck_sessions: list[SessionDataForStart] = []
+        pool = RecorderContext[SessionId].current_pool()
+        for session, result in zip(sessions, results, strict=True):
+            recorder = pool.recorder(session.session_id)
+            with recorder.phase(
+                "verify_creation_status",
+                success_detail="Kernel creation status verified",
+            ):
+                with recorder.step(
+                    "check_kernel_status",
+                    success_detail="Kernel creation status checked",
+                ):
+                    if isinstance(result, BaseException):
                         log.warning(
-                            "Failed to check creating status for kernel {} on agent {}: {}",
-                            kernel.kernel_id,
-                            kernel.agent_id,
-                            e,
+                            "Failed to check session {} creating status: {}",
+                            session.session_id,
+                            result,
                         )
                         # If we can't check, assume it's stuck
-
-            if not any_active:
-                # No kernels are being created or existing, session is truly stuck
-                truly_stuck_sessions.append(session)
+                        truly_stuck_sessions.append(session)
+                    elif not result:
+                        # No active kernels, session is stuck
+                        truly_stuck_sessions.append(session)
 
         return truly_stuck_sessions
 
-    async def retry_creating_sessions(self) -> ScheduleResult:
-        """
-        Retry CREATING sessions that appear stuck.
-        Re-triggers kernel creation operations directly.
+    async def _check_session_has_active_kernels(
+        self,
+        session: SessionDataForStart,
+    ) -> bool:
+        """Check if any kernel in the session is being created or already exists."""
+        for kernel in session.kernels:
+            if not kernel.agent_id:
+                continue
+            try:
+                async with self._agent_client_pool.acquire(kernel.agent_id) as client:
+                    is_active = await client.check_creating(kernel.kernel_id)
+                    if is_active:
+                        return True
+            except Exception as e:
+                log.warning(
+                    "Failed to check creating status for kernel {} on agent {}: {}",
+                    kernel.kernel_id,
+                    kernel.agent_id,
+                    e,
+                )
+        return False
 
-        :return: ScheduleResult with number of sessions retried
+    async def retry_preparing_for_handler(
+        self,
+        sessions: list[SessionDataForPull],
+        image_configs: dict[str, ImageConfigData],
+    ) -> RetryResult:
+        """
+        Retry PREPARING/PULLING sessions for the given sessions list.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by RetryPreparingLifecycleHandler.
+
+        :param sessions: List of sessions to check for retry
+        :param image_configs: Image configurations indexed by image name
+        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
+        """
+        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
+
+        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
+
+        if not sessions:
+            return empty_result
+
+        # Filter sessions that haven't changed status for threshold time
+        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
+
+        if not stuck_sessions:
+            return empty_result
+
+        # Check which sessions are actually stuck (not actively pulling)
+        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
+            stuck_sessions, image_configs
+        )
+
+        if not truly_stuck_sessions:
+            log.debug("All sessions are actively pulling, no retry needed")
+            return empty_result
+
+        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
+
+        # Update retry counts and get sessions that should continue retrying
+        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
+        retry_update_result = await self._repository.batch_update_stuck_session_retries(
+            stuck_session_ids, SERVICE_MAX_RETRIES
+        )
+
+        if not retry_update_result.sessions_to_retry:
+            log.info("All stuck sessions exceeded max retries")
+            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
+
+        # Filter sessions that should be retried based on returned IDs
+        sessions_to_retry = [
+            session
+            for session in truly_stuck_sessions
+            if session.session_id in retry_update_result.sessions_to_retry
+        ]
+
+        # Use the existing _trigger_image_pulling_for_sessions method
+        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+
+        return RetryResult(
+            retried_ids=list(retry_update_result.sessions_to_retry),
+            exceeded_ids=list(retry_update_result.sessions_exceeded),
+        )
+
+    async def retry_creating_for_handler(
+        self,
+        sessions: list[SessionDataForStart],
+        image_configs: dict[str, ImageConfigData],
+    ) -> RetryResult:
+        """
+        Retry CREATING sessions for the given sessions list.
+
+        Handler-specific method that works with pre-fetched data.
+        Used by RetryCreatingLifecycleHandler.
+
+        :param sessions: List of sessions to check for retry
+        :param image_configs: Image configurations indexed by image name
+        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
         """
         CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
-        # Get CREATING sessions from repository
-        sessions_with_images = await self._repository.get_sessions_for_start(
-            [SessionStatus.CREATING],
-            [
-                KernelStatus.PREPARED,
-                KernelStatus.CREATING,
-            ],
-        )
-        sessions = sessions_with_images.sessions
-        image_configs = sessions_with_images.image_configs
+        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
 
         if not sessions:
-            return ScheduleResult()
+            return empty_result
 
         # Filter sessions that haven't changed status for threshold time
         stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
 
         if not stuck_sessions:
-            return ScheduleResult()
+            return empty_result
 
         # Check which sessions are truly stuck (not actively creating)
         truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
 
         if not truly_stuck_sessions:
             log.debug("All sessions are actively creating kernels, no retry needed")
-            return ScheduleResult()
+            return empty_result
 
         log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
         # Update retry counts and get sessions that should continue retrying
         stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        sessions_to_retry_ids = await self._repository.batch_update_stuck_session_retries(
+        retry_update_result = await self._repository.batch_update_stuck_session_retries(
             stuck_session_ids, SERVICE_MAX_RETRIES
         )
 
-        if not sessions_to_retry_ids:
-            log.info("All stuck sessions exceeded max retries, moved to PENDING")
-            return ScheduleResult()
+        if not retry_update_result.sessions_to_retry:
+            log.info("All stuck sessions exceeded max retries")
+            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
 
         # Filter sessions that should be retried based on returned IDs
         sessions_to_retry = [
             session
             for session in truly_stuck_sessions
-            if session.session_id in sessions_to_retry_ids
+            if session.session_id in retry_update_result.sessions_to_retry
         ]
 
         # Use the existing _start_sessions_concurrently method to retry
-        # This will re-trigger kernel creation for stuck sessions
         await self._start_sessions_concurrently(sessions_to_retry, image_configs)
 
-        # Convert retried sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=session.session_id,
-                creation_id=session.creation_id,
-                access_key=session.access_key,
-                reason="triggered-by-scheduler",
-            )
-            for session in sessions_to_retry
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
+        return RetryResult(
+            retried_ids=list(retry_update_result.sessions_to_retry),
+            exceeded_ids=list(retry_update_result.sessions_exceeded),
+        )

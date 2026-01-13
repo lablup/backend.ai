@@ -2,7 +2,7 @@
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -54,41 +54,38 @@ from ai.backend.manager.sokovan.scheduler.provisioner.validators.validator impor
     SchedulingValidator,
 )
 from ai.backend.manager.sokovan.scheduler.scheduler import (
-    Scheduler,
-    SchedulerArgs,
+    SchedulerComponents,
+    create_scheduler_components,
 )
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
 )
-from ai.backend.manager.types import DistributedLockFactory
 
 
-def create_default_scheduler(
+def create_default_scheduler_components(
     repository: SchedulerRepository,
     deployment_repository: DeploymentRepository,
     config_provider: ManagerConfigProvider,
-    lock_factory: DistributedLockFactory,
-    agent_pool: AgentPool,
+    agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
     event_producer: EventProducer,
     valkey_schedule: ValkeyScheduleClient,
-) -> Scheduler:
+) -> SchedulerComponents:
     """
-    Create a scheduler with default components.
+    Create scheduler components with default configuration.
 
     Args:
         repository: The repository for accessing system data
         deployment_repository: The deployment repository
         config_provider: The manager configuration provider
-        lock_factory: Factory for creating distributed locks
-        agent_pool: Pool for managing agent clients
+        agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
         event_producer: Event producer for publishing events
         valkey_schedule: Valkey client for scheduling operations
 
     Returns:
-        A configured Scheduler instance
+        A configured SchedulerComponents instance
     """
     # Create provisioner components
     sequencer = FIFOSequencer()
@@ -124,7 +121,7 @@ def create_default_scheduler(
     launcher = SessionLauncher(
         SessionLauncherArgs(
             repository=repository,
-            agent_pool=agent_pool,
+            agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
@@ -135,23 +132,19 @@ def create_default_scheduler(
     terminator = SessionTerminator(
         SessionTerminatorArgs(
             repository=repository,
-            agent_pool=agent_pool,
+            agent_client_pool=agent_client_pool,
             valkey_schedule=valkey_schedule,
         )
     )
 
-    return Scheduler(
-        SchedulerArgs(
-            provisioner=provisioner,
-            launcher=launcher,
-            terminator=terminator,
-            repository=repository,
-            deployment_repository=deployment_repository,
-            config_provider=config_provider,
-            lock_factory=lock_factory,
-            agent_pool=agent_pool,
-            network_plugin_ctx=network_plugin_ctx,
-            event_producer=event_producer,
-            valkey_schedule=valkey_schedule,
-        )
+    return create_scheduler_components(
+        provisioner=provisioner,
+        launcher=launcher,
+        terminator=terminator,
+        repository=repository,
+        deployment_repository=deployment_repository,
+        config_provider=config_provider,
+        agent_client_pool=agent_client_pool,
+        network_plugin_ctx=network_plugin_ctx,
+        event_producer=event_producer,
     )

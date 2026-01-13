@@ -96,10 +96,13 @@ async def registry_ctx() -> AsyncGenerator[
     mock_scheduling_controller.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
     mock_scheduling_controller.dispatch_session_events = AsyncMock()
 
+    mock_agent_client_pool = MagicMock()
+
     registry = AgentRegistry(
         config_provider=mock_config_provider,
         db=mock_db,
         agent_cache=mock_agent_cache,
+        agent_client_pool=mock_agent_client_pool,
         valkey_stat=mock_valkey_stat_client,
         valkey_live=mock_redis_live,
         valkey_image=mock_redis_image,

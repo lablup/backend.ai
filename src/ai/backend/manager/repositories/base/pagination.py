@@ -64,6 +64,32 @@ class PageInfoResult(Generic[TRow]):
 
 
 @dataclass
+class NoPagination(QueryPagination):
+    """
+    No pagination - returns all matching rows.
+
+    Use this when you need to fetch all results without any limit.
+    Useful for internal operations like scheduler batch processing.
+    """
+
+    @property
+    def uses_window_function(self) -> bool:
+        return False
+
+    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+        """No pagination applied - returns query unchanged."""
+        return query
+
+    def compute_page_info(self, rows: list[Row], total_count: int) -> PageInfoResult[Row]:
+        """No pagination - no next/previous pages."""
+        return PageInfoResult(
+            rows=rows,
+            has_next_page=False,
+            has_previous_page=False,
+        )
+
+
+@dataclass
 class OffsetPagination(QueryPagination):
     """
     Offset-based pagination using limit and offset.

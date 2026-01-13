@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
@@ -11,7 +12,12 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData, Scalin
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import (
@@ -184,6 +190,76 @@ class ScalingGroupDBSource:
                     sa.and_(
                         ScalingGroupForDomainRow.scaling_group == scaling_group,
                         ScalingGroupForDomainRow.domain == domain,
+                    )
+                )
+            )
+            result = await session.scalar(query)
+            return (result or 0) > 0
+
+    async def associate_scaling_group_with_keypairs(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Associates a scaling group with multiple keypairs."""
+        async with self._db.begin_session() as session:
+            await execute_bulk_creator(session, bulk_creator)
+
+    async def disassociate_scaling_group_with_keypairs(
+        self,
+        purger: BatchPurger[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Disassociates a scaling group from multiple keypairs."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)
+
+    async def check_scaling_group_keypair_association_exists(
+        self,
+        scaling_group_name: str,
+        access_key: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a keypair."""
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(
+                sa.exists().where(
+                    sa.and_(
+                        ScalingGroupForKeypairsRow.scaling_group == scaling_group_name,
+                        ScalingGroupForKeypairsRow.access_key == access_key,
+                    )
+                )
+            )
+            result = await session.execute(query)
+            return result.scalar() or False
+
+    async def associate_scaling_group_with_user_groups(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a scaling group with multiple user groups (projects)."""
+        async with self._db.begin_session() as session:
+            await execute_bulk_creator(session, bulk_creator)
+
+    async def disassociate_scaling_group_with_user_groups(
+        self,
+        purger: BatchPurger[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates a single scaling group from a user group (project)."""
+        async with self._db.begin_session() as session:
+            await execute_batch_purger(session, purger)
+
+    async def check_scaling_group_user_group_association_exists(
+        self,
+        scaling_group: str,
+        user_group: uuid.UUID,
+    ) -> bool:
+        """Checks if a scaling group is associated with a user group (project)."""
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(ScalingGroupForProjectRow)
+                .where(
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == scaling_group,
+                        ScalingGroupForProjectRow.group == user_group,
                     )
                 )
             )

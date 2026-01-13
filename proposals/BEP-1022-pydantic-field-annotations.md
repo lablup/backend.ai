@@ -1,10 +1,10 @@
 ---
-Author: Hyeokjin Kim (hj.kim@lablup.com)
-Status: Draft
+Author: HyeokJin Kim (hyeokjin@lablup.com)
+Status: Implemented
 Created: 2026-01-06
 Created-Version: 26.1.0
-Target-Version:
-Implemented-Version:
+Target-Version: 26.1.0
+Implemented-Version: 26.1.0
 ---
 
 # Pydantic Field Metadata Annotation

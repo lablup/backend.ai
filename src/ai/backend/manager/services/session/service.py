@@ -73,7 +73,6 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -202,7 +201,6 @@ class SessionServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
-    admin_session_repository: AdminSessionRepository
     scheduling_controller: SchedulingController
 
 
@@ -214,7 +212,6 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
-    _admin_session_repository: AdminSessionRepository
     _scheduling_controller: SchedulingController
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
@@ -230,7 +227,6 @@ class SessionService:
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
-        self._admin_session_repository = args.admin_session_repository
         self._scheduling_controller = args.scheduling_controller
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
@@ -1417,17 +1413,16 @@ class SessionService:
         user_role = action.user_role
         session_id = action.session_id
 
-        if user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            session_row = (
-                await self._admin_session_repository.get_session_to_determine_status_force(
-                    session_id
-                )
-            )
-        else:
-            session_row = await self._session_repository.get_session_to_determine_status(session_id)
+        # Fetch session by ID without ownership check
+        session_row = await self._session_repository.get_session_by_id(session_id)
+        if session_row is None:
+            raise SessionNotFound(f"Session not found (id:{session_id})")
+
+        # Regular users can only transit their own sessions
+        if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             if session_row.user_uuid != user_id:
                 log.warning(
-                    f"You are not allowed to transit others's sessions status, skip (s:{session_id})"
+                    f"You are not allowed to transit other user's session status, skip (s:{session_id})"
                 )
                 return CheckAndTransitStatusActionResult(
                     result={}, session_data=session_row.to_dataclass()
