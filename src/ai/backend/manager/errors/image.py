@@ -110,18 +110,6 @@ class ImageAccessForbiddenError(BackendAIError):
         )
 
 
-class ForgetImageForbiddenError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/generic-forbidden"
-    error_title = "User does not have permission to delete this image"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class ForgetImageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/generic-not-found"
     error_title = "The image you are trying to delete does not exist."
