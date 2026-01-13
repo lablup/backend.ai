@@ -8,6 +8,7 @@ from pydantic import HttpUrl
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.model_serving.types import RouteInfo, ServiceInfo, UserRole
+from ai.backend.manager.errors.service import EndpointAccessForbiddenError
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
@@ -158,3 +159,157 @@ class TestGetModelServiceInfo:
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)
 
         await scenario.test(get_model_service_info)
+
+
+class TestGetModelServiceInfoPermissions:
+    """Tests for permission validation in get_model_service_info."""
+
+    @pytest.fixture
+    def mock_get_endpoint_by_id(self, mocker, mock_repositories) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "get_endpoint_by_id",
+            new_callable=AsyncMock,
+        )
+
+    @pytest.fixture
+    def mock_check_requester_access(self, mocker, model_serving_service) -> AsyncMock:
+        mock = mocker.patch.object(
+            model_serving_service,
+            "check_requester_access",
+            new_callable=AsyncMock,
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.mark.asyncio
+    async def test_user_cannot_access_other_users_endpoint(
+        self,
+        model_serving_processors: ModelServingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+    ) -> None:
+        """USER should NOT be able to access another user's endpoint info."""
+        owner_user_id = uuid.uuid4()
+        other_user_id = uuid.uuid4()
+        service_id = uuid.uuid4()
+
+        mock_endpoint = MagicMock(
+            id=service_id,
+            model=uuid.uuid4(),
+            extra_mounts=[],
+            model_definition_path=None,
+            replicas=1,
+            routings=[],
+            url="https://example.com",
+            open_to_public=False,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            session_owner_id=owner_user_id,
+            session_owner_role=UserRole.USER,
+            domain="default",
+        )
+        mock_endpoint.name = "test-model"
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = GetModelServiceInfoAction(
+            service_id=service_id,
+            user_data=UserData(
+                user_id=other_user_id,  # Different from owner
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role="user",
+                domain_name="default",
+            ),
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await model_serving_processors.get_model_service_info.wait_for_complete(action)
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_access_endpoint_in_different_domain(
+        self,
+        model_serving_processors: ModelServingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+    ) -> None:
+        """ADMIN should NOT be able to access endpoint in different domain."""
+        owner_user_id = uuid.uuid4()
+        admin_user_id = uuid.uuid4()
+        service_id = uuid.uuid4()
+
+        mock_endpoint = MagicMock(
+            id=service_id,
+            model=uuid.uuid4(),
+            extra_mounts=[],
+            model_definition_path=None,
+            replicas=1,
+            routings=[],
+            url="https://example.com",
+            open_to_public=False,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            session_owner_id=owner_user_id,
+            session_owner_role=UserRole.USER,
+            domain="domain-a",
+        )
+        mock_endpoint.name = "test-model"
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = GetModelServiceInfoAction(
+            service_id=service_id,
+            user_data=UserData(
+                user_id=admin_user_id,
+                is_authorized=True,
+                is_admin=True,
+                is_superadmin=False,
+                role="admin",
+                domain_name="domain-b",  # Different domain
+            ),
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await model_serving_processors.get_model_service_info.wait_for_complete(action)
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_access_superadmin_owned_endpoint(
+        self,
+        model_serving_processors: ModelServingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+    ) -> None:
+        """ADMIN should NOT be able to access SUPERADMIN's endpoint even in same domain."""
+        superadmin_owner_id = uuid.uuid4()
+        admin_user_id = uuid.uuid4()
+        service_id = uuid.uuid4()
+
+        mock_endpoint = MagicMock(
+            id=service_id,
+            model=uuid.uuid4(),
+            extra_mounts=[],
+            model_definition_path=None,
+            replicas=1,
+            routings=[],
+            url="https://example.com",
+            open_to_public=False,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            session_owner_id=superadmin_owner_id,
+            session_owner_role=UserRole.SUPERADMIN,  # Owned by SUPERADMIN
+            domain="default",
+        )
+        mock_endpoint.name = "test-model"
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = GetModelServiceInfoAction(
+            service_id=service_id,
+            user_data=UserData(
+                user_id=admin_user_id,
+                is_authorized=True,
+                is_admin=True,
+                is_superadmin=False,
+                role="admin",
+                domain_name="default",
+            ),
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await model_serving_processors.get_model_service_info.wait_for_complete(action)

@@ -12,6 +12,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.data.model_serving.types import UserRole
+from ai.backend.manager.errors.service import EndpointAccessForbiddenError
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -266,3 +267,169 @@ class TestCreateEndpointAutoScalingRule:
         if expected and expected.data:
             assert result.data is not None
             assert result.data.id == expected.data.id
+
+
+class TestCreateAutoScalingRulePermissions:
+    """Tests for permission validation in create_auto_scaling_rule."""
+
+    @pytest.fixture
+    def mock_get_endpoint_by_id(self, mocker, mock_repositories) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "get_endpoint_by_id",
+            new_callable=AsyncMock,
+        )
+
+    @pytest.fixture
+    def mock_create_auto_scaling_rule(self, mocker, mock_repositories) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "create_auto_scaling_rule",
+            new_callable=AsyncMock,
+        )
+
+    @pytest.fixture
+    def mock_check_requester_access(self, mocker, auto_scaling_service) -> AsyncMock:
+        mock = mocker.patch.object(
+            auto_scaling_service,
+            "check_requester_access",
+            new_callable=AsyncMock,
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.fixture
+    def sample_creator(self) -> EndpointAutoScalingRuleCreator:
+        return EndpointAutoScalingRuleCreator(
+            metric_source=AutoScalingMetricSource.KERNEL,
+            metric_name="cpu_utilization",
+            threshold="70.0",
+            comparator=AutoScalingMetricComparator.GREATER_THAN,
+            step_size=1,
+            cooldown_seconds=300,
+            min_replicas=2,
+            max_replicas=10,
+        )
+
+    @pytest.mark.asyncio
+    async def test_user_cannot_create_rule_for_other_users_endpoint(
+        self,
+        auto_scaling_processors: ModelServingAutoScalingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_create_auto_scaling_rule: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+        sample_creator: EndpointAutoScalingRuleCreator,
+    ) -> None:
+        """USER should NOT be able to create auto-scaling rule for another user's endpoint."""
+        owner_user_id = uuid.uuid4()
+        other_user_id = uuid.uuid4()
+        endpoint_id = EndpointId(uuid.uuid4())
+
+        mock_endpoint = MagicMock(
+            id=endpoint_id,
+            status=EndpointStatus.READY,
+            session_owner_id=owner_user_id,
+            session_owner_role=UserRole.USER,
+            domain="default",
+        )
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = CreateEndpointAutoScalingRuleAction(
+            endpoint_id=endpoint_id,
+            user_data=UserData(
+                user_id=other_user_id,  # Different from owner
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role="user",
+                domain_name="default",
+            ),
+            creator=sample_creator,
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
+                action
+            )
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_create_rule_for_superadmin_owned_endpoint(
+        self,
+        auto_scaling_processors: ModelServingAutoScalingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_create_auto_scaling_rule: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+        sample_creator: EndpointAutoScalingRuleCreator,
+    ) -> None:
+        """ADMIN should NOT be able to create rule for SUPERADMIN's endpoint."""
+        superadmin_owner_id = uuid.uuid4()
+        admin_user_id = uuid.uuid4()
+        endpoint_id = EndpointId(uuid.uuid4())
+
+        mock_endpoint = MagicMock(
+            id=endpoint_id,
+            status=EndpointStatus.READY,
+            session_owner_id=superadmin_owner_id,
+            session_owner_role=UserRole.SUPERADMIN,  # Owned by SUPERADMIN
+            domain="default",
+        )
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = CreateEndpointAutoScalingRuleAction(
+            endpoint_id=endpoint_id,
+            user_data=UserData(
+                user_id=admin_user_id,
+                is_authorized=True,
+                is_admin=True,
+                is_superadmin=False,
+                role="admin",
+                domain_name="default",
+            ),
+            creator=sample_creator,
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
+                action
+            )
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_create_rule_for_endpoint_in_different_domain(
+        self,
+        auto_scaling_processors: ModelServingAutoScalingProcessors,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_create_auto_scaling_rule: AsyncMock,
+        mock_check_requester_access: AsyncMock,
+        sample_creator: EndpointAutoScalingRuleCreator,
+    ) -> None:
+        """ADMIN should NOT be able to create rule for endpoint in different domain."""
+        owner_user_id = uuid.uuid4()
+        admin_user_id = uuid.uuid4()
+        endpoint_id = EndpointId(uuid.uuid4())
+
+        mock_endpoint = MagicMock(
+            id=endpoint_id,
+            status=EndpointStatus.READY,
+            session_owner_id=owner_user_id,
+            session_owner_role=UserRole.USER,
+            domain="domain-a",
+        )
+        mock_get_endpoint_by_id.return_value = mock_endpoint
+
+        action = CreateEndpointAutoScalingRuleAction(
+            endpoint_id=endpoint_id,
+            user_data=UserData(
+                user_id=admin_user_id,
+                is_authorized=True,
+                is_admin=True,
+                is_superadmin=False,
+                role="admin",
+                domain_name="domain-b",  # Different domain
+            ),
+            creator=sample_creator,
+        )
+
+        with pytest.raises(EndpointAccessForbiddenError):
+            await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
+                action
+            )
