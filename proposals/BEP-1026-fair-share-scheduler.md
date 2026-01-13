@@ -216,6 +216,150 @@ Weight
 - Minimal difference in actual scheduling results compared to Continuous
 - Simplified implementation and debugging
 
+#### Multi-Resource Normalization
+
+**Problem: Multiple Resource Types**
+
+Backend.AI manages multiple resource types (CPU, memory, GPU, etc.), so the Fair Share calculation
+must handle different resource dimensions.
+
+**Approaches Considered:**
+
+| Approach | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **SLURM TRESBillingWeights** | Combine resources into single billing unit | Simple computation | Requires careful weight tuning |
+| **Usage-based Normalization** | `UserUsage / TotalClusterUsage` | Industry standard (SLURM) | Unfair when cluster underutilized |
+| **Capacity-based Normalization** | `UserUsage / ClusterCapacity` | Fair regardless of utilization | Requires capacity tracking |
+
+**Chosen Approach: Capacity-based Per-Resource Normalization**
+
+```
+normalized_usage = Σ((usage[r] / capacity[r]) × weight[r]) / Σ(weight[r])
+
+Where:
+- r: Each resource type (cpu, mem, cuda.device, etc.)
+- usage[r]: User's resource usage for type r (resource-seconds)
+- capacity[r]: Cluster capacity for type r (resource-seconds)
+- weight[r]: Resource weight for type r (from scheduler_opts.resource_weights)
+
+IMPORTANT - Unit Consistency:
+Both usage and capacity MUST be in the same unit (resource-seconds).
+- usage: Accumulated from kernel usage records (e.g., 3600 GPU-seconds = 1 GPU-hour)
+- capacity: agent.available_slots × period_duration_seconds
+  (e.g., 8 GPUs × 28 days × 86400 sec/day = 19,353,600 GPU-seconds)
+
+DO NOT mix resource-seconds (usage) with raw resource units (capacity).
+This would cause incorrect ratios (e.g., 3,600,000 / 8 = 450,000 instead of 0.186).
+```
+
+**Why Capacity-based is Better Than Usage-based:**
+
+```
+Scenario: Cluster with 100 GPU capacity
+
+Usage-based (SLURM style):
+- User A is the only user, used 10 GPU-hours
+- normalized_usage = 10 / 10 = 100% (A has 100% of total usage!)
+- Problem: Small usage gets 100% penalty when cluster underutilized
+
+Capacity-based (Backend.AI approach):
+- User A used 10 GPU-hours, cluster capacity = 100
+- normalized_usage = 10 / 100 = 10%
+- Fair: Usage is correctly proportional to available capacity
+```
+
+**Resource Weight Configuration:**
+
+Resource weights are configured in `scaling_groups.scheduler_opts`:
+
+```python
+# scheduler_opts
+{
+    "resource_weights": {
+        "cpu": 1.0,
+        "mem": 1.0,
+        "cuda.device": 10.0,  # GPU weighted 10x
+        "cuda.shares": 1.0,
+    }
+}
+```
+
+**Calculation Example (1-day period):**
+
+```
+Cluster capacity (resource-seconds for 1 day = 86400 seconds):
+- cpu: 100 cores × 86400 sec = 8,640,000 cpu-seconds
+- mem: 1000 GB × 86400 sec = 86,400,000 mem-seconds
+- cuda.device: 8 GPUs × 86400 sec = 691,200 GPU-seconds
+
+User's usage (used 4 GPUs for 4 hours):
+- cpu: 20 cores × 4 hours × 3600 sec = 288,000 cpu-seconds
+- mem: 200 GB × 4 hours × 3600 sec = 2,880,000 mem-seconds
+- cuda.device: 4 GPUs × 4 hours × 3600 sec = 57,600 GPU-seconds
+
+Resource weights: {cpu: 1.0, mem: 1.0, cuda.device: 10.0}
+
+Per-resource ratio (both in resource-seconds):
+- cpu: 288,000 / 8,640,000 = 0.0333 (3.33%)
+- mem: 2,880,000 / 86,400,000 = 0.0333 (3.33%)
+- cuda.device: 57,600 / 691,200 = 0.0833 (8.33%)
+
+Weighted average:
+normalized_usage = (0.0333×1.0 + 0.0333×1.0 + 0.0833×10.0) / (1.0 + 1.0 + 10.0)
+                 = (0.0333 + 0.0333 + 0.833) / 12.0
+                 = 0.8996 / 12.0
+                 = 0.075 (7.5%)
+```
+
+**Edge Case: Zero Capacity**
+
+When capacity for a resource is zero or unavailable (e.g., all agents offline):
+
+```python
+def calculate_normalized_usage(
+    usage: ResourceSlot,
+    capacity: ResourceSlot,
+    weights: ResourceSlot,
+) -> Decimal:
+    weighted_sum = Decimal(0)
+    weight_sum = Decimal(0)
+
+    for resource_type, weight in weights.items():
+        cap = capacity.get(resource_type, Decimal(0))
+        if cap <= 0:
+            # Skip this resource - capacity unavailable
+            continue
+
+        use = usage.get(resource_type, Decimal(0))
+        ratio = Decimal(use) / Decimal(cap)
+        weighted_sum += ratio * Decimal(weight)
+        weight_sum += Decimal(weight)
+
+    if weight_sum == 0:
+        # No valid resources to calculate - return 0 (new user priority)
+        return Decimal(0)
+
+    return weighted_sum / weight_sum
+```
+
+**Capacity Tracking Strategy:**
+
+To ensure stable Fair Share calculation when cluster capacity changes (e.g., agents added/removed),
+each Usage Bucket stores a **capacity_snapshot** at creation time:
+
+```
+Day 1: Cluster has 100 GPUs
+- User A's bucket: usage=10, capacity_snapshot=100
+- Usage ratio = 10/100 = 10%
+
+Day 2: 20 GPUs removed (maintenance)
+- New bucket: usage=5, capacity_snapshot=80
+- Usage ratio = 5/80 = 6.25%
+- Day 1 bucket unchanged: still 10/100 = 10%
+
+Result: Historical ratios remain stable despite capacity changes
+```
+
 ### 2. 2-Tier Storage Architecture
 
 #### Architecture Overview
@@ -444,6 +588,13 @@ class DomainUsageBucketRow(Base):
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
 
+    # Capacity snapshot for normalization
+    capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Scaling group capacity at bucket period. "
+                "Sum of agent.available_slots for calculating usage ratio."
+    )
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -497,6 +648,13 @@ class ProjectUsageBucketRow(Base):
     # Aggregated resource usage (resource-seconds unit)
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
+    )
+
+    # Capacity snapshot for normalization
+    capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Scaling group capacity at bucket period. "
+                "Sum of agent.available_slots for calculating usage ratio."
     )
 
     # Metadata
@@ -559,6 +717,13 @@ class UserUsageBucketRow(Base):
     # Aggregated resource usage (resource-seconds unit)
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
+    )
+
+    # Capacity snapshot for normalization
+    capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Scaling group capacity at bucket period. "
+                "Sum of agent.available_slots for calculating usage ratio."
     )
 
     # Metadata
@@ -1211,7 +1376,9 @@ user_usage_buckets           aggregation        user_fair_shares
 
 period_start, period_end                        weight (configured value)
 resource_usage (for that period)                total_decayed_usage (summed value)
+capacity_snapshot (for normalization)           normalized_usage (weighted avg of usage/capacity)
                                                 fair_share_factor (calculated value)
+                                                resource_weights (from scheduler_opts)
                                                 lookback_start/end (calculation period)
                                                 half_life_days, decay_unit_days (calculation params)
 ```
@@ -1249,36 +1416,51 @@ class DomainFairShareRow(Base):
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
         comment="Time decay applied total usage (resource-seconds)"
     )
+    normalized_usage: Mapped[Decimal] = mapped_column(
+        Numeric(precision=8, scale=6),
+        nullable=False,
+        default=Decimal("0"),
+        comment="Weighted average of (usage/capacity) per resource (0.0 ~ 1.0). "
+                "IMPORTANT: Both usage and capacity must be in resource-seconds. "
+                "Formula: sum((usage[r]/capacity[r]) * weight[r]) / sum(weight[r])"
+    )
     fair_share_factor: Mapped[Decimal] = mapped_column(
-        Numeric(precision=10, scale=6),
+        Numeric(precision=8, scale=6),
         nullable=False,
         default=Decimal("1.0"),
-        comment="Fair Share Factor (0.0 ~ 1.0)"
+        comment="Calculated priority score from 0.0 to 1.0. "
+                "Higher value = less past usage = higher scheduling priority. "
+                "Formula: F = 2^(-normalized_usage / weight)"
     )
-    last_calculated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True,
-        comment="Last calculation timestamp"
+    last_calculated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        comment="Timestamp when fair_share_factor was last recalculated by batch job."
     )
 
     # Calculation parameters (tracks conditions used for calculation)
-    lookback_start: Mapped[date | None] = mapped_column(
-        Date, nullable=True,
+    resource_weights: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Resource weights used in fair share calculation. "
+                "From scheduler_opts. Example: {cpu: 1.0, mem: 1.0, cuda.device: 10.0}"
+    )
+    lookback_start: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
         comment="Lookup start date used in calculation"
     )
-    lookback_end: Mapped[date | None] = mapped_column(
-        Date, nullable=True,
+    lookback_end: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
         comment="Lookup end date used in calculation"
     )
-    half_life_days: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
+    half_life_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=7,
         comment="Half-life used in calculation (days)"
     )
-    lookback_days: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
+    lookback_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=28,
         comment="Lookback period used in calculation (days)"
     )
-    decay_unit_days: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
+    decay_unit_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1,
         comment="Aggregation unit used in calculation (days)"
     )
 
@@ -1332,21 +1514,53 @@ class ProjectFairShareRow(Base):
     total_decayed_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
     )
+    normalized_usage: Mapped[Decimal] = mapped_column(
+        Numeric(precision=8, scale=6),
+        nullable=False,
+        default=Decimal("0"),
+        comment="Weighted average of (usage/capacity) per resource (0.0 ~ 1.0). "
+                "IMPORTANT: Both usage and capacity must be in resource-seconds. "
+                "Formula: sum((usage[r]/capacity[r]) * weight[r]) / sum(weight[r])"
+    )
     fair_share_factor: Mapped[Decimal] = mapped_column(
-        Numeric(precision=10, scale=6),
+        Numeric(precision=8, scale=6),
         nullable=False,
         default=Decimal("1.0"),
+        comment="Calculated priority score from 0.0 to 1.0. "
+                "Higher value = less past usage = higher scheduling priority. "
+                "Formula: F = 2^(-normalized_usage / weight)"
     )
-    last_calculated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True,
+    last_calculated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        comment="Timestamp when fair_share_factor was last recalculated by batch job."
     )
 
     # Calculation parameters (tracks conditions used for calculation)
-    lookback_start: Mapped[date | None] = mapped_column(Date, nullable=True)
-    lookback_end: Mapped[date | None] = mapped_column(Date, nullable=True)
-    half_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    lookback_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    decay_unit_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_weights: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Resource weights used in fair share calculation. "
+                "From scheduler_opts. Example: {cpu: 1.0, mem: 1.0, cuda.device: 10.0}"
+    )
+    lookback_start: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
+        comment="Lookup start date used in calculation"
+    )
+    lookback_end: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
+        comment="Lookup end date used in calculation"
+    )
+    half_life_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=7,
+        comment="Half-life used in calculation (days)"
+    )
+    lookback_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=28,
+        comment="Lookback period used in calculation (days)"
+    )
+    decay_unit_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1,
+        comment="Aggregation unit used in calculation (days)"
+    )
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
@@ -1405,23 +1619,55 @@ class UserFairShareRow(Base):
     total_decayed_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
     )
+    normalized_usage: Mapped[Decimal] = mapped_column(
+        Numeric(precision=8, scale=6),
+        nullable=False,
+        default=Decimal("0"),
+        comment="Weighted average of (usage/capacity) per resource (0.0 ~ 1.0). "
+                "IMPORTANT: Both usage and capacity must be in resource-seconds. "
+                "Formula: sum((usage[r]/capacity[r]) * weight[r]) / sum(weight[r])"
+    )
     fair_share_factor: Mapped[Decimal] = mapped_column(
-        Numeric(precision=10, scale=6),
+        Numeric(precision=8, scale=6),
         nullable=False,
         default=Decimal("1.0"),
+        comment="Calculated priority score from 0.0 to 1.0. "
+                "Higher value = less past usage = higher scheduling priority. "
+                "Formula: F = 2^(-normalized_usage / weight)"
     )
-    last_calculated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True,
+    last_calculated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        comment="Timestamp when fair_share_factor was last recalculated by batch job."
     )
 
     # Calculation parameters (tracks conditions used for calculation)
     # - Used to determine if recalculation is needed when config changes
     # - Provides visibility of calculation conditions to users
-    lookback_start: Mapped[date | None] = mapped_column(Date, nullable=True)
-    lookback_end: Mapped[date | None] = mapped_column(Date, nullable=True)
-    half_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    lookback_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    decay_unit_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_weights: Mapped[ResourceSlot] = mapped_column(
+        ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
+        comment="Resource weights used in fair share calculation. "
+                "From scheduler_opts. Example: {cpu: 1.0, mem: 1.0, cuda.device: 10.0}"
+    )
+    lookback_start: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
+        comment="Lookup start date used in calculation"
+    )
+    lookback_end: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date(),
+        comment="Lookup end date used in calculation"
+    )
+    half_life_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=7,
+        comment="Half-life used in calculation (days)"
+    )
+    lookback_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=28,
+        comment="Lookback period used in calculation (days)"
+    )
+    decay_unit_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1,
+        comment="Aggregation unit used in calculation (days)"
+    )
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
@@ -1454,8 +1700,10 @@ DomainFairShareRow(
     domain_name="research",
     weight=Decimal("2.0"),
     # Below are calculated/updated by batch
-    total_decayed_usage=ResourceSlot({"cpu": 50000, "mem": 100000}),
-    fair_share_factor=Decimal("0.75"),
+    total_decayed_usage=ResourceSlot({"cpu": 50000, "mem": 100000, "cuda.device": 3600}),
+    normalized_usage=Decimal("0.15"),  # Weighted average of (usage/capacity)
+    fair_share_factor=Decimal("0.94574160838"),  # 2^(-0.15/2.0)
+    resource_weights=ResourceSlot({"cpu": 1.0, "mem": 1.0, "cuda.device": 10.0}),
     last_calculated_at=datetime.now(timezone.utc),
 )
 
@@ -1465,8 +1713,10 @@ ProjectFairShareRow(
     project_id=ml_team_id,
     domain_name="research",
     weight=Decimal("1.5"),
-    total_decayed_usage=ResourceSlot({"cpu": 30000, "cuda.shares": 5000}),
-    fair_share_factor=Decimal("0.82"),
+    total_decayed_usage=ResourceSlot({"cpu": 30000, "cuda.device": 5000}),
+    normalized_usage=Decimal("0.25"),
+    fair_share_factor=Decimal("0.89089871814"),  # 2^(-0.25/1.5)
+    resource_weights=ResourceSlot({"cpu": 1.0, "mem": 1.0, "cuda.device": 10.0}),
     last_calculated_at=datetime.now(timezone.utc),
 )
 
@@ -1477,8 +1727,10 @@ UserFairShareRow(
     project_id=ml_team_id,
     domain_name="research",
     weight=Decimal("1.0"),
-    total_decayed_usage=ResourceSlot({"cpu": 10000, "cuda.shares": 2000}),
-    fair_share_factor=Decimal("0.91"),
+    total_decayed_usage=ResourceSlot({"cpu": 10000, "cuda.device": 2000}),
+    normalized_usage=Decimal("0.10"),
+    fair_share_factor=Decimal("0.93303299153"),  # 2^(-0.10/1.0)
+    resource_weights=ResourceSlot({"cpu": 1.0, "mem": 1.0, "cuda.device": 10.0}),
     last_calculated_at=datetime.now(timezone.utc),
 )
 ```
@@ -2851,7 +3103,9 @@ def upgrade() -> None:
         sa.Column("weight", sa.Numeric(precision=10, scale=4), nullable=False, default=Decimal("1.0")),
         # Calculated values
         sa.Column("total_decayed_usage", ResourceSlotColumn(), nullable=False),
-        sa.Column("fair_share_factor", sa.Numeric(precision=10, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("normalized_usage", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("0")),
+        sa.Column("fair_share_factor", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("resource_weights", ResourceSlotColumn(), nullable=False),
         sa.Column("last_calculated_at", sa.DateTime(timezone=True), nullable=True),
         # Calculation parameters (tracks conditions used for calculation)
         sa.Column("lookback_start", sa.Date(), nullable=True),
@@ -2877,7 +3131,9 @@ def upgrade() -> None:
         sa.Column("weight", sa.Numeric(precision=10, scale=4), nullable=False, default=Decimal("1.0")),
         # Calculated values
         sa.Column("total_decayed_usage", ResourceSlotColumn(), nullable=False),
-        sa.Column("fair_share_factor", sa.Numeric(precision=10, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("normalized_usage", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("0")),
+        sa.Column("fair_share_factor", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("resource_weights", ResourceSlotColumn(), nullable=False),
         sa.Column("last_calculated_at", sa.DateTime(timezone=True), nullable=True),
         # Calculation parameters (tracks conditions used for calculation)
         sa.Column("lookback_start", sa.Date(), nullable=True),
@@ -2904,7 +3160,9 @@ def upgrade() -> None:
         sa.Column("weight", sa.Numeric(precision=10, scale=4), nullable=False, default=Decimal("1.0")),
         # Calculated values
         sa.Column("total_decayed_usage", ResourceSlotColumn(), nullable=False),
-        sa.Column("fair_share_factor", sa.Numeric(precision=10, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("normalized_usage", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("0")),
+        sa.Column("fair_share_factor", sa.Numeric(precision=8, scale=6), nullable=False, default=Decimal("1.0")),
+        sa.Column("resource_weights", ResourceSlotColumn(), nullable=False),
         sa.Column("last_calculated_at", sa.DateTime(timezone=True), nullable=True),
         # Calculation parameters (tracks conditions used for calculation)
         sa.Column("lookback_start", sa.Date(), nullable=True),
