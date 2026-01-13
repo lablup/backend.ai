@@ -83,10 +83,10 @@ class StorageMappingResolver:
     def __init__(
         self,
         volume_pool: VolumePool,
-        storage_targets: StorageMappingResolverData,
+        storage_step_mappings: StorageMappingResolverData,
     ) -> None:
         self._volume_pool = volume_pool
-        self._storage_targets = storage_targets
+        self._storage_step_mappings = storage_step_mappings
 
     def resolve(self) -> dict[ArtifactStorageImportStep, StorageTarget]:
         """
@@ -104,7 +104,7 @@ class StorageMappingResolver:
 
         result: dict[ArtifactStorageImportStep, StorageTarget] = {}
 
-        for step, target in self._storage_targets.storage_step_mappings.items():
+        for step, target in self._storage_step_mappings.storage_step_mappings.items():
             if isinstance(target, VFolderTarget):
                 adapter_name = f"volume_storage_{step}_{current_request_id()}"
                 volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)

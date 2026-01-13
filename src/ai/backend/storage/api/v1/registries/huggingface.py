@@ -184,7 +184,7 @@ class HuggingFaceRegistryAPIHandler:
 
         storage_step_mappings = StorageMappingResolver(
             self._volume_pool,
-            body.parsed.storage_targets,
+            body.parsed.storage_step_mappings,
         ).resolve()
 
         pipeline = create_huggingface_import_pipeline(

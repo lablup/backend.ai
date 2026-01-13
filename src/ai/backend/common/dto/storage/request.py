@@ -305,7 +305,7 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_targets: StorageMappingResolverData = Field(
+    storage_step_mappings: StorageMappingResolverData = Field(
         description="""
         Storage target configuration for model import.
         Provide either vfolder_id + volume_name for direct vfolder import,
@@ -363,7 +363,7 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["reservoir", "my-reservoir"],
     )
-    storage_targets: StorageMappingResolverData = Field(
+    storage_step_mappings: StorageMappingResolverData = Field(
         description="""
         Storage target configuration for model import.
         Provide either vfolder_id + volume_name for direct vfolder import,

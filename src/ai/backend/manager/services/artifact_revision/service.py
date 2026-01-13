@@ -440,7 +440,7 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_targets=StorageMappingResolverData(
+                            storage_step_mappings=StorageMappingResolverData(
                                 storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                             ),
                         )
@@ -541,7 +541,7 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_targets=StorageMappingResolverData(
+                                storage_step_mappings=StorageMappingResolverData(
                                     storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                                 ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
