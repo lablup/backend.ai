@@ -16,7 +16,7 @@ __all__ = (
     "DeleteObjectPermissionPathParam",
     "DeletePermissionPathParam",
     "GetRolePathParam",
-    "SearchScopeIDsPathParam",
+    "SearchScopesPathParam",
     "SearchUsersAssignedToRolePathParam",
     "UpdateRolePathParam",
 )
@@ -52,8 +52,8 @@ class DeleteObjectPermissionPathParam(BaseRequestModel):
     object_permission_id: UUID = Field(description="The object permission ID to delete")
 
 
-class SearchScopeIDsPathParam(BaseRequestModel):
-    """Path parameter for searching scope IDs."""
+class SearchScopesPathParam(BaseRequestModel):
+    """Path parameter for searching scopes."""
 
     scope_type: ScopeType = Field(
         description="Scope types", examples=["domain", "project", "user", "global"]

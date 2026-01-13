@@ -52,9 +52,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     SearchRolesAction,
     SearchRolesActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_scope_ids import (
-    SearchScopeIDsAction,
-    SearchScopeIDsActionResult,
+from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
+    SearchScopesAction,
+    SearchScopesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -205,10 +205,10 @@ class PermissionControllerService:
         )
         return UpdateRolePermissionsActionResult(role=result)
 
-    async def search_scope_ids(self, action: SearchScopeIDsAction) -> SearchScopeIDsActionResult:
-        """Search scope IDs based on scope type."""
-        result = await self._repository.search_scope_ids(action.scope_type, action.querier)
-        return SearchScopeIDsActionResult(
+    async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
+        """Search scopes based on scope type."""
+        result = await self._repository.search_scopes(action.scope_type, action.querier)
+        return SearchScopesActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

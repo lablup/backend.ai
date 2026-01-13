@@ -18,25 +18,25 @@ __all__ = (
     "EntityType",
     "OperationType",
     "RoleSource",
-    "ScopeIDData",
-    "ScopeIDListResult",
+    "ScopeData",
+    "ScopeListResult",
     "ScopeType",
 )
 
 
 @dataclass(frozen=True)
-class ScopeIDData:
-    """Data for a scope ID."""
+class ScopeData:
+    """Data for a scope."""
 
     id: ScopeId
     name: str
 
 
 @dataclass
-class ScopeIDListResult:
-    """Result of searching scope IDs."""
+class ScopeListResult:
+    """Result of searching scopes."""
 
-    items: list[ScopeIDData]
+    items: list[ScopeData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

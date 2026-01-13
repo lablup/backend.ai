@@ -29,8 +29,8 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    ScopeIDData,
-    ScopeIDListResult,
+    ScopeData,
+    ScopeListResult,
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
@@ -258,11 +258,11 @@ class PermissionControllerRepository:
             querier=querier,
         )
 
-    def _get_global_scope(self) -> ScopeIDListResult:
+    def _get_global_scope(self) -> ScopeListResult:
         """Get the global scope as a static result."""
-        return ScopeIDListResult(
+        return ScopeListResult(
             items=[
-                ScopeIDData(
+                ScopeData(
                     id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
                     name=GLOBAL_SCOPE_ID,
                 )
@@ -273,19 +273,19 @@ class PermissionControllerRepository:
         )
 
     @permission_controller_repository_resilience.apply()
-    async def search_scope_ids(
+    async def search_scopes(
         self,
         scope_type: ScopeType,
         querier: BatchQuerier,
-    ) -> ScopeIDListResult:
-        """Search scope IDs based on scope type.
+    ) -> ScopeListResult:
+        """Search scopes based on scope type.
 
         Args:
             scope_type: The type of scope to search.
             querier: BatchQuerier with conditions, orders, and pagination.
 
         Returns:
-            ScopeIDListResult with matching scope IDs.
+            ScopeListResult with matching scopes.
         """
         match scope_type:
             case ScopeType.GLOBAL:

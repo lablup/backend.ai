@@ -33,15 +33,15 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleRequest,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.path import SearchScopeIDsPathParam
+from ai.backend.common.dto.manager.rbac.path import SearchScopesPathParam
 from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
-    SearchScopeIDsRequest,
+    SearchScopesRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
-    SearchScopeIDsResponse,
+    SearchScopesResponse,
 )
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
@@ -65,13 +65,13 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
-from ai.backend.manager.services.permission_contoller.actions.search_scope_ids import (
-    SearchScopeIDsAction,
+from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
+    SearchScopesAction,
 )
 
 from .assigned_user_adapter import AssignedUserAdapter
 from .role_adapter import RoleAdapter
-from .scope_id_adapter import ScopeIDAdapter
+from .scope_adapter import ScopeAdapter
 
 __all__ = ("create_app",)
 
@@ -82,7 +82,7 @@ class RBACAPIHandler:
     def __init__(self) -> None:
         self.role_adapter = RoleAdapter()
         self.assigned_user_adapter = AssignedUserAdapter()
-        self.scope_id_adapter = ScopeIDAdapter()
+        self.scope_adapter = ScopeAdapter()
 
     # Role Management Endpoints
 
@@ -380,32 +380,32 @@ class RBACAPIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def search_scope_ids(
+    async def search_scopes(
         self,
-        path: PathParam[SearchScopeIDsPathParam],
-        body: BodyParam[SearchScopeIDsRequest],
+        path: PathParam[SearchScopesPathParam],
+        body: BodyParam[SearchScopesRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Search scope IDs for a specific scope type with filters and pagination."""
+        """Search scopes for a specific scope type with filters and pagination."""
         processors = processors_ctx.processors
         me = current_user()
         # TODO: Replace with RBAC-based permission check after migration is complete.
         if me is None or not me.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search scope IDs.")
+            raise NotEnoughPermission("Only superadmin can search scopes.")
 
         # Build querier and action
         scope_type = path.parsed.scope_type
-        querier = self.scope_id_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopeIDsAction(scope_type=scope_type, querier=querier)
+        querier = self.scope_adapter.build_querier(scope_type, body.parsed)
+        action = SearchScopesAction(scope_type=scope_type, querier=querier)
 
         # Call service action
-        action_result = await processors.permission_controller.search_scope_ids.wait_for_complete(
+        action_result = await processors.permission_controller.search_scopes.wait_for_complete(
             action
         )
 
         # Build response using adapter
-        resp = SearchScopeIDsResponse(
-            scope_ids=[self.scope_id_adapter.convert_to_dto(item) for item in action_result.items],
+        resp = SearchScopesResponse(
+            scopes=[self.scope_adapter.convert_to_dto(item) for item in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -451,7 +451,7 @@ def create_app(
         app.router.add_route(
             "POST",
             "/admin/rbac/scopes/{scope_type}/search",
-            api_handler.search_scope_ids,
+            api_handler.search_scopes,
         )
     )
 

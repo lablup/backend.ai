@@ -1,5 +1,5 @@
 """
-Adapter for Scope ID API requests.
+Adapter for Scope API requests.
 Handles conversion of request DTOs to BatchQuerier objects.
 """
 
@@ -7,14 +7,14 @@ from __future__ import annotations
 
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.rbac.request import (
-    ScopeIDFilter,
-    ScopeIDOrder,
-    SearchScopeIDsRequest,
+    ScopeFilter,
+    ScopeOrder,
+    SearchScopesRequest,
 )
-from ai.backend.common.dto.manager.rbac.response import ScopeIDDTO
-from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeIDOrderField
+from ai.backend.common.dto.manager.rbac.response import ScopeDTO
+from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
 from ai.backend.manager.api.adapter import BaseFilterAdapter
-from ai.backend.manager.data.permission.types import ScopeIDData
+from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -30,13 +30,13 @@ from ai.backend.manager.repositories.permission_controller.options import (
     UserScopeOrders,
 )
 
-__all__ = ("ScopeIDAdapter",)
+__all__ = ("ScopeAdapter",)
 
 
-class ScopeIDAdapter(BaseFilterAdapter):
-    """Adapter for converting scope ID requests to BatchQuerier objects."""
+class ScopeAdapter(BaseFilterAdapter):
+    """Adapter for converting scope requests to BatchQuerier objects."""
 
-    def build_querier(self, scope_type: ScopeType, request: SearchScopeIDsRequest) -> BatchQuerier:
+    def build_querier(self, scope_type: ScopeType, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier based on scope type."""
         match scope_type:
             case ScopeType.GLOBAL:
@@ -48,37 +48,37 @@ class ScopeIDAdapter(BaseFilterAdapter):
             case ScopeType.USER:
                 return self._build_user_scope_querier(request)
 
-    def _build_domain_scope_querier(self, request: SearchScopeIDsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for domain scope IDs from search request."""
+    def _build_domain_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
+        """Build a BatchQuerier for domain scopes from search request."""
         conditions = self._convert_domain_filter(request.filter) if request.filter else []
         orders = [self._convert_domain_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_project_scope_querier(self, request: SearchScopeIDsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for project scope IDs from search request."""
+    def _build_project_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
+        """Build a BatchQuerier for project scopes from search request."""
         conditions = self._convert_project_filter(request.filter) if request.filter else []
         orders = [self._convert_project_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_user_scope_querier(self, request: SearchScopeIDsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for user scope IDs from search request."""
+    def _build_user_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
+        """Build a BatchQuerier for user scopes from search request."""
         conditions = self._convert_user_filter(request.filter) if request.filter else []
         orders = [self._convert_user_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_global_scope_querier(self, request: SearchScopeIDsRequest) -> BatchQuerier:
+    def _build_global_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier for global scope (no filtering needed)."""
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
         return BatchQuerier(conditions=[], orders=[], pagination=pagination)
 
-    def _convert_domain_filter(self, filter: ScopeIDFilter) -> list[QueryCondition]:
-        """Convert scope ID filter to domain query conditions."""
+    def _convert_domain_filter(self, filter: ScopeFilter) -> list[QueryCondition]:
+        """Convert scope filter to domain query conditions."""
         conditions: list[QueryCondition] = []
 
         if filter.name is not None:
@@ -94,8 +94,8 @@ class ScopeIDAdapter(BaseFilterAdapter):
 
         return conditions
 
-    def _convert_project_filter(self, filter: ScopeIDFilter) -> list[QueryCondition]:
-        """Convert scope ID filter to project query conditions."""
+    def _convert_project_filter(self, filter: ScopeFilter) -> list[QueryCondition]:
+        """Convert scope filter to project query conditions."""
         conditions: list[QueryCondition] = []
 
         if filter.name is not None:
@@ -111,8 +111,8 @@ class ScopeIDAdapter(BaseFilterAdapter):
 
         return conditions
 
-    def _convert_user_filter(self, filter: ScopeIDFilter) -> list[QueryCondition]:
-        """Convert scope ID filter to user query conditions."""
+    def _convert_user_filter(self, filter: ScopeFilter) -> list[QueryCondition]:
+        """Convert scope filter to user query conditions."""
         conditions: list[QueryCondition] = []
 
         if filter.name is not None:
@@ -128,49 +128,49 @@ class ScopeIDAdapter(BaseFilterAdapter):
 
         return conditions
 
-    def _convert_domain_order(self, order: ScopeIDOrder) -> QueryOrder:
-        """Convert scope ID order specification to domain query order."""
+    def _convert_domain_order(self, order: ScopeOrder) -> QueryOrder:
+        """Convert scope order specification to domain query order."""
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
-            case ScopeIDOrderField.NAME:
+            case ScopeOrderField.NAME:
                 return DomainScopeOrders.name(ascending=ascending)
-            case ScopeIDOrderField.CREATED_AT:
+            case ScopeOrderField.CREATED_AT:
                 return DomainScopeOrders.created_at(ascending=ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
-    def _convert_project_order(self, order: ScopeIDOrder) -> QueryOrder:
-        """Convert scope ID order specification to project query order."""
+    def _convert_project_order(self, order: ScopeOrder) -> QueryOrder:
+        """Convert scope order specification to project query order."""
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
-            case ScopeIDOrderField.NAME:
+            case ScopeOrderField.NAME:
                 return ProjectScopeOrders.name(ascending=ascending)
-            case ScopeIDOrderField.CREATED_AT:
+            case ScopeOrderField.CREATED_AT:
                 return ProjectScopeOrders.created_at(ascending=ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
-    def _convert_user_order(self, order: ScopeIDOrder) -> QueryOrder:
-        """Convert scope ID order specification to user query order."""
+    def _convert_user_order(self, order: ScopeOrder) -> QueryOrder:
+        """Convert scope order specification to user query order."""
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
-            case ScopeIDOrderField.NAME:
+            case ScopeOrderField.NAME:
                 return UserScopeOrders.name(ascending=ascending)
-            case ScopeIDOrderField.CREATED_AT:
+            case ScopeOrderField.CREATED_AT:
                 return UserScopeOrders.created_at(ascending=ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
-    def convert_to_dto(self, data: ScopeIDData) -> ScopeIDDTO:
-        """Convert ScopeIDData to DTO.
+    def convert_to_dto(self, data: ScopeData) -> ScopeDTO:
+        """Convert ScopeData to DTO.
 
         Args:
-            data: Scope ID data from action result
+            data: Scope data from action result
 
         Returns:
-            ScopeIDDTO for API response
+            ScopeDTO for API response
         """
-        return ScopeIDDTO(scope_type=data.id.scope_type, id=data.id.scope_id, name=data.name)
+        return ScopeDTO(scope_type=data.id.scope_type, id=data.id.scope_id, name=data.name)

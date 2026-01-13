@@ -5,14 +5,14 @@ from typing import Optional, override
 
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.permission.types import ScopeIDData
+from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
-class SearchScopeIDsAction(RoleAction):
-    """Action to search scope IDs.
+class SearchScopesAction(RoleAction):
+    """Action to search scopes.
 
     This action is only available to superadmins.
     Permission check is performed at the API handler level.
@@ -28,14 +28,14 @@ class SearchScopeIDsAction(RoleAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "search_scope_ids"
+        return "search_scopes"
 
 
 @dataclass
-class SearchScopeIDsActionResult(BaseActionResult):
-    """Result of searching scope IDs."""
+class SearchScopesActionResult(BaseActionResult):
+    """Result of searching scopes."""
 
-    items: list[ScopeIDData]
+    items: list[ScopeData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

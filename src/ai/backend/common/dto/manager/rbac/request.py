@@ -23,7 +23,7 @@ from .types import (
     RoleOrderField,
     RoleSource,
     RoleStatus,
-    ScopeIDOrderField,
+    ScopeOrderField,
 )
 
 __all__ = (
@@ -36,10 +36,10 @@ __all__ = (
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
-    "ScopeIDFilter",
-    "ScopeIDOrder",
+    "ScopeFilter",
+    "ScopeOrder",
     "SearchRolesRequest",
-    "SearchScopeIDsRequest",
+    "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -171,24 +171,24 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     )
 
 
-class ScopeIDFilter(BaseRequestModel):
-    """Filter for scope IDs."""
+class ScopeFilter(BaseRequestModel):
+    """Filter for scopes."""
 
     name: Optional[StringFilter] = Field(default=None, description="Filter by name")
 
 
-class ScopeIDOrder(BaseRequestModel):
-    """Order specification for scope IDs."""
+class ScopeOrder(BaseRequestModel):
+    """Order specification for scopes."""
 
-    field: ScopeIDOrderField = Field(description="Field to order by")
+    field: ScopeOrderField = Field(description="Field to order by")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
 
 
-class SearchScopeIDsRequest(BaseRequestModel):
-    """Request body for searching scope IDs with filters and pagination."""
+class SearchScopesRequest(BaseRequestModel):
+    """Request body for searching scopes with filters and pagination."""
 
-    filter: Optional[ScopeIDFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[ScopeIDOrder]] = Field(default=None, description="Order specifications")
+    filter: Optional[ScopeFilter] = Field(default=None, description="Filter conditions")
+    order: Optional[list[ScopeOrder]] = Field(default=None, description="Order specifications")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )

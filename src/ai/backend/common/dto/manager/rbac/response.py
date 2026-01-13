@@ -32,9 +32,9 @@ __all__ = (
     "PermissionDTO",
     "RevokeRoleResponse",
     "RoleDTO",
-    "ScopeIDDTO",
+    "ScopeDTO",
     "SearchRolesResponse",
-    "SearchScopeIDsResponse",
+    "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
     "UpdateRoleResponse",
 )
@@ -171,16 +171,16 @@ class GetScopeTypesResponse(BaseResponseModel):
     scope_types: list[ScopeType] = Field(description="List of available scope types")
 
 
-class ScopeIDDTO(BaseModel):
-    """DTO for scope ID data."""
+class ScopeDTO(BaseModel):
+    """DTO for scope data."""
 
     scope_type: ScopeType = Field(description="Scope type")
     id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
     name: str = Field(description="Scope display name")
 
 
-class SearchScopeIDsResponse(BaseResponseModel):
-    """Response for searching scope IDs."""
+class SearchScopesResponse(BaseResponseModel):
+    """Response for searching scopes."""
 
-    scope_ids: list[ScopeIDDTO] = Field(description="List of scope IDs")
+    scopes: list[ScopeDTO] = Field(description="List of scopes")
     pagination: PaginationInfo = Field(description="Pagination information")

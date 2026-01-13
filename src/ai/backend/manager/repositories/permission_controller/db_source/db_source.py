@@ -30,8 +30,8 @@ from ai.backend.manager.data.permission.status import (
 )
 from ai.backend.manager.data.permission.types import (
     OperationType,
-    ScopeIDData,
-    ScopeIDListResult,
+    ScopeData,
+    ScopeListResult,
     ScopeType,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -903,7 +903,7 @@ class PermissionDBSource:
     async def search_domain_scopes(
         self,
         querier: BatchQuerier,
-    ) -> ScopeIDListResult:
+    ) -> ScopeListResult:
         """Search all domains using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DomainRow)
@@ -915,14 +915,14 @@ class PermissionDBSource:
             )
 
             items = [
-                ScopeIDData(
+                ScopeData(
                     id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.DomainRow.name),
                     name=row.DomainRow.name,
                 )
                 for row in result.rows
             ]
 
-            return ScopeIDListResult(
+            return ScopeListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -932,7 +932,7 @@ class PermissionDBSource:
     async def search_project_scopes(
         self,
         querier: BatchQuerier,
-    ) -> ScopeIDListResult:
+    ) -> ScopeListResult:
         """Search all projects using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(GroupRow)
@@ -944,14 +944,14 @@ class PermissionDBSource:
             )
 
             items = [
-                ScopeIDData(
+                ScopeData(
                     id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.GroupRow.id)),
                     name=row.GroupRow.name,
                 )
                 for row in result.rows
             ]
 
-            return ScopeIDListResult(
+            return ScopeListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -961,7 +961,7 @@ class PermissionDBSource:
     async def search_user_scopes(
         self,
         querier: BatchQuerier,
-    ) -> ScopeIDListResult:
+    ) -> ScopeListResult:
         """Search all users using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(UserRow)
@@ -973,7 +973,7 @@ class PermissionDBSource:
             )
 
             items = [
-                ScopeIDData(
+                ScopeData(
                     id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.UserRow.uuid)),
                     name=row.UserRow.username
                     if row.UserRow.username is not None
@@ -982,7 +982,7 @@ class PermissionDBSource:
                 for row in result.rows
             ]
 
-            return ScopeIDListResult(
+            return ScopeListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

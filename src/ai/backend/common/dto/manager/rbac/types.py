@@ -23,7 +23,7 @@ __all__ = (
     "RoleOrderField",
     "RoleSource",
     "RoleStatus",
-    "ScopeIDOrderField",
+    "ScopeOrderField",
 )
 
 
@@ -50,7 +50,7 @@ class AssignedUserOrderField(StrEnum):
     GRANTED_AT = "granted_at"
 
 
-class ScopeIDOrderField(StrEnum):
+class ScopeOrderField(StrEnum):
     """Fields available for ordering scope IDs."""
 
     NAME = "name"
