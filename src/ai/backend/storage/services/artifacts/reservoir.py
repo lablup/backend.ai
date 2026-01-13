@@ -663,16 +663,9 @@ class ReservoirDownloadStep(ImportStep[None]):
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
 
-        # Determine model_prefix based on target_prefix
-        if context.target_prefix is None:
-            # Default behavior: use model_id/revision prefix
-            model_prefix = f"{model.model_id}/{revision}"
-        elif context.target_prefix == "":
-            # Empty string: store at root
-            model_prefix = ""
-        else:
-            # Custom prefix
-            model_prefix = context.target_prefix
+        # Default prefix for Reservoir: {model_id}/{revision}
+        default_prefix = f"{model.model_id}/{revision}"
+        model_prefix = self._resolve_storage_prefix(context, default_prefix)
 
         # Determine storage type based on the actual download storage object type
         if isinstance(self._download_storage, VFSStorage):

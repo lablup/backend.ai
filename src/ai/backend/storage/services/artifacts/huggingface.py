@@ -808,10 +808,14 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             file_info_list=file_info_list,
         )
 
+        # Default prefix for HuggingFace: {model_id}/{revision}
+        default_prefix = f"{context.model.model_id}/{revision}"
+
         downloaded_files: list[tuple[FileObjectData, str]] = []
         total_bytes = 0
 
         for file_info in file_infos:
+            storage_key = self._resolve_storage_key(context, default_prefix, file_info.path)
             storage_key = await self._download_file_to_storage(
                 file_info=file_info,
                 model=context.model,
@@ -819,7 +823,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 storage_pool=context.storage_pool,
                 download_chunk_size=chunk_size,
                 redis_client=self._redis_client,
-                target_prefix=context.target_prefix,
+                storage_key=storage_key,
                 token=registry_config.token,
             )
             downloaded_files.append((file_info, storage_key))
@@ -847,7 +851,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         storage_pool: AbstractStoragePool,
         download_chunk_size: int,
         redis_client: ValkeyArtifactDownloadTrackingClient,
-        target_prefix: Optional[str] = None,
+        storage_key: str,
         token: Optional[str] = None,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
@@ -855,17 +859,6 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         storage_name = storage_target.name
 
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-
-        # Determine storage key based on target_prefix
-        if target_prefix is None:
-            # Default behavior: use model_id/revision prefix
-            storage_key = f"{model.model_id}/{revision}/{file_info.path}"
-        elif target_prefix == "":
-            # Empty string: store at root
-            storage_key = file_info.path
-        else:
-            # Custom prefix
-            storage_key = f"{target_prefix}/{file_info.path}"
 
         log.info(
             f"[download] Starting download to {storage_name}: file_path={file_info.path}, "

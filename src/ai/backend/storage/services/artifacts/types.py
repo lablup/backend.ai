@@ -62,6 +62,42 @@ class ImportStep(abc.ABC, Generic[InputType]):
         """Return the storage for this step"""
         pass
 
+    def _resolve_storage_prefix(self, context: ImportStepContext, default_prefix: str) -> str:
+        """
+        Resolve storage prefix based on target_prefix setting.
+
+        Args:
+            context: Import step context containing target_prefix
+            default_prefix: Default prefix when target_prefix is None
+                           (typically "{model_id}/{revision}")
+
+        Returns:
+            The resolved prefix (may be empty string for root storage)
+        """
+        if context.target_prefix is None:
+            return default_prefix
+        return context.target_prefix
+
+    def _resolve_storage_key(
+        self, context: ImportStepContext, default_prefix: str, file_path: str
+    ) -> str:
+        """
+        Resolve full storage key for a file based on target_prefix setting.
+
+        Args:
+            context: Import step context containing target_prefix
+            default_prefix: Default prefix when target_prefix is None
+                           (typically "{model_id}/{revision}")
+            file_path: The file path to store
+
+        Returns:
+            The resolved storage key path
+        """
+        prefix = self._resolve_storage_prefix(context, default_prefix)
+        if prefix:
+            return f"{prefix}/{file_path}"
+        return file_path
+
     async def cleanup_stage(self, context: ImportStepContext) -> None:
         """Default cleanup implementation that removes files"""
         storage = self.stage_storage(context)
