@@ -10,6 +10,7 @@ from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.dto.storage.request import StorageMappingResolverData, VFolderStorageTarget
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
@@ -99,9 +100,6 @@ class StorageMappingResolver:
         Returns:
             Dict mapping import steps to StorageTarget objects
         """
-        # Avoid circular import
-        from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
-
         result: dict[ArtifactStorageImportStep, StorageTarget] = {}
 
         for step, target in self._storage_step_mappings.storage_step_mappings.items():
