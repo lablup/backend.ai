@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from typing import Optional, override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.models.group import GroupDotfile
+from ai.backend.manager.services.group_config.actions.base import GroupConfigAction
+
+
+@dataclass
+class ListDotfilesAction(GroupConfigAction):
+    group_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.group_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "list_dotfiles"
+
+
+@dataclass
+class ListDotfilesActionResult(BaseActionResult):
+    dotfiles: list[GroupDotfile]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None

@@ -47,6 +47,8 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.group_config.processors import GroupConfigProcessors
+from ai.backend.manager.services.group_config.service import GroupConfigService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -140,6 +142,7 @@ class Services:
     domain: DomainService
     error_log: ErrorLogService
     group: GroupService
+    group_config: GroupConfigService
     user: UserService
     image: ImageService
     container_registry: ContainerRegistryService
@@ -195,6 +198,9 @@ class Services:
             args.config_provider,
             args.valkey_stat_client,
             repositories.group,
+        )
+        group_config_service = GroupConfigService(
+            repositories.group_config.repository,
         )
         user_service = UserService(
             args.storage_manager,
@@ -347,6 +353,7 @@ class Services:
             domain=domain_service,
             error_log=error_log_service,
             group=group_service,
+            group_config=group_config_service,
             user=user_service,
             image=image_service,
             container_registry=container_registry_service,
@@ -389,6 +396,7 @@ class Processors(AbstractProcessorPackage):
     domain: DomainProcessors
     error_log: ErrorLogProcessors
     group: GroupProcessors
+    group_config: GroupConfigProcessors
     user: UserProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
@@ -425,6 +433,7 @@ class Processors(AbstractProcessorPackage):
         domain_processors = DomainProcessors(services.domain, action_monitors)
         error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
+        group_config_processors = GroupConfigProcessors(services.group_config, action_monitors)
         user_processors = UserProcessors(services.user, action_monitors)
         image_processors = ImageProcessors(services.image, action_monitors)
         container_registry_processors = ContainerRegistryProcessors(
@@ -489,6 +498,7 @@ class Processors(AbstractProcessorPackage):
             domain=domain_processors,
             error_log=error_log_processors,
             group=group_processors,
+            group_config=group_config_processors,
             user=user_processors,
             image=image_processors,
             container_registry=container_registry_processors,
@@ -526,6 +536,7 @@ class Processors(AbstractProcessorPackage):
             *self.domain.supported_actions(),
             *self.error_log.supported_actions(),
             *self.group.supported_actions(),
+            *self.group_config.supported_actions(),
             *self.user.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),

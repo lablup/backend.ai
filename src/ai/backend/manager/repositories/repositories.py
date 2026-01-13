@@ -16,6 +16,7 @@ from ai.backend.manager.repositories.deployment.repositories import DeploymentRe
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
+from ai.backend.manager.repositories.group_config.repositories import GroupConfigRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
@@ -66,6 +67,7 @@ class Repositories:
     domain: DomainRepositories
     error_log: ErrorLogRepositories
     group: GroupRepositories
+    group_config: GroupConfigRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     metric: MetricRepositories
@@ -101,6 +103,7 @@ class Repositories:
         domain_repositories = DomainRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
+        group_config_repositories = GroupConfigRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
@@ -135,6 +138,7 @@ class Repositories:
             domain=domain_repositories,
             error_log=error_log_repositories,
             group=group_repositories,
+            group_config=group_config_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             metric=metric_repositories,
