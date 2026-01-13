@@ -18,13 +18,10 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base.rbac_entity.granter import (
+from ai.backend.manager.repositories.base.rbac.granter import (
     RBACGranter,
     execute_rbac_granter,
 )
@@ -42,7 +39,6 @@ GRANTER_TABLES = [
     RoleRow,
     PermissionGroupRow,
     ObjectPermissionRow,
-    AssociationScopesEntitiesRow,
 ]
 
 
@@ -55,31 +51,22 @@ GRANTER_TABLES = [
 class GranterTestContext:
     """Context data for granter tests."""
 
-    target_scope_id: ScopeId
     entity_scope_id: ScopeId
     entity_id: ObjectId
 
 
 @dataclass
-class RoleWithPermGroupContext(GranterTestContext):
-    """Context with a single system role and permission group."""
+class SingleRoleContext(GranterTestContext):
+    """Context with a single role."""
 
     role_id: UUID
 
 
 @dataclass
 class MultiRoleContext(GranterTestContext):
-    """Context with multiple system roles."""
+    """Context with multiple roles."""
 
     role_ids: list[UUID]
-
-
-@dataclass
-class MixedRoleContext(GranterTestContext):
-    """Context with both system and custom roles."""
-
-    system_role_id: UUID
-    custom_role_id: UUID
 
 
 # =============================================================================
@@ -105,15 +92,12 @@ class TestGranterBasic:
     """Basic tests for granter operations."""
 
     @pytest.fixture
-    async def role_with_perm_group(
+    async def single_role(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
-    ) -> AsyncGenerator[RoleWithPermGroupContext, None]:
-        """Create a system role with permission group for target scope."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
+    ) -> AsyncGenerator[SingleRoleContext, None]:
+        """Create a single role for granter testing."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
@@ -122,23 +106,14 @@ class TestGranterBasic:
         async with database_connection.begin_session() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
-                name="target-user-system-role",
+                name="test-role",
                 source=RoleSource.SYSTEM,
             )
             db_sess.add(role)
             await db_sess.flush()
-
-            perm_group = PermissionGroupRow(
-                role_id=role.id,
-                scope_type=target_scope_id.scope_type,
-                scope_id=target_scope_id.scope_id,
-            )
-            db_sess.add(perm_group)
-            await db_sess.flush()
             role_id = role.id
 
-        yield RoleWithPermGroupContext(
-            target_scope_id=target_scope_id,
+        yield SingleRoleContext(
             entity_scope_id=entity_scope_id,
             entity_id=entity_id,
             role_id=role_id,
@@ -150,33 +125,29 @@ class TestGranterBasic:
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> AsyncGenerator[GranterTestContext, None]:
-        """Create context without any roles (for testing graceful handling)."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
+        """Create context without any roles (for testing empty role_ids)."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
 
         yield GranterTestContext(
-            target_scope_id=target_scope_id,
             entity_scope_id=entity_scope_id,
             entity_id=entity_id,
         )
 
-    async def test_granter_creates_object_permissions_and_association(
+    async def test_granter_creates_object_permissions(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
-        """Test that granter creates object permissions and scope-entity association."""
-        ctx = role_with_perm_group
+        """Test that granter creates object permissions for specified role."""
+        ctx = single_role
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ, OperationType.UPDATE],
             )
             await execute_rbac_granter(db_sess, granter)
@@ -196,32 +167,19 @@ class TestGranterBasic:
                 assert perm.entity_type == EntityType.VFOLDER
                 assert perm.entity_id == ctx.entity_id.entity_id
 
-            # Verify scope-entity association was created
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
-            )
-            assert assoc_count == 1
-
-            assoc_row = await db_sess.scalar(sa.select(AssociationScopesEntitiesRow))
-            assert assoc_row is not None
-            assert assoc_row.scope_type == ctx.target_scope_id.scope_type
-            assert assoc_row.scope_id == ctx.target_scope_id.scope_id
-            assert assoc_row.entity_type == ctx.entity_id.entity_type
-            assert assoc_row.entity_id == ctx.entity_id.entity_id
-
     async def test_granter_creates_permission_group_for_entity_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
         """Test that granter ensures permission group exists for entity's original scope."""
-        ctx = role_with_perm_group
+        ctx = single_role
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
@@ -230,9 +188,9 @@ class TestGranterBasic:
             pg_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert pg_count == 2
+            assert pg_count == 1
 
-            # Verify the new permission group
+            # Verify the permission group details
             entity_scope_pg = await db_sess.scalar(
                 sa.select(PermissionGroupRow).where(
                     sa.and_(
@@ -244,38 +202,38 @@ class TestGranterBasic:
             assert entity_scope_pg is not None
             assert entity_scope_pg.role_id == ctx.role_id
 
-    async def test_granter_with_no_matching_system_role(
+    async def test_granter_with_empty_role_ids(
         self,
         database_connection: ExtendedAsyncSAEngine,
         empty_context: GranterTestContext,
     ) -> None:
-        """Test granter behavior when no system role exists for target scope."""
+        """Test granter behavior with empty target_role_ids."""
         ctx = empty_context
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[],
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
 
-            # Verify no object permissions were created (no roles to grant to)
+            # Verify no object permissions were created
             obj_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
             )
             assert obj_perm_count == 0
 
-            # Verify association was still created
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            # Verify no permission groups were created
+            pg_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert assoc_count == 1
+            assert pg_count == 0
 
 
 class TestGranterMultipleRoles:
-    """Tests for granter with multiple system roles."""
+    """Tests for granter with multiple roles."""
 
     @pytest.fixture
     async def multi_role_context(
@@ -283,10 +241,7 @@ class TestGranterMultipleRoles:
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> AsyncGenerator[MultiRoleContext, None]:
-        """Create multiple system roles with permission groups for target scope."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
+        """Create multiple roles for granter testing."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
@@ -297,94 +252,32 @@ class TestGranterMultipleRoles:
             for i in range(3):
                 role = RoleRow(
                     id=uuid.uuid4(),
-                    name=f"system-role-{i}",
+                    name=f"test-role-{i}",
                     source=RoleSource.SYSTEM,
                 )
                 db_sess.add(role)
                 await db_sess.flush()
                 role_ids.append(role.id)
 
-                perm_group = PermissionGroupRow(
-                    role_id=role.id,
-                    scope_type=target_scope_id.scope_type,
-                    scope_id=target_scope_id.scope_id,
-                )
-                db_sess.add(perm_group)
-                await db_sess.flush()
-
         yield MultiRoleContext(
-            target_scope_id=target_scope_id,
             entity_scope_id=entity_scope_id,
             entity_id=entity_id,
             role_ids=role_ids,
         )
 
-    @pytest.fixture
-    async def mixed_role_context(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        create_tables: None,
-    ) -> AsyncGenerator[MixedRoleContext, None]:
-        """Create one system role and one custom role with permission groups."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
-        entity_owner_id = str(uuid.uuid4())
-        entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
-        entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
-
-        system_role_id: UUID
-        custom_role_id: UUID
-
-        async with database_connection.begin_session() as db_sess:
-            system_role = RoleRow(
-                id=uuid.uuid4(),
-                name="system-role",
-                source=RoleSource.SYSTEM,
-            )
-            db_sess.add(system_role)
-
-            custom_role = RoleRow(
-                id=uuid.uuid4(),
-                name="custom-role",
-                source=RoleSource.CUSTOM,
-            )
-            db_sess.add(custom_role)
-            await db_sess.flush()
-
-            for role in [system_role, custom_role]:
-                perm_group = PermissionGroupRow(
-                    role_id=role.id,
-                    scope_type=target_scope_id.scope_type,
-                    scope_id=target_scope_id.scope_id,
-                )
-                db_sess.add(perm_group)
-            await db_sess.flush()
-
-            system_role_id = system_role.id
-            custom_role_id = custom_role.id
-
-        yield MixedRoleContext(
-            target_scope_id=target_scope_id,
-            entity_scope_id=entity_scope_id,
-            entity_id=entity_id,
-            system_role_id=system_role_id,
-            custom_role_id=custom_role_id,
-        )
-
-    async def test_granter_grants_to_multiple_system_roles(
+    async def test_granter_grants_to_multiple_roles(
         self,
         database_connection: ExtendedAsyncSAEngine,
         multi_role_context: MultiRoleContext,
     ) -> None:
-        """Test that granter grants permissions to all system roles for a scope."""
+        """Test that granter grants permissions to all specified roles."""
         ctx = multi_role_context
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=ctx.role_ids,
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
@@ -399,42 +292,44 @@ class TestGranterMultipleRoles:
             granted_role_ids = {perm.role_id for perm in obj_perms}
             assert granted_role_ids == set(ctx.role_ids)
 
-    async def test_granter_ignores_custom_roles(
+    async def test_granter_creates_permission_groups_for_all_roles(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        mixed_role_context: MixedRoleContext,
+        multi_role_context: MultiRoleContext,
     ) -> None:
-        """Test that granter only grants to system roles, not custom roles."""
-        ctx = mixed_role_context
+        """Test that granter creates permission groups for all roles."""
+        ctx = multi_role_context
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=ctx.role_ids,
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
 
-            # Verify only system role got permissions
-            obj_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
-            assert len(obj_perms) == 1
-            assert obj_perms[0].role_id == ctx.system_role_id
+            # Verify permission groups were created for all roles
+            pg_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
+            )
+            assert pg_count == 3  # One per role
+
+            pg_rows = (await db_sess.scalars(sa.select(PermissionGroupRow))).all()
+            pg_role_ids = {pg.role_id for pg in pg_rows}
+            assert pg_role_ids == set(ctx.role_ids)
 
 
 class TestGranterMultipleOperations:
     """Tests for granter with multiple operations."""
 
     @pytest.fixture
-    async def role_with_perm_group(
+    async def single_role(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
-    ) -> AsyncGenerator[RoleWithPermGroupContext, None]:
-        """Create a system role with permission group for target scope."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
+    ) -> AsyncGenerator[SingleRoleContext, None]:
+        """Create a single role for granter testing."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
@@ -443,23 +338,14 @@ class TestGranterMultipleOperations:
         async with database_connection.begin_session() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
-                name="system-role",
+                name="test-role",
                 source=RoleSource.SYSTEM,
             )
             db_sess.add(role)
             await db_sess.flush()
-
-            perm_group = PermissionGroupRow(
-                role_id=role.id,
-                scope_type=target_scope_id.scope_type,
-                scope_id=target_scope_id.scope_id,
-            )
-            db_sess.add(perm_group)
-            await db_sess.flush()
             role_id = role.id
 
-        yield RoleWithPermGroupContext(
-            target_scope_id=target_scope_id,
+        yield SingleRoleContext(
             entity_scope_id=entity_scope_id,
             entity_id=entity_id,
             role_id=role_id,
@@ -468,10 +354,10 @@ class TestGranterMultipleOperations:
     async def test_granter_with_all_operations(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
         """Test granter with all operation types."""
-        ctx = role_with_perm_group
+        ctx = single_role
         all_operations = [
             OperationType.READ,
             OperationType.UPDATE,
@@ -483,7 +369,7 @@ class TestGranterMultipleOperations:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=all_operations,
             )
             await execute_rbac_granter(db_sess, granter)
@@ -497,16 +383,16 @@ class TestGranterMultipleOperations:
     async def test_granter_with_empty_operations(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
         """Test granter with empty operations list."""
-        ctx = role_with_perm_group
+        ctx = single_role
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=[],
             )
             await execute_rbac_granter(db_sess, granter)
@@ -517,26 +403,23 @@ class TestGranterMultipleOperations:
             )
             assert obj_perm_count == 0
 
-            # Verify association was still created
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            # Permission group should still be created for entity scope
+            pg_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert assoc_count == 1
+            assert pg_count == 1
 
 
 class TestGranterIdempotent:
     """Tests for idempotent behavior of RBAC entity granter."""
 
     @pytest.fixture
-    async def role_with_perm_group(
+    async def single_role(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
-    ) -> AsyncGenerator[RoleWithPermGroupContext, None]:
-        """Create a system role with permission group for target scope."""
-        target_user_id = str(uuid.uuid4())
-        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id)
-
+    ) -> AsyncGenerator[SingleRoleContext, None]:
+        """Create a single role for granter testing."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
@@ -545,23 +428,14 @@ class TestGranterIdempotent:
         async with database_connection.begin_session() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
-                name="system-role",
+                name="test-role",
                 source=RoleSource.SYSTEM,
             )
             db_sess.add(role)
             await db_sess.flush()
-
-            perm_group = PermissionGroupRow(
-                role_id=role.id,
-                scope_type=target_scope_id.scope_type,
-                scope_id=target_scope_id.scope_id,
-            )
-            db_sess.add(perm_group)
-            await db_sess.flush()
             role_id = role.id
 
-        yield RoleWithPermGroupContext(
-            target_scope_id=target_scope_id,
+        yield SingleRoleContext(
             entity_scope_id=entity_scope_id,
             entity_id=entity_id,
             role_id=role_id,
@@ -570,20 +444,20 @@ class TestGranterIdempotent:
     async def test_granter_handles_duplicate_grant_gracefully(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
-        """Test that granting same entity to same scope twice is idempotent.
+        """Test that granting same entity to same roles twice is idempotent.
 
         The granter uses bulk_insert_on_conflict_do_nothing, so duplicate grants
         should be handled gracefully without errors or duplicate rows.
         """
-        ctx = role_with_perm_group
+        ctx = single_role
 
         async with database_connection.begin_session() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ, OperationType.UPDATE],
             )
 
@@ -596,10 +470,10 @@ class TestGranterIdempotent:
             )
             assert obj_perm_count == 2
 
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            pg_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert assoc_count == 1
+            assert pg_count == 1
 
             # Second grant (duplicate) - should not fail
             await execute_rbac_granter(db_sess, granter)
@@ -610,22 +484,22 @@ class TestGranterIdempotent:
             )
             assert obj_perm_count_after == 2  # Same count, no duplicates
 
-            assoc_count_after = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            pg_count_after = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert assoc_count_after == 1  # Same count, no duplicates
+            assert pg_count_after == 1  # Same count, no duplicates
 
     async def test_granter_reuses_existing_permission_group_for_entity_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
-        role_with_perm_group: RoleWithPermGroupContext,
+        single_role: SingleRoleContext,
     ) -> None:
         """Test that granter reuses existing permission_group for entity's original scope.
 
         When granting, if a permission_group already exists for the entity's scope,
         the granter should not create a duplicate.
         """
-        ctx = role_with_perm_group
+        ctx = single_role
 
         async with database_connection.begin_session() as db_sess:
             # Pre-create permission_group for entity's scope
@@ -641,14 +515,13 @@ class TestGranterIdempotent:
             pg_count_before = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            # Should have 2: one for target_scope (from fixture), one for entity_scope (just created)
-            assert pg_count_before == 2
+            assert pg_count_before == 1
 
             # Execute grant
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
-                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
@@ -657,63 +530,49 @@ class TestGranterIdempotent:
             pg_count_after = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert pg_count_after == 2  # Same count, no duplicates
+            assert pg_count_after == 1  # Same count, no duplicates
 
-    async def test_granter_grants_to_multiple_scopes_sequentially(
+    async def test_granter_grants_to_multiple_roles_sequentially(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> None:
-        """Test that same entity can be granted to multiple scopes sequentially."""
+        """Test that same entity can be granted to multiple roles sequentially."""
         entity_owner_id = str(uuid.uuid4())
         entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=entity_owner_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
 
-        target_user_ids = [str(uuid.uuid4()) for _ in range(3)]
-
         async with database_connection.begin_session() as db_sess:
-            # Create system roles for each target scope
-            for target_user_id in target_user_ids:
+            # Create multiple roles
+            role_ids: list[UUID] = []
+            for i in range(3):
                 role = RoleRow(
                     id=uuid.uuid4(),
-                    name=f"system-role-{target_user_id[:8]}",
+                    name=f"test-role-{i}",
                     source=RoleSource.SYSTEM,
                 )
                 db_sess.add(role)
                 await db_sess.flush()
+                role_ids.append(role.id)
 
-                perm_group = PermissionGroupRow(
-                    role_id=role.id,
-                    scope_type=ScopeType.USER,
-                    scope_id=target_user_id,
-                )
-                db_sess.add(perm_group)
-            await db_sess.flush()
-
-            # Grant entity to each scope
-            for target_user_id in target_user_ids:
+            # Grant entity to each role individually
+            for role_id in role_ids:
                 granter = RBACGranter(
                     granted_entity_id=entity_id,
                     granted_entity_scope_id=entity_scope_id,
-                    target_scope_id=ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id),
+                    target_role_ids=[role_id],
                     operations=[OperationType.READ],
                 )
                 await execute_rbac_granter(db_sess, granter)
 
-            # Verify object permissions created for all 3 roles
+            # Verify object permissions created for all roles
             obj_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
             )
             assert obj_perm_count == 3
 
-            # Verify scope-entity associations created for all 3 scopes
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
-            )
-            assert assoc_count == 3
-
-            # Verify permission_groups: 3 for target scopes + 3 for entity scope (one per role)
+            # Verify permission groups created for all roles
             pg_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
             )
-            assert pg_count == 6
+            assert pg_count == 3  # One per role
