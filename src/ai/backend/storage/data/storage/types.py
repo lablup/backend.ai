@@ -114,7 +114,7 @@ class ImportStepContext:
     storage_pool: AbstractStoragePool
     storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget]
     step_metadata: dict[str, Any]
-    target_prefix: Optional[str] = None
+    custom_storage_prefix: Optional[str] = None
 
 
 class StorageMappingResolver:

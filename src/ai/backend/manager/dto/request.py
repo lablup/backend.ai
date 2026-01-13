@@ -130,7 +130,7 @@ class ImportArtifactsReq(BaseRequestModel):
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
     )
-    target_prefix: Optional[str] = Field(
+    storage_prefix: Optional[str] = Field(
         default=None,
         description="""
         Custom prefix path for storing imported models.

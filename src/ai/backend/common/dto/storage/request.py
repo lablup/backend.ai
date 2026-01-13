@@ -349,7 +349,7 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
             },
         ],
     )
-    target_prefix: Optional[str] = Field(
+    storage_prefix: Optional[str] = Field(
         default=None,
         description="""
         Custom prefix path for storing imported models.
@@ -445,7 +445,7 @@ class ReservoirImportModelsReq(BaseRequestModel):
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
     )
-    target_prefix: Optional[str] = Field(
+    storage_prefix: Optional[str] = Field(
         default=None,
         description="""
         Custom prefix path for storing imported models.

@@ -267,7 +267,7 @@ async def import_artifacts(
                 ImportArtifactRevisionAction(
                     artifact_revision_id=uuid.UUID(revision_id),
                     vfolder_id=vfolder_id,
-                    target_prefix=input.target_prefix,
+                    storage_prefix=input.storage_prefix,
                 )
             )
         )

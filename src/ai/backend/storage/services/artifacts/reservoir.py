@@ -471,7 +471,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
-        target_prefix: Optional[str] = None,
+        storage_prefix: Optional[str] = None,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -483,7 +483,7 @@ class ReservoirService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
             artifact_revision_id: The artifact revision ID for verification result lookup
-            target_prefix: Custom prefix path for storing imported models.
+            storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path: {model_id}/{revision}.
                 If empty string, stores files at root.
         """
@@ -500,7 +500,7 @@ class ReservoirService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
-                target_prefix=target_prefix,
+                custom_storage_prefix=storage_prefix,
             )
 
             # Execute import pipeline
@@ -533,7 +533,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
-        target_prefix: Optional[str] = None,
+        storage_prefix: Optional[str] = None,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -570,7 +570,7 @@ class ReservoirService:
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
                             artifact_revision_id=artifact_revision_id,
-                            target_prefix=target_prefix,
+                            storage_prefix=storage_prefix,
                         )
 
                         successful_models += 1

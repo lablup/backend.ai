@@ -540,7 +540,7 @@ class HuggingFaceService:
         model: ModelTarget,
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
-        target_prefix: Optional[str] = None,
+        storage_prefix: Optional[str] = None,
     ) -> None:
         """Import a HuggingFace model to storage using ImportPipeline.
 
@@ -549,7 +549,7 @@ class HuggingFaceService:
             model: HuggingFace model to import
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline configured for this request
-            target_prefix: Custom prefix path for storing imported models.
+            storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path: {model_id}/{revision}.
                 If empty string, stores files at root.
 
@@ -567,7 +567,7 @@ class HuggingFaceService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
-                target_prefix=target_prefix,
+                custom_storage_prefix=storage_prefix,
             )
 
             # Execute import pipeline
@@ -626,7 +626,7 @@ class HuggingFaceService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
-        target_prefix: Optional[str] = None,
+        storage_prefix: Optional[str] = None,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
@@ -635,7 +635,7 @@ class HuggingFaceService:
             models: List of HuggingFace models to import
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: Import pipeline to execute
-            target_prefix: Custom prefix path for storing imported models.
+            storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path: {model_id}/{revision}.
                 If empty string, stores files at root.
 
@@ -673,7 +673,7 @@ class HuggingFaceService:
                             model=model,
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
-                            target_prefix=target_prefix,
+                            storage_prefix=storage_prefix,
                         )
 
                         successful_models += 1
