@@ -12,6 +12,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.common import (
     InternalServerError,
@@ -41,11 +42,14 @@ class WSProxyVersionQueryParams:
 async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if request_id := current_request_id():
+        headers["X-BackendAI-RequestID"] = request_id
     async with (
         aiohttp.ClientSession() as session,
         session.get(
             wsproxy_addr + "/status",
-            headers={"Accept": "application/json"},
+            headers=headers,
         ) as resp,
     ):
         try:
