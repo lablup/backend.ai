@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -18,6 +18,7 @@ class SearchEntitiesAction(RoleAction):
     Permission check is performed at the API handler level.
     """
 
+    scope_type: ScopeType
     scope_id: str
     target_entity_type: EntityType
     querier: BatchQuerier

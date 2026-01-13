@@ -301,6 +301,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def search_entities(
         self,
+        scope_type: ScopeType,
         scope_id: str,
         entity_type: EntityType,
         querier: BatchQuerier,
@@ -308,6 +309,7 @@ class PermissionControllerRepository:
         """Search entities within a scope.
 
         Args:
+            scope_type: The scope type to search within.
             scope_id: The scope ID to search within.
             entity_type: The type of entity to search.
             querier: BatchQuerier with pagination settings.
@@ -315,4 +317,6 @@ class PermissionControllerRepository:
         Returns:
             EntityListResult with matching entities.
         """
-        return await self._db_source.search_entities_in_scope(scope_id, entity_type, querier)
+        return await self._db_source.search_entities_in_scope(
+            scope_type, scope_id, entity_type, querier
+        )

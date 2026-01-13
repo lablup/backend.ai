@@ -234,7 +234,7 @@ class PermissionControllerService:
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
         result = await self._repository.search_entities(
-            action.scope_id, action.target_entity_type, action.querier
+            action.scope_type, action.scope_id, action.target_entity_type, action.querier
         )
         return SearchEntitiesActionResult(
             items=result.items,

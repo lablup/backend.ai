@@ -991,6 +991,7 @@ class PermissionDBSource:
 
     async def search_entities_in_scope(
         self,
+        scope_type: ScopeType,
         scope_id: str,
         entity_type: EntityType,
         querier: BatchQuerier,
@@ -998,9 +999,10 @@ class PermissionDBSource:
         """Search entities within a scope.
 
         Queries the association_scopes_entities table for entity IDs matching
-        the scope_id and entity_type.
+        the scope_type, scope_id, and entity_type.
 
         Args:
+            scope_type: The scope type to search within
             scope_id: The scope ID to search within
             entity_type: The type of entity to search for
             querier: BatchQuerier containing pagination
@@ -1011,6 +1013,7 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AssociationScopesEntitiesRow.entity_id).where(
                 sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_type,
                     AssociationScopesEntitiesRow.scope_id == scope_id,
                     AssociationScopesEntitiesRow.entity_type == entity_type,
                 )
