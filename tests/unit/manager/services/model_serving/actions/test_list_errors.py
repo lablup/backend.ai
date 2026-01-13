@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import ErrorInfo, RequesterCtx
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import ErrorInfo, UserRole
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.list_errors import (
     ListErrorsAction,
     ListErrorsActionResult,
@@ -30,19 +30,10 @@ def mock_check_requester_access_list_errors(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_list_errors(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_list_errors(mocker, mock_repositories):
+def mock_get_endpoint_by_id_list_errors(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
@@ -54,10 +45,12 @@ class TestListErrors:
             ScenarioBase.success(
                 "recent errors lookup",
                 ListErrorsAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
@@ -87,10 +80,12 @@ class TestListErrors:
             ScenarioBase.success(
                 "error type filtered",
                 ListErrorsAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
@@ -117,11 +112,11 @@ class TestListErrors:
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_list_errors,
-        mock_get_endpoint_by_id_force_list_errors,
-        mock_get_endpoint_by_id_validated_list_errors,
+        mock_get_endpoint_by_id_list_errors,
     ):
         # Mock repository responses
         expected = cast(ListErrorsActionResult, scenario.expected)
+        action = scenario.input
         mock_routings = [
             MagicMock(
                 status=RouteStatus.FAILED_TO_START,
@@ -140,12 +135,13 @@ class TestListErrors:
             id=scenario.input.service_id,
             routings=mock_routings,
             retries=expected.retries,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole.USER,
+            domain=action.user_data.domain_name,
         )
 
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_list_errors.return_value = mock_endpoint
-        else:
-            mock_get_endpoint_by_id_validated_list_errors.return_value = mock_endpoint
+        # Now uses single repository for all roles
+        mock_get_endpoint_by_id_list_errors.return_value = mock_endpoint
 
         async def list_errors(action: ListErrorsAction):
             return await model_serving_processors.list_errors.wait_for_complete(action)

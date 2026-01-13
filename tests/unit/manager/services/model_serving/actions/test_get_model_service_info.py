@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import HttpUrl
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.manager.data.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.data.model_serving.types import RouteInfo, ServiceInfo, UserRole
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
@@ -30,19 +30,10 @@ def mock_check_requester_access_get_info(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_get_info(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_get_info(mocker, mock_repositories):
+def mock_get_endpoint_by_id_get_info(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
@@ -54,10 +45,12 @@ class TestGetModelServiceInfo:
             ScenarioBase.success(
                 "full info lookup",
                 GetModelServiceInfoAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
@@ -83,10 +76,12 @@ class TestGetModelServiceInfo:
             ScenarioBase.success(
                 "SUPERADMIN permission lookup",
                 GetModelServiceInfoAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role="superadmin",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
@@ -123,11 +118,11 @@ class TestGetModelServiceInfo:
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_get_info,
-        mock_get_endpoint_by_id_force_get_info,
-        mock_get_endpoint_by_id_validated_get_info,
+        mock_get_endpoint_by_id_get_info,
     ):
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
+        action = scenario.input
         mock_endpoint = MagicMock(
             id=expected.data.endpoint_id,
             model=expected.data.model_id,
@@ -150,14 +145,14 @@ class TestGetModelServiceInfo:
             url=str(expected.data.service_endpoint) if expected.data.service_endpoint else None,
             open_to_public=expected.data.is_public,
             runtime_variant=expected.data.runtime_variant,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole.USER,
+            domain=action.user_data.domain_name,
         )
         mock_endpoint.name = expected.data.name
 
-        # Mock repository based on user role
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_get_info.return_value = mock_endpoint
-        else:
-            mock_get_endpoint_by_id_validated_get_info.return_value = mock_endpoint
+        # Now uses single repository for all roles
+        mock_get_endpoint_by_id_get_info.return_value = mock_endpoint
 
         async def get_model_service_info(action: GetModelServiceInfoAction):
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)

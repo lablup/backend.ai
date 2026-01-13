@@ -4,14 +4,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointId,
 )
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
-from ai.backend.manager.data.model_serving.types import RequesterCtx
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.data.model_serving.types import UserRole
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -37,10 +37,10 @@ def mock_check_requester_access_create(mocker, auto_scaling_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_validated_create(mocker, mock_repositories):
+def mock_get_endpoint_by_id_create(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
@@ -49,16 +49,7 @@ def mock_get_endpoint_by_id_validated_create(mocker, mock_repositories):
 def mock_create_auto_scaling_rule(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "create_auto_scaling_rule_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_auto_scaling_rule_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "create_auto_scaling_rule_force",
+        "create_auto_scaling_rule",
         new_callable=AsyncMock,
     )
 
@@ -70,10 +61,12 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     endpoint_id=EndpointId(uuid.UUID("11111111-1111-1111-1111-111111111111")),
@@ -96,10 +89,12 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Request count based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     endpoint_id=EndpointId(uuid.UUID("33333333-3333-3333-3333-333333333333")),
@@ -122,10 +117,12 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Custom metric",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     endpoint_id=EndpointId(uuid.UUID("55555555-5555-5555-5555-555555555555")),
@@ -148,10 +145,12 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.failure(
                 "Endpoint not found",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     endpoint_id=EndpointId(uuid.UUID("77777777-7777-7777-7777-777777777777")),
@@ -171,10 +170,12 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "SUPERADMIN CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role="superadmin",
                         domain_name="default",
                     ),
                     endpoint_id=EndpointId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
@@ -204,10 +205,11 @@ class TestCreateEndpointAutoScalingRule:
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_create,
-        mock_get_endpoint_by_id_validated_create,
+        mock_get_endpoint_by_id_create,
         mock_create_auto_scaling_rule,
-        mock_create_auto_scaling_rule_force,
     ):
+        action = scenario.input
+
         # Mock repository responses based on scenario
         if scenario.description in [
             "CPU based scaling",
@@ -216,31 +218,33 @@ class TestCreateEndpointAutoScalingRule:
             "SUPERADMIN CPU based scaling",
         ]:
             mock_endpoint = MagicMock(
-                id=scenario.input.endpoint_id,
+                id=action.endpoint_id,
                 status=EndpointStatus.READY,
+                session_owner_id=action.user_data.user_id,
+                session_owner_role=UserRole.USER,
+                domain=action.user_data.domain_name,
             )
-            mock_get_endpoint_by_id_validated_create.return_value = mock_endpoint
+            mock_get_endpoint_by_id_create.return_value = mock_endpoint
 
             expected_result = scenario.expected
             assert expected_result is not None
             mock_rule = MagicMock(
                 id=expected_result.data.id if expected_result.data else None,
-                endpoint_id=scenario.input.endpoint_id,
-                metric_source=scenario.input.creator.metric_source,
-                metric_name=scenario.input.creator.metric_name,
-                threshold=scenario.input.creator.threshold,
-                comparator=scenario.input.creator.comparator,
-                step_size=scenario.input.creator.step_size,
-                cooldown_seconds=scenario.input.creator.cooldown_seconds,
-                min_replicas=scenario.input.creator.min_replicas,
-                max_replicas=scenario.input.creator.max_replicas,
+                endpoint_id=action.endpoint_id,
+                metric_source=action.creator.metric_source,
+                metric_name=action.creator.metric_name,
+                threshold=action.creator.threshold,
+                comparator=action.creator.comparator,
+                step_size=action.creator.step_size,
+                cooldown_seconds=action.creator.cooldown_seconds,
+                min_replicas=action.creator.min_replicas,
+                max_replicas=action.creator.max_replicas,
                 enabled=True,
             )
             mock_create_auto_scaling_rule.return_value = mock_rule
-            mock_create_auto_scaling_rule_force.return_value = mock_rule
 
         elif scenario.description == "Endpoint not found":
-            mock_get_endpoint_by_id_validated_create.return_value = None
+            mock_get_endpoint_by_id_create.return_value = None
             mock_create_auto_scaling_rule.return_value = None
 
         async def create_auto_scaling_rule(action: CreateEndpointAutoScalingRuleAction):
@@ -256,7 +260,7 @@ class TestCreateEndpointAutoScalingRule:
             return
 
         # For success scenarios, verify success and id
-        result = await create_auto_scaling_rule(scenario.input)
+        result = await create_auto_scaling_rule(action)
         assert result.success is True
         expected = scenario.expected
         if expected and expected.data:

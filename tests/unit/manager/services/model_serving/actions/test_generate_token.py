@@ -7,8 +7,8 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
-from ai.backend.manager.data.user.types import UserRole
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import EndpointTokenData, UserRole
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
@@ -31,37 +31,19 @@ def mock_check_requester_access_token(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_token(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_endpoint_token_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "create_endpoint_token_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_token(mocker, mock_repositories):
+def mock_get_endpoint_by_id_token(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_create_endpoint_token_validated(mocker, mock_repositories):
+def mock_create_endpoint_token(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "create_endpoint_token_validated",
+        "create_endpoint_token",
         new_callable=AsyncMock,
     )
 
@@ -82,10 +64,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -108,10 +92,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
@@ -134,10 +120,12 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
@@ -165,10 +153,8 @@ class TestGenerateToken:
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_token,
-        mock_get_endpoint_by_id_force_token,
-        mock_create_endpoint_token_force,
-        mock_get_endpoint_by_id_validated_token,
-        mock_create_endpoint_token_validated,
+        mock_get_endpoint_by_id_token,
+        mock_create_endpoint_token,
         mock_get_scaling_group_info_token,
     ):
         action = scenario.input
@@ -180,6 +166,7 @@ class TestGenerateToken:
             id=action.service_id,
             status=EndpointStatus.READY,
             session_owner_id=expected.data.session_owner,
+            session_owner_role=UserRole.USER,
             domain=expected.data.domain,
             project=expected.data.project,
             resource_group="default",
@@ -199,14 +186,9 @@ class TestGenerateToken:
             created_at=expected.data.created_at,
         )
 
-        # Setup repository mocks based on user role
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_token.return_value = mock_endpoint
-            mock_create_endpoint_token_force.return_value = mock_token_data
-        else:
-            mock_get_endpoint_by_id_validated_token.return_value = mock_endpoint
-            mock_create_endpoint_token_validated.return_value = mock_token_data
-
+        # Setup repository mocks - now uses single repository for all roles
+        mock_get_endpoint_by_id_token.return_value = mock_endpoint
+        mock_create_endpoint_token.return_value = mock_token_data
         mock_get_scaling_group_info_token.return_value = mock_scaling_group
 
         # TODO: Change using aioresponses to mocking client layer after refactoring service layer

@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
-from ai.backend.manager.models.user import UserRole
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import UserRole
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
@@ -31,37 +31,19 @@ def mock_check_requester_access_scale(mocker, auto_scaling_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_scale(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_update_endpoint_replicas_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "update_endpoint_replicas_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_scale(mocker, mock_repositories):
+def mock_get_endpoint_by_id_scale(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_update_endpoint_replicas_validated(mocker, mock_repositories):
+def mock_update_endpoint_replicas(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "update_endpoint_replicas_validated",
+        "update_endpoint_replicas",
         new_callable=AsyncMock,
     )
 
@@ -73,10 +55,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "scale up",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -91,10 +75,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "scale down",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -109,10 +95,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "zero scale",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -127,10 +115,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "SUPERADMIN scale up",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role="superadmin",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -145,10 +135,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.failure(
                 "non-existent service",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -160,10 +152,12 @@ class TestScaleServiceReplicas:
             ScenarioBase.failure(
                 "update operation failed",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                     max_session_count_per_model_session=100,
@@ -180,43 +174,37 @@ class TestScaleServiceReplicas:
         scenario: ScenarioBase[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_scale,
-        mock_get_endpoint_by_id_force_scale,
-        mock_update_endpoint_replicas_force,
-        mock_get_endpoint_by_id_validated_scale,
-        mock_update_endpoint_replicas_validated,
+        mock_get_endpoint_by_id_scale,
+        mock_update_endpoint_replicas,
     ):
         expected = cast(ScaleServiceReplicasActionResult, scenario.expected)
+        action = scenario.input
 
         # Mock endpoint data based on scenario
-        if scenario.description in ["scale up", "scale down", "zero scale"]:
+        if scenario.description in ["scale up", "scale down", "zero scale", "SUPERADMIN scale up"]:
             mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
+                id=action.service_id,
                 routings=[MagicMock() for _ in range(expected.current_route_count)],
+                session_owner_id=action.user_data.user_id,
+                session_owner_role=UserRole.USER,
+                domain=action.user_data.domain_name,
             )
-            mock_get_endpoint_by_id_validated_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_validated.return_value = True
-
-        elif scenario.description == "SUPERADMIN scale up":
-            mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
-                routings=[MagicMock() for _ in range(expected.current_route_count)],
-            )
-            mock_get_endpoint_by_id_force_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_force.return_value = True
+            mock_get_endpoint_by_id_scale.return_value = mock_endpoint
+            mock_update_endpoint_replicas.return_value = True
 
         elif scenario.description == "non-existent service":
-            if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-                mock_get_endpoint_by_id_force_scale.return_value = None
-            else:
-                mock_get_endpoint_by_id_validated_scale.return_value = None
+            mock_get_endpoint_by_id_scale.return_value = None
 
         elif scenario.description == "update operation failed":
             mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
+                id=action.service_id,
                 routings=[MagicMock() for _ in range(2)],
+                session_owner_id=action.user_data.user_id,
+                session_owner_role=UserRole.USER,
+                domain=action.user_data.domain_name,
             )
-            mock_get_endpoint_by_id_validated_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_validated.return_value = False
+            mock_get_endpoint_by_id_scale.return_value = mock_endpoint
+            mock_update_endpoint_replicas.return_value = False
 
         async def scale_service_replicas(action: ScaleServiceReplicasAction):
             return await auto_scaling_processors.scale_service_replicas.wait_for_complete(action)

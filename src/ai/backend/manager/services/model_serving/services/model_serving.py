@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import secrets
 import uuid
@@ -11,6 +13,7 @@ from yarl import URL
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -39,7 +42,6 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
     ErrorInfo,
-    RequesterCtx,
     RouteInfo,
     ServiceInfo,
 )
@@ -48,6 +50,7 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import (
+    EndpointAccessForbiddenError,
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,
@@ -56,14 +59,10 @@ from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseErro
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
-from ai.backend.manager.repositories.model_serving.admin_repository import (
-    AdminModelServingRepository,
-)
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
@@ -122,6 +121,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
 )
+from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -138,7 +138,6 @@ class ModelServingService:
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _repository: ModelServingRepository
-    _admin_repository: AdminModelServingRepository
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
@@ -154,7 +153,6 @@ class ModelServingService:
         config_provider: ManagerConfigProvider,
         valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
-        admin_repository: AdminModelServingRepository,
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
     ) -> None:
@@ -166,7 +164,6 @@ class ModelServingService:
         self._config_provider = config_provider
         self._valkey_live = valkey_live
         self._repository = repository
-        self._admin_repository = admin_repository
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
         # Map SessionStatus to legacy event names for backward compatibility
@@ -380,27 +377,23 @@ class ModelServingService:
             ]
         )
 
-    async def check_requester_access(self, requester_ctx: RequesterCtx) -> None:
-        if requester_ctx.is_authorized is False:
+    async def check_requester_access(self, user_data: UserData) -> None:
+        if user_data.is_authorized is False:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
 
     async def delete(self, action: DeleteModelServiceAction) -> DeleteModelServiceActionResult:
         service_id = action.service_id
 
-        # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(service_id)
-        else:
-            endpoint_data = await self._repository.get_endpoint_by_id_validated(
-                service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(service_id)
 
         if not endpoint_data:
             raise ModelServiceNotFound
+
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
 
         # Determine lifecycle stage based on routes
         has_routes = endpoint_data.routings and len(endpoint_data.routings) > 0
@@ -412,19 +405,7 @@ class ModelServingService:
             replicas = None
 
         # Update endpoint lifecycle
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            await self._admin_repository.update_endpoint_lifecycle_force(
-                service_id, lifecycle_stage, replicas
-            )
-        else:
-            await self._repository.update_endpoint_lifecycle_validated(
-                service_id,
-                lifecycle_stage,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-                replicas,
-            )
+        await self._repository.update_endpoint_lifecycle(service_id, lifecycle_stage, replicas)
 
         return DeleteModelServiceActionResult(success=True)
 
@@ -566,20 +547,16 @@ class ModelServingService:
     async def get_model_service_info(
         self, action: GetModelServiceInfoAction
     ) -> GetModelServiceInfoActionResult:
-        # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(action.service_id)
-        else:
-            endpoint_data = await self._repository.get_endpoint_by_id_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
 
         if not endpoint_data:
             raise ModelServiceNotFound
+
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
 
         return GetModelServiceInfoActionResult(
             ServiceInfo(
@@ -607,20 +584,16 @@ class ModelServingService:
         )
 
     async def list_errors(self, action: ListErrorsAction) -> ListErrorsActionResult:
-        # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(action.service_id)
-        else:
-            endpoint_data = await self._repository.get_endpoint_by_id_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
 
         if not endpoint_data:
             raise ModelServiceNotFound
+
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
 
         error_routes = (
             [r for r in endpoint_data.routings if r.status == RouteStatus.FAILED_TO_START]
@@ -639,17 +612,19 @@ class ModelServingService:
         )
 
     async def clear_error(self, action: ClearErrorAction) -> ClearErrorActionResult:
-        # Clear errors with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            success = await self._admin_repository.clear_endpoint_errors_force(action.service_id)
-        else:
-            success = await self._repository.clear_endpoint_errors_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint first to validate access
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+
+        if not endpoint_data:
+            raise ModelServiceNotFound
+
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
+
+        # Clear errors
+        success = await self._repository.clear_endpoint_errors(action.service_id)
 
         if not success:
             raise ModelServiceNotFound
@@ -657,44 +632,44 @@ class ModelServingService:
         return ClearErrorActionResult(success=True)
 
     async def update_route(self, action: UpdateRouteAction) -> UpdateRouteActionResult:
-        # Update route traffic with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.update_route_traffic_force(
-                self._valkey_live, action.route_id, action.service_id, action.traffic_ratio
-            )
-        else:
-            endpoint_data = await self._repository.update_route_traffic_validated(
-                self._valkey_live,
-                action.route_id,
-                action.service_id,
-                action.traffic_ratio,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint first to validate access
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+
         if not endpoint_data:
             raise ModelServiceNotFound
 
-        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
+
+        # Update route traffic
+        updated_endpoint_data = await self._repository.update_route_traffic(
+            self._valkey_live, action.route_id, action.service_id, action.traffic_ratio
+        )
+        if not updated_endpoint_data:
+            raise ModelServiceNotFound
+
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(
+            updated_endpoint_data.id
+        )
 
         return UpdateRouteActionResult(success=True)
 
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
-        # Get route with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            route_data = await self._admin_repository.get_route_by_id_force(
-                action.route_id, action.service_id
-            )
-        else:
-            route_data = await self._repository.get_route_by_id_validated(
-                action.route_id,
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        # Get endpoint first to validate access
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+
+        if not endpoint_data:
+            raise ModelServiceNotFound
+
+        # Validate access
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
+
+        # Get route
+        route_data = await self._repository.get_route_by_id(action.route_id, action.service_id)
 
         if not route_data:
             raise RouteNotFound
@@ -715,34 +690,18 @@ class ModelServingService:
             )
 
         # Decrease endpoint replicas
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            await self._admin_repository.decrease_endpoint_replicas_force(action.service_id)
-        else:
-            await self._repository.decrease_endpoint_replicas_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        await self._repository.decrease_endpoint_replicas(action.service_id)
 
         return DeleteRouteActionResult(success=True)
 
     async def generate_token(self, action: GenerateTokenAction) -> GenerateTokenActionResult:
         # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(action.service_id)
-        else:
-            endpoint_data = await self._repository.get_endpoint_by_id_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
-
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
 
         # Get scaling group info
         scaling_group_data = await self._repository.get_scaling_group_info(
@@ -784,17 +743,8 @@ class ModelServingService:
             )
         )
 
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            token_data = await self._admin_repository.create_endpoint_token_force(token_creator)
-        else:
-            token_data = await self._repository.create_endpoint_token_validated(
-                token_creator,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
-
+        # Access already validated above, just create the token
+        token_data = await self._repository.create_endpoint_token(token_creator)
         if not token_data:
             raise ModelServiceNotFound
 
@@ -812,18 +762,12 @@ class ModelServingService:
 
     async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
         # Get endpoint with access validation
-        await self.check_requester_access(action.requester_ctx)
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            endpoint_data = await self._admin_repository.get_endpoint_by_id_force(action.service_id)
-        else:
-            endpoint_data = await self._repository.get_endpoint_by_id_validated(
-                action.service_id,
-                action.requester_ctx.user_id,
-                action.requester_ctx.user_role,
-                action.requester_ctx.domain_name,
-            )
+        await self.check_requester_access(action.user_data)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
+        if not validate_endpoint_access(endpoint_data, action.user_data):
+            raise EndpointAccessForbiddenError
 
         await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
 

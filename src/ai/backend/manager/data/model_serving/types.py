@@ -54,6 +54,9 @@ class EndpointData:
     created_user_email: Optional[str]
     session_owner_id: uuid.UUID
     session_owner_email: str
+    # Used for service-layer access control validation.
+    # Enables checking whether ADMIN users can access resources owned by SUPERADMIN.
+    session_owner_role: Optional[UserRole]
     tag: Optional[str]
     startup_command: Optional[str]
     bootstrap_script: Optional[str]
@@ -228,6 +231,10 @@ class CompactServiceInfo:
 
 @dataclass
 class RequesterCtx:
+    """
+    Deprecated: Use ai.backend.common.data.user.types.UserData instead.
+    """
+
     is_authorized: Optional[bool]
     user_id: uuid.UUID
     user_role: UserRole

@@ -17,9 +17,6 @@ from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.model_serving.admin_repository import (
-    AdminModelServingRepository,
-)
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
@@ -81,7 +78,6 @@ def mock_repositories() -> MagicMock:
     """Mock ModelServingRepositories for testing."""
     mock = MagicMock(spec=ModelServingRepositories)
     mock.repository = MagicMock(spec=ModelServingRepository)
-    mock.admin_repository = MagicMock(spec=AdminModelServingRepository)
     return mock
 
 
@@ -150,7 +146,6 @@ def model_serving_service(
         config_provider=mock_config_provider,
         valkey_live=mock_valkey_live,
         repository=mock_repositories.repository,
-        admin_repository=mock_repositories.admin_repository,
         deployment_controller=mock_deployment_controller,
         scheduling_controller=mock_scheduling_controller,
     )
@@ -175,7 +170,6 @@ def auto_scaling_service(
     """Create AutoScalingService with mock dependencies."""
     return AutoScalingService(
         repository=mock_repositories.repository,
-        admin_repository=mock_repositories.admin_repository,
     )
 
 

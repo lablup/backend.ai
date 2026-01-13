@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import UserRole
 from ai.backend.manager.errors.service import ModelServiceNotFound
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
@@ -17,37 +17,19 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_validated(mocker, mock_repositories):
+def mock_get_endpoint_by_id(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_update_endpoint_lifecycle_validated(mocker, mock_repositories):
+def mock_update_endpoint_lifecycle(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "update_endpoint_lifecycle_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_update_endpoint_lifecycle_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "update_endpoint_lifecycle_force",
+        "update_endpoint_lifecycle",
         new_callable=AsyncMock,
     )
 
@@ -71,10 +53,12 @@ class TestDeleteModelService:
                 "successful model deletion (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                 ),
@@ -86,10 +70,12 @@ class TestDeleteModelService:
                 "non-existent model (user request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role="user",
                         domain_name="default",
                     ),
                 ),
@@ -99,10 +85,12 @@ class TestDeleteModelService:
                 "successful model deletion (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role="superadmin",
                         domain_name="default",
                     ),
                 ),
@@ -114,10 +102,12 @@ class TestDeleteModelService:
                 "non-existent model (superadmin request)",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role="superadmin",
                         domain_name="default",
                     ),
                 ),
@@ -130,28 +120,24 @@ class TestDeleteModelService:
         self,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_get_endpoint_by_id_validated,
-        mock_update_endpoint_lifecycle_validated,
-        mock_get_endpoint_by_id_force,
-        mock_update_endpoint_lifecycle_force,
+        mock_get_endpoint_by_id,
+        mock_update_endpoint_lifecycle,
         mock_check_requester_access,
     ):
-        mock_endpoint = MagicMock(routings=[])
+        action = scenario.input
+        mock_endpoint = MagicMock(
+            routings=[],
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole.USER,
+            domain=action.user_data.domain_name,
+        )
 
         # Mock repository responses based on scenario
-        if scenario.description == "successful model deletion (user request)":
-            mock_get_endpoint_by_id_validated.return_value = mock_endpoint
-            mock_update_endpoint_lifecycle_validated.return_value = None
-
-        elif scenario.description == "non-existent model (user request)":
-            mock_get_endpoint_by_id_validated.return_value = None
-
-        elif scenario.description == "successful model deletion (superadmin request)":
-            mock_get_endpoint_by_id_force.return_value = mock_endpoint
-            mock_update_endpoint_lifecycle_force.return_value = None
-
-        elif scenario.description == "non-existent model (superadmin request)":
-            mock_get_endpoint_by_id_force.return_value = None
+        if "successful" in scenario.description:
+            mock_get_endpoint_by_id.return_value = mock_endpoint
+            mock_update_endpoint_lifecycle.return_value = None
+        else:  # non-existent model
+            mock_get_endpoint_by_id.return_value = None
 
         async def delete_model_service(action: DeleteModelServiceAction):
             return await model_serving_processors.delete_model_service.wait_for_complete(action)
