@@ -670,7 +670,6 @@ install_editable_webui() {
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
     cd src/ai/backend/webui
     make clean
-    git pull --ff-only || echo "Local changes exist, skipping pull..."
   else
     git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
     cd src/ai/backend/webui
