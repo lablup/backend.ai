@@ -9,6 +9,8 @@ from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.types import VFolderID
+
+from ai.backend.storage.exception import InvalidAPIParameters
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors.common import InvalidStorageTargetError
 
@@ -148,7 +150,7 @@ class StorageMappingResolver:
         # When vfolder_id is provided, use VolumeStorageAdapter for all steps
         if vfolder_id is not None:
             if volume_name is None:
-                raise ValueError("volume_name is required when vfolder_id is provided")
+                raise InvalidAPIParameters("volume_name is required when vfolder_id is provided")
 
             adapter_name = f"volume_storage_{current_request_id()}"
             volume = self._volume_pool.get_volume_by_name_direct(volume_name)
@@ -171,6 +173,6 @@ class StorageMappingResolver:
 
         # When vfolder_id is not provided, use raw_mappings
         if raw_mappings is None:
-            raise ValueError("storage_step_mappings is required when vfolder_id is not provided")
+            raise InvalidAPIParameters("storage_step_mappings is required when vfolder_id is not provided")
 
         return {step: StorageTarget(name) for step, name in raw_mappings.items()}
