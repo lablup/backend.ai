@@ -54,6 +54,7 @@ class CliArgs:
     non_interactive: bool
     public_facing_address: str
     accelerator: Optional[str] = None
+    editable_webui: Optional[bool] = None
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -185,3 +186,4 @@ class ServiceConfig:
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Optional[Accelerator] = None
+    editable_webui: Optional[bool] = None  # None: auto (True on main branch)

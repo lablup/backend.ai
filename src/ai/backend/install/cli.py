@@ -58,6 +58,12 @@ from .types import Accelerator, CliArgs, InstallModes
     default="127.0.0.1",
     help="Set public facing address for the Backend.AI server.",
 )
+@click.option(
+    "--editable-webui",
+    type=bool,
+    default=None,
+    help="Install webui as editable repository. [default: auto (True on main branch)]",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -69,6 +75,7 @@ def main(
     headless: bool,
     public_facing_address: str,
     accelerator: str,
+    editable_webui: bool | None,
 ) -> None:
     """The installer"""
     from rich.console import Console
@@ -91,6 +98,7 @@ def main(
         non_interactive=non_interactive,
         public_facing_address=public_facing_address,
         accelerator=accelerator,
+        editable_webui=editable_webui,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

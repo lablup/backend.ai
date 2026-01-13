@@ -414,6 +414,7 @@ class ModeMenu(Static):
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+            editable_webui=args.editable_webui,
         )
 
     def compose(self) -> ComposeResult:
