@@ -1,7 +1,8 @@
 ---
-Author: Design Discussion
+Author: Sanghun Lee (sanghun@lablup.com)
 Status: Reference Document
 Created: 2025-11-05
+Parent: BEP-1012-main.md
 ---
 
 # BEP-1012 RBAC Design Decisions
