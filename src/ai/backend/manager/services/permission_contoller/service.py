@@ -1,5 +1,6 @@
 import logging
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
@@ -22,6 +23,10 @@ from ai.backend.manager.services.permission_contoller.actions.delete_role import
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
+    GetScopeTypesAction,
+    GetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.object_permission import (
     CreateObjectPermissionAction,
@@ -46,6 +51,10 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
+    SearchScopesAction,
+    SearchScopesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -195,3 +204,17 @@ class PermissionControllerService:
             input_data=action.input_data,
         )
         return UpdateRolePermissionsActionResult(role=result)
+
+    async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
+        """Search scopes based on scope type."""
+        result = await self._repository.search_scopes(action.scope_type, action.querier)
+        return SearchScopesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def get_scope_types(self, action: GetScopeTypesAction) -> GetScopeTypesActionResult:
+        """Get all available scope types."""
+        return GetScopeTypesActionResult(scope_types=list(ScopeType))

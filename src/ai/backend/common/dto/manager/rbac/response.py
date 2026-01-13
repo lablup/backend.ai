@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.permission.types import ScopeType
 
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
@@ -25,12 +26,15 @@ __all__ = (
     "DeletePermissionResponse",
     "DeleteRoleResponse",
     "GetRoleResponse",
+    "GetScopeTypesResponse",
     "ObjectPermissionDTO",
     "PaginationInfo",
     "PermissionDTO",
     "RevokeRoleResponse",
     "RoleDTO",
+    "ScopeDTO",
     "SearchRolesResponse",
+    "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
     "UpdateRoleResponse",
 )
@@ -159,3 +163,24 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
     """Response for deleting an object permission."""
 
     deleted: bool = Field(description="Whether the object permission was deleted")
+
+
+class GetScopeTypesResponse(BaseResponseModel):
+    """Response for getting available scope types."""
+
+    scope_types: list[ScopeType] = Field(description="List of available scope types")
+
+
+class ScopeDTO(BaseModel):
+    """DTO for scope data."""
+
+    scope_type: ScopeType = Field(description="Scope type")
+    scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
+    name: str = Field(description="Scope display name")
+
+
+class SearchScopesResponse(BaseResponseModel):
+    """Response for searching scopes."""
+
+    scopes: list[ScopeDTO] = Field(description="List of scopes")
+    pagination: PaginationInfo = Field(description="Pagination information")
