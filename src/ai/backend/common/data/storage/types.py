@@ -16,18 +16,6 @@ class VFolderStorageTarget(BaseModel):
     volume_name: str
 
 
-from pydantic import BaseModel, ConfigDict
-
-
-class VFolderStorageTarget(BaseModel):
-    """Target for direct import to a specific virtual folder."""
-
-    vfolder_id: VFolderIDField
-    volume_name: str
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
 class NamedStorageTarget(BaseModel):
     """Target for named storage lookup via storage pool."""
 
