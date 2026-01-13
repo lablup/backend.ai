@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
+import jwt
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -421,6 +422,21 @@ class Circuit(Base, BaseMixin):
 
                 return did_update_status
         return False
+
+    async def generate_jwt(
+        self, db_sess: AsyncSession, jwt_secret: str, created_user: UUID, exp: datetime
+    ) -> str:
+        payload = dict(self.dump_model())
+
+        # inject extra information
+        payload["app_url"] = str(await self.get_endpoint_url(session=db_sess))
+        payload["user"] = str(created_user)
+        payload["exp"] = exp
+        # mask unrelated & sensitive information
+        del payload["config"]
+        del payload["route_info"]
+
+        return jwt.encode(payload, jwt_secret, algorithm="HS256")
 
     @property
     def traefik_services(self) -> dict[str, Any]:
