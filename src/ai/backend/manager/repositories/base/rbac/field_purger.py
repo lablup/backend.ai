@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Generic, Protocol, cast
+from typing import Generic, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.manager.data.permission.id import FieldRef
+from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec as BaseBatchPurgerSpec
@@ -19,23 +21,55 @@ from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurg
 from ai.backend.manager.repositories.base.purger import TRow
 
 # =============================================================================
-# Protocol
+# Data Classes
 # =============================================================================
 
 
-class RBACFieldRowProtocol(Protocol):
-    """Protocol for rows that support RBAC field purging.
+@dataclass
+class RBACField:
+    """Represents an RBAC field to be purged.
 
-    Row classes used with RBACFieldPurger/RBACFieldBatchPurger must implement this method.
+    Attributes:
+        field: FieldRef representing the field to delete.
     """
 
-    def field(self) -> FieldRef:
-        """Return the FieldRef for RBAC cleanup."""
-        ...
+    field: FieldRef
 
 
 # =============================================================================
-# Data Classes
+# Spec Classes
+# =============================================================================
+
+
+class RBACFieldPurgerSpec(ABC):
+    """Spec for building RBAC field info for single-row purge.
+
+    Implementations specify which field to purge by providing:
+    - field(): Returns RBACField with the FieldRef to delete
+    """
+
+    @abstractmethod
+    def field(self) -> RBACField:
+        """Return the RBAC field information for deletion."""
+        raise NotImplementedError
+
+
+class RBACFieldBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
+    """Spec for RBAC field batch purge operations.
+
+    Inherits build_subquery() from BaseBatchPurgerSpec.
+    Implementations must provide:
+    - field_type(): Returns the EntityType for constructing FieldRefs from row PKs
+    """
+
+    @abstractmethod
+    def field_type(self) -> EntityType:
+        """Return the field type for constructing FieldRefs from row primary keys."""
+        raise NotImplementedError
+
+
+# =============================================================================
+# Purger Classes
 # =============================================================================
 
 
@@ -44,25 +78,17 @@ class RBACFieldPurger(BasePurger[TRow]):
     """Single-row RBAC field purger by primary key.
 
     Inherits row_class and pk_value from BasePurger.
-    The row_class must implement RBACFieldRowProtocol (field() method).
+
+    Attributes:
+        spec: RBACFieldPurgerSpec providing field info for RBAC cleanup.
     """
 
-    pass
+    spec: RBACFieldPurgerSpec
 
 
 @dataclass
 class RBACFieldPurgerResult(BasePurgerResult[TRow]):
     """Result of executing a single-row RBAC field purge."""
-
-    pass
-
-
-class RBACFieldBatchPurgerSpec(BaseBatchPurgerSpec[TRow]):
-    """Spec for RBAC field batch purge operations.
-
-    Inherits build_subquery() from BaseBatchPurgerSpec.
-    The selected rows must implement RBACFieldRowProtocol.
-    """
 
     pass
 
@@ -138,11 +164,11 @@ async def _batch_delete_entity_fields(
 # =============================================================================
 
 
-async def _fetch_row_by_pk(
+async def _delete_row_by_pk_returning(
     db_sess: SASession,
     purger: RBACFieldPurger[TRow],
 ) -> TRow | None:
-    """Fetch a row by primary key."""
+    """Delete a row by primary key and return the deleted row data."""
     row_class = purger.row_class
     table = row_class.__table__  # type: ignore[attr-defined]
     pk_columns = list(table.primary_key.columns)
@@ -152,25 +178,14 @@ async def _fetch_row_by_pk(
             f"Purger only supports single-column primary keys (table: {table.name})",
         )
 
-    result = await db_sess.scalars(sa.select(row_class).where(pk_columns[0] == purger.pk_value))
-    return result.first()
+    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+    result = await db_sess.execute(stmt)
+    row_data = result.fetchone()
 
+    if row_data is None:
+        return None
 
-async def _delete_row_by_pk(
-    db_sess: SASession,
-    purger: RBACFieldPurger[TRow],
-) -> None:
-    """Delete a row by primary key."""
-    row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
-    pk_columns = list(table.primary_key.columns)
-
-    if len(pk_columns) != 1:
-        raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {table.name})",
-        )
-
-    await db_sess.execute(sa.delete(table).where(pk_columns[0] == purger.pk_value))
+    return row_class(**dict(row_data._mapping))
 
 
 # =============================================================================
@@ -185,33 +200,28 @@ async def execute_rbac_field_purger(
     """
     Execute DELETE for a single field-scoped entity by primary key, along with related RBAC entries.
 
-    The row_class must implement RBACFieldRowProtocol (field() method).
-
     Operations performed:
-    1. Fetch row by primary key to get RBAC info
+    1. Get field info from spec
     2. Delete EntityFieldRow (field-entity mapping)
-    3. Delete the main object row
+    3. Delete the main object row with RETURNING
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable)
-        purger: Purger containing row_class and pk_value
+        purger: Purger containing row_class, pk_value, and spec
 
     Returns:
         RBACFieldPurgerResult containing the deleted row, or None if no row matched
     """
-    # 1. Fetch row to get RBAC info
-    row = await _fetch_row_by_pk(db_sess, purger)
+    # 1. Get field info from spec
+    field_ref = purger.spec.field().field
+
+    # 2. Delete RBAC entries (EntityFieldRow)
+    await _delete_entity_field(db_sess, field_ref)
+
+    # 3. Delete main row with RETURNING
+    row = await _delete_row_by_pk_returning(db_sess, purger)
     if row is None:
         return None
-
-    # 2. Extract field from row (must implement RBACFieldRowProtocol)
-    field: FieldRef = row.field()  # type: ignore[attr-defined]
-
-    # 3. Delete RBAC entries (EntityFieldRow)
-    await _delete_entity_field(db_sess, field)
-
-    # 4. Delete main row
-    await _delete_row_by_pk(db_sess, purger)
 
     return RBACFieldPurgerResult(row=row)
 
@@ -222,8 +232,6 @@ async def execute_rbac_field_batch_purger(
 ) -> RBACFieldBatchPurgerResult:
     """
     Execute batch DELETE for field-scoped entities with RBAC cleanup.
-
-    The selected rows must implement RBACFieldRowProtocol (field() method).
 
     Deletes rows in batches, cleaning up related RBAC entries for each batch:
     - EntityFieldRows for field_ids
@@ -238,6 +246,9 @@ async def execute_rbac_field_batch_purger(
     total_deleted = 0
     total_entity_field = 0
 
+    # Get field type from spec
+    field_type = purger.spec.field_type()
+
     while True:
         # 1. Select batch of rows to delete
         subquery = purger.spec.build_subquery().limit(purger.batch_size)
@@ -246,16 +257,7 @@ async def execute_rbac_field_batch_purger(
         if not rows:
             break
 
-        # 2. Extract field_ids from rows (must implement RBACFieldRowProtocol)
-        field_ids: list[FieldRef] = [
-            row.field()  # type: ignore[attr-defined]
-            for row in rows
-        ]
-
-        # 3. Clean up RBAC entries for fields
-        total_entity_field += await _batch_delete_entity_fields(db_sess, field_ids)
-
-        # 4. Delete main rows
+        # 2. Get table and PK info
         table = cast(sa.Table, purger.spec.build_subquery().froms[0])
         pk_columns = list(table.primary_key.columns)
 
@@ -265,6 +267,16 @@ async def execute_rbac_field_batch_purger(
             )
 
         pk_col = pk_columns[0]
+
+        # 3. Extract field_ids from rows using field_type and row PKs
+        field_ids: list[FieldRef] = [
+            FieldRef(field_type=field_type, field_id=str(getattr(row, pk_col.key))) for row in rows
+        ]
+
+        # 4. Clean up RBAC entries for fields
+        total_entity_field += await _batch_delete_entity_fields(db_sess, field_ids)
+
+        # 5. Delete main rows
         pk_values = [getattr(row, pk_col.key) for row in rows]
 
         result = await db_sess.execute(sa.delete(table).where(pk_col.in_(pk_values)))

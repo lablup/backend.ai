@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Generic, Protocol, cast
+from typing import Generic, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -15,6 +16,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -28,23 +30,55 @@ from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurg
 from ai.backend.manager.repositories.base.purger import TRow
 
 # =============================================================================
-# Protocol
+# Data Classes
 # =============================================================================
 
 
-class RBACEntityRowProtocol(Protocol):
-    """Protocol for rows that support RBAC entity purging.
+@dataclass
+class RBACEntity:
+    """Represents an RBAC entity to be purged.
 
-    Row classes used with RBACEntityPurger/RBACEntityBatchPurger must implement this method.
+    Attributes:
+        entity: ObjectId representing the entity to delete.
     """
 
-    def entity_id(self) -> ObjectId:
-        """Return the entity ObjectId for RBAC cleanup."""
-        ...
+    entity: ObjectId
 
 
 # =============================================================================
-# Data Classes
+# Spec Classes
+# =============================================================================
+
+
+class RBACEntityPurgerSpec(ABC):
+    """Spec for building RBAC entity info for single-row purge.
+
+    Implementations specify which entity to purge by providing:
+    - entity(): Returns RBACEntity with the ObjectId to delete
+    """
+
+    @abstractmethod
+    def entity(self) -> RBACEntity:
+        """Return the RBAC entity information for deletion."""
+        raise NotImplementedError
+
+
+class RBACEntityBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
+    """Spec for RBAC entity batch purge operations.
+
+    Inherits build_subquery() from BaseBatchPurgerSpec.
+    Implementations must provide:
+    - entity_type(): Returns the EntityType for constructing ObjectIds from row PKs
+    """
+
+    @abstractmethod
+    def entity_type(self) -> EntityType:
+        """Return the entity type for constructing ObjectIds from row primary keys."""
+        raise NotImplementedError
+
+
+# =============================================================================
+# Purger Classes
 # =============================================================================
 
 
@@ -53,25 +87,17 @@ class RBACEntityPurger(BasePurger[TRow]):
     """Single-row RBAC entity purger by primary key.
 
     Inherits row_class and pk_value from BasePurger.
-    The row_class must implement RBACEntityRowProtocol (entity_id() method).
+
+    Attributes:
+        spec: RBACEntityPurgerSpec providing entity info for RBAC cleanup.
     """
 
-    pass
+    spec: RBACEntityPurgerSpec
 
 
 @dataclass
 class RBACEntityPurgerResult(BasePurgerResult[TRow]):
     """Result of executing a single-row RBAC entity purge."""
-
-    pass
-
-
-class RBACEntityBatchPurgerSpec(BaseBatchPurgerSpec[TRow]):
-    """Spec for RBAC entity batch purge operations.
-
-    Inherits build_subquery() from BaseBatchPurgerSpec.
-    The selected rows must implement RBACEntityRowProtocol.
-    """
 
     pass
 
@@ -430,11 +456,11 @@ async def _delete_rbac_for_entity(
     await _delete_scope_associations(db_sess, entity_id)
 
 
-async def _fetch_row_by_pk(
+async def _delete_row_by_pk_returning(
     db_sess: SASession,
     purger: RBACEntityPurger[TRow],
 ) -> TRow | None:
-    """Fetch a row by primary key."""
+    """Delete a row by primary key and return the deleted row data."""
     row_class = purger.row_class
     table = row_class.__table__  # type: ignore[attr-defined]
     pk_columns = list(table.primary_key.columns)
@@ -444,25 +470,14 @@ async def _fetch_row_by_pk(
             f"Purger only supports single-column primary keys (table: {table.name})",
         )
 
-    result = await db_sess.scalars(sa.select(row_class).where(pk_columns[0] == purger.pk_value))
-    return result.first()
+    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+    result = await db_sess.execute(stmt)
+    row_data = result.fetchone()
 
+    if row_data is None:
+        return None
 
-async def _delete_row_by_pk(
-    db_sess: SASession,
-    purger: RBACEntityPurger[TRow],
-) -> None:
-    """Delete a row by primary key."""
-    row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
-    pk_columns = list(table.primary_key.columns)
-
-    if len(pk_columns) != 1:
-        raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {table.name})",
-        )
-
-    await db_sess.execute(sa.delete(table).where(pk_columns[0] == purger.pk_value))
+    return row_class(**dict(row_data._mapping))
 
 
 # =============================================================================
@@ -477,33 +492,28 @@ async def execute_rbac_entity_purger(
     """
     Execute DELETE for a single scope-scoped entity by primary key, along with related RBAC entries.
 
-    The row_class must implement RBACEntityRowProtocol (entity_id() method).
-
     Operations performed:
-    1. Fetch row by primary key to get RBAC info
+    1. Get entity info from spec
     2. Delete RBAC entries (ObjectPermissions/PermissionGroups/Associations)
-    3. Delete the main object row
+    3. Delete the main object row with RETURNING
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable)
-        purger: Purger containing row_class and pk_value
+        purger: Purger containing row_class, pk_value, and spec
 
     Returns:
         RBACEntityPurgerResult containing the deleted row, or None if no row matched
     """
-    # 1. Fetch row to get RBAC info
-    row = await _fetch_row_by_pk(db_sess, purger)
-    if row is None:
-        return None
+    # 1. Get entity info from spec
+    entity_id = purger.spec.entity().entity
 
-    # 2. Extract entity_id from row (must implement RBACEntityRowProtocol)
-    entity_id: ObjectId = row.entity_id()  # type: ignore[attr-defined]
-
-    # 3. Delete RBAC entries
+    # 2. Delete RBAC entries
     await _delete_rbac_for_entity(db_sess, entity_id)
 
-    # 4. Delete main row
-    await _delete_row_by_pk(db_sess, purger)
+    # 3. Delete main row with RETURNING
+    row = await _delete_row_by_pk_returning(db_sess, purger)
+    if row is None:
+        return None
 
     return RBACEntityPurgerResult(row=row)
 
@@ -514,8 +524,6 @@ async def execute_rbac_entity_batch_purger(
 ) -> RBACEntityBatchPurgerResult:
     """
     Execute batch DELETE for scope-scoped entities with RBAC cleanup.
-
-    The selected rows must implement RBACEntityRowProtocol (entity_id() method).
 
     Deletes rows in batches, cleaning up related RBAC entries for each batch:
     - ObjectPermissionRows for entity_ids
@@ -534,6 +542,9 @@ async def execute_rbac_entity_batch_purger(
     total_perm_group = 0
     total_scope_assoc = 0
 
+    # Get entity type from spec
+    entity_type = purger.spec.entity_type()
+
     while True:
         # 1. Select batch of rows to delete
         subquery = purger.spec.build_subquery().limit(purger.batch_size)
@@ -542,13 +553,24 @@ async def execute_rbac_entity_batch_purger(
         if not rows:
             break
 
-        # 2. Extract entity_ids from rows (must implement RBACEntityRowProtocol)
+        # 2. Get table and PK info
+        table = cast(sa.Table, purger.spec.build_subquery().froms[0])
+        pk_columns = list(table.primary_key.columns)
+
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                f"Batch purger only supports single-column primary keys (table: {table.name})",
+            )
+
+        pk_col = pk_columns[0]
+
+        # 3. Extract entity_ids from rows using entity_type and row PKs
         entity_ids: list[ObjectId] = [
-            row.entity_id()  # type: ignore[attr-defined]
+            ObjectId(entity_type=entity_type, entity_id=str(getattr(row, pk_col.key)))
             for row in rows
         ]
 
-        # 3. Clean up RBAC entries for entities
+        # 4. Clean up RBAC entries for entities
         role_rows = await _get_related_roles_for_entities(db_sess, entity_ids)
 
         # Find and delete object permissions
@@ -562,16 +584,7 @@ async def execute_rbac_entity_batch_purger(
         # Delete scope associations
         total_scope_assoc += await _batch_delete_scope_associations(db_sess, entity_ids)
 
-        # 4. Delete main rows
-        table = cast(sa.Table, purger.spec.build_subquery().froms[0])
-        pk_columns = list(table.primary_key.columns)
-
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Batch purger only supports single-column primary keys (table: {table.name})",
-            )
-
-        pk_col = pk_columns[0]
+        # 5. Delete main rows
         pk_values = [getattr(row, pk_col.key) for row in rows]
 
         result = await db_sess.execute(sa.delete(table).where(pk_col.in_(pk_values)))

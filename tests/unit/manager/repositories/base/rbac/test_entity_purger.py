@@ -28,11 +28,13 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntity,
     RBACEntityBatchPurger,
     RBACEntityBatchPurgerResult,
     RBACEntityBatchPurgerSpec,
     RBACEntityPurger,
     RBACEntityPurgerResult,
+    RBACEntityPurgerSpec,
     execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
@@ -65,6 +67,23 @@ class RBACEntityPurgerTestRow(Base):
 
     def entity_id(self) -> ObjectId:
         return ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self.id))
+
+
+# =============================================================================
+# Purger Spec Implementations
+# =============================================================================
+
+
+class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
+    """Simple spec for entity purger testing."""
+
+    def __init__(self, entity_uuid: UUID) -> None:
+        self._entity_uuid = entity_uuid
+
+    def entity(self) -> RBACEntity:
+        return RBACEntity(
+            entity=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self._entity_uuid))
+        )
 
 
 # =============================================================================
@@ -249,9 +268,11 @@ class TestRBACEntityPurgerBasic:
         ctx = entity_with_association
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             result = await execute_rbac_entity_purger(db_sess, purger)
 
@@ -281,9 +302,11 @@ class TestRBACEntityPurgerBasic:
         nonexistent_uuid = uuid.uuid4()
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=nonexistent_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=nonexistent_uuid,
+                spec=spec,
             )
             result = await execute_rbac_entity_purger(db_sess, purger)
             assert result is None
@@ -431,9 +454,11 @@ class TestRBACEntityPurgerWithObjectPermissions:
         ctx = entity_with_permissions
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -453,9 +478,11 @@ class TestRBACEntityPurgerWithObjectPermissions:
 
         async with database_connection.begin_session() as db_sess:
             # Delete only entity1
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid1,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -613,9 +640,11 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         ctx = single_entity_with_empty_perm_group
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -635,9 +664,11 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
 
         async with database_connection.begin_session() as db_sess:
             # Delete entity1
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid1,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -765,9 +796,11 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
             assert assoc_count == 2  # Both entities have associations
 
             # Delete entity with role's object_permission
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -932,9 +965,11 @@ class TestRBACEntityPurgerMultipleRoles:
             assert obj_perm_count == 3  # roleA:1 + roleB:2
 
             # Purge vfolderA
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.vfolder_a_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.vfolder_a_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -1007,9 +1042,11 @@ class TestRBACEntityPurgerMultipleScopes:
         ctx = multi_scope_entity
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -1129,9 +1166,11 @@ class TestRBACEntityPurgerPermissionRowPreservation:
             assert perm_group_count == 1
 
             # Delete the entity
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
                 pk_value=ctx.entity_uuid,
+                spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
 
@@ -1168,6 +1207,9 @@ class TestEntityBatchPurgerSpec(RBACEntityBatchPurgerSpec[RBACEntityPurgerTestRo
 
     def build_subquery(self) -> sa.sql.Select[tuple[RBACEntityPurgerTestRow]]:
         return sa.select(RBACEntityPurgerTestRow)
+
+    def entity_type(self) -> EntityType:
+        return EntityType.VFOLDER
 
 
 class TestRBACEntityBatchPurger:

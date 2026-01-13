@@ -20,11 +20,13 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.rbac.field_purger import (
+    RBACField,
     RBACFieldBatchPurger,
     RBACFieldBatchPurgerResult,
     RBACFieldBatchPurgerSpec,
     RBACFieldPurger,
     RBACFieldPurgerResult,
+    RBACFieldPurgerSpec,
     execute_rbac_field_batch_purger,
     execute_rbac_field_purger,
 )
@@ -58,6 +60,23 @@ class RBACFieldPurgerTestRow(Base):
 
     def field(self) -> FieldRef:
         return FieldRef(field_type=EntityType.VFOLDER, field_id=str(self.id))
+
+
+# =============================================================================
+# Purger Spec Implementations
+# =============================================================================
+
+
+class SimpleRBACFieldPurgerSpec(RBACFieldPurgerSpec):
+    """Simple spec for field purger testing."""
+
+    def __init__(self, field_uuid: UUID) -> None:
+        self._field_uuid = field_uuid
+
+    def field(self) -> RBACField:
+        return RBACField(
+            field=FieldRef(field_type=EntityType.VFOLDER, field_id=str(self._field_uuid))
+        )
 
 
 # =============================================================================
@@ -209,9 +228,11 @@ class TestRBACFieldPurgerBasic:
         ctx = field_entity
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACFieldPurgerSpec(field_uuid=ctx.field_uuid)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid,
+                spec=spec,
             )
             result = await execute_rbac_field_purger(db_sess, purger)
 
@@ -241,9 +262,11 @@ class TestRBACFieldPurgerBasic:
 
         async with database_connection.begin_session() as db_sess:
             # Delete only field1
+            spec = SimpleRBACFieldPurgerSpec(field_uuid=ctx.field_uuid1)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid1,
+                spec=spec,
             )
             await execute_rbac_field_purger(db_sess, purger)
 
@@ -267,9 +290,11 @@ class TestRBACFieldPurgerBasic:
         nonexistent_uuid = uuid.uuid4()
 
         async with database_connection.begin_session() as db_sess:
+            spec = SimpleRBACFieldPurgerSpec(field_uuid=nonexistent_uuid)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=nonexistent_uuid,
+                spec=spec,
             )
             result = await execute_rbac_field_purger(db_sess, purger)
             assert result is None
@@ -285,6 +310,9 @@ class TestFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[RBACFieldPurgerTestRow])
 
     def build_subquery(self) -> sa.sql.Select[tuple[RBACFieldPurgerTestRow]]:
         return sa.select(RBACFieldPurgerTestRow)
+
+    def field_type(self) -> EntityType:
+        return EntityType.VFOLDER
 
 
 class TestRBACFieldBatchPurger:
