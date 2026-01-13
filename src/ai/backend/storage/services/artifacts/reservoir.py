@@ -485,7 +485,7 @@ class ReservoirService:
             artifact_revision_id: The artifact revision ID for verification result lookup
             storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path.
-                If empty string, stores files at root.
+                If "/", stores files at root.
         """
         success = False
         verification_result: Optional[VerificationStepResult] = None

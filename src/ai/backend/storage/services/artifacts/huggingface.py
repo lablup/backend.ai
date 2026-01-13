@@ -551,7 +551,7 @@ class HuggingFaceService:
             pipeline: ImportPipeline configured for this request
             storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path.
-                If empty string, stores files at root.
+                If "/", stores files at root.
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
@@ -637,7 +637,7 @@ class HuggingFaceService:
             pipeline: Import pipeline to execute
             storage_prefix: Custom prefix path for storing imported models.
                 If None, uses default path.
-                If empty string, stores files at root.
+                If "/", stores files at root.
 
         Raises:
             HuggingFaceAPIError: If API call fails
