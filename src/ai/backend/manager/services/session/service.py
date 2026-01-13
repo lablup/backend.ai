@@ -18,6 +18,7 @@ from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -1338,11 +1339,15 @@ class SessionService:
             },
         }
 
+        headers: dict[str, str] = {}
+        if request_id := current_request_id():
+            headers["X-BackendAI-RequestID"] = request_id
         async with (
             aiohttp.ClientSession() as req,
             req.post(
                 f"{wsproxy_addr}/v2/conf",
                 json=body,
+                headers=headers if headers else None,
             ) as resp,
         ):
             token_json = await resp.json()
