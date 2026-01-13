@@ -10,12 +10,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 
 __all__ = (
     "DeleteObjectPermissionPathParam",
     "DeletePermissionPathParam",
     "GetRolePathParam",
+    "SearchEntitiesPathParam",
     "SearchScopesPathParam",
     "SearchUsersAssignedToRolePathParam",
     "UpdateRolePathParam",
@@ -57,4 +58,20 @@ class SearchScopesPathParam(BaseRequestModel):
 
     scope_type: ScopeType = Field(
         description="Scope types", examples=["domain", "project", "user", "global"]
+    )
+
+
+class SearchEntitiesPathParam(BaseRequestModel):
+    """Path parameter for searching entities within a scope."""
+
+    scope_type: ScopeType = Field(
+        description="Scope type", examples=["domain", "project", "user", "global"]
+    )
+    scope_id: str = Field(
+        description="Scope ID (domain name, project UUID, or user UUID)",
+        examples=["default", "550e8400-e29b-41d4-a716-446655440000"],
+    )
+    entity_type: EntityType = Field(
+        description="Entity type to search",
+        examples=["user", "vfolder", "session", "image"],
     )

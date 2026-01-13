@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -29,6 +30,7 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
     ScopeData,
     ScopeListResult,
@@ -981,6 +983,54 @@ class PermissionDBSource:
             ]
 
             return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_entities_in_scope(
+        self,
+        scope_id: str,
+        entity_type: EntityType,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Queries the association_scopes_entities table for entity IDs matching
+        the scope_id and entity_type.
+
+        Args:
+            scope_id: The scope ID to search within
+            entity_type: The type of entity to search for
+            querier: BatchQuerier containing pagination
+
+        Returns:
+            EntityListResult containing entity IDs
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_id == scope_id,
+                    AssociationScopesEntitiesRow.entity_type == entity_type,
+                )
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                EntityData(
+                    entity_type=entity_type,
+                    entity_id=row.entity_id,
+                )
+                for row in result.rows
+            ]
+
+            return EntityListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
