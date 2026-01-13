@@ -24,6 +24,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
+    StorageMappingResolverData,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
@@ -439,7 +440,9 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                            storage_targets=StorageMappingResolverData(
+                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                            ),
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -538,7 +541,9 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                storage_targets=StorageMappingResolverData(
+                                    storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
                             )
                         )

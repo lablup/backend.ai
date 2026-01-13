@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -247,6 +248,41 @@ class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
     revision: str = Field(description="The model revision to scan from the registry.")
 
 
+class VFolderTarget(BaseRequestModel):
+    """Target for direct import to a specific virtual folder."""
+
+    vfolder_id: VFolderIDField = Field(
+        description="VFolder ID for direct import to a specific virtual folder.",
+    )
+    volume_name: str = Field(
+        description="Volume name (host) where the vfolder resides.",
+    )
+
+
+class StorageMappingResolverData(BaseRequestModel):
+    """
+    Storage target configuration for model import.
+
+    Each import step can be mapped to either:
+    - A storage name (str): resolved via storage pool lookup
+    - A VFolderTarget: uses VolumeStorageAdapter for direct vfolder import
+    """
+
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str | VFolderTarget] = Field(
+        description="""
+        Mapping of import steps to storage targets.
+        Each target can be either a storage name (string) or a VFolderTarget object.
+        """,
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
+    )
+
+
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
@@ -269,29 +305,11 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_step_mappings: Optional[dict[ArtifactStorageImportStep, str]] = Field(
-        default=None,
+    storage_targets: StorageMappingResolverData = Field(
         description="""
-        Mapping of import steps to specific storage backends.
-        Required when vfolder_id is not provided.
-        When vfolder_id is provided, this is ignored and VolumeStorageAdapter is used instead.
-        """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
-    )
-    vfolder_id: Optional[VFolderIDField] = Field(
-        default=None,
-        description="""
-        Optional VFolder ID for direct import to a specific virtual folder.
-        When provided, the import pipeline will use VolumeStorageAdapter
-        to write directly to the specified vfolder instead of using
-        the storage pool lookup. volume_name must also be provided.
-        """,
-    )
-    volume_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Volume name (host) where the vfolder resides.
-        Required when vfolder_id is provided to locate the correct volume.
+        Storage target configuration for model import.
+        Provide either vfolder_id + volume_name for direct vfolder import,
+        or storage_step_mappings for storage pool based import.
         """,
     )
 
@@ -345,35 +363,17 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["reservoir", "my-reservoir"],
     )
-    storage_step_mappings: Optional[dict[ArtifactStorageImportStep, str]] = Field(
-        default=None,
+    storage_targets: StorageMappingResolverData = Field(
         description="""
-        Mapping of import steps to specific storage backends.
-        Required when vfolder_id is not provided.
-        When vfolder_id is provided, this is ignored and VolumeStorageAdapter is used instead.
+        Storage target configuration for model import.
+        Provide either vfolder_id + volume_name for direct vfolder import,
+        or storage_step_mappings for storage pool based import.
         """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
     )
     # Used by storage proxy to fetch verification results from remote reservoir.
     # Must have 1:1 correspondence with the models list.
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
-    )
-    vfolder_id: Optional[VFolderIDField] = Field(
-        default=None,
-        description="""
-        Optional VFolder ID for direct import to a specific virtual folder.
-        When provided, the import pipeline will use VolumeStorageAdapter
-        to write directly to the specified vfolder instead of using
-        the storage pool lookup. volume_name must also be provided.
-        """,
-    )
-    volume_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Volume name (host) where the vfolder resides.
-        Required when vfolder_id is provided to locate the correct volume.
-        """,
     )
 
 

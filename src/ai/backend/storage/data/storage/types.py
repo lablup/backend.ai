@@ -8,11 +8,8 @@ from ai.backend.common.artifact_storage import AbstractStorage, AbstractStorageP
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
-from ai.backend.common.types import VFolderID
-
-from ai.backend.storage.exception import InvalidAPIParameters
+from ai.backend.common.dto.storage.request import StorageMappingResolverData, VFolderTarget
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.errors.common import InvalidStorageTargetError
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
@@ -27,47 +24,19 @@ class StorageTarget:
 
     When str: resolved via storage_pool.get_storage(name)
     When AbstractStorage: used directly (e.g., VolumeStorageAdapter for VFolder imports)
-
-    Use class methods to create instances:
-        - StorageTarget.from_storage_name(name) for string-based storage names
-        - StorageTarget.from_storage(storage) for AbstractStorage instances
     """
 
-    _storage_name: str | None
-    _storage: AbstractStorage | None
+    _value: str | AbstractStorage
 
-    def __init__(
-        self,
-        storage_name: str | None = None,
-        storage: AbstractStorage | None = None,
-    ) -> None:
-        if storage_name is None and storage is None:
-            raise InvalidStorageTargetError("Either storage_name or storage must be provided")
-        if storage_name is not None and storage is not None:
-            raise InvalidStorageTargetError(
-                "Only one of storage_name or storage should be provided"
-            )
-        self._storage_name = storage_name
-        self._storage = storage
-
-    @classmethod
-    def from_storage_name(cls, name: str) -> StorageTarget:
-        """Create a StorageTarget from a storage name."""
-        return cls(storage_name=name)
-
-    @classmethod
-    def from_storage(cls, storage: AbstractStorage) -> StorageTarget:
-        """Create a StorageTarget from an AbstractStorage instance."""
-        return cls(storage=storage)
+    def __init__(self, value: str | AbstractStorage) -> None:
+        self._value = value
 
     @property
     def name(self) -> str:
         """Get the storage name from this mapping."""
-        if self._storage_name is not None:
-            return self._storage_name
-        if self._storage is None:
-            raise InvalidStorageTargetError("StorageTarget has no storage_name or storage")
-        return self._storage.name
+        if isinstance(self._value, str):
+            return self._value
+        return self._value.name
 
     def resolve_storage(self, storage_pool: AbstractStoragePool) -> AbstractStorage:
         """
@@ -79,27 +48,19 @@ class StorageTarget:
         Returns:
             The resolved AbstractStorage instance
         """
-        if self._storage is not None:
-            return self._storage
-        if self._storage_name is None:
-            raise InvalidStorageTargetError("StorageTarget has no storage_name or storage")
-        return storage_pool.get_storage(self._storage_name)
+        if isinstance(self._value, AbstractStorage):
+            return self._value
+        return storage_pool.get_storage(self._value)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, StorageTarget):
-            if self._storage_name is not None and other._storage_name is not None:
-                return self._storage_name == other._storage_name
-            if self._storage is not None and other._storage is not None:
-                return self._storage is other._storage
-            return False
+            return self._value == other._value
         return False
 
     def __hash__(self) -> int:
-        if self._storage_name is not None:
-            return hash(self._storage_name)
-        if self._storage is None:
-            raise InvalidStorageTargetError("StorageTarget has no storage_name or storage")
-        return id(self._storage)
+        if isinstance(self._value, str):
+            return hash(self._value)
+        return id(self._value)
 
 
 @dataclass
@@ -119,27 +80,21 @@ class StorageMappingResolver:
     optionally wrapping with VolumeStorageAdapter when vfolder_id is provided.
     """
 
-    def __init__(self, volume_pool: VolumePool) -> None:
-        self._volume_pool = volume_pool
-
-    def resolve(
+    def __init__(
         self,
-        raw_mappings: dict[ArtifactStorageImportStep, str] | None,
-        vfolder_id: VFolderID | None = None,
-        volume_name: str | None = None,
-    ) -> dict[ArtifactStorageImportStep, StorageTarget]:
+        volume_pool: VolumePool,
+        storage_targets: StorageMappingResolverData,
+    ) -> None:
+        self._volume_pool = volume_pool
+        self._storage_targets = storage_targets
+
+    def resolve(self) -> dict[ArtifactStorageImportStep, StorageTarget]:
         """
-        Resolve raw string mappings to StorageTarget objects.
+        Resolve storage targets to StorageTarget objects.
 
-        When vfolder_id and volume_name are provided, creates VolumeStorageAdapter
-        for all import steps, ignoring raw_mappings.
-
-        Args:
-            raw_mappings: Dict mapping import steps to storage names.
-                          Required when vfolder_id is not provided.
-            vfolder_id: Optional VFolder ID. If provided, creates VolumeStorageAdapter.
-            volume_name: Volume name (host) where the vfolder resides.
-                         Required when vfolder_id is provided.
+        For each import step:
+        - If target is str: creates StorageTarget with storage name
+        - If target is VFolderTarget: creates StorageTarget with VolumeStorageAdapter
 
         Returns:
             Dict mapping import steps to StorageTarget objects
@@ -147,32 +102,28 @@ class StorageMappingResolver:
         # Avoid circular import
         from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
 
-        # When vfolder_id is provided, use VolumeStorageAdapter for all steps
-        if vfolder_id is not None:
-            if volume_name is None:
-                raise InvalidAPIParameters("volume_name is required when vfolder_id is provided")
+        result: dict[ArtifactStorageImportStep, StorageTarget] = {}
 
-            adapter_name = f"volume_storage_{current_request_id()}"
-            volume = self._volume_pool.get_volume_by_name_direct(volume_name)
-            adapter = VolumeStorageAdapter(
-                name=adapter_name,
-                volume=volume,
-                vfid=vfolder_id,
-            )
+        for step, target in self._storage_targets.storage_step_mappings.items():
+            if isinstance(target, VFolderTarget):
+                adapter_name = f"volume_storage_{step}_{current_request_id()}"
+                volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
+                adapter = VolumeStorageAdapter(
+                    name=adapter_name,
+                    volume=volume,
+                    vfolder_id=target.vfolder_id,
+                )
 
-            log.info(
-                "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
-                adapter_name,
-                vfolder_id,
-                volume_name,
-                type(volume).__name__,
-            )
+                log.info(
+                    "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
+                    adapter_name,
+                    target.vfolder_id,
+                    target.volume_name,
+                    type(volume).__name__,
+                )
 
-            # Create StorageTarget with adapter for all import steps
-            return {step: StorageTarget(adapter) for step in ArtifactStorageImportStep}
+                result[step] = StorageTarget(adapter)
+            else:
+                result[step] = StorageTarget(target)
 
-        # When vfolder_id is not provided, use raw_mappings
-        if raw_mappings is None:
-            raise InvalidAPIParameters("storage_step_mappings is required when vfolder_id is not provided")
-
-        return {step: StorageTarget(name) for step, name in raw_mappings.items()}
+        return result

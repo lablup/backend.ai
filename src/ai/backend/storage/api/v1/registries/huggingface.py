@@ -54,7 +54,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
-    _storage_mapping_resolver: StorageMappingResolver
+    _volume_pool: VolumePool
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class HuggingFaceRegistryAPIHandler:
         volume_pool: VolumePool,
     ) -> None:
         self._huggingface_service = huggingface_service
-        self._storage_mapping_resolver = StorageMappingResolver(volume_pool)
+        self._volume_pool = volume_pool
 
     @api_handler
     async def scan_models(
@@ -182,11 +182,10 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
-        storage_step_mappings = self._storage_mapping_resolver.resolve(
-            body.parsed.storage_step_mappings,
-            body.parsed.vfolder_id,
-            body.parsed.volume_name,
-        )
+        storage_step_mappings = StorageMappingResolver(
+            self._volume_pool,
+            body.parsed.storage_targets,
+        ).resolve()
 
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,

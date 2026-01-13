@@ -36,7 +36,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReservoirRegistryAPIHandler:
     _reservoir_service: ReservoirService
-    _storage_mapping_resolver: StorageMappingResolver
+    _volume_pool: VolumePool
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class ReservoirRegistryAPIHandler:
         volume_pool: VolumePool,
     ) -> None:
         self._reservoir_service = reservoir_service
-        self._storage_mapping_resolver = StorageMappingResolver(volume_pool)
+        self._volume_pool = volume_pool
 
     @api_handler
     async def import_models(
@@ -56,11 +56,10 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
-        storage_step_mappings = self._storage_mapping_resolver.resolve(
-            body.parsed.storage_step_mappings,
-            body.parsed.vfolder_id,
-            body.parsed.volume_name,
-        )
+        storage_step_mappings = StorageMappingResolver(
+            self._volume_pool,
+            body.parsed.storage_targets,
+        ).resolve()
 
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
