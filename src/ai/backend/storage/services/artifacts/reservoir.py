@@ -484,7 +484,7 @@ class ReservoirService:
             pipeline: ImportPipeline to execute
             artifact_revision_id: The artifact revision ID for verification result lookup
             storage_prefix: Custom prefix path for storing imported models.
-                If None, uses default path: {model_id}/{revision}.
+                If None, uses default path.
                 If empty string, stores files at root.
         """
         success = False
@@ -663,7 +663,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
 
-        # Default prefix for Reservoir: {model_id}/{revision}
+        # Default prefix: {artifact_id}/{revision}
         default_prefix = f"{model.model_id}/{revision}"
         model_prefix = self._resolve_storage_prefix(context, default_prefix)
 

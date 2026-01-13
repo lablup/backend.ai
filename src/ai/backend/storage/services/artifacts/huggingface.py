@@ -550,7 +550,7 @@ class HuggingFaceService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline configured for this request
             storage_prefix: Custom prefix path for storing imported models.
-                If None, uses default path: {model_id}/{revision}.
+                If None, uses default path.
                 If empty string, stores files at root.
 
         Raises:
@@ -636,7 +636,7 @@ class HuggingFaceService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: Import pipeline to execute
             storage_prefix: Custom prefix path for storing imported models.
-                If None, uses default path: {model_id}/{revision}.
+                If None, uses default path.
                 If empty string, stores files at root.
 
         Raises:
@@ -808,7 +808,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             file_info_list=file_info_list,
         )
 
-        # Default prefix for HuggingFace: {model_id}/{revision}
+        # Default prefix: {artifact_id}/{revision}
         default_prefix = f"{context.model.model_id}/{revision}"
 
         downloaded_files: list[tuple[FileObjectData, str]] = []

@@ -542,7 +542,7 @@ class ImportArtifactsInput:
         Added in 26.1.0.
 
         Custom prefix path for storing imported models.
-        If not specified (None), uses the default path: {model_id}/{revision}.
+        If not specified (None), uses the default path.
         If set to empty string "", files will be stored at the root.
         """),
     )

@@ -69,7 +69,7 @@ class ImportStep(abc.ABC, Generic[InputType]):
         Args:
             context: Import step context containing storage_prefix
             default_prefix: Default prefix when storage_prefix is None
-                           (typically "{model_id}/{revision}")
+
 
         Returns:
             The resolved prefix (may be empty string for root storage)
@@ -87,7 +87,6 @@ class ImportStep(abc.ABC, Generic[InputType]):
         Args:
             context: Import step context containing storage_prefix
             default_prefix: Default prefix when storage_prefix is None
-                           (typically "{model_id}/{revision}")
             file_path: The file path to store
 
         Returns:
