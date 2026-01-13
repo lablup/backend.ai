@@ -906,7 +906,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all domains using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainRow)
+            query = sa.select(DomainRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -916,8 +916,8 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.DomainRow.name),
-                    name=row.DomainRow.name,
+                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.name),
+                    name=row.name,
                 )
                 for row in result.rows
             ]
@@ -935,7 +935,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all projects using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow)
+            query = sa.select(GroupRow.id, GroupRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -945,8 +945,8 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.GroupRow.id)),
-                    name=row.GroupRow.name,
+                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.id)),
+                    name=row.name,
                 )
                 for row in result.rows
             ]
@@ -964,7 +964,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all users using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRow)
+            query = sa.select(UserRow.uuid, UserRow.username, UserRow.email)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -974,10 +974,8 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.UserRow.uuid)),
-                    name=row.UserRow.username
-                    if row.UserRow.username is not None
-                    else row.UserRow.email,
+                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.uuid)),
+                    name=row.username if row.username is not None else row.email,
                 )
                 for row in result.rows
             ]
