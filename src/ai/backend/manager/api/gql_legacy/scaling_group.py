@@ -104,8 +104,6 @@ from .gql_relay import (
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-_DISASSOCIATE_ALL_BATCH_SIZE = 1000
-
 __all__ = (
     "AssociateScalingGroupWithDomain",
     "AssociateScalingGroupWithKeyPair",
@@ -895,7 +893,6 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
                     scaling_group=scaling_group,
                     domain=domain,
                 ),
-                batch_size=1,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -931,7 +928,6 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):
                     scaling_groups=list(scaling_groups),
                     domain=domain,
                 ),
-                batch_size=len(scaling_groups),
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -962,7 +958,6 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
                 spec=AllScalingGroupsForDomainPurgerSpec(
                     domain=domain,
                 ),
-                batch_size=_DISASSOCIATE_ALL_BATCH_SIZE,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -1069,7 +1064,6 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
                     scaling_group=scaling_group,
                     project=user_group,
                 ),
-                batch_size=1,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
@@ -1105,7 +1099,6 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
                     scaling_groups=list(scaling_groups),
                     project=user_group,
                 ),
-                batch_size=len(scaling_groups),
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
@@ -1136,7 +1129,6 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
                 spec=AllScalingGroupsForProjectPurgerSpec(
                     project=user_group,
                 ),
-                batch_size=_DISASSOCIATE_ALL_BATCH_SIZE,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
@@ -1243,7 +1235,6 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
                     scaling_group=scaling_group,
                     access_key=AccessKey(access_key),
                 ),
-                batch_size=1,
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_keypairs.wait_for_complete(
@@ -1279,7 +1270,6 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
                     scaling_groups=list(scaling_groups),
                     access_key=AccessKey(access_key),
                 ),
-                batch_size=len(scaling_groups),
             )
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_keypairs.wait_for_complete(
