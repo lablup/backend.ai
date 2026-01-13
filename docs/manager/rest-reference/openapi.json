@@ -10842,6 +10842,71 @@
         "description": "Search scopes for a specific scope type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2.0/admin/rbac/entity-types": {
+      "get": {
+        "operationId": "v2.0.get_entity_types",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get available entity types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search": {
+      "post": {
+        "operationId": "v2.0.search_entities",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search entities within a scope by entity type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/scheduling-history/sessions/search": {
       "post": {
         "operationId": "scheduling-history.search_session_history",
