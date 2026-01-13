@@ -137,6 +137,7 @@ class CPUPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.docker.Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         cores = [*map(int, device_alloc["cpu"].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
@@ -289,6 +290,7 @@ class MemoryPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.docker.Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         return {}
 

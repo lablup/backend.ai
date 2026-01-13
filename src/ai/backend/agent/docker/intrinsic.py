@@ -436,14 +436,43 @@ class CPUPlugin(AbstractComputePlugin):
         self,
         docker: Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         cores = [*map(int, device_alloc["cpu"].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         num_cores = len(cores)
 
-        # Apply CPU boost if enabled in container config
-        boost_enabled = self.local_config["container"].get("cpu-boost-enabled", False)
-        boost_factor = self.local_config["container"].get("cpu-boost-factor", 2.0)
+        # Apply CPU boost if enabled in both agent config AND session resource_opts
+        agent_boost_enabled = self.local_config["container"].get("cpu-boost-enabled", False)
+        if agent_boost_enabled is None:
+            agent_boost_enabled = False
+
+        # Parse session-level enable_cpu_boost (could be string "true"/"false")
+        session_boost_value = resource_opts.get("enable_cpu_boost") if resource_opts else None
+        if isinstance(session_boost_value, str):
+            session_boost_requested = session_boost_value.lower() in ("true", "1", "yes")
+        else:
+            session_boost_requested = (
+                bool(session_boost_value) if session_boost_value is not None else False
+            )
+
+        boost_enabled = agent_boost_enabled and session_boost_requested
+
+        # Use session-level boost_factor if provided, otherwise use agent default
+        default_boost_factor = self.local_config["container"].get("cpu-boost-factor", 2.0)
+        if default_boost_factor is None:
+            default_boost_factor = 2.0
+
+        # Parse session-level boost_factor (could be string)
+        session_boost_factor = resource_opts.get("cpu_boost_factor") if resource_opts else None
+        if session_boost_factor is not None:
+            try:
+                boost_factor = float(session_boost_factor)
+            except (ValueError, TypeError):
+                boost_factor = default_boost_factor
+        else:
+            boost_factor = default_boost_factor
+
         boosted_cores = self.apply_cpu_boost(num_cores, boost_enabled, boost_factor)
 
         if boost_enabled and boosted_cores > num_cores:
@@ -998,6 +1027,7 @@ class MemoryPlugin(AbstractComputePlugin):
         self,
         docker: Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         memory = sum(device_alloc["mem"].values())
         return {

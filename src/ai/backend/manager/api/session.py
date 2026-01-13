@@ -146,6 +146,9 @@ class UndefChecker(t.Trafaret):
 resource_opts_iv = t.Dict({
     t.Key("shmem", default=None): t.Null | tx.BinarySize,
     t.Key("allow_fractional_resource_fragmentation", default=None): t.Null | t.ToBool,
+    t.Key("enable_cpu_boost", default=None): t.Null | t.ToBool,
+    t.Key("cpu_boost_factor", default=None): t.Null | t.Float,
+    t.Key("cpu_boost_duration", default=None): t.Null | t.Float,
 }).allow_extra("*")
 
 creation_config_v1 = t.Dict({

@@ -794,11 +794,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         async with closing_async(Docker()) as docker:
             update_nested_dict(
                 self.computer_docker_args,
-                await computer.generate_docker_args(docker, device_alloc),
+                await computer.generate_docker_args(docker, device_alloc, resource_opts),
             )
 
     @override
@@ -818,6 +819,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         environ: Mapping[str, str],
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> DockerKernel:
         loop = current_loop()
         ouid = self.get_overriding_uid()
@@ -988,6 +990,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         container_id: str,
         resource_spec: KernelResourceSpec,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         """
         Schedule a background task to restore CPU from boost after the configured duration.
@@ -999,6 +1002,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         Args:
             container_id: ID of the container to schedule restoration for
             resource_spec: Kernel resource specification containing CPU allocations
+            resource_opts: Optional resource options from session creation request
         """
         cpu_alloc = resource_spec.allocations.get(DeviceName("cpu"), {})
         if not cpu_alloc:
@@ -1013,7 +1017,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cpu_cores_map = cpu_alloc.get(SlotName("cpu"), {})
         original_cpus = len(cpu_cores_map)
         cpu_core_ids = sorted([str(core_id) for core_id in cpu_cores_map.keys()])
-        boost_duration = self.local_config.container.cpu_boost_duration
+
+        # Use session-level boost_duration if provided, otherwise use agent default
+        default_boost_duration = self.local_config.container.cpu_boost_duration
+        if default_boost_duration is None:
+            default_boost_duration = 60.0
+
+        # Parse session-level boost_duration (could be string)
+        session_boost_duration = resource_opts.get("cpu_boost_duration") if resource_opts else None
+        if session_boost_duration is not None:
+            try:
+                boost_duration = float(session_boost_duration)
+            except (ValueError, TypeError):
+                boost_duration = default_boost_duration
+        else:
+            boost_duration = default_boost_duration
 
         # Lazily initialize the tracking structure for CPU boost restoration tasks.
         tasks_by_container = getattr(self, "_cpu_boost_restore_tasks", None)
@@ -1443,9 +1461,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
             kernel_obj.container_id = container._id
 
-            # Schedule CPU boost restoration task if enabled
-            if self.local_config.container.cpu_boost_enabled:
-                self._schedule_cpu_boost_restoration(cid, resource_spec)
+            # Schedule CPU boost restoration task if enabled in both agent config AND session
+            # Parse session-level enable_cpu_boost (could be string "true"/"false")
+            session_boost_value = resource_opts.get("enable_cpu_boost") if resource_opts else None
+            if isinstance(session_boost_value, str):
+                session_boost_requested = session_boost_value.lower() in ("true", "1", "yes")
+            else:
+                session_boost_requested = (
+                    bool(session_boost_value) if session_boost_value is not None else False
+                )
+
+            if self.local_config.container.cpu_boost_enabled and session_boost_requested:
+                self._schedule_cpu_boost_restoration(cid, resource_spec, resource_opts)
 
             container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":

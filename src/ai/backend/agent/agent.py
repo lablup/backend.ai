@@ -469,6 +469,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         raise NotImplementedError
 
@@ -508,6 +509,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> KernelObjectType:
         raise NotImplementedError
 
@@ -584,6 +586,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         def _mount(
             type,
@@ -702,6 +705,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             await self.apply_accelerator_allocation(
                 computer_ctx.instance,
                 {device_view.slot: device_view.device_alloc},
+                resource_opts,
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
                 computer_ctx.instance,
@@ -2781,7 +2785,7 @@ class AbstractAgent(
                     ]
                     if not restarting:
                         await ctx.mount_vfolders(vfolder_mounts, resource_spec)
-                        await ctx.mount_krunner(resource_spec, environ)
+                        await ctx.mount_krunner(resource_spec, environ, resource_opts)
                         log.info(
                             "create_kernel(kernel:{}, session:{}) vfolder and krunner mount configured",
                             kernel_id,
@@ -3029,6 +3033,7 @@ class AbstractAgent(
                         environ,
                         service_ports,
                         cluster_info,
+                        resource_opts,
                     )
                     log.info(
                         "create_kernel(kernel:{}, session:{}) container prepared",

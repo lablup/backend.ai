@@ -487,10 +487,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             resource_spec.mounts.append(mount)
 
     @override
-    async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
+    async def apply_accelerator_allocation(
+        self, computer, device_alloc, resource_opts: Optional[Mapping[str, Any]] = None
+    ) -> None:
         # update_nested_dict(
         #     self.computer_docker_args,
-        #     await computer.generate_docker_args(self.docker, device_alloc))
+        #     await computer.generate_docker_args(self.docker, device_alloc, resource_opts))
         # TODO: add support for accelerator allocation
         pass
 
@@ -550,6 +552,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> KubernetesKernel:
         loop = current_loop()
         if self.restarting:

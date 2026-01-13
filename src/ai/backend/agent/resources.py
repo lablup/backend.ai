@@ -437,11 +437,17 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         docker: aiodocker.docker.Docker,
         device_alloc: DeviceAllocation,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         """
         When starting a new container, generate device-specific options for the
         docker container create API as a dictionary, referring the given allocation
         map.  The agent will merge it with its own options.
+
+        Args:
+            docker: Docker client instance
+            device_alloc: Device allocation map
+            resource_opts: Optional resource options from session creation request
         """
         return {}
 

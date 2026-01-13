@@ -189,6 +189,7 @@ class CPUPlugin(AbstractComputePlugin):
         self,
         docker: Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         # This function might be needed later to apply fine-grained tuning for
         # K8s resource allocation
@@ -348,6 +349,7 @@ class MemoryPlugin(AbstractComputePlugin):
         self,
         docker: Docker,
         device_alloc,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         # This function might be needed later to apply fine-grained tuning for
         # K8s resource allocation

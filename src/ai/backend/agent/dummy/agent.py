@@ -154,6 +154,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         return
 
@@ -187,6 +188,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
@@ -233,6 +235,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> None:
         delay = self.creation_ctx_config["delay"]["mount-krunner"]
         await asyncio.sleep(delay)
