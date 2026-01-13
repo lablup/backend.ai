@@ -22,6 +22,13 @@ type NestedStrKeyedDict = dict[str, Any | NestedStrKeyedDict]
 
 
 class LegacyEtcdLoader(AbstractConfigLoader):
+    """
+    A configuration loader from an AsyncEtcd instance.
+
+    The responsibility to keep the etcd client's lifecycle longer than the loader
+    is on the user of this class.
+    """
+
     _etcd: AsyncEtcd
     _config_prefix: str = "config"
 
@@ -34,9 +41,6 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     @override
     async def load(self) -> Mapping[str, Any]:
         return await self._etcd.get_prefix(self._config_prefix)
-
-    async def close(self) -> None:
-        await self._etcd.close()
 
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.

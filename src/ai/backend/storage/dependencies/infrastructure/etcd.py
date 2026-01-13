@@ -21,11 +21,8 @@ class EtcdProvider(DependencyProvider[StorageProxyUnifiedConfig, AsyncEtcd]):
     @asynccontextmanager
     async def provide(self, setup_input: StorageProxyUnifiedConfig) -> AsyncIterator[AsyncEtcd]:
         """Create and provide an etcd client."""
-        etcd = make_etcd(setup_input)
-        try:
+        async with make_etcd(setup_input) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
         """

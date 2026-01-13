@@ -106,7 +106,7 @@ pytest>=8.3.3
 pytest-aiohttp~=1.1.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
-testcontainers[postgres,redis,minio]~=4.8.1
+testcontainers[postgres,redis,minio]~=4.13.3
 
 # type stubs
 types-six
@@ -129,4 +129,4 @@ types-tqdm
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
 
-etcd-client-py~=0.4.1
+etcd-client-py~=0.5.1

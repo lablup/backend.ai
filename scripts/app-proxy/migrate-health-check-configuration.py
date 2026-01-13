@@ -92,8 +92,8 @@ async def update_appproxy_endpoint_entity(
 
 async def main(get_bootstrap_config_coro: Coroutine[None, None, BootstrapConfig]) -> None:
     config: BootstrapConfig = await get_bootstrap_config_coro
-    etcd = AsyncEtcd.initialize(config.etcd.to_dataclass())
-    raw_volumes_config = await etcd.get_prefix("volumes")
+    async with AsyncEtcd.create_from_config(config.etcd.to_dataclass()) as etcd:
+        raw_volumes_config = await etcd.get_prefix("volumes")
     storage_manager = StorageSessionManager(VolumesConfig(**raw_volumes_config))
 
     db_username = config.db.user

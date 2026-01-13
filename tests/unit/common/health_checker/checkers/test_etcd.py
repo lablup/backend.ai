@@ -28,16 +28,12 @@ class TestEtcdHealthChecker:
             ConfigScopes.NODE: f"nodes/test/{test_ns}",
         }
 
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [HostPortPair(etcd_addr.host, etcd_addr.port)],
             namespace=test_ns,
             scope_prefix_map=scope_prefix_map,
-        )
-
-        try:
+        ) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     @pytest.mark.asyncio
     async def test_success(self, etcd_client: AsyncEtcd) -> None:
@@ -74,13 +70,11 @@ class TestEtcdHealthChecker:
             ConfigScopes.GLOBAL: "",
         }
 
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [HostPortPair("localhost", 99999)],
             namespace="test",
             scope_prefix_map=scope_prefix_map,
-        )
-
-        try:
+        ) as etcd:
             checker = EtcdHealthChecker(
                 etcd=etcd,
                 timeout=1.0,
@@ -91,8 +85,6 @@ class TestEtcdHealthChecker:
             status = result.results[list(result.results.keys())[0]]
             assert not status.is_healthy
             assert status.error_message is not None
-        finally:
-            await etcd.close()
 
     @pytest.mark.asyncio
     async def test_multiple_checks(self, etcd_client: AsyncEtcd) -> None:
