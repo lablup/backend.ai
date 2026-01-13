@@ -663,7 +663,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
 
-        # Default prefix: {artifact_id}/{revision}
+        # Default prefix: {model_id}/{revision}
         default_prefix = f"{model.model_id}/{revision}"
         model_prefix = self._resolve_storage_prefix(context, default_prefix)
 

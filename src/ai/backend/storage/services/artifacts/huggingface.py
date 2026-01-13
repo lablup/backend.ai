@@ -808,7 +808,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             file_info_list=file_info_list,
         )
 
-        # Default prefix: {artifact_id}/{revision}
+        # Default prefix: {model_id}/{revision}
         default_prefix = f"{context.model.model_id}/{revision}"
 
         downloaded_files: list[tuple[FileObjectData, str]] = []
