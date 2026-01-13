@@ -15,9 +15,8 @@ class VFolderStorageTarget(BaseModel):
     vfolder_id: VFolderIDField
     volume_name: str
 
-from pydantic import BaseModel, ConfigDict
 
-from ai.backend.common.type_adapters import VFolderIDField
+from pydantic import BaseModel, ConfigDict
 
 
 class VFolderStorageTarget(BaseModel):
