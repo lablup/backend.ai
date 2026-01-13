@@ -30,7 +30,7 @@ from .utils import bulk_insert_on_conflict_do_nothing, insert_on_conflict_do_not
 
 
 @dataclass
-class Granter:
+class RBACGranter:
     """
     Data class for granting object-level permissions to another scope.
 
@@ -146,9 +146,9 @@ async def _insert_scope_entity_association(
 # =============================================================================
 
 
-async def execute_rbac_entity_granter(
+async def execute_rbac_granter(
     db_sess: SASession,
-    granter: Granter,
+    granter: RBACGranter,
 ) -> None:
     """
     Grant object-level permissions to a scope's system roles.
@@ -159,7 +159,7 @@ async def execute_rbac_entity_granter(
     - The VFolder is associated with user B's scope.
 
     Args:
-        db_sess: Async SQLAlchemy session.
+        db_sess: Async SQLAlchemy session (must be writable).
         granter: Granter instance containing granted_entity_id, target_scope_id, and operations.
     """
     target_scope_id = granter.target_scope_id

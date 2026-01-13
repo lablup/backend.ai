@@ -38,24 +38,24 @@ class RBACEntityRow(ABC):
 TEntityRow = TypeVar("TEntityRow", bound=RBACEntityRow)
 
 
-class CreatorSpec(BaseCreatorSpec[TEntityRow]):
+class RBACCreatorSpec(BaseCreatorSpec[TEntityRow]):
     pass
 
 
 @dataclass
-class Creator(BaseCreator[TEntityRow]):
+class RBACCreator(BaseCreator[TEntityRow]):
     pass
 
 
 @dataclass
-class CreatorResult(BaseCreatorResult[TEntityRow]):
+class RBACCreatorResult(BaseCreatorResult[TEntityRow]):
     pass
 
 
-async def execute_rbac_entity_creator(
+async def execute_rbac_creator(
     db_sess: SASession,
-    creator: Creator[TEntityRow],
-) -> CreatorResult[TEntityRow]:
+    creator: RBACCreator[TEntityRow],
+) -> RBACCreatorResult[TEntityRow]:
     """
     Execute INSERT with RBAC-aware creator.
     - Insert the main entity row.
@@ -63,7 +63,7 @@ async def execute_rbac_entity_creator(
     - Insert AssociationScopesEntitiesRow if not field-scoped.
 
     Args:
-        db_sess: Async SQLAlchemy session.
+        db_sess: Async SQLAlchemy session (must be writable).
         creator: Creator instance with RBAC context and spec.
 
     Returns:
@@ -96,4 +96,4 @@ async def execute_rbac_entity_creator(
                 entity_id=entity_id.entity_id,
             ),
         )
-    return CreatorResult(row=row)
+    return RBACCreatorResult(row=row)

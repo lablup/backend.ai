@@ -15,7 +15,6 @@ async def insert_on_conflict_do_nothing(
     row: TRow,
 ) -> TRow:
     """Insert the given row, ignoring conflicts."""
-    # TODO: Use SQLAlchemy 2.0 native upsert when available
     mapper = inspect(type(row))
     column_keys = {c.key for c in mapper.columns}
     values = {k: v for k, v in row.__dict__.items() if k in column_keys}
@@ -30,7 +29,6 @@ async def bulk_insert_on_conflict_do_nothing(
     rows: Collection[TRow],
 ) -> None:
     """Insert the given rows, ignoring conflicts."""
-    # TODO: Use SQLAlchemy 2.0 native upsert when available
     if not rows:
         return
     row_cls = type(next(iter(rows)))

@@ -25,8 +25,8 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac_entity.granter import (
-    Granter,
-    execute_rbac_entity_granter,
+    RBACGranter,
+    execute_rbac_granter,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -173,13 +173,13 @@ class TestGranterBasic:
         ctx = role_with_perm_group
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ, OperationType.UPDATE],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify object permissions were created
             obj_perm_count = await db_sess.scalar(
@@ -218,13 +218,13 @@ class TestGranterBasic:
         ctx = role_with_perm_group
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify permission group was created for entity scope
             pg_count = await db_sess.scalar(
@@ -253,13 +253,13 @@ class TestGranterBasic:
         ctx = empty_context
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify no object permissions were created (no roles to grant to)
             obj_perm_count = await db_sess.scalar(
@@ -381,13 +381,13 @@ class TestGranterMultipleRoles:
         ctx = multi_role_context
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify object permissions were created for all roles
             obj_perm_count = await db_sess.scalar(
@@ -408,13 +408,13 @@ class TestGranterMultipleRoles:
         ctx = mixed_role_context
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify only system role got permissions
             obj_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
@@ -480,13 +480,13 @@ class TestGranterMultipleOperations:
         ]
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=all_operations,
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify all operations were granted
             obj_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
@@ -503,13 +503,13 @@ class TestGranterMultipleOperations:
         ctx = role_with_perm_group
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify no object permissions were created
             obj_perm_count = await db_sess.scalar(
@@ -580,7 +580,7 @@ class TestGranterIdempotent:
         ctx = role_with_perm_group
 
         async with database_connection.begin_session() as db_sess:
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
@@ -588,7 +588,7 @@ class TestGranterIdempotent:
             )
 
             # First grant
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify initial state
             obj_perm_count = await db_sess.scalar(
@@ -602,7 +602,7 @@ class TestGranterIdempotent:
             assert assoc_count == 1
 
             # Second grant (duplicate) - should not fail
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify no duplicates created
             obj_perm_count_after = await db_sess.scalar(
@@ -645,13 +645,13 @@ class TestGranterIdempotent:
             assert pg_count_before == 2
 
             # Execute grant
-            granter = Granter(
+            granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_id=ctx.entity_scope_id,
                 target_scope_id=ctx.target_scope_id,
                 operations=[OperationType.READ],
             )
-            await execute_rbac_entity_granter(db_sess, granter)
+            await execute_rbac_granter(db_sess, granter)
 
             # Verify no duplicate permission_group created
             pg_count_after = await db_sess.scalar(
@@ -692,13 +692,13 @@ class TestGranterIdempotent:
 
             # Grant entity to each scope
             for target_user_id in target_user_ids:
-                granter = Granter(
+                granter = RBACGranter(
                     granted_entity_id=entity_id,
                     granted_entity_scope_id=entity_scope_id,
                     target_scope_id=ScopeId(scope_type=ScopeType.USER, scope_id=target_user_id),
                     operations=[OperationType.READ],
                 )
-                await execute_rbac_entity_granter(db_sess, granter)
+                await execute_rbac_granter(db_sess, granter)
 
             # Verify object permissions created for all 3 roles
             obj_perm_count = await db_sess.scalar(

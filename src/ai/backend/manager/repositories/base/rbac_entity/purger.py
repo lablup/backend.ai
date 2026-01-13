@@ -29,7 +29,7 @@ from ai.backend.manager.repositories.base.purger import TRow
 
 
 @dataclass
-class Purger(BasePurger[TRow]):
+class RBACPurger(BasePurger[TRow]):
     """Single-row delete by primary key.
 
     Attributes:
@@ -42,7 +42,7 @@ class Purger(BasePurger[TRow]):
 
 
 @dataclass
-class PurgerResult(BasePurgerResult[TRow]):
+class RBACPurgerResult(BasePurgerResult[TRow]):
     pass
 
 
@@ -125,7 +125,7 @@ def _find_orphaned_perm_groups(
     role_rows: Collection[RoleRow],
     entity_to_delete: ObjectId,
 ) -> list[UUID]:
-    """Collect orphaned permission group IDs across all roles."""
+    """Collect orphaned permission group IDs across the given roles."""
     if not role_rows:
         return []
     permission_group_ids: list[UUID] = []
@@ -163,11 +163,7 @@ async def _delete_object_permissions(
     """Delete ObjectPermissionRows by IDs."""
     if not ids:
         return
-    await db_sess.execute(
-        sa.delete(ObjectPermissionRow).where(
-            ObjectPermissionRow.id.in_(ids)  # type: ignore[attr-defined]
-        )
-    )
+    await db_sess.execute(sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids)))
 
 
 async def _delete_permission_groups(
@@ -177,11 +173,7 @@ async def _delete_permission_groups(
     """Delete PermissionGroupRows by IDs."""
     if not ids:
         return
-    await db_sess.execute(
-        sa.delete(PermissionGroupRow).where(
-            PermissionGroupRow.id.in_(ids)  # type: ignore[attr-defined]
-        )
-    )
+    await db_sess.execute(sa.delete(PermissionGroupRow).where(PermissionGroupRow.id.in_(ids)))
 
 
 async def _delete_scope_associations(
@@ -216,7 +208,7 @@ async def _delete_entity_field(
 
 async def _delete_main_row(
     db_sess: SASession,
-    purger: Purger[TRow],
+    purger: RBACPurger[TRow],
 ) -> TRow | None:
     """Delete the main entity row by primary key and return the deleted row."""
     row_class = purger.row_class
@@ -278,7 +270,7 @@ async def _delete_rbac_field(
 
 async def _delete_related_rbac_entries(
     db_sess: SASession,
-    purger: Purger[TRow],
+    purger: RBACPurger[TRow],
 ) -> None:
     """Delete RBAC entries based on whether it's an entity or field."""
     if purger.field_id is not None:
@@ -292,10 +284,10 @@ async def _delete_related_rbac_entries(
 # =============================================================================
 
 
-async def execute_rbac_entity_purger(
+async def execute_rbac_purger(
     db_sess: SASession,
-    purger: Purger[TRow],
-) -> PurgerResult[TRow] | None:
+    purger: RBACPurger[TRow],
+) -> RBACPurgerResult[TRow] | None:
     """
     Execute DELETE for a single row by primary key, along with related RBAC entries.
 
@@ -317,4 +309,4 @@ async def execute_rbac_entity_purger(
     deleted_row = await _delete_main_row(db_sess, purger)
     if deleted_row is None:
         return None
-    return PurgerResult(row=deleted_row)
+    return RBACPurgerResult(row=deleted_row)
