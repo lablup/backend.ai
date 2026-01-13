@@ -173,4 +173,4 @@ class ScopeAdapter(BaseFilterAdapter):
         Returns:
             ScopeDTO for API response
         """
-        return ScopeDTO(scope_type=data.id.scope_type, id=data.id.scope_id, name=data.name)
+        return ScopeDTO(scope_type=data.id.scope_type, scope_id=data.id.scope_id, name=data.name)

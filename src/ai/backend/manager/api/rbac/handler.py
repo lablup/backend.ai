@@ -82,7 +82,7 @@ class RBACAPIHandler:
     def __init__(self) -> None:
         self.role_adapter = RoleAdapter()
         self.assigned_user_adapter = AssignedUserAdapter()
-        self.scope_adapter = ScopeAdapter()
+        self._scope_adapter = ScopeAdapter()
 
     # Role Management Endpoints
 
@@ -395,7 +395,7 @@ class RBACAPIHandler:
 
         # Build querier and action
         scope_type = path.parsed.scope_type
-        querier = self.scope_adapter.build_querier(scope_type, body.parsed)
+        querier = self._scope_adapter.build_querier(scope_type, body.parsed)
         action = SearchScopesAction(scope_type=scope_type, querier=querier)
 
         # Call service action
@@ -405,7 +405,7 @@ class RBACAPIHandler:
 
         # Build response using adapter
         resp = SearchScopesResponse(
-            scopes=[self.scope_adapter.convert_to_dto(item) for item in action_result.items],
+            scopes=[self._scope_adapter.convert_to_dto(item) for item in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,

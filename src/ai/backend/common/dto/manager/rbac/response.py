@@ -175,7 +175,7 @@ class ScopeDTO(BaseModel):
     """DTO for scope data."""
 
     scope_type: ScopeType = Field(description="Scope type")
-    id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
+    scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
     name: str = Field(description="Scope display name")
 
 
