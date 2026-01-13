@@ -419,7 +419,7 @@ class ArtifactRevisionService:
                 vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
                 if vfolder_data:
                     vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-                    volume_name = vfolder_data.host
+                    _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
 
             task_id: UUID
             match artifact.registry_type:
