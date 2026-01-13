@@ -8,7 +8,7 @@ from ai.backend.common.artifact_storage import AbstractStorage, AbstractStorageP
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
-from ai.backend.common.dto.storage.request import StorageMappingResolverData, VFolderTarget
+from ai.backend.common.dto.storage.request import StorageMappingResolverData, VFolderStorageTarget
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -94,7 +94,7 @@ class StorageMappingResolver:
 
         For each import step:
         - If target is str: creates StorageTarget with storage name
-        - If target is VFolderTarget: creates StorageTarget with VolumeStorageAdapter
+        - If target is VFolderStorageTarget: creates StorageTarget with VolumeStorageAdapter
 
         Returns:
             Dict mapping import steps to StorageTarget objects
@@ -105,7 +105,7 @@ class StorageMappingResolver:
         result: dict[ArtifactStorageImportStep, StorageTarget] = {}
 
         for step, target in self._storage_step_mappings.storage_step_mappings.items():
-            if isinstance(target, VFolderTarget):
+            if isinstance(target, VFolderStorageTarget):
                 adapter_name = f"volume_storage_{step}_{current_request_id()}"
                 volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
                 adapter = VolumeStorageAdapter(

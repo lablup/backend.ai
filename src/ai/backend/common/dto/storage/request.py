@@ -248,7 +248,7 @@ class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
     revision: str = Field(description="The model revision to scan from the registry.")
 
 
-class VFolderTarget(BaseRequestModel):
+class VFolderStorageTarget(BaseRequestModel):
     """Target for direct import to a specific virtual folder."""
 
     vfolder_id: VFolderIDField = Field(
@@ -265,13 +265,13 @@ class StorageMappingResolverData(BaseRequestModel):
 
     Each import step can be mapped to either:
     - A storage name (str): resolved via storage pool lookup
-    - A VFolderTarget: uses VolumeStorageAdapter for direct vfolder import
+    - A VFolderStorageTarget: uses VolumeStorageAdapter for direct vfolder import
     """
 
-    storage_step_mappings: Mapping[ArtifactStorageImportStep, str | VFolderTarget] = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str | VFolderStorageTarget] = Field(
         description="""
         Mapping of import steps to storage targets.
-        Each target can be either a storage name (string) or a VFolderTarget object.
+        Each target can be either a storage name (string) or a VFolderStorageTarget object.
         """,
         examples=[
             {"download": "fast-storage", "archive": "long-term-storage"},
