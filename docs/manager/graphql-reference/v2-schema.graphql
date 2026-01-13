@@ -1331,6 +1331,13 @@ SCANNED → PULLING → PULLED → AVAILABLE status progression.
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
   vfolderId: ID = null
+
+  """
+  Custom prefix path for storing imported models.
+  If not specified (None), uses the default path: {model_id}/{revision}.
+  If set to empty string "", files will be stored at the root.
+  """
+  targetPrefix: String = null
 }
 
 """
