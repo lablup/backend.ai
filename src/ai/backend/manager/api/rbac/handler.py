@@ -446,7 +446,7 @@ def create_app(
     )
 
     # Scope routes
-    cors.add(app.router.add_route("GET", "/admin/rbac/scopes/types", api_handler.get_scope_types))
+    cors.add(app.router.add_route("GET", "/admin/rbac/scope-types", api_handler.get_scope_types))
     cors.add(
         app.router.add_route(
             "POST",
