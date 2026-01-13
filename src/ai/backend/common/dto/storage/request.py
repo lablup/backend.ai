@@ -1,6 +1,6 @@
 import uuid
-from pathlib import PurePosixPath
 from collections.abc import Mapping
+from pathlib import PurePosixPath
 from typing import Optional
 
 from pydantic import Field

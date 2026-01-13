@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
 
-from ai.backend.common.types import VFolderID
+from pydantic import BaseModel, ConfigDict
+
+from ai.backend.common.type_adapters import VFolderIDField
 
 
-@dataclass
-class VFolderStorageTarget:
+class VFolderStorageTarget(BaseModel):
     """Target for direct import to a specific virtual folder."""
 
-    vfolder_id: VFolderID
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    vfolder_id: VFolderIDField
     volume_name: str
 
 from pydantic import BaseModel, ConfigDict
