@@ -1,9 +1,9 @@
 ---
-Author: (author)
+Author: Sanghun Lee (sanghun@lablup.com)
 Status: Draft
-Created: 2025-01-14
-Created-Version: 25.1.0
-Target-Version:
+Created: 2026-01-14
+Created-Version: 26.1.0
+Target-Version: 26.1.0
 Implemented-Version:
 ---
 
