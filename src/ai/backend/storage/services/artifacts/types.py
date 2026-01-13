@@ -72,7 +72,7 @@ class ImportStep(abc.ABC, Generic[InputType]):
 
 
         Returns:
-            The resolved prefix (may be empty string for root storage)
+            The resolved prefix ("/" for root storage)
         """
         if context.custom_storage_prefix is None:
             return default_prefix
@@ -93,6 +93,9 @@ class ImportStep(abc.ABC, Generic[InputType]):
             The resolved storage key path
         """
         prefix = self._resolve_storage_prefix(context, default_prefix)
+        # "/" means root storage - store files without prefix
+        if prefix == "/":
+            return file_path
         if prefix:
             return f"{prefix}/{file_path}"
         return file_path

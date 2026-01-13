@@ -135,7 +135,7 @@ class ImportArtifactsReq(BaseRequestModel):
         description="""
         Custom prefix path for storing imported models.
         If not specified (None), uses the default path.
-        If set to empty string "", files will be stored at the root.
+        If set to "/", files will be stored at the root.
         """,
     )
 
