@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, Final
 from uuid import UUID
 
 import aiohttp
 
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -10,6 +11,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 
 from .types import CreateEndpointRequestBody
+
+REQUEST_ID_HDR: Final = "X-BackendAI-RequestID"
 
 appproxy_client_resilience = Resilience(
     policies=[
@@ -36,6 +39,13 @@ class AppProxyClient:
         self._address = address
         self._token = token
 
+    def _get_headers(self) -> dict[str, str]:
+        """Get common headers for API requests."""
+        headers = {"X-BackendAI-Token": self._token}
+        if request_id := current_request_id():
+            headers[REQUEST_ID_HDR] = request_id
+        return headers
+
     @appproxy_client_resilience.apply()
     async def create_endpoint(
         self,
@@ -45,9 +55,7 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._get_headers(),
         ) as resp:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
@@ -60,8 +68,6 @@ class AppProxyClient:
     ) -> None:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._get_headers(),
         ):
             pass
