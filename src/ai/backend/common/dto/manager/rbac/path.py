@@ -55,4 +55,6 @@ class DeleteObjectPermissionPathParam(BaseRequestModel):
 class SearchScopeIDsPathParam(BaseRequestModel):
     """Path parameter for searching scope IDs."""
 
-    scope_type: ScopeType = Field(description="Scope type (domain, project, user, global)")
+    scope_type: ScopeType = Field(
+        description="Scope types", examples=["domain", "project", "user", "global"]
+    )
