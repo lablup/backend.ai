@@ -3397,7 +3397,7 @@ input ImportArtifactsInput
   If not specified (None), uses the default path: {model_id}/{revision}.
   If set to empty string "", files will be stored at the root.
   """
-  targetPrefix: String = null
+  storagePrefix: String = null
 }
 
 """
