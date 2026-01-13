@@ -10793,6 +10793,55 @@
         "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2.0/admin/rbac/scope-types": {
+      "get": {
+        "operationId": "v2.0.get_scope_types",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get available scope types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/scopes/{scope_type}/search": {
+      "post": {
+        "operationId": "v2.0.search_scopes",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search scopes for a specific scope type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/scheduling-history/sessions/search": {
       "post": {
         "operationId": "scheduling-history.search_session_history",
