@@ -1,7 +1,8 @@
 ---
-Author: Design Discussion
+Author: Sanghun Lee (sanghun@lablup.com)
 Status: Reference Document
 Created: 2025-11-05
+Parent: BEP-1012-main.md
 ---
 
 # BEP-1012 RBAC Design Decisions
@@ -189,7 +190,7 @@ To share VFolder X with User B:
 
 ### References
 
-- [BEP-1012: Backend.AI Role-Based Access Control (RBAC) Feature Specification](../BEP-1012-RBAC-feature-spec.md)
-- [BEP-1008: Backend.AI Role-Based Access Control (RBAC) Technical Implementation](../BEP-1008-RBAC.md)
+- [BEP-1012: Backend.AI Role-Based Access Control (RBAC) Feature Specification](./BEP-1012-main.md)
+- [BEP-1008: Backend.AI Role-Based Access Control (RBAC) Technical Implementation](./BEP-1008-RBAC.md)
 - [Azure RBAC: Role Assignments](https://learn.microsoft.com/en-us/azure/role-based-access-control/role-assignments)
 - [AWS IAM: Policies and Permissions](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html)
