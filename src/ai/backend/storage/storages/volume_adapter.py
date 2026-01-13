@@ -69,23 +69,23 @@ class VolumeStorageAdapter(AbstractStorage):
     """
 
     _volume: AbstractVolume
-    _vfid: VFolderID
+    _vfolder_id: VFolderID
     _name: str
 
     def __init__(
         self,
         name: str,
         volume: AbstractVolume,
-        vfid: VFolderID,
+        vfolder_id: VFolderID,
     ) -> None:
         self._name = name
         self._volume = volume
-        self._vfid = vfid
+        self._vfolder_id = vfolder_id
 
         log.info(
-            "VolumeStorageAdapter initialized: name={}, vfid={}, volume_type={}",
+            "VolumeStorageAdapter initialized: name={}, vfolder_id={}, volume_type={}",
             name,
-            vfid,
+            vfolder_id,
             type(volume).__name__,
         )
 
@@ -107,7 +107,7 @@ class VolumeStorageAdapter(AbstractStorage):
         This delegates to volume's sanitize_vfpath for proper path validation.
         """
         relpath = self._normalize_relpath(filepath)
-        return self._volume.sanitize_vfpath(self._vfid, relpath)
+        return self._volume.sanitize_vfpath(self._vfolder_id, relpath)
 
     @override
     async def stream_upload(
@@ -130,7 +130,7 @@ class VolumeStorageAdapter(AbstractStorage):
             parent_relpath = relpath.parent
             if parent_relpath != PurePosixPath("."):
                 await self._volume.mkdir(
-                    self._vfid,
+                    self._vfolder_id,
                     parent_relpath,
                     parents=True,
                     exist_ok=True,
@@ -143,7 +143,7 @@ class VolumeStorageAdapter(AbstractStorage):
                         yield chunk
 
             await self._volume.add_file(
-                self._vfid,
+                self._vfolder_id,
                 relpath,
                 _stream_to_iterator(),
             )
@@ -170,7 +170,7 @@ class VolumeStorageAdapter(AbstractStorage):
                 content_type = guessed_type
 
             # read_file returns AsyncIterator[bytes]
-            iterator = self._volume.read_file(self._vfid, relpath)
+            iterator = self._volume.read_file(self._vfolder_id, relpath)
 
             return VolumeDownloadStreamReader(iterator, content_type)
 
@@ -188,7 +188,7 @@ class VolumeStorageAdapter(AbstractStorage):
 
         try:
             await self._volume.delete_files(
-                self._vfid,
+                self._vfolder_id,
                 [relpath],
                 recursive=True,
             )
@@ -207,7 +207,7 @@ class VolumeStorageAdapter(AbstractStorage):
         """
         try:
             relpath = self._normalize_relpath(filepath)
-            target_path = self._volume.sanitize_vfpath(self._vfid, relpath)
+            target_path = self._volume.sanitize_vfpath(self._vfolder_id, relpath)
 
             stat_result = await aiofiles.os.stat(target_path)
 
