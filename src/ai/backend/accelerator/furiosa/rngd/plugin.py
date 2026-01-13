@@ -163,6 +163,7 @@ class RngdPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         device_ids = [
             x.device_id

@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import aiodocker
 
@@ -148,6 +148,7 @@ class TPUPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ):
         assigned_device_ids: list[DeviceId] = []
 

@@ -304,6 +304,7 @@ class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABC
         self,
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         assigned_devices: list[str] = []
         for idx, dev in enumerate(await self.list_devices()):

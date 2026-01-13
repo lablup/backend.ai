@@ -277,6 +277,7 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         self,
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         assigned_devices: list[TATOMDevice] = []
         device_files: list[Path] = []

@@ -384,6 +384,7 @@ class IPUPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.docker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         return {
             "Env": ["IPUOF_CONFIG_PATH=/etc/ipuof.conf.d/ipuof.conf"],

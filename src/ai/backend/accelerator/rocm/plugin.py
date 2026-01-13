@@ -349,6 +349,7 @@ class ROCmPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         assigned_xcds: list[ROCmXCD] = []
         for dev in await self.list_devices():

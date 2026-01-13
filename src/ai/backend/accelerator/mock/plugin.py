@@ -581,6 +581,7 @@ class MockPlugin(AbstractComputePlugin):
         self,
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        resource_opts: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         docker_config: dict[str, Any] = {}
         if not self.enabled:
