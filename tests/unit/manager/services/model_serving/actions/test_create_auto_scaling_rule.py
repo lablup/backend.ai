@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -37,10 +36,10 @@ def mock_check_requester_access_create(mocker, auto_scaling_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_create(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_create(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -195,7 +194,7 @@ class TestCreateEndpointAutoScalingRule:
         ],
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_create,
-        mock_get_endpoint_by_id_create,
+        mock_get_endpoint_access_validation_data_create,
         mock_create_auto_scaling_rule,
     ):
         action = scenario.input
@@ -207,14 +206,12 @@ class TestCreateEndpointAutoScalingRule:
             "Custom metric",
             "SUPERADMIN CPU based scaling",
         ]:
-            mock_endpoint = MagicMock(
-                id=action.endpoint_id,
-                status=EndpointStatus.READY,
+            mock_validation_data = MagicMock(
                 session_owner_id=action.requester_ctx.user_id,
                 session_owner_role=action.requester_ctx.user_role,
                 domain=action.requester_ctx.domain_name,
             )
-            mock_get_endpoint_by_id_create.return_value = mock_endpoint
+            mock_get_endpoint_access_validation_data_create.return_value = mock_validation_data
 
             expected_result = scenario.expected
             assert expected_result is not None
@@ -234,7 +231,7 @@ class TestCreateEndpointAutoScalingRule:
             mock_create_auto_scaling_rule.return_value = mock_rule
 
         elif scenario.description == "Endpoint not found":
-            mock_get_endpoint_by_id_create.return_value = None
+            mock_get_endpoint_access_validation_data_create.return_value = None
             mock_create_auto_scaling_rule.return_value = None
 
         async def create_auto_scaling_rule(action: CreateEndpointAutoScalingRuleAction):

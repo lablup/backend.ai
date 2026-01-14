@@ -40,10 +40,10 @@ def mock_get_auto_scaling_rule_by_id_delete_rule(mocker, mock_repositories):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_delete_rule(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_delete_rule(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -115,7 +115,7 @@ class TestDeleteAutoScalingRule:
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_delete_rule,
         mock_get_auto_scaling_rule_by_id_delete_rule,
-        mock_get_endpoint_by_id_delete_rule,
+        mock_get_endpoint_access_validation_data_delete_rule,
         mock_delete_auto_scaling_rule,
     ):
         action = scenario.input
@@ -129,13 +129,12 @@ class TestDeleteAutoScalingRule:
             )
             mock_get_auto_scaling_rule_by_id_delete_rule.return_value = mock_rule
 
-            mock_endpoint = MagicMock(
-                id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+            mock_validation_data = MagicMock(
                 session_owner_id=action.requester_ctx.user_id,
                 session_owner_role=action.requester_ctx.user_role,
                 domain=action.requester_ctx.domain_name,
             )
-            mock_get_endpoint_by_id_delete_rule.return_value = mock_endpoint
+            mock_get_endpoint_access_validation_data_delete_rule.return_value = mock_validation_data
             mock_delete_auto_scaling_rule.return_value = True
 
         elif scenario.description == "Rule not found":
