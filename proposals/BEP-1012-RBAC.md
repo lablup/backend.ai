@@ -2,6 +2,9 @@
 Author: Sanghun Lee (sanghun@lablup.com)
 Status: Draft
 Created: 2025-11-05
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Backend.AI Role-Based Access Control (RBAC) Feature Specification

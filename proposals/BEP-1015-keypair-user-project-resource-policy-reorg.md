@@ -2,6 +2,9 @@
 Author: Joongi Kim (joongi@lablup.com)
 Status: Draft
 Created: 2025-11-25
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # KeyPair/User/Project Resource Policy Reorganization

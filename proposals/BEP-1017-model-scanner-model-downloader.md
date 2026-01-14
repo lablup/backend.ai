@@ -2,6 +2,9 @@
 Author: Bokeum Kim (bkkim@lablup.com)
 Status: Accepted
 Created: 2025-07-08
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Title

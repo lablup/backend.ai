@@ -1,6 +1,10 @@
 ---
 Author: Bokeum Kim (bkkim@lablup.com)
 Status: Draft
+Created:
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Agent Operations
