@@ -1,1 +1,0 @@
-"""Resource Usage service tests."""
