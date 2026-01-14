@@ -83,7 +83,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_domain_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         domain_name: str,
     ) -> DomainFairShareData:
         """Get a domain fair share record by scaling group and domain name.
@@ -91,7 +91,7 @@ class FairShareRepository:
         Raises:
             FairShareNotFoundError: If the domain fair share is not found.
         """
-        return await self._db_source.get_domain_fair_share(scaling_group, domain_name)
+        return await self._db_source.get_domain_fair_share(resource_group, domain_name)
 
     @fair_share_repository_resilience.apply()
     async def search_domain_fair_shares(
@@ -122,7 +122,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_project_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         project_id: uuid.UUID,
     ) -> ProjectFairShareData:
         """Get a project fair share record by scaling group and project ID.
@@ -130,7 +130,7 @@ class FairShareRepository:
         Raises:
             FairShareNotFoundError: If the project fair share is not found.
         """
-        return await self._db_source.get_project_fair_share(scaling_group, project_id)
+        return await self._db_source.get_project_fair_share(resource_group, project_id)
 
     @fair_share_repository_resilience.apply()
     async def search_project_fair_shares(
@@ -161,7 +161,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
     ) -> UserFairShareData:
@@ -170,7 +170,7 @@ class FairShareRepository:
         Raises:
             FairShareNotFoundError: If the user fair share is not found.
         """
-        return await self._db_source.get_user_fair_share(scaling_group, project_id, user_uuid)
+        return await self._db_source.get_user_fair_share(resource_group, project_id, user_uuid)
 
     @fair_share_repository_resilience.apply()
     async def search_user_fair_shares(

@@ -1,6 +1,6 @@
 """Fair Share Row models.
 
-Database models for Fair Share state management per scaling group:
+Database models for Fair Share state management per resource group:
 - DomainFairShareRow: Domain-level fair share state
 - ProjectFairShareRow: Project-level fair share state
 - UserFairShareRow: User-level fair share state (per project)
@@ -59,7 +59,7 @@ class DomainFairShareRow(Base):
     """Per-domain Fair Share state.
 
     Stores weight (configured value) and calculated values together for current state.
-    One row per (scaling_group, domain_name) combination.
+    One row per (resource_group, domain_name) combination.
     """
 
     __tablename__ = "domain_fair_shares"
@@ -67,8 +67,8 @@ class DomainFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
@@ -201,15 +201,15 @@ class DomainFairShareRow(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("scaling_group", "domain_name", name="uq_domain_fair_share"),
-        sa.Index("ix_domain_fair_share_lookup", "scaling_group", "domain_name"),
+        sa.UniqueConstraint("resource_group", "domain_name", name="uq_domain_fair_share"),
+        sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
 
     def to_data(self) -> DomainFairShareData:
         """Convert to DomainFairShareData."""
         return DomainFairShareData(
             id=self.id,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             domain_name=self.domain_name,
             spec=FairShareSpec(
                 weight=self.weight,
@@ -248,7 +248,7 @@ def _get_project_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
 class ProjectFairShareRow(Base):
     """Per-project Fair Share state.
 
-    One row per (scaling_group, project_id) combination.
+    One row per (resource_group, project_id) combination.
     """
 
     __tablename__ = "project_fair_shares"
@@ -256,8 +256,8 @@ class ProjectFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
     domain_name: Mapped[str] = mapped_column(
@@ -384,15 +384,15 @@ class ProjectFairShareRow(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("scaling_group", "project_id", name="uq_project_fair_share"),
-        sa.Index("ix_project_fair_share_lookup", "scaling_group", "project_id"),
+        sa.UniqueConstraint("resource_group", "project_id", name="uq_project_fair_share"),
+        sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
 
     def to_data(self) -> ProjectFairShareData:
         """Convert to ProjectFairShareData."""
         return ProjectFairShareData(
             id=self.id,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             project_id=self.project_id,
             domain_name=self.domain_name,
             spec=FairShareSpec(
@@ -441,7 +441,7 @@ class UserFairShareRow(Base):
     Since a User can belong to multiple Projects, distinguished by
     (user_uuid, project_id) combination.
 
-    One row per (scaling_group, user_uuid, project_id) combination.
+    One row per (resource_group, user_uuid, project_id) combination.
     """
 
     __tablename__ = "user_fair_shares"
@@ -449,8 +449,8 @@ class UserFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
@@ -586,19 +586,19 @@ class UserFairShareRow(Base):
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "scaling_group",
+            "resource_group",
             "user_uuid",
             "project_id",
             name="uq_user_fair_share",
         ),
-        sa.Index("ix_user_fair_share_lookup", "scaling_group", "user_uuid", "project_id"),
+        sa.Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
 
     def to_data(self) -> UserFairShareData:
         """Convert to UserFairShareData."""
         return UserFairShareData(
             id=self.id,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,

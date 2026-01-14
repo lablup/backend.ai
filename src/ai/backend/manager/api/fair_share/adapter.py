@@ -110,9 +110,9 @@ class FairShareAdapter:
         """Convert domain fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
             conditions.append(
-                DomainFairShareConditions.by_scaling_group(filter.scaling_group.equals)
+                DomainFairShareConditions.by_resource_group(filter.resource_group.equals)
             )
 
         if filter.domain_name is not None and filter.domain_name.equals is not None:
@@ -138,7 +138,7 @@ class FairShareAdapter:
         """Convert DomainFairShareData to DTO."""
         return DomainFairShareDTO(
             id=data.id,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             domain_name=data.domain_name,
             spec=self._convert_spec_to_dto(data.spec),
             calculation_snapshot=self._convert_calculation_snapshot_to_dto(
@@ -172,9 +172,9 @@ class FairShareAdapter:
         """Convert project fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
             conditions.append(
-                ProjectFairShareConditions.by_scaling_group(filter.scaling_group.equals)
+                ProjectFairShareConditions.by_resource_group(filter.resource_group.equals)
             )
 
         if filter.project_id is not None:
@@ -206,7 +206,7 @@ class FairShareAdapter:
         """Convert ProjectFairShareData to DTO."""
         return ProjectFairShareDTO(
             id=data.id,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
             spec=self._convert_spec_to_dto(data.spec),
@@ -233,8 +233,10 @@ class FairShareAdapter:
         """Convert user fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
-            conditions.append(UserFairShareConditions.by_scaling_group(filter.scaling_group.equals))
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
+            conditions.append(
+                UserFairShareConditions.by_resource_group(filter.resource_group.equals)
+            )
 
         if filter.user_uuid is not None:
             if filter.user_uuid.equals is not None:
@@ -269,7 +271,7 @@ class FairShareAdapter:
         """Convert UserFairShareData to DTO."""
         return UserFairShareDTO(
             id=data.id,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
@@ -305,9 +307,9 @@ class FairShareAdapter:
         """Convert domain usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
             conditions.append(
-                DomainUsageBucketConditions.by_scaling_group(filter.scaling_group.equals)
+                DomainUsageBucketConditions.by_resource_group(filter.resource_group.equals)
             )
 
         if filter.domain_name is not None and filter.domain_name.equals is not None:
@@ -332,7 +334,7 @@ class FairShareAdapter:
         return DomainUsageBucketDTO(
             id=data.id,
             domain_name=data.domain_name,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             metadata=UsageBucketMetadataDTO(
                 period_start=data.period_start,
                 period_end=data.period_end,
@@ -368,9 +370,9 @@ class FairShareAdapter:
         """Convert project usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
             conditions.append(
-                ProjectUsageBucketConditions.by_scaling_group(filter.scaling_group.equals)
+                ProjectUsageBucketConditions.by_resource_group(filter.resource_group.equals)
             )
 
         if filter.project_id is not None and filter.project_id.equals is not None:
@@ -396,7 +398,7 @@ class FairShareAdapter:
             id=data.id,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             metadata=UsageBucketMetadataDTO(
                 period_start=data.period_start,
                 period_end=data.period_end,
@@ -432,9 +434,9 @@ class FairShareAdapter:
         """Convert user usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.scaling_group is not None and filter.scaling_group.equals is not None:
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
             conditions.append(
-                UserUsageBucketConditions.by_scaling_group(filter.scaling_group.equals)
+                UserUsageBucketConditions.by_resource_group(filter.resource_group.equals)
             )
 
         if filter.user_uuid is not None and filter.user_uuid.equals is not None:
@@ -462,7 +464,7 @@ class FairShareAdapter:
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             metadata=UsageBucketMetadataDTO(
                 period_start=data.period_start,
                 period_end=data.period_end,

@@ -72,7 +72,7 @@ class DomainFairShareData:
     """Domain-level fair share data."""
 
     id: uuid.UUID
-    scaling_group: str
+    resource_group: str
     domain_name: str
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
@@ -84,7 +84,7 @@ class ProjectFairShareData:
     """Project-level fair share data."""
 
     id: uuid.UUID
-    scaling_group: str
+    resource_group: str
     project_id: uuid.UUID
     domain_name: str
     spec: FairShareSpec
@@ -97,7 +97,7 @@ class UserFairShareData:
     """User-level fair share data."""
 
     id: uuid.UUID
-    scaling_group: str
+    resource_group: str
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str

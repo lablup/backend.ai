@@ -24,7 +24,7 @@ class DomainFairShareCreatorSpec(CreatorSpec[DomainFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     domain_name: str
 
     # Spec (optional - uses Row defaults if None)
@@ -37,7 +37,7 @@ class DomainFairShareCreatorSpec(CreatorSpec[DomainFairShareRow]):
     @override
     def build_row(self) -> DomainFairShareRow:
         row = DomainFairShareRow(
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             domain_name=self.domain_name,
         )
         if self.weight is not None:
@@ -61,7 +61,7 @@ class ProjectFairShareCreatorSpec(CreatorSpec[ProjectFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     project_id: uuid.UUID
     domain_name: str
 
@@ -75,7 +75,7 @@ class ProjectFairShareCreatorSpec(CreatorSpec[ProjectFairShareRow]):
     @override
     def build_row(self) -> ProjectFairShareRow:
         row = ProjectFairShareRow(
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             project_id=self.project_id,
             domain_name=self.domain_name,
         )
@@ -100,7 +100,7 @@ class UserFairShareCreatorSpec(CreatorSpec[UserFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -115,7 +115,7 @@ class UserFairShareCreatorSpec(CreatorSpec[UserFairShareRow]):
     @override
     def build_row(self) -> UserFairShareRow:
         row = UserFairShareRow(
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,

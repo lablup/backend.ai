@@ -31,7 +31,7 @@ class DomainFairShareAction(BaseAction):
 class GetDomainFairShareAction(DomainFairShareAction):
     """Action to get a domain fair share record."""
 
-    scaling_group: str
+    resource_group: str
     domain_name: str
 
     @override
@@ -41,7 +41,7 @@ class GetDomainFairShareAction(DomainFairShareAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return f"{self.scaling_group}:{self.domain_name}"
+        return f"{self.resource_group}:{self.domain_name}"
 
 
 @dataclass
@@ -102,7 +102,7 @@ class ProjectFairShareAction(BaseAction):
 class GetProjectFairShareAction(ProjectFairShareAction):
     """Action to get a project fair share record."""
 
-    scaling_group: str
+    resource_group: str
     project_id: uuid.UUID
 
     @override
@@ -112,7 +112,7 @@ class GetProjectFairShareAction(ProjectFairShareAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return f"{self.scaling_group}:{self.project_id}"
+        return f"{self.resource_group}:{self.project_id}"
 
 
 @dataclass
@@ -173,7 +173,7 @@ class UserFairShareAction(BaseAction):
 class GetUserFairShareAction(UserFairShareAction):
     """Action to get a user fair share record."""
 
-    scaling_group: str
+    resource_group: str
     project_id: uuid.UUID
     user_uuid: uuid.UUID
 
@@ -184,7 +184,7 @@ class GetUserFairShareAction(UserFairShareAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return f"{self.scaling_group}:{self.project_id}:{self.user_uuid}"
+        return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
 
 
 @dataclass

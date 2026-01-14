@@ -29,7 +29,7 @@ class KernelUsageRecordCreatorSpec(CreatorSpec[KernelUsageRecordRow]):
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: datetime
     period_end: datetime
     resource_usage: ResourceSlot
@@ -42,7 +42,7 @@ class KernelUsageRecordCreatorSpec(CreatorSpec[KernelUsageRecordRow]):
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             period_start=self.period_start,
             period_end=self.period_end,
             resource_usage=self.resource_usage,
@@ -54,7 +54,7 @@ class DomainUsageBucketCreatorSpec(CreatorSpec[DomainUsageBucketRow]):
     """Creator spec for DomainUsageBucketRow."""
 
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -65,7 +65,7 @@ class DomainUsageBucketCreatorSpec(CreatorSpec[DomainUsageBucketRow]):
     def build_row(self) -> DomainUsageBucketRow:
         return DomainUsageBucketRow(
             domain_name=self.domain_name,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             period_start=self.period_start,
             period_end=self.period_end,
             decay_unit_days=self.decay_unit_days,
@@ -80,7 +80,7 @@ class ProjectUsageBucketCreatorSpec(CreatorSpec[ProjectUsageBucketRow]):
 
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -92,7 +92,7 @@ class ProjectUsageBucketCreatorSpec(CreatorSpec[ProjectUsageBucketRow]):
         return ProjectUsageBucketRow(
             project_id=self.project_id,
             domain_name=self.domain_name,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             period_start=self.period_start,
             period_end=self.period_end,
             decay_unit_days=self.decay_unit_days,
@@ -108,7 +108,7 @@ class UserUsageBucketCreatorSpec(CreatorSpec[UserUsageBucketRow]):
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int = 1
@@ -121,7 +121,7 @@ class UserUsageBucketCreatorSpec(CreatorSpec[UserUsageBucketRow]):
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            scaling_group=self.scaling_group,
+            resource_group=self.resource_group,
             period_start=self.period_start,
             period_end=self.period_end,
             decay_unit_days=self.decay_unit_days,

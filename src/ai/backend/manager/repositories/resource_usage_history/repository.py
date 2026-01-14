@@ -183,7 +183,7 @@ class ResourceUsageHistoryRepository:
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_user(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -194,13 +194,13 @@ class ResourceUsageHistoryRepository:
         calculation service.
         """
         return await self._db_source.get_aggregated_usage_by_user(
-            scaling_group, lookback_start, lookback_end
+            resource_group, lookback_start, lookback_end
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_project(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[uuid.UUID, ResourceSlot]:
@@ -210,13 +210,13 @@ class ResourceUsageHistoryRepository:
         lookback period for each project.
         """
         return await self._db_source.get_aggregated_usage_by_project(
-            scaling_group, lookback_start, lookback_end
+            resource_group, lookback_start, lookback_end
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_domain(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[str, ResourceSlot]:
@@ -226,5 +226,5 @@ class ResourceUsageHistoryRepository:
         lookback period for each domain.
         """
         return await self._db_source.get_aggregated_usage_by_domain(
-            scaling_group, lookback_start, lookback_end
+            resource_group, lookback_start, lookback_end
         )

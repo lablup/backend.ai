@@ -54,14 +54,14 @@ class TestGetDomainFairShare:
         mock_repository.get_domain_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetDomainFairShareAction(
-            scaling_group="default",
+            resource_group="default",
             domain_name="test-domain",
         )
 
         result = await service.get_domain_fair_share(action)
 
         mock_repository.get_domain_fair_share.assert_called_once_with(
-            scaling_group="default",
+            resource_group="default",
             domain_name="test-domain",
         )
         assert result.data == expected_data
@@ -145,14 +145,14 @@ class TestGetProjectFairShare:
         mock_repository.get_project_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetProjectFairShareAction(
-            scaling_group="default",
+            resource_group="default",
             project_id=project_id,
         )
 
         result = await service.get_project_fair_share(action)
 
         mock_repository.get_project_fair_share.assert_called_once_with(
-            scaling_group="default",
+            resource_group="default",
             project_id=project_id,
         )
         assert result.data == expected_data
@@ -237,7 +237,7 @@ class TestGetUserFairShare:
         mock_repository.get_user_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetUserFairShareAction(
-            scaling_group="default",
+            resource_group="default",
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -245,7 +245,7 @@ class TestGetUserFairShare:
         result = await service.get_user_fair_share(action)
 
         mock_repository.get_user_fair_share.assert_called_once_with(
-            scaling_group="default",
+            resource_group="default",
             project_id=project_id,
             user_uuid=user_uuid,
         )

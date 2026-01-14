@@ -188,7 +188,7 @@ async def domain_usage_bucket_id(
     """Create DomainUsageBucketRow and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -211,7 +211,7 @@ async def domain_usage_bucket_with_capacity_id(
     """Create DomainUsageBucketRow with capacity snapshot and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -243,7 +243,7 @@ async def project_usage_bucket_id(
     row = ProjectUsageBucketRow(
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -270,7 +270,7 @@ async def user_usage_bucket_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -303,7 +303,7 @@ async def kernel_usage_record_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=now,
         period_end=now,
         resource_usage=ResourceSlot(),
@@ -330,7 +330,7 @@ async def kernel_usage_record_with_usage_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         period_start=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
         period_end=datetime(2024, 1, 1, 12, 5, 0, tzinfo=UTC),
         resource_usage=ResourceSlot({

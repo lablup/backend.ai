@@ -23,7 +23,7 @@ from ai.backend.manager.services.fair_share.actions import GetDomainFairShareAct
 @strawberry.field(description="Added in 26.1.0. Get domain fair share data (superadmin only).")
 async def domain_fair_share(
     info: Info[StrawberryGQLContext],
-    scaling_group: str,
+    resource_group: str,
     domain_name: str,
 ) -> Optional[DomainFairShareGQL]:
     """Get a single domain fair share record."""
@@ -34,7 +34,7 @@ async def domain_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
         GetDomainFairShareAction(
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             domain_name=domain_name,
         )
     )

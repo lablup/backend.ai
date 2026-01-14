@@ -56,7 +56,7 @@ async def fetch_domain_fair_shares(
         order_by: Optional ordering specification
         before/after/first/last: Cursor-based pagination parameters
         limit/offset: Offset-based pagination parameters
-        base_conditions: Additional conditions to prepend (e.g., scaling_group filter)
+        base_conditions: Additional conditions to prepend (e.g., resource_group filter)
     """
     processors = info.context.processors
 

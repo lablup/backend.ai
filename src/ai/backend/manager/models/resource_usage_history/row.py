@@ -97,8 +97,8 @@ class KernelUsageRecordRow(Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
 
     # Period slice information
@@ -152,7 +152,7 @@ class KernelUsageRecordRow(Base):
     )
 
     __table_args__ = (
-        sa.Index("ix_kernel_usage_sg_period", "scaling_group", "period_start"),
+        sa.Index("ix_kernel_usage_sg_period", "resource_group", "period_start"),
         sa.Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
 
@@ -178,8 +178,8 @@ class DomainUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False
     )
 
     # Bucket period information
@@ -231,11 +231,11 @@ class DomainUsageBucketRow(Base):
     __table_args__ = (
         sa.UniqueConstraint(
             "domain_name",
-            "scaling_group",
+            "resource_group",
             "period_start",
             name="uq_domain_usage_bucket",
         ),
-        sa.Index("ix_domain_usage_bucket_lookup", "domain_name", "scaling_group", "period_start"),
+        sa.Index("ix_domain_usage_bucket_lookup", "domain_name", "resource_group", "period_start"),
     )
 
 
@@ -267,8 +267,8 @@ class ProjectUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False
     )
 
     # Bucket period information
@@ -327,11 +327,11 @@ class ProjectUsageBucketRow(Base):
     __table_args__ = (
         sa.UniqueConstraint(
             "project_id",
-            "scaling_group",
+            "resource_group",
             "period_start",
             name="uq_project_usage_bucket",
         ),
-        sa.Index("ix_project_usage_bucket_lookup", "project_id", "scaling_group", "period_start"),
+        sa.Index("ix_project_usage_bucket_lookup", "project_id", "resource_group", "period_start"),
     )
 
 
@@ -375,8 +375,8 @@ class UserUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False
     )
 
     # Bucket period information
@@ -443,7 +443,7 @@ class UserUsageBucketRow(Base):
         sa.UniqueConstraint(
             "user_uuid",
             "project_id",
-            "scaling_group",
+            "resource_group",
             "period_start",
             name="uq_user_usage_bucket",
         ),
@@ -451,7 +451,7 @@ class UserUsageBucketRow(Base):
             "ix_user_usage_bucket_lookup",
             "user_uuid",
             "project_id",
-            "scaling_group",
+            "resource_group",
             "period_start",
         ),
     )

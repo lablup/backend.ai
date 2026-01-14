@@ -28,7 +28,7 @@ class KernelUsageRecordData:
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: datetime
     period_end: datetime
     resource_usage: ResourceSlot
@@ -43,7 +43,7 @@ class KernelUsageRecordData:
             user_uuid=row.user_uuid,
             project_id=row.project_id,
             domain_name=row.domain_name,
-            scaling_group=row.scaling_group,
+            resource_group=row.resource_group,
             period_start=row.period_start,
             period_end=row.period_end,
             resource_usage=row.resource_usage,
@@ -56,7 +56,7 @@ class DomainUsageBucketData:
 
     id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -71,7 +71,7 @@ class DomainUsageBucketData:
         return cls(
             id=row.id,
             domain_name=row.domain_name,
-            scaling_group=row.scaling_group,
+            resource_group=row.resource_group,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,
@@ -89,7 +89,7 @@ class ProjectUsageBucketData:
     id: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -105,7 +105,7 @@ class ProjectUsageBucketData:
             id=row.id,
             project_id=row.project_id,
             domain_name=row.domain_name,
-            scaling_group=row.scaling_group,
+            resource_group=row.resource_group,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,
@@ -124,7 +124,7 @@ class UserUsageBucketData:
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    scaling_group: str
+    resource_group: str
     period_start: date
     period_end: date
     decay_unit_days: int
@@ -141,7 +141,7 @@ class UserUsageBucketData:
             user_uuid=row.user_uuid,
             project_id=row.project_id,
             domain_name=row.domain_name,
-            scaling_group=row.scaling_group,
+            resource_group=row.resource_group,
             period_start=row.period_start,
             period_end=row.period_end,
             decay_unit_days=row.decay_unit_days,

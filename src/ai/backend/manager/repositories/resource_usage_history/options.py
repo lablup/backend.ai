@@ -20,9 +20,9 @@ class KernelUsageRecordConditions:
     """Query conditions for KernelUsageRecordRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelUsageRecordRow.scaling_group == scaling_group
+            return KernelUsageRecordRow.resource_group == resource_group
 
         return inner
 
@@ -78,9 +78,9 @@ class DomainUsageBucketConditions:
     """Query conditions for DomainUsageBucketRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.scaling_group == scaling_group
+            return DomainUsageBucketRow.resource_group == resource_group
 
         return inner
 
@@ -151,9 +151,9 @@ class ProjectUsageBucketConditions:
     """Query conditions for ProjectUsageBucketRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.scaling_group == scaling_group
+            return ProjectUsageBucketRow.resource_group == resource_group
 
         return inner
 
@@ -231,9 +231,9 @@ class UserUsageBucketConditions:
     """Query conditions for UserUsageBucketRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.scaling_group == scaling_group
+            return UserUsageBucketRow.resource_group == resource_group
 
         return inner
 

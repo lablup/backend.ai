@@ -250,7 +250,7 @@ class TestResourceUsageHistoryRepository:
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=now - timedelta(minutes=5),
                 period_end=now,
                 resource_usage=ResourceSlot({"cpu": Decimal("300"), "mem": Decimal("1073741824")}),
@@ -291,7 +291,7 @@ class TestResourceUsageHistoryRepository:
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -305,7 +305,7 @@ class TestResourceUsageHistoryRepository:
 
         assert len(results) == 5
         for result in results:
-            assert result.scaling_group == test_scaling_group
+            assert result.resource_group == test_scaling_group
             assert result.domain_name == test_domain_name
 
     @pytest.mark.asyncio
@@ -334,7 +334,7 @@ class TestResourceUsageHistoryRepository:
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -372,7 +372,7 @@ class TestResourceUsageHistoryRepository:
         creator = Creator(
             spec=DomainUsageBucketCreatorSpec(
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -390,7 +390,7 @@ class TestResourceUsageHistoryRepository:
         result = await resource_usage_history_repository.create_domain_usage_bucket(creator)
 
         assert result.domain_name == test_domain_name
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.period_start == today
         assert result.resource_usage["cpu"] == Decimal("86400")
 
@@ -407,7 +407,7 @@ class TestResourceUsageHistoryRepository:
         upserter = Upserter(
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -435,7 +435,7 @@ class TestResourceUsageHistoryRepository:
         upserter1 = Upserter(
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -449,7 +449,7 @@ class TestResourceUsageHistoryRepository:
         upserter2 = Upserter(
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -477,7 +477,7 @@ class TestResourceUsageHistoryRepository:
             creator = Creator(
                 spec=DomainUsageBucketCreatorSpec(
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -493,7 +493,7 @@ class TestResourceUsageHistoryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                DomainUsageBucketConditions.by_scaling_group(test_scaling_group),
+                DomainUsageBucketConditions.by_resource_group(test_scaling_group),
                 DomainUsageBucketConditions.by_period_range(lookback_start, lookback_end),
             ],
             orders=[DomainUsageBucketOrders.by_period_start()],
@@ -522,7 +522,7 @@ class TestResourceUsageHistoryRepository:
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -554,7 +554,7 @@ class TestResourceUsageHistoryRepository:
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -585,7 +585,7 @@ class TestResourceUsageHistoryRepository:
             spec=ProjectUsageBucketCreatorSpec(
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -621,7 +621,7 @@ class TestResourceUsageHistoryRepository:
                     user_uuid=test_user_uuid,
                     project_id=test_project_id,
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -635,7 +635,7 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_user(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -656,7 +656,7 @@ class TestResourceUsageHistoryRepository:
         lookback_end = today
 
         results = await resource_usage_history_repository.get_aggregated_usage_by_user(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -681,7 +681,7 @@ class TestResourceUsageHistoryRepository:
                 spec=ProjectUsageBucketCreatorSpec(
                     project_id=test_project_id,
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -695,7 +695,7 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_project(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )
@@ -719,7 +719,7 @@ class TestResourceUsageHistoryRepository:
             creator = Creator(
                 spec=DomainUsageBucketCreatorSpec(
                     domain_name=test_domain_name,
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -733,7 +733,7 @@ class TestResourceUsageHistoryRepository:
         lookback_start = today - timedelta(days=7)
         lookback_end = today
         results = await resource_usage_history_repository.get_aggregated_usage_by_domain(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             lookback_start=lookback_start,
             lookback_end=lookback_end,
         )

@@ -47,7 +47,7 @@ class UserUsageBucketGQL(Node):
     user_uuid: UUID = strawberry.field(description="UUID of the user this usage bucket belongs to.")
     project_id: UUID = strawberry.field(description="UUID of the project the user belongs to.")
     domain_name: str = strawberry.field(description="Name of the domain the user belongs to.")
-    scaling_group: str = strawberry.field(
+    resource_group: str = strawberry.field(
         description="Name of the scaling group this usage was recorded in."
     )
     metadata: UsageBucketMetadataGQL = strawberry.field(
@@ -74,7 +74,7 @@ class UserUsageBucketGQL(Node):
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             metadata=UsageBucketMetadataGQL(
                 period_start=data.period_start,
                 period_end=data.period_end,
@@ -119,7 +119,7 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
 class UserUsageBucketFilter(GQLFilter):
     """Filter for user usage buckets."""
 
-    scaling_group: Optional[StringFilter] = strawberry.field(
+    resource_group: Optional[StringFilter] = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define where usage was recorded. "
@@ -165,16 +165,16 @@ class UserUsageBucketFilter(GQLFilter):
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
-        if self.scaling_group:
-            sg_condition = self.scaling_group.build_query_condition(
-                contains_factory=lambda spec: UserUsageBucketConditions.by_scaling_group(
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
                     spec.value
                 ),
-                equals_factory=lambda spec: UserUsageBucketConditions.by_scaling_group(spec.value),
-                starts_with_factory=lambda spec: UserUsageBucketConditions.by_scaling_group(
+                equals_factory=lambda spec: UserUsageBucketConditions.by_resource_group(spec.value),
+                starts_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
                     spec.value
                 ),
-                ends_with_factory=lambda spec: UserUsageBucketConditions.by_scaling_group(
+                ends_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
                     spec.value
                 ),
             )

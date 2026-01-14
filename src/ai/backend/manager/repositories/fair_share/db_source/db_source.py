@@ -65,13 +65,13 @@ class FairShareDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["scaling_group", "domain_name"],
+                index_elements=["resource_group", "domain_name"],
             )
             return result.row.to_data()
 
     async def get_domain_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         domain_name: str,
     ) -> DomainFairShareData:
         """Get a domain fair share record by scaling group and domain name.
@@ -82,7 +82,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DomainFairShareRow).where(
                 sa.and_(
-                    DomainFairShareRow.scaling_group == scaling_group,
+                    DomainFairShareRow.resource_group == resource_group,
                     DomainFairShareRow.domain_name == domain_name,
                 )
             )
@@ -90,7 +90,7 @@ class FairShareDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise FairShareNotFoundError(
-                    f"Domain fair share not found: scaling_group={scaling_group}, domain_name={domain_name}"
+                    f"Domain fair share not found: resource_group={resource_group}, domain_name={domain_name}"
                 )
             return row.to_data()
 
@@ -130,13 +130,13 @@ class FairShareDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["scaling_group", "project_id"],
+                index_elements=["resource_group", "project_id"],
             )
             return result.row.to_data()
 
     async def get_project_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         project_id: uuid.UUID,
     ) -> ProjectFairShareData:
         """Get a project fair share record by scaling group and project ID.
@@ -147,7 +147,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(ProjectFairShareRow).where(
                 sa.and_(
-                    ProjectFairShareRow.scaling_group == scaling_group,
+                    ProjectFairShareRow.resource_group == resource_group,
                     ProjectFairShareRow.project_id == project_id,
                 )
             )
@@ -155,7 +155,7 @@ class FairShareDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise FairShareNotFoundError(
-                    f"Project fair share not found: scaling_group={scaling_group}, project_id={project_id}"
+                    f"Project fair share not found: resource_group={resource_group}, project_id={project_id}"
                 )
             return row.to_data()
 
@@ -195,13 +195,13 @@ class FairShareDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["scaling_group", "user_uuid", "project_id"],
+                index_elements=["resource_group", "user_uuid", "project_id"],
             )
             return result.row.to_data()
 
     async def get_user_fair_share(
         self,
-        scaling_group: str,
+        resource_group: str,
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
     ) -> UserFairShareData:
@@ -213,7 +213,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(UserFairShareRow).where(
                 sa.and_(
-                    UserFairShareRow.scaling_group == scaling_group,
+                    UserFairShareRow.resource_group == resource_group,
                     UserFairShareRow.project_id == project_id,
                     UserFairShareRow.user_uuid == user_uuid,
                 )
@@ -222,7 +222,7 @@ class FairShareDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise FairShareNotFoundError(
-                    f"User fair share not found: scaling_group={scaling_group}, "
+                    f"User fair share not found: resource_group={resource_group}, "
                     f"project_id={project_id}, user_uuid={user_uuid}"
                 )
             return row.to_data()

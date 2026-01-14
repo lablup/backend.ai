@@ -83,7 +83,7 @@ class FairShareAPIHandler:
 
         action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                scaling_group=path.parsed.scaling_group, domain_name=path.parsed.domain_name
+                resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
             )
         )
 
@@ -142,7 +142,7 @@ class FairShareAPIHandler:
 
         action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                scaling_group=path.parsed.scaling_group, project_id=path.parsed.project_id
+                resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
             )
         )
 
@@ -201,7 +201,7 @@ class FairShareAPIHandler:
 
         action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                scaling_group=path.parsed.scaling_group,
+                resource_group=path.parsed.resource_group,
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
             )
@@ -368,7 +368,7 @@ def create_app(
     cors.add(
         app.router.add_route(
             "GET",
-            "/domains/{scaling_group}/{domain_name}",
+            "/domains/{resource_group}/{domain_name}",
             api_handler.get_domain_fair_share,
         )
     )
@@ -384,7 +384,7 @@ def create_app(
     cors.add(
         app.router.add_route(
             "GET",
-            "/projects/{scaling_group}/{project_id}",
+            "/projects/{resource_group}/{project_id}",
             api_handler.get_project_fair_share,
         )
     )
@@ -400,7 +400,7 @@ def create_app(
     cors.add(
         app.router.add_route(
             "GET",
-            "/users/{scaling_group}/{project_id}/{user_uuid}",
+            "/users/{resource_group}/{project_id}/{user_uuid}",
             api_handler.get_user_fair_share,
         )
     )

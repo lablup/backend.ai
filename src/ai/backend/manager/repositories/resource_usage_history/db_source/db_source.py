@@ -116,7 +116,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["domain_name", "scaling_group", "period_start"],
+                index_elements=["domain_name", "resource_group", "period_start"],
             )
             return DomainUsageBucketData.from_row(result.row)
 
@@ -158,7 +158,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["project_id", "scaling_group", "period_start"],
+                index_elements=["project_id", "resource_group", "period_start"],
             )
             return ProjectUsageBucketData.from_row(result.row)
 
@@ -200,7 +200,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["user_uuid", "project_id", "scaling_group", "period_start"],
+                index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
             )
             return UserUsageBucketData.from_row(result.row)
 
@@ -224,7 +224,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_user(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -238,13 +238,13 @@ class ResourceUsageHistoryDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             return await self._fetch_aggregated_usage_by_user(
-                db_sess, scaling_group, lookback_start, lookback_end
+                db_sess, resource_group, lookback_start, lookback_end
             )
 
     async def _fetch_aggregated_usage_by_user(
         self,
         db_sess: SASession,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -255,7 +255,7 @@ class ResourceUsageHistoryDBSource:
             UserUsageBucketRow.resource_usage,
         ).where(
             sa.and_(
-                UserUsageBucketRow.scaling_group == scaling_group,
+                UserUsageBucketRow.resource_group == resource_group,
                 UserUsageBucketRow.period_start >= lookback_start,
                 UserUsageBucketRow.period_start <= lookback_end,
             )
@@ -274,7 +274,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_project(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[uuid.UUID, ResourceSlot]:
@@ -289,7 +289,7 @@ class ResourceUsageHistoryDBSource:
                 ProjectUsageBucketRow.resource_usage,
             ).where(
                 sa.and_(
-                    ProjectUsageBucketRow.scaling_group == scaling_group,
+                    ProjectUsageBucketRow.resource_group == resource_group,
                     ProjectUsageBucketRow.period_start >= lookback_start,
                     ProjectUsageBucketRow.period_start <= lookback_end,
                 )
@@ -307,7 +307,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_domain(
         self,
-        scaling_group: str,
+        resource_group: str,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[str, ResourceSlot]:
@@ -322,7 +322,7 @@ class ResourceUsageHistoryDBSource:
                 DomainUsageBucketRow.resource_usage,
             ).where(
                 sa.and_(
-                    DomainUsageBucketRow.scaling_group == scaling_group,
+                    DomainUsageBucketRow.resource_group == resource_group,
                     DomainUsageBucketRow.period_start >= lookback_start,
                     DomainUsageBucketRow.period_start <= lookback_end,
                 )
