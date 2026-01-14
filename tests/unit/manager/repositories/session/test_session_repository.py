@@ -457,11 +457,6 @@ class TestSessionRepository:
                 preopen_ports=None,
                 bootstrap_script=None,
                 startup_command=None,
-                repl_in_port=2000,
-                repl_out_port=2001,
-                stdin_port=2002,
-                stdout_port=2003,
-                use_host_network=False,
             )
             db_sess.add(kernel)
 
