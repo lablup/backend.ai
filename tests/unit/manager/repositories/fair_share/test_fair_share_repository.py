@@ -239,7 +239,7 @@ class TestFairShareRepository:
         """Test creating domain fair share"""
         creator = Creator(
             spec=DomainFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=Decimal("2.0"),
             )
@@ -247,7 +247,7 @@ class TestFairShareRepository:
 
         result = await fair_share_repository.create_domain_fair_share(creator)
 
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
         assert result.spec.weight == Decimal("2.0")
         assert result.calculation_snapshot.fair_share_factor == Decimal(
@@ -265,7 +265,7 @@ class TestFairShareRepository:
         """Test upsert domain fair share - insert case"""
         upserter = Upserter(
             spec=DomainFairShareUpserterSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=OptionalState.update(Decimal("1.5")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
@@ -275,7 +275,7 @@ class TestFairShareRepository:
 
         result = await fair_share_repository.upsert_domain_fair_share(upserter)
 
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
         assert result.spec.weight == Decimal("1.5")
         assert result.calculation_snapshot.fair_share_factor == Decimal("1.0")
@@ -291,7 +291,7 @@ class TestFairShareRepository:
         # First insert
         upserter1 = Upserter(
             spec=DomainFairShareUpserterSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=OptionalState.update(Decimal("1.0")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
@@ -303,7 +303,7 @@ class TestFairShareRepository:
         # Second upsert - should update calculated fields only
         upserter2 = Upserter(
             spec=DomainFairShareUpserterSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 fair_share_factor=OptionalState.update(Decimal("0.75")),
                 normalized_usage=OptionalState.update(Decimal("0.5")),
@@ -328,7 +328,7 @@ class TestFairShareRepository:
         # Create first
         creator = Creator(
             spec=DomainFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=Decimal("1.5"),
             )
@@ -337,11 +337,11 @@ class TestFairShareRepository:
 
         # Get
         result = await fair_share_repository.get_domain_fair_share(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             domain_name=test_domain_name,
         )
 
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
         assert result.spec.weight == Decimal("1.5")
 
@@ -353,7 +353,7 @@ class TestFairShareRepository:
         """Test getting non-existent domain fair share raises FairShareNotFoundError"""
         with pytest.raises(FairShareNotFoundError):
             await fair_share_repository.get_domain_fair_share(
-                scaling_group="non-existent-sg",
+                resource_group="non-existent-sg",
                 domain_name="non-existent-domain",
             )
 
@@ -384,7 +384,7 @@ class TestFairShareRepository:
         for name in domain_names:
             creator = Creator(
                 spec=DomainFairShareCreatorSpec(
-                    scaling_group=test_scaling_group,
+                    resource_group=test_scaling_group,
                     domain_name=name,
                 )
             )
@@ -393,7 +393,7 @@ class TestFairShareRepository:
         # Search with BatchQuerier
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[DomainFairShareConditions.by_scaling_group(test_scaling_group)],
+            conditions=[DomainFairShareConditions.by_resource_group(test_scaling_group)],
             orders=[DomainFairShareOrders.by_domain_name()],
         )
         result = await fair_share_repository.search_domain_fair_shares(querier)
@@ -416,7 +416,7 @@ class TestFairShareRepository:
         """Test creating project fair share"""
         creator = Creator(
             spec=ProjectFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 weight=Decimal("1.5"),
@@ -425,7 +425,7 @@ class TestFairShareRepository:
 
         result = await fair_share_repository.create_project_fair_share(creator)
 
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.project_id == test_project_id
         assert result.domain_name == test_domain_name
         assert result.spec.weight == Decimal("1.5")
@@ -441,7 +441,7 @@ class TestFairShareRepository:
         """Test upsert project fair share"""
         upserter = Upserter(
             spec=ProjectFairShareUpserterSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 weight=OptionalState.update(Decimal("2.0")),
@@ -466,7 +466,7 @@ class TestFairShareRepository:
         """Test getting project fair share"""
         creator = Creator(
             spec=ProjectFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
             )
@@ -474,7 +474,7 @@ class TestFairShareRepository:
         await fair_share_repository.create_project_fair_share(creator)
 
         result = await fair_share_repository.get_project_fair_share(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             project_id=test_project_id,
         )
 
@@ -494,7 +494,7 @@ class TestFairShareRepository:
         """Test creating user fair share"""
         creator = Creator(
             spec=UserFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -504,7 +504,7 @@ class TestFairShareRepository:
 
         result = await fair_share_repository.create_user_fair_share(creator)
 
-        assert result.scaling_group == test_scaling_group
+        assert result.resource_group == test_scaling_group
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
         assert result.spec.weight == Decimal("1.2")
@@ -521,7 +521,7 @@ class TestFairShareRepository:
         """Test upsert user fair share"""
         upserter = Upserter(
             spec=UserFairShareUpserterSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -548,7 +548,7 @@ class TestFairShareRepository:
         """Test getting user fair share"""
         creator = Creator(
             spec=UserFairShareCreatorSpec(
-                scaling_group=test_scaling_group,
+                resource_group=test_scaling_group,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -557,7 +557,7 @@ class TestFairShareRepository:
         await fair_share_repository.create_user_fair_share(creator)
 
         result = await fair_share_repository.get_user_fair_share(
-            scaling_group=test_scaling_group,
+            resource_group=test_scaling_group,
             project_id=test_project_id,
             user_uuid=test_user_uuid,
         )
