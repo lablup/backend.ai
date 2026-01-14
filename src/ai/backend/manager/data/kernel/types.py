@@ -245,6 +245,16 @@ class KernelInfo:
     metadata: Metadata
 
 
+@dataclass
+class KernelListResult:
+    """Search result with total count and pagination info for kernels."""
+
+    items: list[KernelInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
 # ========== Scheduling History Types ==========
 
 
