@@ -17,6 +17,14 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.fair_share import (
+    DomainFairShareData,
+    FairShareCalculationSnapshot,
+    FairShareMetadata,
+    FairShareSpec,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -196,6 +204,33 @@ class DomainFairShareRow(Base):
         sa.Index("ix_domain_fair_share_lookup", "scaling_group", "domain_name"),
     )
 
+    def to_data(self) -> DomainFairShareData:
+        """Convert to DomainFairShareData."""
+        return DomainFairShareData(
+            id=self.id,
+            scaling_group=self.scaling_group,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+        )
+
 
 def _get_project_fair_share_project_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.group import GroupRow
@@ -349,6 +384,34 @@ class ProjectFairShareRow(Base):
         sa.UniqueConstraint("scaling_group", "project_id", name="uq_project_fair_share"),
         sa.Index("ix_project_fair_share_lookup", "scaling_group", "project_id"),
     )
+
+    def to_data(self) -> ProjectFairShareData:
+        """Convert to ProjectFairShareData."""
+        return ProjectFairShareData(
+            id=self.id,
+            scaling_group=self.scaling_group,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+        )
 
 
 def _get_user_fair_share_user_join_condition() -> sa.ColumnElement[bool]:
@@ -524,3 +587,32 @@ class UserFairShareRow(Base):
         ),
         sa.Index("ix_user_fair_share_lookup", "scaling_group", "user_uuid", "project_id"),
     )
+
+    def to_data(self) -> UserFairShareData:
+        """Convert to UserFairShareData."""
+        return UserFairShareData(
+            id=self.id,
+            scaling_group=self.scaling_group,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+        )
