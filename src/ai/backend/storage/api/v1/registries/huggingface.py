@@ -203,6 +203,7 @@ class HuggingFaceRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
+            storage_prefix=body.parsed.storage_prefix,
         )
 
         response = HuggingFaceImportModelsResponse(

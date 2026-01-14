@@ -532,7 +532,10 @@ class ScanArtifactsInput:
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
-    vfolder_id: ID | None = None
+    vfolder_id: ID | None = strawberry.field(
+        default=None,
+        description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
+    )
 
 
 @strawberry.input(description="Added in 25.15.0")
