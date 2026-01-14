@@ -148,8 +148,8 @@ class TestGetScopeTypesHandler:
         assert response.status == HTTPStatus.OK
         assert response.body is not None
         response_data = json.loads(cast(bytes, response.body))
-        assert "scope_types" in response_data
-        assert len(response_data["scope_types"]) == self.EXPECTED_SCOPE_TYPES_COUNT
+        assert "items" in response_data
+        assert len(response_data["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
 
     @pytest.mark.asyncio
     async def test_get_scope_types_rejects_non_superadmin(
@@ -366,11 +366,11 @@ class TestSearchScopesHandler:
         assert response.status == HTTPStatus.OK
         assert response.body is not None
         response_data = json.loads(cast(bytes, response.body))
-        assert "scopes" in response_data
+        assert "items" in response_data
         assert "pagination" in response_data
-        assert len(response_data["scopes"]) == len(single_scope_result.items)
-        assert response_data["scopes"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
-        assert response_data["scopes"][0]["name"] == self.TEST_DOMAIN_NAME
+        assert len(response_data["items"]) == len(single_scope_result.items)
+        assert response_data["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
+        assert response_data["items"][0]["name"] == self.TEST_DOMAIN_NAME
 
     @pytest.mark.asyncio
     async def test_search_scopes_with_pagination(
