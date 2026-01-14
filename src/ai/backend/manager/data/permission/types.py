@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ai.backend.common.data.permission.types import (
     GLOBAL_SCOPE_ID,
     EntityType,
+    FieldType,
     OperationType,
     RoleSource,
     ScopeType,
@@ -16,6 +17,7 @@ from .id import ScopeId
 __all__ = (
     "GLOBAL_SCOPE_ID",
     "EntityType",
+    "FieldType",
     "OperationType",
     "RoleSource",
     "ScopeData",
