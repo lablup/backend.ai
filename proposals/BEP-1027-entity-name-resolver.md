@@ -7,7 +7,7 @@ Target-Version: 26.1.0
 Implemented-Version:
 ---
 
-# Entity Name Resolver for RBAC Entity Search API
+# Entity Querier for RBAC Entity Search API
 
 ## Related Issues
 
@@ -19,7 +19,7 @@ The RBAC system provides APIs to query available entities within a scope for rol
 
 To provide entity names, we need to query different database tables based on the entity type (e.g., `users` for USER, `groups` for PROJECT, `domains` for DOMAIN). However, embedding this logic directly into the existing data layer would violate the single responsibility principle and create tight coupling between the RBAC module and various entity tables.
 
-This BEP proposes an **Entity Name Resolver** abstraction that cleanly separates name resolution logic from the core entity search functionality, maintaining architectural integrity while enabling the desired feature.
+This BEP proposes an **Entity Querier** abstraction that extends the `association_scopes_entities` table query to include entity-specific data (such as names) by joining with appropriate entity tables.
 
 ## Current Design
 
@@ -65,46 +65,57 @@ Handler → Service → Repository → DBSource
 
 ### Architecture Overview
 
+The Entity Querier is placed in the **Repository layer** and provides an abstraction for querying entities within a scope. Each entity type has its own querier implementation that joins `association_scopes_entities` with the appropriate entity table.
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Handler Layer                            │
-│  ┌─────────────────┐    ┌──────────────────────────────────┐    │
-│  │ search_entities │───▶│ EntityNameResolverRegistry       │    │
-│  │    handler      │    │   - resolve_names(entities)      │    │
-│  └────────┬────────┘    └──────────────┬───────────────────┘    │
-│           │                            │                         │
-│           ▼                            ▼                         │
-│  ┌─────────────────┐    ┌──────────────────────────────────┐    │
-│  │ Service Layer   │    │ Individual Resolvers              │    │
-│  │ (unchanged)     │    │   - UserNameResolver             │    │
-│  └────────┬────────┘    │   - ProjectNameResolver          │    │
-│           │             │   - DomainNameResolver           │    │
-│           ▼             │   - VFolderNameResolver          │    │
-│  ┌─────────────────┐    │   - ...                          │    │
-│  │ Repository      │    └──────────────────────────────────┘    │
-│  │ (unchanged)     │                                            │
-│  └────────┬────────┘                                            │
+│  Handler                                                         │
+│  └── Input validation, DTO conversion                           │
 │           │                                                      │
 │           ▼                                                      │
-│  ┌─────────────────┐                                            │
-│  │ DBSource        │                                            │
-│  │ (unchanged)     │                                            │
-│  └─────────────────┘                                            │
+│  Service                                                         │
+│  └── Business logic coordination                                │
+│           │                                                      │
+│           ▼                                                      │
+│  Repository                                                      │
+│  └── PermissionControllerRepository                             │
+│       └── search_entities()                                     │
+│                 │                                                │
+│                 ▼                                                │
+│       EntityQuerierRegistry                                     │
+│       └── get_querier(entity_type)                              │
+│                 │                                                │
+│                 ▼                                                │
+│       EntityQuerier (per entity type)                           │
+│       ├── UserEntityQuerier                                     │
+│       ├── ProjectEntityQuerier                                  │
+│       ├── DomainEntityQuerier                                   │
+│       └── ...                                                   │
+│                 │                                                │
+│                 ▼                                                │
+│       JOIN: association_scopes_entities + entity table          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Directory Structure
 
 ```
-src/ai/backend/manager/api/rbac/
-├── entity_name_resolver/
+src/ai/backend/manager/repositories/permission_controller/
+├── entity_querier/
 │   ├── __init__.py          # Public exports
-│   ├── abc.py               # EntityNameResolver ABC
-│   ├── base.py              # TableBasedEntityNameResolver
-│   ├── registry.py          # EntityNameResolverRegistry
-│   └── resolvers.py         # Individual resolver implementations
-├── entity_adapter.py
-├── handler.py
+│   ├── abc.py               # EntityQuerier ABC
+│   ├── base.py              # TableBasedEntityQuerier
+│   ├── registry.py          # EntityQuerierRegistry
+│   └── queriers/
+│       ├── __init__.py
+│       ├── user.py          # UserEntityQuerier
+│       ├── project.py       # ProjectEntityQuerier
+│       ├── domain.py        # DomainEntityQuerier
+│       ├── vfolder.py       # VFolderEntityQuerier
+│       └── ...
+├── db_source/
+│   └── db_source.py
+├── repository.py
 └── ...
 ```
 
@@ -114,37 +125,52 @@ src/ai/backend/manager/api/rbac/
 
 ```python
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
+from ai.backend.manager.repositories.base import BatchQuerier
 
 
-class EntityNameResolver(ABC):
-    """Abstract interface for entity name resolution."""
+class EntityQuerier(ABC):
+    """
+    Abstract interface for querying entities within a scope.
+
+    Each entity type must implement this interface to provide
+    entity-specific query logic that joins association_scopes_entities
+    with the appropriate entity table.
+    """
 
     @classmethod
     @abstractmethod
     def entity_type(cls) -> EntityType:
-        """Returns the entity type this resolver handles."""
+        """Returns the entity type this querier handles."""
         ...
 
     @abstractmethod
-    async def resolve_names(
+    async def search_in_scope(
         self,
         db_sess: AsyncSession,
-        entity_ids: Sequence[str],
-    ) -> Mapping[str, str]:
+        scope_type: ScopeType,
+        scope_id: str,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
         """
-        Batch resolve entity names for given IDs.
+        Search entities within a scope.
+
+        Queries the association_scopes_entities table joined with
+        the entity-specific table to return entity data including names.
 
         Args:
             db_sess: Database session
-            entity_ids: List of entity IDs to resolve
+            scope_type: The scope type to search within
+            scope_id: The scope ID to search within
+            querier: BatchQuerier with pagination and filtering
 
         Returns:
-            Mapping of {entity_id: name}. Missing IDs are not included.
+            EntityListResult with entities including names
         """
         ...
 ```
@@ -152,19 +178,30 @@ class EntityNameResolver(ABC):
 #### Table-Based Default Implementation (`base.py`)
 
 ```python
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any, ClassVar
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
-from .abc import EntityNameResolver
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.executor import execute_batch_querier
+
+from .abc import EntityQuerier
 
 
-class TableBasedEntityNameResolver(EntityNameResolver):
+class TableBasedEntityQuerier(EntityQuerier):
     """
     Default implementation for entities stored in a single table.
+
+    Joins association_scopes_entities with the entity table to fetch
+    entity data including names in a single query.
 
     Most entity types can inherit this class and only specify configuration values.
     """
@@ -184,41 +221,81 @@ class TableBasedEntityNameResolver(EntityNameResolver):
         """
         return entity_id
 
-    async def resolve_names(
+    @classmethod
+    def get_id_column(cls) -> sa.Column:
+        """Get the ID column from the entity table."""
+        return getattr(cls.table_class, cls.id_column)
+
+    @classmethod
+    def get_name_column(cls) -> sa.Column:
+        """Get the name column from the entity table."""
+        return getattr(cls.table_class, cls.name_column)
+
+    async def search_in_scope(
         self,
         db_sess: AsyncSession,
-        entity_ids: Sequence[str],
-    ) -> Mapping[str, str]:
-        if not entity_ids:
-            return {}
+        scope_type: ScopeType,
+        scope_id: str,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        entity_type = self.entity_type()
+        id_col = self.get_id_column()
+        name_col = self.get_name_column()
 
-        table = self.table_class
-        id_col = getattr(table, self.id_column)
-        name_col = getattr(table, self.name_column)
+        # Build query joining association_scopes_entities with entity table
+        query = (
+            sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                name_col.label("entity_name"),
+            )
+            .select_from(AssociationScopesEntitiesRow)
+            .join(
+                self.table_class,
+                sa.cast(AssociationScopesEntitiesRow.entity_id, id_col.type) == id_col,
+            )
+            .where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope_id,
+                    AssociationScopesEntitiesRow.entity_type == entity_type,
+                )
+            )
+        )
 
-        typed_ids = [self.convert_id(eid) for eid in entity_ids]
+        result = await execute_batch_querier(db_sess, query, querier)
 
-        query = sa.select(id_col, name_col).where(id_col.in_(typed_ids))
-        result = await db_sess.execute(query)
+        items = [
+            EntityData(
+                entity_type=entity_type,
+                entity_id=row.entity_id,
+                name=row.entity_name,
+            )
+            for row in result.rows
+        ]
 
-        return {str(row[0]): row[1] for row in result.fetchall()}
+        return EntityListResult(
+            items=items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 ```
 
-#### Individual Resolvers (`resolvers.py`)
+#### Individual Queriers (`queriers/`)
+
+**User Entity Querier (`queriers/user.py`)**
 
 ```python
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.domain.row import DomainRow
 
-from .base import TableBasedEntityNameResolver
+from ..base import TableBasedEntityQuerier
 
 
-class UserNameResolver(TableBasedEntityNameResolver):
-    """User entity name resolver."""
+class UserEntityQuerier(TableBasedEntityQuerier):
+    """Entity querier for USER type."""
 
     table_class = UserRow
     id_column = "uuid"
@@ -231,10 +308,21 @@ class UserNameResolver(TableBasedEntityNameResolver):
     @classmethod
     def convert_id(cls, entity_id: str) -> UUID:
         return UUID(entity_id)
+```
+
+**Project Entity Querier (`queriers/project.py`)**
+
+```python
+from uuid import UUID
+
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.models.group.row import GroupRow
+
+from ..base import TableBasedEntityQuerier
 
 
-class ProjectNameResolver(TableBasedEntityNameResolver):
-    """Project (Group) entity name resolver."""
+class ProjectEntityQuerier(TableBasedEntityQuerier):
+    """Entity querier for PROJECT type."""
 
     table_class = GroupRow
     id_column = "id"
@@ -247,10 +335,19 @@ class ProjectNameResolver(TableBasedEntityNameResolver):
     @classmethod
     def convert_id(cls, entity_id: str) -> UUID:
         return UUID(entity_id)
+```
+
+**Domain Entity Querier (`queriers/domain.py`)**
+
+```python
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.models.domain.row import DomainRow
+
+from ..base import TableBasedEntityQuerier
 
 
-class DomainNameResolver(TableBasedEntityNameResolver):
-    """Domain entity name resolver. ID is the name itself."""
+class DomainEntityQuerier(TableBasedEntityQuerier):
+    """Entity querier for DOMAIN type. ID is the name itself."""
 
     table_class = DomainRow
     id_column = "name"
@@ -263,94 +360,224 @@ class DomainNameResolver(TableBasedEntityNameResolver):
     # No convert_id override needed - already a string
 ```
 
+**Custom Querier Example (`queriers/session.py`)**
+
+For entity types requiring custom query logic:
+
+```python
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.executor import execute_batch_querier
+
+from ..abc import EntityQuerier
+
+
+class SessionEntityQuerier(EntityQuerier):
+    """
+    Entity querier for SESSION type.
+
+    Custom implementation because session name can be in multiple columns.
+    """
+
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION
+
+    async def search_in_scope(
+        self,
+        db_sess: AsyncSession,
+        scope_type: ScopeType,
+        scope_id: str,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        # Use COALESCE to get name from multiple possible columns
+        name_expr = sa.func.coalesce(
+            SessionRow.name,
+            SessionRow.session_name,
+            sa.cast(SessionRow.id, sa.String),
+        )
+
+        query = (
+            sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                name_expr.label("entity_name"),
+            )
+            .select_from(AssociationScopesEntitiesRow)
+            .join(
+                SessionRow,
+                sa.cast(AssociationScopesEntitiesRow.entity_id, SessionRow.id.type)
+                == SessionRow.id,
+            )
+            .where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope_id,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.SESSION,
+                )
+            )
+        )
+
+        result = await execute_batch_querier(db_sess, query, querier)
+
+        items = [
+            EntityData(
+                entity_type=EntityType.SESSION,
+                entity_id=row.entity_id,
+                name=row.entity_name,
+            )
+            for row in result.rows
+        ]
+
+        return EntityListResult(
+            items=items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+```
+
 #### Registry (`registry.py`)
 
 ```python
-from collections.abc import Mapping, Sequence
 from typing import Optional
 
 from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.data.permission.entity import EntityData
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from .abc import EntityNameResolver
+from .abc import EntityQuerier
 
 
-class EntityNameResolverRegistry:
+class EntityQuerierRegistry:
     """
-    Manages entity type resolvers and performs batch name resolution.
+    Registry for entity queriers.
+
+    Manages queriers for different entity types and provides
+    lookup functionality.
     """
+
+    def __init__(self) -> None:
+        self._queriers: dict[EntityType, EntityQuerier] = {}
+
+    def register(self, querier: EntityQuerier) -> None:
+        """Register a querier for an entity type."""
+        self._queriers[querier.entity_type()] = querier
+
+    def get(self, entity_type: EntityType) -> Optional[EntityQuerier]:
+        """Get querier for a specific entity type."""
+        return self._queriers.get(entity_type)
+
+    def has(self, entity_type: EntityType) -> bool:
+        """Check if a querier is registered for the entity type."""
+        return entity_type in self._queriers
+
+
+def create_entity_querier_registry() -> EntityQuerierRegistry:
+    """Create a pre-configured registry with all queriers."""
+    from .queriers.domain import DomainEntityQuerier
+    from .queriers.project import ProjectEntityQuerier
+    from .queriers.session import SessionEntityQuerier
+    from .queriers.user import UserEntityQuerier
+    from .queriers.vfolder import VFolderEntityQuerier
+    # ... other queriers
+
+    registry = EntityQuerierRegistry()
+
+    registry.register(UserEntityQuerier())
+    registry.register(ProjectEntityQuerier())
+    registry.register(DomainEntityQuerier())
+    registry.register(VFolderEntityQuerier())
+    registry.register(SessionEntityQuerier())
+    # ... register other queriers
+
+    return registry
+```
+
+### Data Layer Update
+
+#### Updated EntityData (`entity.py`)
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+from .types import EntityType
+
+
+@dataclass(frozen=True)
+class EntityData:
+    """Information about an entity within a scope."""
+
+    entity_type: EntityType
+    entity_id: str
+    name: Optional[str] = None
+```
+
+### Repository Integration
+
+#### Updated Repository (`repository.py`)
+
+```python
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.entity import EntityListResult
+from ai.backend.manager.repositories.base import BatchQuerier
+
+from .entity_querier.registry import (
+    EntityQuerierRegistry,
+    create_entity_querier_registry,
+)
+
+
+class PermissionControllerRepository:
+    _db_source: PermissionDBSource
+    _entity_querier_registry: EntityQuerierRegistry
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._resolvers: dict[EntityType, EntityNameResolver] = {}
+        self._db_source = PermissionDBSource(db)
+        self._entity_querier_registry = create_entity_querier_registry()
 
-    def register(self, resolver: EntityNameResolver) -> None:
-        """Register a resolver."""
-        self._resolvers[resolver.entity_type()] = resolver
-
-    def get(self, entity_type: EntityType) -> Optional[EntityNameResolver]:
-        """Get resolver for a specific entity type."""
-        return self._resolvers.get(entity_type)
-
-    async def resolve_names(
+    @permission_controller_repository_resilience.apply()
+    async def search_entities(
         self,
-        entities: Sequence[EntityData],
-    ) -> Mapping[tuple[EntityType, str], str]:
-        """
-        Batch resolve names for mixed entity types.
+        scope_type: ScopeType,
+        scope_id: str,
+        entity_type: EntityType,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope with names.
+
+        Uses the appropriate EntityQuerier for the entity type to
+        query the association_scopes_entities table joined with
+        the entity-specific table.
 
         Args:
-            entities: List of EntityData (mixed types allowed)
+            scope_type: The scope type to search within.
+            scope_id: The scope ID to search within.
+            entity_type: The type of entity to search.
+            querier: BatchQuerier with pagination settings.
 
         Returns:
-            Mapping of {(entity_type, entity_id): name}
+            EntityListResult with matching entities including names.
         """
-        if not entities:
-            return {}
+        entity_querier = self._entity_querier_registry.get(entity_type)
 
-        # Group by entity type
-        by_type: dict[EntityType, list[str]] = {}
-        for entity in entities:
-            by_type.setdefault(entity.entity_type, []).append(entity.entity_id)
+        if entity_querier is None:
+            # Fallback: return without names if no querier registered
+            return await self._db_source.search_entities_in_scope(
+                scope_type, scope_id, entity_type, querier
+            )
 
-        result: dict[tuple[EntityType, str], str] = {}
-
-        # Process all types in a single session for efficiency
         async with self._db.begin_readonly_session() as db_sess:
-            for entity_type, entity_ids in by_type.items():
-                resolver = self._resolvers.get(entity_type)
-                if resolver is None:
-                    continue
-
-                names = await resolver.resolve_names(db_sess, entity_ids)
-                for entity_id, name in names.items():
-                    result[(entity_type, entity_id)] = name
-
-        return result
-
-
-def create_entity_name_resolver_registry(
-    db: ExtendedAsyncSAEngine,
-) -> EntityNameResolverRegistry:
-    """Create a pre-configured registry with all resolvers."""
-    from .resolvers import (
-        DomainNameResolver,
-        ProjectNameResolver,
-        UserNameResolver,
-        VFolderNameResolver,
-        # ... other resolvers
-    )
-
-    registry = EntityNameResolverRegistry(db)
-
-    registry.register(UserNameResolver())
-    registry.register(ProjectNameResolver())
-    registry.register(DomainNameResolver())
-    registry.register(VFolderNameResolver())
-    # ... register other resolvers
-
-    return registry
+            return await entity_querier.search_in_scope(
+                db_sess, scope_type, scope_id, querier
+            )
 ```
 
 ### Updated Response DTO
@@ -361,38 +588,33 @@ class EntityDTO(BaseModel):
 
     entity_type: EntityType = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
-    name: Optional[str] = Field(default=None, description="Entity name")  # Added
+    name: Optional[str] = Field(default=None, description="Entity name")
 ```
 
-### Handler Integration
+### Handler (Unchanged)
+
+The handler remains thin, only responsible for input validation and DTO conversion:
 
 ```python
 class RBACAPIHandler:
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        # ... existing code
-        self._entity_name_registry = create_entity_name_resolver_registry(db)
-
     async def search_entities(self, ...):
-        # 1. Existing: Query entity IDs
+        # Input validation and action building
+        action = SearchEntitiesAction(...)
+
+        # Call service (which calls repository)
         action_result = await processors.permission_controller.search_entities.wait_for_complete(action)
 
-        # 2. New: Batch resolve names
-        name_map = await self._entity_name_registry.resolve_names(action_result.items)
-
-        # 3. Build response with names
+        # Convert to DTO (name is already included from repository)
         entities = [
             EntityDTO(
                 entity_type=item.entity_type,
                 entity_id=item.entity_id,
-                name=name_map.get((item.entity_type, item.entity_id)),
+                name=item.name,
             )
             for item in action_result.items
         ]
 
-        resp = SearchEntitiesResponse(
-            entities=entities,
-            pagination=PaginationInfo(...),
-        )
+        resp = SearchEntitiesResponse(entities=entities, pagination=...)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 ```
 
@@ -421,7 +643,9 @@ class RBACAPIHandler:
 ### Backward Compatibility
 
 - **API Response**: The `name` field is added as optional (`Optional[str]`). Clients that don't use this field will not be affected.
-- **Existing Layers**: DBSource, Repository, and Service layers remain unchanged.
+- **Handler Layer**: No changes required.
+- **Service Layer**: No changes required (passes through enriched data).
+- **Fallback**: If no querier is registered for an entity type, falls back to existing behavior (no name).
 
 ### Breaking Changes
 
@@ -429,57 +653,85 @@ None. This is a purely additive change.
 
 ### Migration Steps
 
-1. Add `entity_name_resolver/` module with all components
-2. Add optional `name` field to `EntityDTO`
-3. Integrate registry into handler
-4. No database migration required
+1. Add `entity_querier/` module under `repositories/permission_controller/`
+2. Add optional `name` field to `EntityData`
+3. Add optional `name` field to `EntityDTO`
+4. Update repository to use `EntityQuerierRegistry`
+5. No database migration required
 
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
 
-1. Create `abc.py` with `EntityNameResolver` abstract class
-2. Create `base.py` with `TableBasedEntityNameResolver`
-3. Create `registry.py` with `EntityNameResolverRegistry`
+1. Create `abc.py` with `EntityQuerier` abstract class
+2. Create `base.py` with `TableBasedEntityQuerier`
+3. Create `registry.py` with `EntityQuerierRegistry`
 
-### Phase 2: Resolver Implementations
+### Phase 2: Querier Implementations
 
-1. Implement resolvers for primary entity types:
-   - `UserNameResolver`
-   - `ProjectNameResolver`
-   - `DomainNameResolver`
-   - `VFolderNameResolver`
-2. Implement resolvers for remaining entity types as needed
+1. Implement queriers for primary entity types:
+   - `UserEntityQuerier`
+   - `ProjectEntityQuerier`
+   - `DomainEntityQuerier`
+   - `VFolderEntityQuerier`
+2. Implement custom queriers for complex entity types:
+   - `SessionEntityQuerier` (multiple name columns)
+3. Implement queriers for remaining entity types as needed
 
-### Phase 3: API Integration
+### Phase 3: Integration
 
-1. Update `EntityDTO` to include optional `name` field
-2. Integrate `EntityNameResolverRegistry` into `RBACAPIHandler`
-3. Update `search_entities` handler to resolve and include names
+1. Update `EntityData` to include optional `name` field
+2. Update `EntityDTO` to include optional `name` field
+3. Integrate `EntityQuerierRegistry` into `PermissionControllerRepository`
+4. Update `search_entities` method to use queriers
 
 ### Phase 4: Testing
 
-1. Unit tests for each resolver
-2. Unit tests for registry batch resolution
-3. Integration tests for API endpoint
+1. Unit tests for each querier
+2. Unit tests for registry
+3. Integration tests for repository method
+4. Integration tests for API endpoint
 
 ## Design Benefits
 
 | Aspect | Benefit |
 |--------|---------|
-| **Extensibility** | New entity type = new resolver class + registry registration |
-| **Simplicity** | Most resolvers inherit `TableBasedEntityNameResolver` with minimal config |
-| **Flexibility** | Complex cases can implement `EntityNameResolver` directly |
-| **Efficiency** | Single DB session for all entity types in batch |
-| **Testability** | Each resolver can be unit tested independently |
-| **Separation** | Existing layers (Service/Repository/DBSource) unchanged |
-| **Resilience** | Name resolution failure still returns entity_id |
+| **Single Query** | JOIN in single query instead of separate queries |
+| **Layer Separation** | Handler stays thin; Repository handles all data access |
+| **Extensibility** | New entity type = new querier class + registry registration |
+| **Simplicity** | Most queriers inherit `TableBasedEntityQuerier` with minimal config |
+| **Flexibility** | Complex cases can implement `EntityQuerier` directly |
+| **Fallback** | Unregistered entity types gracefully fall back to ID-only response |
+| **Testability** | Each querier can be unit tested independently |
+
+## Future Extensions
+
+The `EntityQuerier` abstraction can be extended to support:
+
+1. **Name-based filtering**: Add filter parameter to `search_in_scope`
+   ```python
+   async def search_in_scope(
+       self, db_sess, scope_type, scope_id, querier,
+       name_filter: Optional[str] = None,  # Future
+   ) -> EntityListResult:
+   ```
+
+2. **Additional entity fields**: Return more than just name
+   ```python
+   @dataclass
+   class EntityData:
+       entity_type: EntityType
+       entity_id: str
+       name: Optional[str] = None
+       description: Optional[str] = None  # Future
+       metadata: Optional[dict] = None    # Future
+   ```
 
 ## Open Questions
 
-1. **Caching**: Should we implement caching for frequently accessed entity names?
-2. **Parallel Execution**: Should we use `asyncio.gather` to parallelize queries for different entity types?
-3. **Lazy Loading**: Should name resolution be optional via query parameter (e.g., `?include_names=true`)?
+1. **Caching**: Should we implement caching for frequently accessed entities?
+2. **Parallel Execution**: For mixed entity type queries, should we parallelize?
+3. **Soft-deleted entities**: Should queriers filter out soft-deleted entities?
 
 ## References
 
