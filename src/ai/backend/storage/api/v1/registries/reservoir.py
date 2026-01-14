@@ -54,7 +54,7 @@ class ReservoirRegistryAPIHandler:
 
         # Convert string mappings to StorageTarget instances
         storage_step_mappings = {
-            step: StorageTarget(storage_name)
+            step: StorageTarget.from_storage_name(storage_name)
             for step, storage_name in body.parsed.storage_step_mappings.items()
         }
 
