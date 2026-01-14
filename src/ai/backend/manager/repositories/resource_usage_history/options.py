@@ -1,0 +1,192 @@
+"""Query conditions and orders for Resource Usage History repository."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime
+
+import sqlalchemy as sa
+
+from ai.backend.manager.models.resource_usage_history import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
+
+
+class KernelUsageRecordConditions:
+    """Query conditions for KernelUsageRecordRow."""
+
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelUsageRecordRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_kernel_id(kernel_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelUsageRecordRow.kernel_id == kernel_id
+
+        return inner
+
+    @staticmethod
+    def by_session_id(session_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelUsageRecordRow.session_id == session_id
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelUsageRecordRow.user_uuid == user_uuid
+
+        return inner
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelUsageRecordRow.project_id == project_id
+
+        return inner
+
+    @staticmethod
+    def by_period_range(start: datetime, end: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                KernelUsageRecordRow.period_start >= start,
+                KernelUsageRecordRow.period_end <= end,
+            )
+
+        return inner
+
+
+class KernelUsageRecordOrders:
+    """Query orders for KernelUsageRecordRow."""
+
+    @staticmethod
+    def by_period_start(ascending: bool = True) -> QueryOrder:
+        col = KernelUsageRecordRow.period_start
+        return col.asc() if ascending else col.desc()
+
+
+class DomainUsageBucketConditions:
+    """Query conditions for DomainUsageBucketRow."""
+
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_domain_name(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_period_range(start: date, end: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                DomainUsageBucketRow.period_start >= start,
+                DomainUsageBucketRow.period_start <= end,
+            )
+
+        return inner
+
+
+class DomainUsageBucketOrders:
+    """Query orders for DomainUsageBucketRow."""
+
+    @staticmethod
+    def by_period_start(ascending: bool = True) -> QueryOrder:
+        col = DomainUsageBucketRow.period_start
+        return col.asc() if ascending else col.desc()
+
+
+class ProjectUsageBucketConditions:
+    """Query conditions for ProjectUsageBucketRow."""
+
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.project_id == project_id
+
+        return inner
+
+    @staticmethod
+    def by_period_range(start: date, end: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                ProjectUsageBucketRow.period_start >= start,
+                ProjectUsageBucketRow.period_start <= end,
+            )
+
+        return inner
+
+
+class ProjectUsageBucketOrders:
+    """Query orders for ProjectUsageBucketRow."""
+
+    @staticmethod
+    def by_period_start(ascending: bool = True) -> QueryOrder:
+        col = ProjectUsageBucketRow.period_start
+        return col.asc() if ascending else col.desc()
+
+
+class UserUsageBucketConditions:
+    """Query conditions for UserUsageBucketRow."""
+
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.user_uuid == user_uuid
+
+        return inner
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.project_id == project_id
+
+        return inner
+
+    @staticmethod
+    def by_period_range(start: date, end: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                UserUsageBucketRow.period_start >= start,
+                UserUsageBucketRow.period_start <= end,
+            )
+
+        return inner
+
+
+class UserUsageBucketOrders:
+    """Query orders for UserUsageBucketRow."""
+
+    @staticmethod
+    def by_period_start(ascending: bool = True) -> QueryOrder:
+        col = UserUsageBucketRow.period_start
+        return col.asc() if ascending else col.desc()
