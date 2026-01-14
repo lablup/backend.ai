@@ -38,6 +38,7 @@ from ai.backend.manager.errors.storage import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -67,11 +68,15 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.permission_controller.creators import (
-    AssociationScopesEntitiesCreatorSpec,
+from ai.backend.manager.repositories.base.rbac.granter import (
+    RBACGranter,
+    execute_rbac_granter,
 )
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.rbac.revoker import (
+    RBACRevoker,
+    execute_rbac_revoker,
+)
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 
 vfolder_repository_resilience = Resilience(
@@ -91,11 +96,9 @@ vfolder_repository_resilience = Resilience(
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
-    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._role_manager = RoleManager()
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
@@ -296,6 +299,9 @@ class VfolderRepository:
 
             # Create owner permission if requested (legacy compatibility)
             if create_owner_permission and params.user:
+                # Get user's role_id
+                user_role_id = await self._get_user_role_id(session, params.user)
+
                 # Insert VFolderPermissionRow for legacy compatibility
                 permission_insert = sa.insert(VFolderPermissionRow).values({
                     "user": params.user,
@@ -304,20 +310,17 @@ class VfolderRepository:
                 })
                 await session.execute(permission_insert)
 
-                # Map entity to owner's user scope only if ownership type is GROUP
-                # (for USER ownership, RBACEntityCreator already mapped to user scope)
-                if params.ownership_type == VFolderOwnershipType.GROUP:
-                    owner_scope_creator = Creator(
-                        spec=AssociationScopesEntitiesCreatorSpec(
-                            scope_id=ScopeId(ScopeType.USER, str(params.user)),
-                            object_id=ObjectId(
-                                entity_type=EntityType.VFOLDER,
-                                entity_id=str(params.id),
-                            ),
-                        )
-                    )
+                # Add object permission to user's role using RBACGranter
+                granter = RBACGranter(
+                    granted_entity_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(params.id),
+                    ),
+                    granted_entity_scope_id=ScopeId(scope_type, scope_id),
+                    target_role_ids=[user_role_id],
+                    operations=[OperationType.READ],
                 )
-                await self._role_manager.map_entity_to_scope(session, owner_scope_creator)
+                await execute_rbac_granter(session, granter)
 
             return created_row.to_data()
 
@@ -474,6 +477,17 @@ class VfolderRepository:
         Create a VFolder permission entry.
         """
         async with self._db.begin_session() as session:
+            # Get vfolder to determine its scope
+            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
+            if vfolder_row is None:
+                raise VFolderNotFound()
+            vfolder_data = self._vfolder_row_to_data(vfolder_row)
+            vfolder_scope = self._get_vfolder_scope(vfolder_data)
+
+            # Get user's role_id
+            user_role_id = await self._get_user_role_id(session, user_id)
+
+            # Insert VFolderPermissionRow (legacy compatibility)
             permission_id = uuid.uuid4()
             insert_values = {
                 "id": permission_id,
@@ -481,20 +495,20 @@ class VfolderRepository:
                 "user": user_id,
                 "permission": permission,
             }
-
             query = sa.insert(VFolderPermissionRow).values(insert_values)
             await session.execute(query)
 
-            user_scope_creator = Creator(
-                spec=AssociationScopesEntitiesCreatorSpec(
-                    scope_id=ScopeId(ScopeType.USER, str(user_id)),
-                    object_id=ObjectId(
-                        entity_type=EntityType.VFOLDER,
-                        entity_id=str(vfolder_id),
-                    ),
-                )
+            # Grant object permission to user's role using RBACGranter
+            granter = RBACGranter(
+                granted_entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(vfolder_id),
+                ),
+                granted_entity_scope_id=vfolder_scope,
+                target_role_ids=[user_role_id],
+                operations=list(permission.to_rbac_operation()),
             )
-            await self._role_manager.map_entity_to_scope(session, user_scope_creator)
+            await execute_rbac_granter(session, granter)
 
             return VFolderPermissionData(
                 id=permission_id,
@@ -509,19 +523,26 @@ class VfolderRepository:
         Delete a VFolder permission entry.
         """
         async with self._db.begin_session() as session:
+            # Get user's role_id
+            user_role_id = await self._get_user_role_id(session, user_id)
+
+            # Delete VFolderPermissionRow (legacy compatibility)
             query = sa.delete(VFolderPermissionRow).where(
                 (VFolderPermissionRow.vfolder == vfolder_id)
                 & (VFolderPermissionRow.user == user_id)
             )
             await session.execute(query)
-            await self._role_manager.unmap_entity_from_scope(
-                session,
+
+            # Revoke object permission from user's role using RBACRevoker
+            revoker = RBACRevoker(
                 entity_id=ObjectId(
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+                target_role_ids=[user_role_id],
+                operations=None,  # Revoke all operations
             )
+            await execute_rbac_revoker(session, revoker)
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_invitations_by_vfolder(
@@ -729,6 +750,28 @@ class VfolderRepository:
         query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
         result = await session.execute(query)
         return result.scalar()
+
+    async def _get_user_role_id(self, session: SASession, user_id: uuid.UUID) -> uuid.UUID:
+        """
+        Get the role_id associated with a user.
+
+        Looks up the PermissionGroupRow where scope_id matches the user_id string.
+        Raises ObjectNotFound if the user's role is not found.
+        """
+        stmt = sa.select(PermissionGroupRow.role_id).where(
+            PermissionGroupRow.scope_id == str(user_id)
+        )
+        result = await session.scalar(stmt)
+        if result is None:
+            raise ObjectNotFound(object_name="user role", object_id=str(user_id))
+        return result
+
+    def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
+        """Determine scope from vfolder ownership."""
+        if vfolder.ownership_type == VFolderOwnershipType.USER:
+            return ScopeId(ScopeType.USER, str(vfolder.user))
+        # GROUP ownership
+        return ScopeId(ScopeType.PROJECT, str(vfolder.group))
 
     async def _validate_vfolder_ownership(
         self, session: SASession, vfolder_id: uuid.UUID, user_id: uuid.UUID
