@@ -28,25 +28,28 @@ The current notification system consists of two main flows: **Channel/Rule Manag
 │                           Client (WebUI / CLI)                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
-            ┌─────────────────────────┼─────────────────────────┐
-            │                         │                         │
-            ▼                         ▼                         ▼
-    GraphQL Mutation           GraphQL Query              CLI Command
-    (create/update/delete)     (list/get)            (notification channel/rule)
-            │                         │                         │
-            └─────────────────────────┼─────────────────────────┘
+            ┌──────────────────┬──────────────────┬──────────────────┐
+            │                  │                  │                  │
+            ▼                  ▼                  ▼                  ▼
+     GraphQL Mutation    GraphQL Query        REST API          CLI Command
+    (create/update/      (list/get)      (/notifications/*)   (via Client SDK)
+         delete)
+            │                  │                  │                  │
+            └──────────────────┴──────────────────┴──────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Manager                                        │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  GraphQL API Layer (src/ai/backend/manager/api/gql/notification/)     │  │
-│  │    - NotificationChannel, NotificationRule types                      │  │
-│  │    - Query/Mutation resolvers                                         │  │
-│  │    - Config types: WebhookConfigGQL (only)                            │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                      │
-│                                      ▼                                      │
+│  ┌────────────────────────────────┐  ┌────────────────────────────────┐     │
+│  │  GraphQL API Layer             │  │  REST API Layer                │     │
+│  │  (api/gql/notification/)       │  │  (api/notification/)           │     │
+│  │    - Channel, Rule types       │  │    - /notifications/* routes   │     │
+│  │    - Query/Mutation resolvers  │  │    - Pydantic DTOs             │     │
+│  └────────────────────────────────┘  └────────────────────────────────┘     │
+│                       │                          │                          │
+│                       └────────────┬─────────────┘                          │
+│                                    │                                        │
+│                                    ▼                                        │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │  Service Layer (src/ai/backend/manager/services/notification/)        │  │
 │  │    - Action-Processor pattern                                         │  │
@@ -75,21 +78,21 @@ When a system event occurs (e.g., session started), notifications are dispatched
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        System Event Trigger                                  │
-│                    (Session started/terminated, etc.)                        │
+│                        System Event Trigger                                 │
+│                    (Session started/terminated, etc.)                       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       │ event data
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Manager                                         │
+│                                  Manager                                    │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │  Event Handler                                                        │  │
 │  │    1. Query enabled NotificationRules matching event type             │  │
 │  │    2. For each rule, call NotificationCenter.process_rule()           │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                       │
-│                                      ▼                                       │
+│                                      │                                      │
+│                                      ▼                                      │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │  NotificationCenter (src/ai/backend/manager/notification/)            │  │
 │  │    1. Render message template with Jinja2                             │  │
@@ -119,7 +122,7 @@ When a system event occurs (e.g., session started), notifications are dispatched
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Limitation**: Email notifications cannot be sent directly. Users must configure external services to convert webhook calls to emails.
+**Limitation**: Currently, the means of sending notifications is limited to a single webhook.
 
 ## Proposed Design
 
@@ -173,6 +176,12 @@ Configuration model for email channel
 This is the same as the SMTP Reporter implementation, which is also implemented using `smtplib` and an executor
 
 ```python
+class NotificationChannelConfig:
+    pass
+
+class WebhookConfig(NotificationChannelConfig):
+    url: str
+
 class EmailConfig(NotificationChannelConfig):
     """Email channel configuration."""
     smtp: SMTPConnectionConfig
