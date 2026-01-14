@@ -19,9 +19,9 @@ class DomainFairShareConditions:
     """Query conditions for DomainFairShareRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainFairShareRow.scaling_group == scaling_group
+            return DomainFairShareRow.resource_group == resource_group
 
         return inner
 
@@ -29,13 +29,6 @@ class DomainFairShareConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainFairShareRow.domain_name == domain_name
-
-        return inner
-
-    @staticmethod
-    def by_domain_names(domain_names: Collection[str]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainFairShareRow.domain_name.in_(domain_names)
 
         return inner
 
@@ -99,9 +92,9 @@ class ProjectFairShareConditions:
     """Query conditions for ProjectFairShareRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectFairShareRow.scaling_group == scaling_group
+            return ProjectFairShareRow.resource_group == resource_group
 
         return inner
 
@@ -181,9 +174,9 @@ class UserFairShareConditions:
     """Query conditions for UserFairShareRow."""
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserFairShareRow.scaling_group == scaling_group
+            return UserFairShareRow.resource_group == resource_group
 
         return inner
 

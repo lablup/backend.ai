@@ -49,21 +49,21 @@ __all__ = (
 class GetDomainFairSharePathParam(BaseRequestModel):
     """Path parameters for getting a single domain fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     domain_name: str = Field(description="Domain name")
 
 
 class GetProjectFairSharePathParam(BaseRequestModel):
     """Path parameters for getting a single project fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     project_id: UUID = Field(description="Project ID")
 
 
 class GetUserFairSharePathParam(BaseRequestModel):
     """Path parameters for getting a single user fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     project_id: UUID = Field(description="Project ID")
     user_uuid: UUID = Field(description="User UUID")
 
@@ -74,21 +74,21 @@ class GetUserFairSharePathParam(BaseRequestModel):
 class GetDomainFairShareRequest(BaseRequestModel):
     """Request for getting a single domain fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     domain_name: str = Field(description="Domain name")
 
 
 class GetProjectFairShareRequest(BaseRequestModel):
     """Request for getting a single project fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     project_id: UUID = Field(description="Project ID")
 
 
 class GetUserFairShareRequest(BaseRequestModel):
     """Request for getting a single user fair share."""
 
-    scaling_group: str = Field(description="Scaling group name")
+    resource_group: str = Field(description="Scaling group name")
     project_id: UUID = Field(description="Project ID")
     user_uuid: UUID = Field(description="User UUID")
 

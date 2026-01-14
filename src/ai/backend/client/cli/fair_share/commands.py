@@ -25,12 +25,12 @@ def domain() -> None:
 
 @domain.command("get")
 @pass_ctx_obj
-@click.argument("scaling_group", type=str)
+@click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def domain_get_cmd(
     ctx: CLIContext,
-    scaling_group: str,
+    resource_group: str,
     domain_name: str,
     as_json: bool,
 ) -> None:
@@ -40,7 +40,7 @@ def domain_get_cmd(
 
     with Session() as api_session:
         try:
-            response = api_session.FairShare.get_domain_fair_share(scaling_group, domain_name)
+            response = api_session.FairShare.get_domain_fair_share(resource_group, domain_name)
             if response.item is None:
                 print("No domain fair share found")
                 return
@@ -50,7 +50,7 @@ def domain_get_cmd(
             else:
                 fs = response.item
                 print(f"ID: {fs.id}")
-                print(f"Scaling Group: {fs.scaling_group}")
+                print(f"Resource Group: {fs.resource_group}")
                 print(f"Domain: {fs.domain_name}")
                 print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                 print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
@@ -67,7 +67,7 @@ def domain_get_cmd(
 
 @domain.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
@@ -86,7 +86,7 @@ def domain_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def domain_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     domain_name: Optional[str],
     limit: int,
     offset: int,
@@ -109,9 +109,9 @@ def domain_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or domain_name:
+            if resource_group or domain_name:
                 filter_cond = DomainFairShareFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
                 )
 
@@ -145,7 +145,7 @@ def domain_list_cmd(
                 print()
                 for fs in items:
                     print(f"ID: {fs.id}")
-                    print(f"Scaling Group: {fs.scaling_group}")
+                    print(f"Resource Group: {fs.resource_group}")
                     print(f"Domain: {fs.domain_name}")
                     print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                     print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
@@ -168,12 +168,12 @@ def project() -> None:
 
 @project.command("get")
 @pass_ctx_obj
-@click.argument("scaling_group", type=str)
+@click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def project_get_cmd(
     ctx: CLIContext,
-    scaling_group: str,
+    resource_group: str,
     project_id: str,
     as_json: bool,
 ) -> None:
@@ -183,7 +183,9 @@ def project_get_cmd(
 
     with Session() as api_session:
         try:
-            response = api_session.FairShare.get_project_fair_share(scaling_group, UUID(project_id))
+            response = api_session.FairShare.get_project_fair_share(
+                resource_group, UUID(project_id)
+            )
             if response.item is None:
                 print("No project fair share found")
                 return
@@ -193,7 +195,7 @@ def project_get_cmd(
             else:
                 fs = response.item
                 print(f"ID: {fs.id}")
-                print(f"Scaling Group: {fs.scaling_group}")
+                print(f"Resource Group: {fs.resource_group}")
                 print(f"Project ID: {fs.project_id}")
                 print(f"Domain: {fs.domain_name}")
                 print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
@@ -211,7 +213,7 @@ def project_get_cmd(
 
 @project.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
@@ -231,7 +233,7 @@ def project_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def project_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     project_id: Optional[str],
     domain_name: Optional[str],
     limit: int,
@@ -255,9 +257,9 @@ def project_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or project_id or domain_name:
+            if resource_group or project_id or domain_name:
                 filter_cond = ProjectFairShareFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
                 )
@@ -292,7 +294,7 @@ def project_list_cmd(
                 print()
                 for fs in items:
                     print(f"ID: {fs.id}")
-                    print(f"Scaling Group: {fs.scaling_group}")
+                    print(f"Resource Group: {fs.resource_group}")
                     print(f"Project ID: {fs.project_id}")
                     print(f"Domain: {fs.domain_name}")
                     print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
@@ -316,13 +318,13 @@ def user() -> None:
 
 @user.command("get")
 @pass_ctx_obj
-@click.argument("scaling_group", type=str)
+@click.argument("resource_group", type=str)
 @click.argument("project_id", type=str)
 @click.argument("user_uuid", type=str)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def user_get_cmd(
     ctx: CLIContext,
-    scaling_group: str,
+    resource_group: str,
     project_id: str,
     user_uuid: str,
     as_json: bool,
@@ -334,7 +336,7 @@ def user_get_cmd(
     with Session() as api_session:
         try:
             response = api_session.FairShare.get_user_fair_share(
-                scaling_group, UUID(project_id), UUID(user_uuid)
+                resource_group, UUID(project_id), UUID(user_uuid)
             )
             if response.item is None:
                 print("No user fair share found")
@@ -345,7 +347,7 @@ def user_get_cmd(
             else:
                 fs = response.item
                 print(f"ID: {fs.id}")
-                print(f"Scaling Group: {fs.scaling_group}")
+                print(f"Resource Group: {fs.resource_group}")
                 print(f"User UUID: {fs.user_uuid}")
                 print(f"Project ID: {fs.project_id}")
                 print(f"Domain: {fs.domain_name}")
@@ -364,7 +366,7 @@ def user_get_cmd(
 
 @user.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
@@ -385,7 +387,7 @@ def user_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def user_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     user_uuid: Optional[str],
     project_id: Optional[str],
     domain_name: Optional[str],
@@ -410,9 +412,9 @@ def user_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or user_uuid or project_id or domain_name:
+            if resource_group or user_uuid or project_id or domain_name:
                 filter_cond = UserFairShareFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     user_uuid=UUIDFilter(equals=UUID(user_uuid)) if user_uuid else None,
                     project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
@@ -448,7 +450,7 @@ def user_list_cmd(
                 print()
                 for fs in items:
                     print(f"ID: {fs.id}")
-                    print(f"Scaling Group: {fs.scaling_group}")
+                    print(f"Resource Group: {fs.resource_group}")
                     print(f"User UUID: {fs.user_uuid}")
                     print(f"Project ID: {fs.project_id}")
                     print(f"Domain: {fs.domain_name}")

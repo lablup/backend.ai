@@ -12,10 +12,10 @@ The resource usage history tracks how resources have been consumed over time by 
 
 ### 1. View Domain Usage History
 
-List domain usage buckets in a scaling group:
+List domain usage buckets in a resource group:
 
 ```bash
-./backend.ai resource-usage domain list --scaling-group default
+./backend.ai resource-usage domain list --resource-group default
 ```
 
 ### 2. View Project Usage History
@@ -23,7 +23,7 @@ List domain usage buckets in a scaling group:
 List project usage buckets filtered by domain:
 
 ```bash
-./backend.ai resource-usage project list --scaling-group default --domain-name default
+./backend.ai resource-usage project list --resource-group default --domain-name default
 ```
 
 ### 3. View User Usage History
@@ -31,7 +31,7 @@ List project usage buckets filtered by domain:
 List user usage buckets for a specific project:
 
 ```bash
-./backend.ai resource-usage user list --scaling-group default --project-id <PROJECT_ID>
+./backend.ai resource-usage user list --resource-group default --project-id <PROJECT_ID>
 ```
 
 ## Command Reference
@@ -44,7 +44,7 @@ List user usage buckets for a specific project:
 ./backend.ai resource-usage domain list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --domain-name TEXT     Filter by domain name
   --bucket-date TEXT     Filter by bucket date (YYYY-MM-DD)
   --start-date TEXT      Filter buckets from this date (inclusive)
@@ -58,8 +58,8 @@ Options:
 
 Example:
 ```bash
-# List last 7 days of domain usage for default scaling group
-./backend.ai resource-usage domain list --scaling-group default --limit 7 --order-by bucket_date --order DESC
+# List last 7 days of domain usage for default resource group
+./backend.ai resource-usage domain list --resource-group default --limit 7 --order-by bucket_date --order DESC
 ```
 
 ### Project Usage Commands
@@ -70,7 +70,7 @@ Example:
 ./backend.ai resource-usage project list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --project-id TEXT      Filter by project ID
   --domain-name TEXT     Filter by domain name
   --bucket-date TEXT     Filter by bucket date (YYYY-MM-DD)
@@ -86,7 +86,7 @@ Options:
 Example:
 ```bash
 # List project usage for a specific domain
-./backend.ai resource-usage project list --scaling-group default --domain-name default --limit 30
+./backend.ai resource-usage project list --resource-group default --domain-name default --limit 30
 ```
 
 ### User Usage Commands
@@ -97,7 +97,7 @@ Example:
 ./backend.ai resource-usage user list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --project-id TEXT      Filter by project ID
   --user-uuid TEXT       Filter by user UUID
   --domain-name TEXT     Filter by domain name
@@ -114,7 +114,7 @@ Options:
 Example:
 ```bash
 # List user usage history sorted by date
-./backend.ai resource-usage user list --scaling-group default --order-by bucket_date --order DESC
+./backend.ai resource-usage user list --resource-group default --order-by bucket_date --order DESC
 ```
 
 ## Common Workflows
@@ -123,34 +123,34 @@ Example:
 
 **1. View weekly domain usage:**
 ```bash
-./backend.ai resource-usage domain list --scaling-group default --limit 7 --order-by bucket_date --order DESC
+./backend.ai resource-usage domain list --resource-group default --limit 7 --order-by bucket_date --order DESC
 ```
 
 **2. Compare project usage within a domain:**
 ```bash
-./backend.ai resource-usage project list --scaling-group default --domain-name default --json | jq 'sort_by(.total_usage.mem) | reverse'
+./backend.ai resource-usage project list --resource-group default --domain-name default --json | jq 'sort_by(.total_usage.mem) | reverse'
 ```
 
 ### Investigate High Resource Consumers
 
 **1. Find users with high usage in a project:**
 ```bash
-./backend.ai resource-usage user list --scaling-group default --project-id <PROJECT_ID> --json
+./backend.ai resource-usage user list --resource-group default --project-id <PROJECT_ID> --json
 ```
 
 **2. Track usage pattern over time:**
 ```bash
-./backend.ai resource-usage user list --scaling-group default --user-uuid <USER_UUID> --limit 30 --order-by bucket_date --order ASC
+./backend.ai resource-usage user list --resource-group default --user-uuid <USER_UUID> --limit 30 --order-by bucket_date --order ASC
 ```
 
 ### Export Usage Data for Analysis
 
 ```bash
 # Export domain usage as JSON
-./backend.ai resource-usage domain list --scaling-group default --limit 1000 --json > domain_usage.json
+./backend.ai resource-usage domain list --resource-group default --limit 1000 --json > domain_usage.json
 
 # Export user usage as JSON
-./backend.ai resource-usage user list --scaling-group default --limit 1000 --json > user_usage.json
+./backend.ai resource-usage user list --resource-group default --limit 1000 --json > user_usage.json
 ```
 
 ## Understanding Usage Data
@@ -182,7 +182,7 @@ The decayed usage applies exponential decay to give more weight to recent usage:
 
 ```
 ID: 550e8400-e29b-41d4-a716-446655440000
-Scaling Group: default
+Resource Group: default
 Domain: default
 Bucket Date: 2024-01-15
 Total Usage: {"cpu": "3600.0", "mem": "8589934592"}
@@ -196,7 +196,7 @@ Created: 2024-01-15T00:00:00
 Use `--json` flag for machine-readable output:
 
 ```bash
-./backend.ai resource-usage domain list --scaling-group default --json
+./backend.ai resource-usage domain list --resource-group default --json
 ```
 
 ## Tips
@@ -209,7 +209,7 @@ Use `--json` flag for machine-readable output:
 ## Troubleshooting
 
 **No usage data found:**
-- Usage buckets are created when sessions run in the scaling group
+- Usage buckets are created when sessions run in the resource group
 - Check if sessions have been scheduled recently
 
 **Permission denied:**
@@ -225,4 +225,4 @@ Use `--json` flag for machine-readable output:
 - `./backend.ai fair-share domain list`: View domain fair share factors
 - `./backend.ai fair-share user list`: View user fair share factors
 - `./backend.ai session list`: View current and past sessions
-- `./backend.ai scaling-group list`: List available scaling groups
+- `./backend.ai scaling-group list`: List available resource groups

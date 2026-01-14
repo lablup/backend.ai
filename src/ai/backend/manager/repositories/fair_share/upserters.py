@@ -22,7 +22,7 @@ from ai.backend.manager.types import OptionalState
 class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     """Upserter spec for DomainFairShareRow.
 
-    Unique constraint: (scaling_group, domain_name)
+    Unique constraint: (resource_group, domain_name)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP
@@ -30,7 +30,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     domain_name: str
 
     # Spec (OptionalState - uses Row defaults on INSERT if NOP)
@@ -55,7 +55,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     @override
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
-            "scaling_group": self.scaling_group,
+            "resource_group": self.resource_group,
             "domain_name": self.domain_name,
         }
         # Spec fields
@@ -88,7 +88,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
 class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     """Upserter spec for ProjectFairShareRow.
 
-    Unique constraint: (scaling_group, project_id)
+    Unique constraint: (resource_group, project_id)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP
@@ -96,7 +96,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     project_id: uuid.UUID
     domain_name: str
 
@@ -122,7 +122,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     @override
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
-            "scaling_group": self.scaling_group,
+            "resource_group": self.resource_group,
             "project_id": self.project_id,
             "domain_name": self.domain_name,
         }
@@ -156,7 +156,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     """Upserter spec for UserFairShareRow.
 
-    Unique constraint: (scaling_group, user_uuid, project_id)
+    Unique constraint: (resource_group, user_uuid, project_id)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP
@@ -164,7 +164,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     """
 
     # Identity (required)
-    scaling_group: str
+    resource_group: str
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -191,7 +191,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     @override
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
-            "scaling_group": self.scaling_group,
+            "resource_group": self.resource_group,
             "user_uuid": self.user_uuid,
             "project_id": self.project_id,
             "domain_name": self.domain_name,

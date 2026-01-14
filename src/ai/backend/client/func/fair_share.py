@@ -35,17 +35,17 @@ class FairShare(BaseFunction):
     @classmethod
     async def get_domain_fair_share(
         cls,
-        scaling_group: str,
+        resource_group: str,
         domain_name: str,
     ) -> GetDomainFairShareResponse:
         """
         Get a single domain fair share.
 
-        :param scaling_group: Scaling group name
+        :param resource_group: Resource group name
         :param domain_name: Domain name
         :returns: Domain fair share data
         """
-        rqst = Request("GET", f"/fair-share/domains/{scaling_group}/{domain_name}")
+        rqst = Request("GET", f"/fair-share/domains/{resource_group}/{domain_name}")
         async with rqst.fetch() as resp:
             data = await resp.json()
             return GetDomainFairShareResponse.model_validate(data)
@@ -74,17 +74,17 @@ class FairShare(BaseFunction):
     @classmethod
     async def get_project_fair_share(
         cls,
-        scaling_group: str,
+        resource_group: str,
         project_id: UUID,
     ) -> GetProjectFairShareResponse:
         """
         Get a single project fair share.
 
-        :param scaling_group: Scaling group name
+        :param resource_group: Resource group name
         :param project_id: Project ID
         :returns: Project fair share data
         """
-        rqst = Request("GET", f"/fair-share/projects/{scaling_group}/{project_id}")
+        rqst = Request("GET", f"/fair-share/projects/{resource_group}/{project_id}")
         async with rqst.fetch() as resp:
             data = await resp.json()
             return GetProjectFairShareResponse.model_validate(data)
@@ -113,19 +113,19 @@ class FairShare(BaseFunction):
     @classmethod
     async def get_user_fair_share(
         cls,
-        scaling_group: str,
+        resource_group: str,
         project_id: UUID,
         user_uuid: UUID,
     ) -> GetUserFairShareResponse:
         """
         Get a single user fair share.
 
-        :param scaling_group: Scaling group name
+        :param resource_group: Resource group name
         :param project_id: Project ID
         :param user_uuid: User UUID
         :returns: User fair share data
         """
-        rqst = Request("GET", f"/fair-share/users/{scaling_group}/{project_id}/{user_uuid}")
+        rqst = Request("GET", f"/fair-share/users/{resource_group}/{project_id}/{user_uuid}")
         async with rqst.fetch() as resp:
             data = await resp.json()
             return GetUserFairShareResponse.model_validate(data)

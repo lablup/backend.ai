@@ -25,7 +25,7 @@ def domain() -> None:
 
 @domain.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
@@ -44,7 +44,7 @@ def domain() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def domain_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     domain_name: Optional[str],
     limit: int,
     offset: int,
@@ -67,9 +67,9 @@ def domain_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or domain_name:
+            if resource_group or domain_name:
                 filter_cond = DomainUsageBucketFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
                 )
 
@@ -103,7 +103,7 @@ def domain_list_cmd(
                 print()
                 for b in items:
                     print(f"ID: {b.id}")
-                    print(f"Scaling Group: {b.scaling_group}")
+                    print(f"Resource Group: {b.resource_group}")
                     print(f"Domain: {b.domain_name}")
                     print(f"Period: {b.period_start} ~ {b.period_end}")
                     print(f"Decay Unit: {b.decay_unit_days} days")
@@ -127,7 +127,7 @@ def project() -> None:
 
 @project.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
@@ -147,7 +147,7 @@ def project() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def project_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     project_id: Optional[str],
     domain_name: Optional[str],
     limit: int,
@@ -171,9 +171,9 @@ def project_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or project_id or domain_name:
+            if resource_group or project_id or domain_name:
                 filter_cond = ProjectUsageBucketFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
                 )
@@ -208,7 +208,7 @@ def project_list_cmd(
                 print()
                 for b in items:
                     print(f"ID: {b.id}")
-                    print(f"Scaling Group: {b.scaling_group}")
+                    print(f"Resource Group: {b.resource_group}")
                     print(f"Project ID: {b.project_id}")
                     print(f"Domain: {b.domain_name}")
                     print(f"Period: {b.period_start} ~ {b.period_end}")
@@ -233,7 +233,7 @@ def user() -> None:
 
 @user.command("list")
 @pass_ctx_obj
-@click.option("--scaling-group", type=str, default=None, help="Filter by scaling group")
+@click.option("--resource-group", type=str, default=None, help="Filter by resource group")
 @click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
 @click.option("--project-id", type=str, default=None, help="Filter by project ID")
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
@@ -254,7 +254,7 @@ def user() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def user_list_cmd(
     ctx: CLIContext,
-    scaling_group: Optional[str],
+    resource_group: Optional[str],
     user_uuid: Optional[str],
     project_id: Optional[str],
     domain_name: Optional[str],
@@ -279,9 +279,9 @@ def user_list_cmd(
     with Session() as api_session:
         try:
             filter_cond = None
-            if scaling_group or user_uuid or project_id or domain_name:
+            if resource_group or user_uuid or project_id or domain_name:
                 filter_cond = UserUsageBucketFilter(
-                    scaling_group=StringFilter(equals=scaling_group) if scaling_group else None,
+                    resource_group=StringFilter(equals=resource_group) if resource_group else None,
                     user_uuid=UUIDFilter(equals=UUID(user_uuid)) if user_uuid else None,
                     project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
                     domain_name=StringFilter(equals=domain_name) if domain_name else None,
@@ -317,7 +317,7 @@ def user_list_cmd(
                 print()
                 for b in items:
                     print(f"ID: {b.id}")
-                    print(f"Scaling Group: {b.scaling_group}")
+                    print(f"Resource Group: {b.resource_group}")
                     print(f"User UUID: {b.user_uuid}")
                     print(f"Project ID: {b.project_id}")
                     print(f"Domain: {b.domain_name}")

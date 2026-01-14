@@ -24,7 +24,7 @@ from ai.backend.manager.services.fair_share.actions import GetProjectFairShareAc
 @strawberry.field(description="Added in 26.1.0. Get project fair share data (superadmin only).")
 async def project_fair_share(
     info: Info[StrawberryGQLContext],
-    scaling_group: str,
+    resource_group: str,
     project_id: uuid.UUID,
 ) -> Optional[ProjectFairShareGQL]:
     """Get a single project fair share record."""
@@ -35,7 +35,7 @@ async def project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             project_id=project_id,
         )
     )

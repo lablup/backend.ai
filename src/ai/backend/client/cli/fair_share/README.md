@@ -15,10 +15,10 @@ The fair share scheduler ensures equitable resource allocation across users, pro
 
 ### 1. View Domain Fair Shares
 
-List all domain fair shares in a scaling group:
+List all domain fair shares in a resource group:
 
 ```bash
-./backend.ai fair-share domain list --scaling-group default
+./backend.ai fair-share domain list --resource-group default
 ```
 
 ### 2. View Project Fair Shares
@@ -26,7 +26,7 @@ List all domain fair shares in a scaling group:
 List project fair shares filtered by domain:
 
 ```bash
-./backend.ai fair-share project list --scaling-group default --domain-name default
+./backend.ai fair-share project list --resource-group default --domain-name default
 ```
 
 ### 3. View User Fair Shares
@@ -34,7 +34,7 @@ List project fair shares filtered by domain:
 List user fair shares for a specific project:
 
 ```bash
-./backend.ai fair-share user list --scaling-group default --project-id <PROJECT_ID>
+./backend.ai fair-share user list --resource-group default --project-id <PROJECT_ID>
 ```
 
 ## Command Reference
@@ -47,7 +47,7 @@ List user fair shares for a specific project:
 ./backend.ai fair-share domain list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --domain-name TEXT     Filter by domain name
   --limit INTEGER        Number of results (default: 20)
   --offset INTEGER       Starting offset for pagination
@@ -59,13 +59,13 @@ Options:
 Example:
 ```bash
 # List domain fair shares sorted by fair share factor
-./backend.ai fair-share domain list --scaling-group default --order-by fair_share_factor --order ASC
+./backend.ai fair-share domain list --resource-group default --order-by fair_share_factor --order ASC
 ```
 
 #### Get Domain Fair Share Details
 
 ```bash
-./backend.ai fair-share domain get <SCALING_GROUP> <DOMAIN_NAME>
+./backend.ai fair-share domain get <RESOURCE_GROUP> <DOMAIN_NAME>
 ```
 
 Example:
@@ -81,7 +81,7 @@ Example:
 ./backend.ai fair-share project list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --project-id TEXT      Filter by project ID
   --domain-name TEXT     Filter by domain name
   --limit INTEGER        Number of results (default: 20)
@@ -94,13 +94,13 @@ Options:
 Example:
 ```bash
 # List all project fair shares for a specific domain
-./backend.ai fair-share project list --scaling-group default --domain-name default
+./backend.ai fair-share project list --resource-group default --domain-name default
 ```
 
 #### Get Project Fair Share Details
 
 ```bash
-./backend.ai fair-share project get <SCALING_GROUP> <PROJECT_ID>
+./backend.ai fair-share project get <RESOURCE_GROUP> <PROJECT_ID>
 ```
 
 Example:
@@ -116,7 +116,7 @@ Example:
 ./backend.ai fair-share user list [OPTIONS]
 
 Options:
-  --scaling-group TEXT   Filter by scaling group name
+  --resource-group TEXT   Filter by resource group name
   --project-id TEXT      Filter by project ID
   --user-uuid TEXT       Filter by user UUID
   --domain-name TEXT     Filter by domain name
@@ -130,13 +130,13 @@ Options:
 Example:
 ```bash
 # List users with lowest fair share factors (highest priority)
-./backend.ai fair-share user list --scaling-group default --order-by fair_share_factor --order ASC
+./backend.ai fair-share user list --resource-group default --order-by fair_share_factor --order ASC
 ```
 
 #### Get User Fair Share Details
 
 ```bash
-./backend.ai fair-share user get <SCALING_GROUP> <PROJECT_ID> <USER_UUID>
+./backend.ai fair-share user get <RESOURCE_GROUP> <PROJECT_ID> <USER_UUID>
 ```
 
 Example:
@@ -157,36 +157,36 @@ When a user reports their sessions are waiting longer than expected:
 
 **2. Compare with other users in the same project:**
 ```bash
-./backend.ai fair-share user list --scaling-group default --project-id <PROJECT_ID> --order-by fair_share_factor --order ASC
+./backend.ai fair-share user list --resource-group default --project-id <PROJECT_ID> --order-by fair_share_factor --order ASC
 ```
 
 ### Monitor Domain Resource Distribution
 
 **1. List all domain fair shares:**
 ```bash
-./backend.ai fair-share domain list --scaling-group default --json | jq '.'
+./backend.ai fair-share domain list --resource-group default --json | jq '.'
 ```
 
 **2. Identify high-usage domains:**
 ```bash
-./backend.ai fair-share domain list --scaling-group default --order-by fair_share_factor --order DESC
+./backend.ai fair-share domain list --resource-group default --order-by fair_share_factor --order DESC
 ```
 
 ### Compare Fair Share Across Projects
 
 ```bash
 # Get all projects' fair share factors in descending order
-./backend.ai fair-share project list --scaling-group default --order-by fair_share_factor --order DESC --json
+./backend.ai fair-share project list --resource-group default --order-by fair_share_factor --order DESC --json
 ```
 
 ### Export Fair Share Data for Analysis
 
 ```bash
 # Export domain fair shares as JSON
-./backend.ai fair-share domain list --scaling-group default --limit 1000 --json > domain_fair_shares.json
+./backend.ai fair-share domain list --resource-group default --limit 1000 --json > domain_fair_shares.json
 
 # Export user fair shares as JSON
-./backend.ai fair-share user list --scaling-group default --limit 1000 --json > user_fair_shares.json
+./backend.ai fair-share user list --resource-group default --limit 1000 --json > user_fair_shares.json
 ```
 
 ## Understanding Fair Share Data
@@ -211,7 +211,7 @@ Each fair share record includes a calculation snapshot with:
 
 ```
 ID: 550e8400-e29b-41d4-a716-446655440000
-Scaling Group: default
+Resource Group: default
 Domain: default
 Fair Share Factor: 0.234567
 Normalized Usage: 0.234567
@@ -224,32 +224,32 @@ Created: 2024-01-15T10:30:00
 Use `--json` flag for machine-readable output:
 
 ```bash
-./backend.ai fair-share domain list --scaling-group default --json
+./backend.ai fair-share domain list --resource-group default --json
 ```
 
 ## Tips
 
 1. **Start with domain level**: Domain fair shares give a high-level view of resource distribution
 2. **Use JSON for automation**: The `--json` flag provides structured output for scripts
-3. **Filter by scaling group**: Always specify `--scaling-group` to view data for the correct resource pool
+3. **Filter by resource group**: Always specify `--resource-group` to view data for the correct resource pool
 4. **Sort by fair share factor**: Use `--order-by fair_share_factor --order ASC` to find highest priority entities
 
 ## Troubleshooting
 
 **No fair share data found:**
-- The fair share scheduler may not have run yet for this scaling group
-- No sessions have been scheduled in this scaling group
+- The fair share scheduler may not have run yet for this resource group
+- No sessions have been scheduled in this resource group
 
 **Permission denied:**
 - Fair share commands require superadmin privileges
 - Verify your user account has superadmin role
 
 **Unexpected fair share values:**
-- Fair share factors are relative to other entities in the same scaling group
+- Fair share factors are relative to other entities in the same resource group
 - High usage by one entity affects all other entities' relative factors
 
 ## Related Commands
 
 - `./backend.ai resource-usage domain list`: View resource usage history
 - `./backend.ai session list`: View current and past sessions
-- `./backend.ai scaling-group list`: List available scaling groups
+- `./backend.ai scaling-group list`: List available resource groups

@@ -42,7 +42,7 @@ class FairShareService:
     ) -> GetDomainFairShareActionResult:
         """Get a domain fair share record."""
         result = await self._repository.get_domain_fair_share(
-            scaling_group=action.scaling_group,
+            resource_group=action.resource_group,
             domain_name=action.domain_name,
         )
         return GetDomainFairShareActionResult(data=result)
@@ -69,7 +69,7 @@ class FairShareService:
     ) -> GetProjectFairShareActionResult:
         """Get a project fair share record."""
         result = await self._repository.get_project_fair_share(
-            scaling_group=action.scaling_group,
+            resource_group=action.resource_group,
             project_id=action.project_id,
         )
         return GetProjectFairShareActionResult(data=result)
@@ -96,7 +96,7 @@ class FairShareService:
     ) -> GetUserFairShareActionResult:
         """Get a user fair share record."""
         result = await self._repository.get_user_fair_share(
-            scaling_group=action.scaling_group,
+            resource_group=action.resource_group,
             project_id=action.project_id,
             user_uuid=action.user_uuid,
         )

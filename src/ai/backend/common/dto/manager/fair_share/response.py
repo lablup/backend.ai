@@ -97,7 +97,7 @@ class DomainFairShareDTO(BaseResponseModel):
     """
 
     id: UUID = Field(description="Unique identifier for this fair share record")
-    scaling_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
     domain_name: str = Field(description="Name of the domain this fair share is calculated for")
     spec: FairShareSpecDTO = Field(
         description="Fair share specification parameters used for calculation"
@@ -134,7 +134,7 @@ class ProjectFairShareDTO(BaseResponseModel):
     """
 
     id: UUID = Field(description="Unique identifier for this fair share record")
-    scaling_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
     project_id: UUID = Field(description="UUID of the project this fair share is calculated for")
     domain_name: str = Field(description="Name of the domain the project belongs to")
     spec: FairShareSpecDTO = Field(
@@ -173,7 +173,7 @@ class UserFairShareDTO(BaseResponseModel):
     """
 
     id: UUID = Field(description="Unique identifier for this fair share record")
-    scaling_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
     user_uuid: UUID = Field(description="UUID of the user this fair share is calculated for")
     project_id: UUID = Field(description="UUID of the project the user belongs to")
     domain_name: str = Field(description="Name of the domain the user belongs to")
@@ -226,7 +226,7 @@ class DomainUsageBucketDTO(BaseResponseModel):
 
     id: UUID = Field(description="Unique identifier for this usage bucket record")
     domain_name: str = Field(description="Name of the domain this usage bucket belongs to")
-    scaling_group: str = Field(description="Name of the scaling group this usage was recorded in")
+    resource_group: str = Field(description="Name of the scaling group this usage was recorded in")
     metadata: UsageBucketMetadataDTO = Field(
         description="Metadata about the usage measurement period and timestamps"
     )
@@ -259,7 +259,7 @@ class ProjectUsageBucketDTO(BaseResponseModel):
     id: UUID = Field(description="Unique identifier for this usage bucket record")
     project_id: UUID = Field(description="UUID of the project this usage bucket belongs to")
     domain_name: str = Field(description="Name of the domain the project belongs to")
-    scaling_group: str = Field(description="Name of the scaling group this usage was recorded in")
+    resource_group: str = Field(description="Name of the scaling group this usage was recorded in")
     metadata: UsageBucketMetadataDTO = Field(
         description="Metadata about the usage measurement period and timestamps"
     )
@@ -294,7 +294,7 @@ class UserUsageBucketDTO(BaseResponseModel):
     user_uuid: UUID = Field(description="UUID of the user this usage bucket belongs to")
     project_id: UUID = Field(description="UUID of the project the user belongs to")
     domain_name: str = Field(description="Name of the domain the user belongs to")
-    scaling_group: str = Field(description="Name of the scaling group this usage was recorded in")
+    resource_group: str = Field(description="Name of the scaling group this usage was recorded in")
     metadata: UsageBucketMetadataDTO = Field(
         description="Metadata about the usage measurement period and timestamps"
     )

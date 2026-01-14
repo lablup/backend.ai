@@ -45,7 +45,7 @@ class ProjectFairShareGQL(Node):
     """Project-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
-    scaling_group: str = strawberry.field(
+    resource_group: str = strawberry.field(
         description="Name of the scaling group this fair share belongs to."
     )
     project_id: UUID = strawberry.field(
@@ -95,7 +95,7 @@ class ProjectFairShareGQL(Node):
             limit=limit,
             offset=offset,
             base_conditions=[
-                UserFairShareConditions.by_scaling_group(self.scaling_group),
+                UserFairShareConditions.by_resource_group(self.resource_group),
                 UserFairShareConditions.by_project_id(self.project_id),
             ],
         )
@@ -104,7 +104,7 @@ class ProjectFairShareGQL(Node):
     def from_dataclass(cls, data: ProjectFairShareData) -> ProjectFairShareGQL:
         return cls(
             id=ID(str(data.id)),
-            scaling_group=data.scaling_group,
+            resource_group=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
             spec=FairShareSpecGQL(
@@ -160,7 +160,7 @@ class ProjectFairShareConnection(Connection[ProjectFairShareGQL]):
 class ProjectFairShareFilter(GQLFilter):
     """Filter for project fair shares."""
 
-    scaling_group: Optional[StringFilter] = strawberry.field(
+    resource_group: Optional[StringFilter] = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define resource pool boundaries "
@@ -200,16 +200,18 @@ class ProjectFairShareFilter(GQLFilter):
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
-        if self.scaling_group:
-            sg_condition = self.scaling_group.build_query_condition(
-                contains_factory=lambda spec: ProjectFairShareConditions.by_scaling_group(
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: ProjectFairShareConditions.by_resource_group(
                     spec.value
                 ),
-                equals_factory=lambda spec: ProjectFairShareConditions.by_scaling_group(spec.value),
-                starts_with_factory=lambda spec: ProjectFairShareConditions.by_scaling_group(
+                equals_factory=lambda spec: ProjectFairShareConditions.by_resource_group(
                     spec.value
                 ),
-                ends_with_factory=lambda spec: ProjectFairShareConditions.by_scaling_group(
+                starts_with_factory=lambda spec: ProjectFairShareConditions.by_resource_group(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: ProjectFairShareConditions.by_resource_group(
                     spec.value
                 ),
             )
