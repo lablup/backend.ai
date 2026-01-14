@@ -536,16 +536,6 @@ class ImportArtifactsInput:
         default=None,
         description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
-    storage_prefix: Optional[str] = strawberry.field(
-        default=None,
-        description=dedent_strip("""
-        Added in 26.1.0.
-
-        Custom prefix path for storing imported models.
-        If not specified (None), uses the default path.
-        If set to "/", files will be stored at the root.
-        """),
-    )
 
 
 @strawberry.input(description="Added in 25.15.0")

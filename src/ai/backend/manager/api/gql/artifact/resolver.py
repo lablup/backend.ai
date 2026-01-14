@@ -261,13 +261,15 @@ async def import_artifacts(
     imported_artifacts = []
     tasks = []
     vfolder_id = uuid.UUID(input.vfolder_id) if input.vfolder_id else None
+    # When using VFolderStorage (vfolder_id provided), store at root path
+    storage_prefix = "/" if vfolder_id else None
     for revision_id in input.artifact_revision_ids:
         action_result = (
             await info.context.processors.artifact_revision.import_revision.wait_for_complete(
                 ImportArtifactRevisionAction(
                     artifact_revision_id=uuid.UUID(revision_id),
                     vfolder_id=vfolder_id,
-                    storage_prefix=input.storage_prefix,
+                    storage_prefix=storage_prefix,
                 )
             )
         )
