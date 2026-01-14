@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -6,7 +7,10 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+    ArtifactStorageTarget,
+)
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import QuotaConfig
 
@@ -247,6 +251,51 @@ class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
     revision: str = Field(description="The model revision to scan from the registry.")
 
 
+class StorageMappingResolverData(BaseRequestModel):
+    """
+    Storage target configuration for model import.
+
+    Provides two ways to specify storage targets:
+    - storage_step_mappings: Simple string-based storage names (resolved via storage pool)
+    - storage_step_target_mappings: Structured targets (NamedStorageTarget or VFolderStorageTarget)
+
+    Both can be provided; they will be merged with storage_step_target_mappings taking precedence.
+    """
+
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
+        description="""
+        Deprecated.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
+        """,
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
+    )
+
+
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
@@ -269,13 +318,50 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Optional mapping of import steps to specific storage backends.
-        If provided, overrides storage_name for step-wise storage selection.
-        If None, storage_name is used for all steps.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
+    )
+    storage_prefix: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
+        """,
+        examples=["my-models", "custom/path", "/"],
     )
 
 
@@ -328,18 +414,55 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["reservoir", "my-reservoir"],
     )
-    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Optional mapping of import steps to specific storage backends.
-        If provided, overrides storage_name for step-wise storage selection.
-        If None, storage_name is used for all steps.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
     )
     # Used by storage proxy to fetch verification results from remote reservoir.
     # Must have 1:1 correspondence with the models list.
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
+    )
+    storage_prefix: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
+        """,
+        examples=["my-models", "custom/path", "/"],
     )
 
 

@@ -125,7 +125,7 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
-    async def get_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderData]:
+    async def get_by_id(self, vfolder_id: uuid.UUID) -> VFolderData:
         """
         Get a VFolder by ID without validation.
         Returns VFolderData if found, None otherwise.
@@ -133,7 +133,7 @@ class VfolderRepository:
         async with self._db.begin_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
-                return None
+                raise VFolderNotFound()
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()

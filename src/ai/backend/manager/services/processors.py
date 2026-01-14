@@ -334,6 +334,7 @@ class Services:
             storage_namespace_repository=repositories.storage_namespace.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
+            vfolder_repository=repositories.vfolder.repository,
             config_provider=args.config_provider,
             valkey_artifact_client=args.valkey_artifact_client,
             background_task_manager=args.background_task_manager,
