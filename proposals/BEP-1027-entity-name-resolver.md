@@ -125,8 +125,8 @@ src/ai/backend/manager/repositories/permission_controller/
 
 ```python
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
@@ -149,6 +149,18 @@ class EntityQuerier(ABC):
         """Returns the entity type this querier handles."""
         ...
 
+    @classmethod
+    @abstractmethod
+    def id_column(cls) -> sa.Column:
+        """Returns the ID column of the entity table."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def name_column(cls) -> sa.Column:
+        """Returns the name column of the entity table."""
+        ...
+
     @abstractmethod
     async def search_in_scope(
         self,
@@ -162,15 +174,6 @@ class EntityQuerier(ABC):
 
         Queries the association_scopes_entities table joined with
         the entity-specific table to return entity data including names.
-
-        Args:
-            db_sess: Database session
-            scope_type: The scope type to search within
-            scope_id: The scope ID to search within
-            querier: BatchQuerier with pagination and filtering
-
-        Returns:
-            EntityListResult with entities including names
         """
         ...
 ```
@@ -178,14 +181,10 @@ class EntityQuerier(ABC):
 #### Table-Based Default Implementation (`base.py`)
 
 ```python
-from collections.abc import Sequence
-from typing import Any, ClassVar
-
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -203,33 +202,8 @@ class TableBasedEntityQuerier(EntityQuerier):
     Joins association_scopes_entities with the entity table to fetch
     entity data including names in a single query.
 
-    Most entity types can inherit this class and only specify configuration values.
+    Subclasses only need to implement entity_type(), id_column(), and name_column().
     """
-
-    # Configuration to override in subclasses
-    table_class: ClassVar[type[DeclarativeBase]]
-    id_column: ClassVar[str]
-    name_column: ClassVar[str]
-
-    @classmethod
-    def convert_id(cls, entity_id: str) -> Any:
-        """
-        Convert string entity_id to database column type.
-
-        Default: Returns as-is (for string IDs)
-        Override: For UUID or other types
-        """
-        return entity_id
-
-    @classmethod
-    def get_id_column(cls) -> sa.Column:
-        """Get the ID column from the entity table."""
-        return getattr(cls.table_class, cls.id_column)
-
-    @classmethod
-    def get_name_column(cls) -> sa.Column:
-        """Get the name column from the entity table."""
-        return getattr(cls.table_class, cls.name_column)
 
     async def search_in_scope(
         self,
@@ -239,10 +213,12 @@ class TableBasedEntityQuerier(EntityQuerier):
         querier: BatchQuerier,
     ) -> EntityListResult:
         entity_type = self.entity_type()
-        id_col = self.get_id_column()
-        name_col = self.get_name_column()
+        id_col = self.id_column()
+        name_col = self.name_column()
 
-        # Build query joining association_scopes_entities with entity table
+        # Get table class from column's parent mapper
+        table_class = id_col.class_
+
         query = (
             sa.select(
                 AssociationScopesEntitiesRow.entity_id,
@@ -250,7 +226,7 @@ class TableBasedEntityQuerier(EntityQuerier):
             )
             .select_from(AssociationScopesEntitiesRow)
             .join(
-                self.table_class,
+                table_class,
                 sa.cast(AssociationScopesEntitiesRow.entity_id, id_col.type) == id_col,
             )
             .where(
@@ -286,7 +262,7 @@ class TableBasedEntityQuerier(EntityQuerier):
 **User Entity Querier (`queriers/user.py`)**
 
 ```python
-from uuid import UUID
+import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.models.user import UserRow
@@ -297,23 +273,23 @@ from ..base import TableBasedEntityQuerier
 class UserEntityQuerier(TableBasedEntityQuerier):
     """Entity querier for USER type."""
 
-    table_class = UserRow
-    id_column = "uuid"
-    name_column = "username"
-
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.USER
 
     @classmethod
-    def convert_id(cls, entity_id: str) -> UUID:
-        return UUID(entity_id)
+    def id_column(cls) -> sa.Column:
+        return UserRow.uuid
+
+    @classmethod
+    def name_column(cls) -> sa.Column:
+        return UserRow.username
 ```
 
 **Project Entity Querier (`queriers/project.py`)**
 
 ```python
-from uuid import UUID
+import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.models.group.row import GroupRow
@@ -324,22 +300,24 @@ from ..base import TableBasedEntityQuerier
 class ProjectEntityQuerier(TableBasedEntityQuerier):
     """Entity querier for PROJECT type."""
 
-    table_class = GroupRow
-    id_column = "id"
-    name_column = "name"
-
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.PROJECT
 
     @classmethod
-    def convert_id(cls, entity_id: str) -> UUID:
-        return UUID(entity_id)
+    def id_column(cls) -> sa.Column:
+        return GroupRow.id
+
+    @classmethod
+    def name_column(cls) -> sa.Column:
+        return GroupRow.name
 ```
 
 **Domain Entity Querier (`queriers/domain.py`)**
 
 ```python
+import sqlalchemy as sa
+
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.models.domain.row import DomainRow
 
@@ -349,15 +327,17 @@ from ..base import TableBasedEntityQuerier
 class DomainEntityQuerier(TableBasedEntityQuerier):
     """Entity querier for DOMAIN type. ID is the name itself."""
 
-    table_class = DomainRow
-    id_column = "name"
-    name_column = "name"
-
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.DOMAIN
 
-    # No convert_id override needed - already a string
+    @classmethod
+    def id_column(cls) -> sa.Column:
+        return DomainRow.name
+
+    @classmethod
+    def name_column(cls) -> sa.Column:
+        return DomainRow.name
 ```
 
 **Custom Querier Example (`queriers/session.py`)**
@@ -447,57 +427,75 @@ class SessionEntityQuerier(EntityQuerier):
 #### Registry (`registry.py`)
 
 ```python
-from typing import Optional
+from typing import assert_never
 
 from ai.backend.common.data.permission.types import EntityType
 
 from .abc import EntityQuerier
+from .queriers.user import UserEntityQuerier
+from .queriers.project import ProjectEntityQuerier
+# ... other querier imports
 
 
 class EntityQuerierRegistry:
     """
     Registry for entity queriers.
 
-    Manages queriers for different entity types and provides
-    lookup functionality.
+    Guarantees all EntityType values have a corresponding querier
+    via match + assert_never (type checker catches missing cases).
     """
 
     def __init__(self) -> None:
         self._queriers: dict[EntityType, EntityQuerier] = {}
+        for entity_type in EntityType:
+            self._queriers[entity_type] = self._create_querier(entity_type)
 
-    def register(self, querier: EntityQuerier) -> None:
-        """Register a querier for an entity type."""
-        self._queriers[querier.entity_type()] = querier
+    def _create_querier(self, entity_type: EntityType) -> EntityQuerier:
+        match entity_type:
+            case EntityType.USER:
+                return UserEntityQuerier()
+            case EntityType.PROJECT:
+                return ProjectEntityQuerier()
+            case EntityType.DOMAIN:
+                return DomainEntityQuerier()
+            # ... other cases for all EntityType values
+            case _ as unreachable:
+                assert_never(unreachable)
 
-    def get(self, entity_type: EntityType) -> Optional[EntityQuerier]:
+    def get(self, entity_type: EntityType) -> EntityQuerier:
         """Get querier for a specific entity type."""
-        return self._queriers.get(entity_type)
-
-    def has(self, entity_type: EntityType) -> bool:
-        """Check if a querier is registered for the entity type."""
-        return entity_type in self._queriers
-
-
-def create_entity_querier_registry() -> EntityQuerierRegistry:
-    """Create a pre-configured registry with all queriers."""
-    from .queriers.domain import DomainEntityQuerier
-    from .queriers.project import ProjectEntityQuerier
-    from .queriers.session import SessionEntityQuerier
-    from .queriers.user import UserEntityQuerier
-    from .queriers.vfolder import VFolderEntityQuerier
-    # ... other queriers
-
-    registry = EntityQuerierRegistry()
-
-    registry.register(UserEntityQuerier())
-    registry.register(ProjectEntityQuerier())
-    registry.register(DomainEntityQuerier())
-    registry.register(VFolderEntityQuerier())
-    registry.register(SessionEntityQuerier())
-    # ... register other queriers
-
-    return registry
+        return self._queriers[entity_type]
 ```
+
+### Ensuring Querier Completeness
+
+Querier completeness is guaranteed through two layers:
+
+#### Layer 1: Static Type Checking (`match` + `assert_never`)
+
+```python
+case _ as unreachable:
+    assert_never(unreachable)  # mypy/pyright error if case missing
+```
+
+When a new `EntityType` is added, the type checker flags the missing case.
+
+#### Layer 2: Unit Test Verification
+
+```python
+def test_all_entity_types_have_queriers() -> None:
+    registry = EntityQuerierRegistry()
+    for entity_type in EntityType:
+        assert registry.has(entity_type), f"Missing querier for {entity_type}"
+```
+
+#### Workflow for Adding New EntityType
+
+1. Add new value to `EntityType` enum
+2. **Run type checker** → Error on `assert_never` (missing case)
+3. Implement the entity querier class
+4. Add case to `_create_querier()` match statement
+5. **Run tests** → Verify completeness
 
 ### Data Layer Update
 
@@ -528,10 +526,7 @@ from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.permission.entity import EntityListResult
 from ai.backend.manager.repositories.base import BatchQuerier
 
-from .entity_querier.registry import (
-    EntityQuerierRegistry,
-    create_entity_querier_registry,
-)
+from .entity_querier.registry import EntityQuerierRegistry
 
 
 class PermissionControllerRepository:
@@ -541,7 +536,7 @@ class PermissionControllerRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._db_source = PermissionDBSource(db)
-        self._entity_querier_registry = create_entity_querier_registry()
+        self._entity_querier_registry = EntityQuerierRegistry()
 
     @permission_controller_repository_resilience.apply()
     async def search_entities(
@@ -567,12 +562,6 @@ class PermissionControllerRepository:
             EntityListResult with matching entities including names.
         """
         entity_querier = self._entity_querier_registry.get(entity_type)
-
-        if entity_querier is None:
-            # Fallback: return without names if no querier registered
-            return await self._db_source.search_entities_in_scope(
-                scope_type, scope_id, entity_type, querier
-            )
 
         async with self._db.begin_readonly_session() as db_sess:
             return await entity_querier.search_in_scope(
@@ -645,7 +634,6 @@ class RBACAPIHandler:
 - **API Response**: The `name` field is added as optional (`Optional[str]`). Clients that don't use this field will not be affected.
 - **Handler Layer**: No changes required.
 - **Service Layer**: No changes required (passes through enriched data).
-- **Fallback**: If no querier is registered for an entity type, falls back to existing behavior (no name).
 
 ### Breaking Changes
 
@@ -654,10 +642,11 @@ None. This is a purely additive change.
 ### Migration Steps
 
 1. Add `entity_querier/` module under `repositories/permission_controller/`
-2. Add optional `name` field to `EntityData`
-3. Add optional `name` field to `EntityDTO`
-4. Update repository to use `EntityQuerierRegistry`
-5. No database migration required
+2. Implement queriers for all `EntityType` values
+3. Add optional `name` field to `EntityData`
+4. Add optional `name` field to `EntityDTO`
+5. Update repository to use `EntityQuerierRegistry`
+6. No database migration required
 
 ## Implementation Plan
 
@@ -688,9 +677,10 @@ None. This is a purely additive change.
 ### Phase 4: Testing
 
 1. Unit tests for each querier
-2. Unit tests for registry
+2. Unit tests for registry (including completeness verification)
 3. Integration tests for repository method
 4. Integration tests for API endpoint
+5. Querier completeness tests (`test_all_entity_types_have_queriers`)
 
 ## Design Benefits
 
@@ -698,10 +688,10 @@ None. This is a purely additive change.
 |--------|---------|
 | **Single Query** | JOIN in single query instead of separate queries |
 | **Layer Separation** | Handler stays thin; Repository handles all data access |
-| **Extensibility** | New entity type = new querier class + registry registration |
-| **Simplicity** | Most queriers inherit `TableBasedEntityQuerier` with minimal config |
-| **Flexibility** | Complex cases can implement `EntityQuerier` directly |
-| **Fallback** | Unregistered entity types gracefully fall back to ID-only response |
+| **Extensibility** | New entity type = new querier class + match case |
+| **Simplicity** | Most queriers only implement 3 methods: `entity_type()`, `id_column()`, `name_column()` |
+| **Flexibility** | Complex cases can override `search_in_scope()` directly |
+| **Completeness Guarantee** | `match` + `assert_never` ensures all EntityTypes have queriers |
 | **Testability** | Each querier can be unit tested independently |
 
 ## Future Extensions
