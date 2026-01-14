@@ -2387,7 +2387,7 @@ class AgentRegistry:
                 return
             for kernel in destroyed_kernels:
 
-                async def destroy_kernel_rpc() -> None:
+                async def destroy_kernel() -> None:
                     async with self._agent_client_pool.acquire(
                         AgentId(destroyed_kernels[0]["agent"])
                     ) as client:
@@ -2399,7 +2399,7 @@ class AgentRegistry:
                         )
 
                 # internally it enqueues a "destroy" lifecycle event.
-                rpc_coros.append(destroy_kernel_rpc())
+                rpc_coros.append(destroy_kernel())
             await asyncio.gather(*rpc_coros)
 
     async def destroy_session(
