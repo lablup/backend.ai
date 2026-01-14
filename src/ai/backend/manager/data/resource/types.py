@@ -8,6 +8,7 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 @dataclass
 class UserResourcePolicyData:
     name: str
+    created_at: datetime | None = field(compare=False)
     max_vfolder_count: int
     max_quota_scope_size: int
     max_session_count_per_model_session: int

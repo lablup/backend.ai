@@ -5,7 +5,7 @@ Tests for AuthRepository functionality.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -532,3 +532,262 @@ class TestAuthRepository:
         now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
+
+    @pytest.fixture
+    async def user_without_main_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_domain: DomainTestData,
+        user_resource_policy: ResourcePolicyTestData,
+        keypair_resource_policy: ResourcePolicyTestData,
+    ) -> AsyncIterator[UserTestData]:
+        """Create user with main_access_key=None and one keypair"""
+        user_uuid = uuid.uuid4()
+        email = f"test-no-main-{uuid.uuid4()}@example.com"
+        access_key = f"AKIATEST{uuid.uuid4().hex[:10]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Create user WITHOUT main_access_key
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            )
+            user = UserRow(
+                uuid=user_uuid,
+                username=email,
+                email=email,
+                password=password_info,
+                domain_name=default_domain.name,
+                role=UserRole.USER,
+                resource_policy=user_resource_policy.name,
+                main_access_key=None,  # Explicitly set to None
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+            # Create keypair
+            keypair = KeyPairRow(
+                access_key=access_key,
+                secret_key="test_secret_key",
+                user_id=email,
+                user=user_uuid,
+                is_active=True,
+                resource_policy=keypair_resource_policy.name,
+            )
+            db_sess.add(keypair)
+            await db_sess.flush()
+            await db_sess.refresh(user)
+
+            user_data = UserTestData(
+                uuid=user.uuid,
+                username=user.username,
+                email=user.email,
+                password=user.password,
+                need_password_change=user.need_password_change or False,
+                full_name=user.full_name or "",
+                description=user.description or "",
+                is_active=user.status == UserStatus.ACTIVE,
+                status=user.status,
+                status_info=user.status_info,
+                created_at=user.created_at,
+                modified_at=user.modified_at,
+                password_changed_at=user.password_changed_at,
+                domain_name=user.domain_name or "",
+                role=user.role or UserRole.USER,
+                integration_id=user.integration_id,
+                resource_policy=user.resource_policy,
+                sudo_session_enabled=user.sudo_session_enabled,
+                access_key=access_key,
+                ssh_public_key="",
+                ssh_private_key="",
+            )
+
+        yield user_data
+
+        # Cleanup
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(KeyPairRow).where(KeyPairRow.access_key == access_key))
+            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+
+    @pytest.fixture
+    async def user_with_multiple_keypairs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_domain: DomainTestData,
+        user_resource_policy: ResourcePolicyTestData,
+        keypair_resource_policy: ResourcePolicyTestData,
+    ) -> AsyncIterator[tuple[UserTestData, str, str]]:
+        """Create user with main_access_key and multiple keypairs"""
+        user_uuid = uuid.uuid4()
+        email = f"test-multi-keys-{uuid.uuid4()}@example.com"
+        main_access_key = f"AKIAMAIN{uuid.uuid4().hex[:10]}"
+        secondary_access_key = f"AKIASECOND{uuid.uuid4().hex[:10]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Create user WITHOUT main_access_key first (to avoid FK violation)
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            )
+            user = UserRow(
+                uuid=user_uuid,
+                username=email,
+                email=email,
+                password=password_info,
+                domain_name=default_domain.name,
+                role=UserRole.USER,
+                resource_policy=user_resource_policy.name,
+                main_access_key=None,  # Set to None first
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+            # Create main keypair
+            main_keypair = KeyPairRow(
+                access_key=main_access_key,
+                secret_key="main_secret_key",
+                user_id=email,
+                user=user_uuid,
+                is_active=True,
+                resource_policy=keypair_resource_policy.name,
+            )
+            db_sess.add(main_keypair)
+
+            # Create secondary keypair
+            secondary_keypair = KeyPairRow(
+                access_key=secondary_access_key,
+                secret_key="secondary_secret_key",
+                user_id=email,
+                user=user_uuid,
+                is_active=True,
+                resource_policy=keypair_resource_policy.name,
+            )
+            db_sess.add(secondary_keypair)
+            await db_sess.flush()
+
+            # Update user with main_access_key after keypairs are created
+            user.main_access_key = main_access_key
+            await db_sess.flush()
+            await db_sess.refresh(user)
+
+            user_data = UserTestData(
+                uuid=user.uuid,
+                username=user.username,
+                email=user.email,
+                password=user.password,
+                need_password_change=user.need_password_change or False,
+                full_name=user.full_name or "",
+                description=user.description or "",
+                is_active=user.status == UserStatus.ACTIVE,
+                status=user.status,
+                status_info=user.status_info,
+                created_at=user.created_at,
+                modified_at=user.modified_at,
+                password_changed_at=user.password_changed_at,
+                domain_name=user.domain_name or "",
+                role=user.role or UserRole.USER,
+                integration_id=user.integration_id,
+                resource_policy=user.resource_policy,
+                sudo_session_enabled=user.sudo_session_enabled,
+                access_key=main_access_key,
+                ssh_public_key="",
+                ssh_private_key="",
+            )
+
+        yield user_data, main_access_key, secondary_access_key
+
+        # Cleanup
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.delete(KeyPairRow).where(
+                    KeyPairRow.access_key.in_([main_access_key, secondary_access_key])
+                )
+            )
+            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+
+    @pytest.mark.asyncio
+    async def test_get_credentials_by_access_key_without_main_keypair(
+        self,
+        auth_repository: AuthRepository,
+        user_without_main_keypair: UserTestData,
+    ) -> None:
+        """Test fetching credentials for user without main_access_key (PR #7533 regression test)"""
+        result = await auth_repository.get_credentials_by_access_key(
+            user_without_main_keypair.access_key
+        )
+
+        # Verify credentials were fetched successfully
+        assert result is not None
+        assert result.user is not None
+        assert result.keypair is not None
+        assert result.keypair_resource_policy is not None
+        assert result.user_resource_policy is not None
+
+        # Verify user data
+        assert result.user.uuid == user_without_main_keypair.uuid
+        assert result.user.email == user_without_main_keypair.email
+
+        # Verify keypair data
+        assert result.keypair.access_key == user_without_main_keypair.access_key
+        assert result.keypair.user == user_without_main_keypair.uuid
+        assert result.keypair.is_active is True
+
+    @pytest.mark.asyncio
+    async def test_get_credentials_by_access_key_with_multiple_keypairs(
+        self,
+        auth_repository: AuthRepository,
+        user_with_multiple_keypairs: tuple[UserTestData, str, str],
+    ) -> None:
+        """Test fetching credentials with multiple keypairs"""
+        user_data, main_access_key, secondary_access_key = user_with_multiple_keypairs
+
+        # Test 1: Query with main access key
+        result_main = await auth_repository.get_credentials_by_access_key(main_access_key)
+
+        assert result_main is not None
+        assert result_main.user is not None
+        assert result_main.keypair is not None
+
+        assert result_main.user.uuid == user_data.uuid
+        assert result_main.user.email == user_data.email
+
+        assert result_main.keypair.access_key == main_access_key
+        assert result_main.keypair.user == user_data.uuid
+
+        # Test 2: Query with secondary access key (non-main)
+        result_secondary = await auth_repository.get_credentials_by_access_key(secondary_access_key)
+
+        assert result_secondary is not None
+        assert result_secondary.user is not None
+        assert result_secondary.keypair is not None
+
+        assert result_secondary.user.uuid == user_data.uuid
+        assert result_secondary.user.email == user_data.email
+
+        assert result_secondary.keypair.access_key == secondary_access_key
+        assert result_secondary.keypair.user == user_data.uuid
+
+        # Verify both queries returned the same user but different keypairs
+        assert result_main.user.uuid == result_secondary.user.uuid
+        assert result_main.keypair.access_key != result_secondary.keypair.access_key
+
+    @pytest.mark.asyncio
+    async def test_get_credentials_by_access_key_not_found(
+        self,
+        auth_repository: AuthRepository,
+    ) -> None:
+        """Test fetching credentials with non-existent access key"""
+        non_existent_key = "AKIANONEXISTENT123"
+
+        result = await auth_repository.get_credentials_by_access_key(non_existent_key)
+
+        # Should return None for all credential fields
+        assert result is not None
+        assert result.user is None
+        assert result.keypair is None
+        assert result.keypair_resource_policy is None
+        assert result.user_resource_policy is None

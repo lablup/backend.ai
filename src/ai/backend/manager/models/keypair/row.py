@@ -21,6 +21,7 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.manager.data.auth.types import KeyPairCredential
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
@@ -177,6 +178,27 @@ class KeyPairRow(Base):
             ssh_private_key=self.ssh_private_key,
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
+        )
+
+    def to_credential(self) -> KeyPairCredential:
+        """Convert KeyPairRow to KeyPairCredential for authentication."""
+        return KeyPairCredential(
+            user_id=self.user_id,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            is_active=self.is_active,
+            is_admin=self.is_admin,
+            created_at=self.created_at,
+            modified_at=self.modified_at,
+            last_used=self.last_used,
+            rate_limit=self.rate_limit,
+            num_queries=self.num_queries,
+            ssh_public_key=self.ssh_public_key,
+            ssh_private_key=self.ssh_private_key,
+            user=self.user,
+            resource_policy=self.resource_policy,
+            dotfiles=self.dotfiles if self.dotfiles else b"",
+            bootstrap_script=self.bootstrap_script or "",
         )
 
 
