@@ -3017,7 +3017,7 @@ type DomainFairShare implements Node
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """Name of the domain this fair share is calculated for."""
   domainName: String!
@@ -3076,7 +3076,7 @@ input DomainFairShareFilter
   """
   Filter by scaling group name. Scaling groups define resource pool boundaries where domains compete for resources. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
@@ -3177,7 +3177,7 @@ type DomainUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -3236,7 +3236,7 @@ input DomainUsageBucketFilter
   """
   Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by domain name. This filters usage buckets for a specific domain. Supports equals, contains, startsWith, and endsWith operations.
@@ -6025,7 +6025,7 @@ type ProjectFairShare implements Node
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """UUID of the project this fair share is calculated for."""
   projectId: UUID!
@@ -6089,7 +6089,7 @@ input ProjectFairShareFilter
   """
   Filter by scaling group name. Scaling groups define resource pool boundaries where projects compete for resources within their domain. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by project UUID. Projects are containers for sessions and user activities. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
@@ -6183,7 +6183,7 @@ type ProjectUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -6242,7 +6242,7 @@ input ProjectUsageBucketFilter
   """
   Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by project UUID. This filters usage buckets for a specific project. Supports equals operation for exact match.
@@ -6852,7 +6852,7 @@ type Query
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(scalingGroup: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. List domain fair shares (superadmin only)."""
   domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY)
@@ -6861,7 +6861,7 @@ type Query
   domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(scalingGroup: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. List project fair shares (superadmin only)."""
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY)
@@ -6870,7 +6870,7 @@ type Query
   projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(scalingGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. List user fair shares (superadmin only)."""
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY)
@@ -8776,7 +8776,7 @@ type UserFairShare implements Node
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """UUID of the user this fair share is calculated for."""
   userUuid: UUID!
@@ -8836,7 +8836,7 @@ input UserFairShareFilter
   """
   Filter by scaling group name. Scaling groups define resource pool boundaries where users compete for resources within their project. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by user UUID. Users are individual accounts that create and run sessions. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
@@ -9055,7 +9055,7 @@ type UserUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  scalingGroup: String!
+  resourceGroup: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -9107,7 +9107,7 @@ input UserUsageBucketFilter
   """
   Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
   """
-  scalingGroup: StringFilter = null
+  resourceGroup: StringFilter = null
 
   """
   Filter by user UUID. This filters usage buckets for a specific user. Supports equals operation for exact match.

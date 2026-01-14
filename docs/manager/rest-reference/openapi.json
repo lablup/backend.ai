@@ -10967,7 +10967,7 @@
         "description": "Search route history.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/fair-share/domains/{scaling_group}/{domain_name}": {
+    "/fair-share/domains/{resource_group}/{domain_name}": {
       "get": {
         "operationId": "fair-share.get_domain_fair_share",
         "tags": [
@@ -10985,7 +10985,7 @@
         ],
         "parameters": [
           {
-            "name": "scaling_group",
+            "name": "resource_group",
             "in": "path",
             "required": true,
             "schema": {
@@ -11024,7 +11024,7 @@
         "description": "Search domain fair shares.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/fair-share/projects/{scaling_group}/{project_id}": {
+    "/fair-share/projects/{resource_group}/{project_id}": {
       "get": {
         "operationId": "fair-share.get_project_fair_share",
         "tags": [
@@ -11042,7 +11042,7 @@
         ],
         "parameters": [
           {
-            "name": "scaling_group",
+            "name": "resource_group",
             "in": "path",
             "required": true,
             "schema": {
@@ -11081,7 +11081,7 @@
         "description": "Search project fair shares.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/fair-share/users/{scaling_group}/{project_id}/{user_uuid}": {
+    "/fair-share/users/{resource_group}/{project_id}/{user_uuid}": {
       "get": {
         "operationId": "fair-share.get_user_fair_share",
         "tags": [
@@ -11099,7 +11099,7 @@
         ],
         "parameters": [
           {
-            "name": "scaling_group",
+            "name": "resource_group",
             "in": "path",
             "required": true,
             "schema": {
