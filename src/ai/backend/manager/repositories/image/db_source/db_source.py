@@ -22,7 +22,6 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
-    ForgetImageForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
     ModifyImageActionValueError,
@@ -103,18 +102,6 @@ class ImageDBSource:
             raise ImageNotFound()
         return row
 
-    async def _validate_image_ownership(
-        self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageRow:
-        """
-        Private method to get an image and validate ownership using an existing session.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
-        """
-        image_row = await self._get_image_by_id(session, image_id, load_aliases)
-        if not image_row.is_owned_by(user_id):
-            raise ForgetImageForbiddenError()
-        return image_row
-
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
         Private method to get an image alias by name using an existing session.
@@ -185,49 +172,48 @@ class ImageDBSource:
             rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)
             return {ImageID(row.id): row.to_detailed_dataclass() for row in rows}
 
-    async def mark_user_image_deleted(
+    async def mark_image_deleted(
         self,
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        user_id: UUID,
     ) -> ImageData:
         """
-        Marks an image record as deleted for a specific user in the database.
-        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
+        Marks an image record as deleted in the database.
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
-            if not row.is_owned_by(user_id):
-                raise ForgetImageForbiddenError()
             await row.mark_as_deleted(session)
             return row.to_dataclass()
 
     async def mark_image_deleted_by_id(
         self,
         image_id: UUID,
-        user_id: UUID,
     ) -> ImageData:
         """
         Marks an image record as deleted by its ID in the database.
-        Validates ownership by user_id before deletion.
-        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._validate_image_ownership(session, image_id, user_id)
+            image_row = await self._get_image_by_id(session, image_id)
             await image_row.mark_as_deleted(session)
             return image_row.to_dataclass()
 
-    async def validate_and_fetch_image_ownership(
-        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageData:
+    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
-        Validates ownership and fetches an image from database by ID in a single operation.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        Fetches an image from database by ID.
+        Raises ImageNotFound if image doesn't exist.
         """
         async with self._db.begin_session() as session:
-            image_row = await self._validate_image_ownership(
-                session, image_id, user_id, load_aliases
-            )
+            image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
+
+    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+        """
+        Checks if user owns the image.
+        Returns True if user owns the image, False otherwise.
+        Raises ImageNotFound if image doesn't exist.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            return image_row.is_owned_by(user_id)
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
@@ -318,33 +304,16 @@ class ImageDBSource:
             image_row._resources = {}
             return image_row.to_dataclass()
 
-    async def remove_tag_from_registry_with_validation(
-        self, image_id: UUID, user_id: UUID
+    async def remove_image_and_aliases(
+        self,
+        image_id: UUID,
     ) -> ImageData:
         """
-        Validates ownership and removes an image registry tag in a single database operation.
-        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
+        Removes an image record and all its aliases from the database.
         """
-        async with self._db.begin_readonly_session() as session:
-            image_row = await self._validate_image_ownership(
-                session, image_id, user_id, load_aliases=True
-            )
-            await image_row.untag_image_from_registry(self._db, session)
-            return image_row.to_dataclass()
-
-    async def remove_image_and_aliases_with_validation(
-        self, image_id: UUID, user_id: UUID
-    ) -> ImageData:
-        """
-        Removes an image record and all its aliases from database after validating ownership.
-        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
-        """
-
         try:
             async with self._db.begin_session() as session:
-                image_row = await self._validate_image_ownership(
-                    session, image_id, user_id, load_aliases=True
-                )
+                image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
                 data = image_row.to_dataclass()
                 for alias in image_row.aliases:
                     await session.delete(alias)

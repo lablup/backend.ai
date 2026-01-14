@@ -197,41 +197,41 @@ class ImageRepository:
         }
 
     @image_repository_resilience.apply()
-    async def soft_delete_user_image(
+    async def soft_delete_image(
         self,
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        user_id: UUID,
     ) -> ImageData:
         """
-        Marks an image as deleted for a specific user.
-        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
+        Marks an image as deleted.
         """
-        return await self._db_source.mark_user_image_deleted(identifiers, user_id)
+        return await self._db_source.mark_image_deleted(identifiers)
 
     @image_repository_resilience.apply()
     async def soft_delete_image_by_id(
         self,
         image_id: UUID,
-        user_id: UUID,
     ) -> ImageData:
         """
         Marks an image as deleted by its ID.
-        Validates ownership by user_id before deletion.
-        Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
-        return await self._db_source.mark_image_deleted_by_id(image_id, user_id)
+        return await self._db_source.mark_image_deleted_by_id(image_id)
 
     @image_repository_resilience.apply()
-    async def get_and_validate_image_ownership(
-        self, image_id: UUID, user_id: UUID, load_aliases: bool = False
-    ) -> ImageData:
+    async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
-        Gets an image by ID and validates ownership in a single operation.
-        Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
+        Fetches an image from database by ID.
+        Raises ImageNotFound if image doesn't exist.
         """
-        return await self._db_source.validate_and_fetch_image_ownership(
-            image_id, user_id, load_aliases
-        )
+        return await self._db_source.fetch_image_by_id(image_id, load_aliases)
+
+    @image_repository_resilience.apply()
+    async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
+        """
+        Validates that user owns the image.
+        Returns True if user owns the image, False otherwise.
+        Raises ImageNotFound if image doesn't exist.
+        """
+        return await self._db_source.validate_image_ownership(image_id, user_id)
 
     @image_repository_resilience.apply()
     async def add_image_alias(
@@ -258,7 +258,7 @@ class ImageRepository:
         return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
     @image_repository_resilience.apply()
-    async def untag_image_from_registry(self, image_id: UUID) -> Optional[ImageData]:
+    async def untag_image_from_registry(self, image_id: UUID) -> ImageData:
         return await self._db_source.remove_tag_from_registry(image_id)
 
     @image_repository_resilience.apply()
@@ -272,17 +272,8 @@ class ImageRepository:
         return await self._db_source.clear_image_resource_limits(image_canonical, architecture)
 
     @image_repository_resilience.apply()
-    async def untag_image_from_registry_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
+    async def delete_image_with_aliases(self, image_id: UUID) -> ImageData:
         """
-        Validates ownership and untags an image from registry in a single operation.
-        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
+        Deletes an image and all its aliases.
         """
-        return await self._db_source.remove_tag_from_registry_with_validation(image_id, user_id)
-
-    @image_repository_resilience.apply()
-    async def delete_image_with_aliases_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
-        """
-        Deletes an image and all its aliases after validating ownership.
-        Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
-        """
-        return await self._db_source.remove_image_and_aliases_with_validation(image_id, user_id)
+        return await self._db_source.remove_image_and_aliases(image_id)
