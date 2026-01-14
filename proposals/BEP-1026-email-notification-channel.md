@@ -3,6 +3,8 @@ Author: Bo Keum Kim (bkkim@lablup.com)
 Status: Draft
 Created: 2026-01-13
 Created-Version: 26.1.0
+Target-Version: 26.1.0
+Implemented-Version: 26.1.0
 ---
 
 # BEP-1026: Email Notification Channel
