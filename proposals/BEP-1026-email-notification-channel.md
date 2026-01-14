@@ -19,59 +19,6 @@ Currently, Backend.AI's Notification system only supports Webhook channels. To r
 
 ## Current Design
 
-### System Architecture
-
-The current notification system consists of two main flows: **Channel/Rule Management** (CRUD operations) and **Notification Dispatch** (actual message sending).
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Client (WebUI / CLI)                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-            ┌──────────────────┬──────────────────┬──────────────────┐
-            │                  │                  │                  │
-            ▼                  ▼                  ▼                  ▼
-     GraphQL Mutation    GraphQL Query        REST API          CLI Command
-    (create/update/      (list/get)      (/notifications/*)   (via Client SDK)
-         delete)
-            │                  │                  │                  │
-            └──────────────────┴──────────────────┴──────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Manager                                        │
-│  ┌────────────────────────────────┐  ┌────────────────────────────────┐     │
-│  │  GraphQL API Layer             │  │  REST API Layer                │     │
-│  │  (api/gql/notification/)       │  │  (api/notification/)           │     │
-│  │    - Channel, Rule types       │  │    - /notifications/* routes   │     │
-│  │    - Query/Mutation resolvers  │  │    - Pydantic DTOs             │     │
-│  └────────────────────────────────┘  └────────────────────────────────┘     │
-│                       │                          │                          │
-│                       └────────────┬─────────────┘                          │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  Service Layer (src/ai/backend/manager/services/notification/)        │  │
-│  │    - Action-Processor pattern                                         │  │
-│  │    - CRUD operations for channels and rules                           │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                      │
-│                                      ▼                                      │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  Repository Layer (src/ai/backend/manager/repositories/notification/) │  │
-│  │    - Database access abstraction                                      │  │
-│  │    - Creator/Updater patterns                                         │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                      │
-│                                      ▼                                      │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  Data Layer                                                           │  │
-│  │    - Models: NotificationChannelRow (channel_type + JSON config)      │  │
-│  │    - Domain: NotificationChannelData, WebhookConfig                   │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
 ### Notification Dispatch Flow
 
 When a system event occurs (e.g., session started), notifications are dispatched through the following flow:
