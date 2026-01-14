@@ -1,4 +1,4 @@
-"""GraphQL query and mutation resolvers for RBAC system."""
+"""GraphQL query and mutation resolvers for role management."""
 
 from __future__ import annotations
 
@@ -11,8 +11,17 @@ from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.rbac import RoleStatus
-from ai.backend.manager.api.gql.adapter import PaginationOptions
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.rbac.fetcher import fetch_role, fetch_roles
+from ai.backend.manager.api.gql.rbac.types import (
+    CreateRoleAssignmentInput,
+    CreateRoleInput,
+    Role,
+    RoleConnection,
+    RoleFilter,
+    RoleOrderBy,
+    UpdateRoleInput,
+    UpdateRolePermissionsInput,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     RolePermissionsUpdateInput,
@@ -31,24 +40,10 @@ from ai.backend.manager.services.permission_contoller.actions import (
     GetRoleDetailAction,
     PurgeRoleAction,
     RevokeRoleAction,
-    SearchRolesAction,
     UpdateRoleAction,
     UpdateRolePermissionsAction,
 )
 from ai.backend.manager.types import OptionalState
-
-from .adapter import get_role_pagination_spec
-from .types import (
-    CreateRoleAssignmentInput,
-    CreateRoleInput,
-    Role,
-    RoleConnection,
-    RoleEdge,
-    RoleFilter,
-    RoleOrderBy,
-    UpdateRoleInput,
-    UpdateRolePermissionsInput,
-)
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
@@ -65,15 +60,7 @@ async def role(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Role]:
     if me is None or not me.is_superadmin:
         raise NotEnoughPermission("Only superadmin can access role details")
 
-    processors = info.context.processors
-    action_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=uuid.UUID(id))
-    )
-
-    if action_result.role is None:
-        return None
-
-    return Role.from_dataclass(action_result.role)
+    return await fetch_role(info, role_id=uuid.UUID(id))
 
 
 @strawberry.field(description="List roles with optional filtering and pagination")
@@ -93,49 +80,16 @@ async def roles(
     if me is None or not me.is_superadmin:
         raise NotEnoughPermission("Only superadmin can list roles")
 
-    processors = info.context.processors
-
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        get_role_pagination_spec(),
+    return await fetch_roles(
+        info,
         filter=filter,
         order_by=order_by,
-    )
-
-    action_result = await processors.permission_controller.search_roles.wait_for_complete(
-        SearchRolesAction(querier=querier)
-    )
-
-    # Convert RoleData to RoleDetailData by fetching details for each role
-    roles_with_details = []
-    for role_data in action_result.items:
-        detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=role_data.id)
-        )
-        if detail_result.role:
-            roles_with_details.append(detail_result.role)
-
-    nodes = [Role.from_dataclass(data) for data in roles_with_details]
-
-    edges = [RoleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return RoleConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=action_result.total_count,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
     )
 
 
