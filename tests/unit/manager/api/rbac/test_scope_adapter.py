@@ -5,6 +5,8 @@ Tests the adapter layer for converting request DTOs to BatchQuerier objects.
 
 from __future__ import annotations
 
+import pytest
+
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
@@ -23,14 +25,20 @@ from ai.backend.manager.repositories.base import OffsetPagination
 class TestScopeAdapterBuildQuerier:
     """Tests for ScopeAdapter.build_querier method."""
 
-    def test_build_querier_domain_no_filter(self) -> None:
+    @pytest.fixture
+    def adapter(self) -> ScopeAdapter:
+        """Create ScopeAdapter instance."""
+        return ScopeAdapter()
+
+    def test_build_querier_domain_no_filter(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope without filters."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=None,
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
@@ -38,12 +46,13 @@ class TestScopeAdapterBuildQuerier:
         assert querier.conditions == []
         assert querier.orders == []
         assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 10
-        assert querier.pagination.offset == 0
+        assert querier.pagination.limit == limit
+        assert querier.pagination.offset == offset
 
-    def test_build_querier_domain_with_name_contains(self) -> None:
+    def test_build_querier_domain_with_name_contains(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope with name contains filter."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -51,8 +60,8 @@ class TestScopeAdapterBuildQuerier:
                 )
             ),
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
@@ -60,9 +69,10 @@ class TestScopeAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_domain_with_name_equals(self) -> None:
+    def test_build_querier_domain_with_name_equals(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope with name equals filter."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -70,8 +80,8 @@ class TestScopeAdapterBuildQuerier:
                 )
             ),
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
@@ -79,9 +89,10 @@ class TestScopeAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_domain_with_name_starts_with(self) -> None:
+    def test_build_querier_domain_with_name_starts_with(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope with name starts_with filter."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -89,17 +100,18 @@ class TestScopeAdapterBuildQuerier:
                 )
             ),
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
 
         assert len(querier.conditions) == 1
 
-    def test_build_querier_domain_with_name_ends_with(self) -> None:
+    def test_build_querier_domain_with_name_ends_with(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope with name ends_with filter."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -107,17 +119,18 @@ class TestScopeAdapterBuildQuerier:
                 )
             ),
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
 
         assert len(querier.conditions) == 1
 
-    def test_build_querier_domain_with_ordering_name_asc(self) -> None:
+    def test_build_querier_domain_with_ordering_name_asc(self, adapter: ScopeAdapter) -> None:
         """Test building querier for domain scope with name ascending order."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=None,
             order=[
@@ -126,17 +139,20 @@ class TestScopeAdapterBuildQuerier:
                     direction=OrderDirection.ASC,
                 )
             ],
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
 
         assert len(querier.orders) == 1
 
-    def test_build_querier_domain_with_ordering_created_at_desc(self) -> None:
+    def test_build_querier_domain_with_ordering_created_at_desc(
+        self, adapter: ScopeAdapter
+    ) -> None:
         """Test building querier for domain scope with created_at descending order."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=None,
             order=[
@@ -145,17 +161,18 @@ class TestScopeAdapterBuildQuerier:
                     direction=OrderDirection.DESC,
                 )
             ],
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.DOMAIN, request)
 
         assert len(querier.orders) == 1
 
-    def test_build_querier_project_scope(self) -> None:
+    def test_build_querier_project_scope(self, adapter: ScopeAdapter) -> None:
         """Test building querier for project scope."""
-        adapter = ScopeAdapter()
+        limit = 20
+        offset = 10
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -168,8 +185,8 @@ class TestScopeAdapterBuildQuerier:
                     direction=OrderDirection.ASC,
                 )
             ],
-            limit=20,
-            offset=10,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.PROJECT, request)
@@ -177,12 +194,13 @@ class TestScopeAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert len(querier.orders) == 1
         assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 20
-        assert querier.pagination.offset == 10
+        assert querier.pagination.limit == limit
+        assert querier.pagination.offset == offset
 
-    def test_build_querier_user_scope(self) -> None:
+    def test_build_querier_user_scope(self, adapter: ScopeAdapter) -> None:
         """Test building querier for user scope."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -190,17 +208,18 @@ class TestScopeAdapterBuildQuerier:
                 )
             ),
             order=None,
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.USER, request)
 
         assert len(querier.conditions) == 1
 
-    def test_build_querier_global_scope(self) -> None:
+    def test_build_querier_global_scope(self, adapter: ScopeAdapter) -> None:
         """Test building querier for global scope returns empty querier."""
-        adapter = ScopeAdapter()
+        limit = 10
+        offset = 0
         request = SearchScopesRequest(
             filter=ScopeFilter(
                 name=StringFilter(
@@ -213,8 +232,8 @@ class TestScopeAdapterBuildQuerier:
                     direction=OrderDirection.ASC,
                 )
             ],
-            limit=10,
-            offset=0,
+            limit=limit,
+            offset=offset,
         )
 
         querier = adapter.build_querier(ScopeType.GLOBAL, request)
@@ -227,54 +246,58 @@ class TestScopeAdapterBuildQuerier:
 class TestScopeAdapterConvertToDTO:
     """Tests for ScopeAdapter.convert_to_dto method."""
 
-    def test_convert_to_dto_domain_scope(self) -> None:
+    @pytest.fixture
+    def adapter(self) -> ScopeAdapter:
+        """Create ScopeAdapter instance."""
+        return ScopeAdapter()
+
+    def test_convert_to_dto_domain_scope(self, adapter: ScopeAdapter) -> None:
         """Test converting domain scope data to DTO."""
-        adapter = ScopeAdapter()
+        domain_name = "test-domain"
         scope_data = ScopeData(
-            id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id="test-domain"),
-            name="test-domain",
+            id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
+            name=domain_name,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
         assert isinstance(dto, ScopeDTO)
         assert dto.scope_type == ScopeType.DOMAIN
-        assert dto.scope_id == "test-domain"
-        assert dto.name == "test-domain"
+        assert dto.scope_id == domain_name
+        assert dto.name == domain_name
 
-    def test_convert_to_dto_project_scope(self) -> None:
+    def test_convert_to_dto_project_scope(self, adapter: ScopeAdapter) -> None:
         """Test converting project scope data to DTO."""
-        adapter = ScopeAdapter()
         project_id = "550e8400-e29b-41d4-a716-446655440000"
+        project_name = "my-project"
         scope_data = ScopeData(
             id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id),
-            name="my-project",
+            name=project_name,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
         assert dto.scope_type == ScopeType.PROJECT
         assert dto.scope_id == project_id
-        assert dto.name == "my-project"
+        assert dto.name == project_name
 
-    def test_convert_to_dto_user_scope(self) -> None:
+    def test_convert_to_dto_user_scope(self, adapter: ScopeAdapter) -> None:
         """Test converting user scope data to DTO."""
-        adapter = ScopeAdapter()
         user_id = "660e8400-e29b-41d4-a716-446655440001"
+        username = "john_doe"
         scope_data = ScopeData(
             id=ScopeId(scope_type=ScopeType.USER, scope_id=user_id),
-            name="john_doe",
+            name=username,
         )
 
         dto = adapter.convert_to_dto(scope_data)
 
         assert dto.scope_type == ScopeType.USER
         assert dto.scope_id == user_id
-        assert dto.name == "john_doe"
+        assert dto.name == username
 
-    def test_convert_to_dto_global_scope(self) -> None:
+    def test_convert_to_dto_global_scope(self, adapter: ScopeAdapter) -> None:
         """Test converting global scope data to DTO."""
-        adapter = ScopeAdapter()
         scope_data = ScopeData(
             id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
             name=GLOBAL_SCOPE_ID,

@@ -45,7 +45,6 @@ class TestGetScopeTypes:
         """Create service with mocked repository."""
         return PermissionControllerService(repository=mock_repository)
 
-    @pytest.mark.asyncio
     async def test_get_scope_types_returns_all_scope_types(
         self,
         service: PermissionControllerService,
@@ -78,21 +77,24 @@ class TestSearchScopes:
         """Create service with mocked repository."""
         return PermissionControllerService(repository=mock_repository)
 
-    @pytest.mark.asyncio
     async def test_search_scopes_calls_repository(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
         """Test search_scopes delegates to repository."""
+        domain_name = "test-domain"
+        total_count = 1
+        limit = 10
+        offset = 0
         mock_result = ScopeListResult(
             items=[
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id="test-domain"),
-                    name="test-domain",
+                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
+                    name=domain_name,
                 )
             ],
-            total_count=1,
+            total_count=total_count,
             has_next_page=False,
             has_previous_page=False,
         )
@@ -101,36 +103,43 @@ class TestSearchScopes:
         querier = BatchQuerier(
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action = SearchScopesAction(scope_type=ScopeType.DOMAIN, querier=querier)
 
         result = await service.search_scopes(action)
 
         mock_repository.search_scopes.assert_called_once_with(ScopeType.DOMAIN, querier)
-        assert result.total_count == 1
-        assert len(result.items) == 1
+        assert result.total_count == total_count
+        assert len(result.items) == total_count
         assert result.items[0].id.scope_type == ScopeType.DOMAIN
 
-    @pytest.mark.asyncio
     async def test_search_scopes_returns_action_result(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
         """Test search_scopes returns properly formatted SearchScopesActionResult."""
+        project_id_1 = "project-1"
+        project_id_2 = "project-2"
+        project_name_1 = "project-alpha"
+        project_name_2 = "project-beta"
+        total_count = 10
+        items_count = 2
+        limit = 2
+        offset = 0
         mock_result = ScopeListResult(
             items=[
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id="project-1"),
-                    name="project-alpha",
+                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id_1),
+                    name=project_name_1,
                 ),
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id="project-2"),
-                    name="project-beta",
+                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=project_id_2),
+                    name=project_name_2,
                 ),
             ],
-            total_count=10,
+            total_count=total_count,
             has_next_page=True,
             has_previous_page=False,
         )
@@ -139,24 +148,26 @@ class TestSearchScopes:
         querier = BatchQuerier(
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=2, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action = SearchScopesAction(scope_type=ScopeType.PROJECT, querier=querier)
 
         result = await service.search_scopes(action)
 
-        assert result.total_count == 10
-        assert len(result.items) == 2
+        assert result.total_count == total_count
+        assert len(result.items) == items_count
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_scopes_global_type(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
         """Test search_scopes handles global scope type."""
+        total_count = 1
+        limit = 10
+        offset = 0
         mock_result = ScopeListResult(
             items=[
                 ScopeData(
@@ -164,7 +175,7 @@ class TestSearchScopes:
                     name=GLOBAL_SCOPE_ID,
                 )
             ],
-            total_count=1,
+            total_count=total_count,
             has_next_page=False,
             has_previous_page=False,
         )
@@ -173,12 +184,12 @@ class TestSearchScopes:
         querier = BatchQuerier(
             conditions=[],
             orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action = SearchScopesAction(scope_type=ScopeType.GLOBAL, querier=querier)
 
         result = await service.search_scopes(action)
 
         mock_repository.search_scopes.assert_called_once_with(ScopeType.GLOBAL, querier)
-        assert result.total_count == 1
+        assert result.total_count == total_count
         assert result.items[0].id.scope_type == ScopeType.GLOBAL
