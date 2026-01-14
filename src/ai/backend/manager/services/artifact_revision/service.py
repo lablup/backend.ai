@@ -46,7 +46,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import DelegateImportArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
+    ImportArtifactsOptions,
+)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -763,7 +766,7 @@ class ArtifactRevisionService:
             delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
-            force=action.force,
+            options=ImportArtifactsOptions(force=action.force) if action.force else None,
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)

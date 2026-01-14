@@ -522,6 +522,22 @@ class ScanArtifactsInput:
 
 @strawberry.input(
     description=dedent_strip("""
+    Added in 26.1.0.
+
+    Options for importing artifact revisions.
+
+    Controls import behavior such as forcing re-download regardless of digest freshness.
+    """)
+)
+class ImportArtifactsOptionsGQL:
+    force: bool = strawberry.field(
+        default=False,
+        description="Force re-download regardless of digest freshness check.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
     Added in 25.14.0.
 
     Input for importing scanned artifact revisions from external registries.
@@ -536,9 +552,9 @@ class ImportArtifactsInput:
         default=None,
         description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
-    force: bool = strawberry.field(
-        default=False,
-        description="Force re-download regardless of digest freshness check. Added in 26.1.0.",
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
+        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
 
@@ -598,9 +614,9 @@ class DelegateImportArtifactsInput:
     )
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
-    force: bool = strawberry.field(
-        default=False,
-        description="Force re-download regardless of digest freshness check. Added in 26.1.0.",
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
+        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
 
