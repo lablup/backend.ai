@@ -50,19 +50,19 @@ class DomainService:
         if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
-        domain_data = await self._repository.create_domain_validated(action.creator)
+        domain_data = await self._repository.create_domain(action.creator)
         return CreateDomainActionResult(
             domain_data=domain_data,
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
-        domain_data = await self._repository.modify_domain_validated(action.updater)
+        domain_data = await self._repository.modify_domain(action.updater)
         return ModifyDomainActionResult(
             domain_data=domain_data,
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
-        await self._repository.soft_delete_domain_validated(action.name)
+        await self._repository.soft_delete_domain(action.name)
 
         return DeleteDomainActionResult(
             name=action.name,
@@ -71,7 +71,7 @@ class DomainService:
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         name = action.name
 
-        await self._repository.purge_domain_validated(name)
+        await self._repository.purge_domain(name)
         return PurgeDomainActionResult(
             name=name,
         )

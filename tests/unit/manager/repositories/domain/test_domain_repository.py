@@ -208,7 +208,7 @@ class TestDomainRepository:
         return UserInfo(id=uuid.uuid4(), role=UserRole.SUPERADMIN, domain_name="default")
 
     @pytest.mark.asyncio
-    async def test_create_domain_validated_success(
+    async def test_create_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -223,9 +223,7 @@ class TestDomainRepository:
             assert result.first() is None
 
         # Create domain
-        created_domain = await domain_repository.create_domain_validated(
-            Creator(spec=sample_domain_creator)
-        )
+        created_domain = await domain_repository.create_domain(Creator(spec=sample_domain_creator))
 
         assert created_domain.name == sample_domain_creator.name
         assert created_domain.description == sample_domain_creator.description
@@ -251,14 +249,14 @@ class TestDomainRepository:
             assert group_row.name == "model-store"
 
     @pytest.mark.asyncio
-    async def test_create_domain_validated_duplicate_name(
+    async def test_create_domain_duplicate_name(
         self,
         domain_repository: DomainRepository,
         sample_domain_creator: DomainCreatorSpec,
     ) -> None:
         """Test domain creation with duplicate name"""
         # Create domain first
-        await domain_repository.create_domain_validated(Creator(spec=sample_domain_creator))
+        await domain_repository.create_domain(Creator(spec=sample_domain_creator))
 
         # Try to create another domain with same name
         duplicate_creator = Creator(
@@ -270,10 +268,10 @@ class TestDomainRepository:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await domain_repository.create_domain_validated(duplicate_creator)
+            await domain_repository.create_domain(duplicate_creator)
 
     @pytest.mark.asyncio
-    async def test_modify_domain_validated_success(
+    async def test_modify_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -296,7 +294,7 @@ class TestDomainRepository:
         )
 
         # Create domain
-        await domain_repository.create_domain_validated(domain_creator)
+        await domain_repository.create_domain(domain_creator)
 
         # Create updater
         updater_spec = DomainUpdaterSpec(
@@ -308,7 +306,7 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value=domain_name)
 
         # Modify domain
-        modified_domain = await domain_repository.modify_domain_validated(updater)
+        modified_domain = await domain_repository.modify_domain(updater)
 
         assert modified_domain is not None
         assert modified_domain.name == domain_name
@@ -322,7 +320,7 @@ class TestDomainRepository:
             assert domain_row.description == "Updated description"
 
     @pytest.mark.asyncio
-    async def test_modify_domain_validated_not_found(
+    async def test_modify_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
@@ -333,10 +331,10 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value="nonexistent-domain")
 
         with pytest.raises(DomainNotFound):
-            await domain_repository.modify_domain_validated(updater)
+            await domain_repository.modify_domain(updater)
 
     @pytest.mark.asyncio
-    async def test_soft_delete_domain_validated_success(
+    async def test_soft_delete_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -359,10 +357,10 @@ class TestDomainRepository:
         )
 
         # Create domain
-        await domain_repository.create_domain_validated(domain_creator)
+        await domain_repository.create_domain(domain_creator)
 
         # Soft delete domain (now returns None)
-        await domain_repository.soft_delete_domain_validated(domain_name)
+        await domain_repository.soft_delete_domain(domain_name)
 
         # Verify domain is marked as inactive
         async with db_with_default_resource_policies.begin() as conn:
@@ -372,16 +370,16 @@ class TestDomainRepository:
             assert domain_row.is_active is False
 
     @pytest.mark.asyncio
-    async def test_soft_delete_domain_validated_not_found(
+    async def test_soft_delete_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain soft deletion when domain not found"""
         with pytest.raises(DomainNotFound):
-            await domain_repository.soft_delete_domain_validated("nonexistent-domain")
+            await domain_repository.soft_delete_domain("nonexistent-domain")
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_success(
+    async def test_purge_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -410,7 +408,7 @@ class TestDomainRepository:
             await conn.commit()
 
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain_validated(domain_name)
+        await domain_repository.purge_domain(domain_name)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
@@ -419,7 +417,7 @@ class TestDomainRepository:
             assert domain_row is None
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_with_users(
+    async def test_purge_domain_with_users(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -484,18 +482,18 @@ class TestDomainRepository:
 
         # Try to purge domain (should fail due to users)
         with pytest.raises(DomainHasUsers) as exc_info:
-            await domain_repository.purge_domain_validated(domain_name)
+            await domain_repository.purge_domain(domain_name)
 
         assert "There are users bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_not_found(
+    async def test_purge_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain purging when domain not found"""
         with pytest.raises(DomainDeletionFailed):
-            await domain_repository.purge_domain_validated("nonexistent-domain")
+            await domain_repository.purge_domain("nonexistent-domain")
 
     @pytest.mark.asyncio
     async def test_create_domain_with_all_fields(
@@ -527,7 +525,7 @@ class TestDomainRepository:
             )
         )
 
-        created_domain = await domain_repository.create_domain_validated(comprehensive_creator)
+        created_domain = await domain_repository.create_domain(comprehensive_creator)
 
         assert created_domain.name == "comprehensive-domain"
         assert created_domain.description == "Comprehensive domain with all features"
@@ -550,7 +548,7 @@ class TestDomainRepository:
             assert domain_row.is_active is True
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_with_groups(
+    async def test_purge_domain_with_groups(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -598,12 +596,12 @@ class TestDomainRepository:
 
         # Try to purge domain (should fail due to groups)
         with pytest.raises(DomainHasGroups) as exc_info:
-            await domain_repository.purge_domain_validated(domain_name)
+            await domain_repository.purge_domain(domain_name)
 
         assert "There are groups bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_with_active_kernels(
+    async def test_purge_domain_with_active_kernels(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -705,6 +703,6 @@ class TestDomainRepository:
 
         # Try to purge domain (should fail due to active kernels)
         with pytest.raises(DomainHasActiveKernels) as exc_info:
-            await domain_repository.purge_domain_validated(domain_name)
+            await domain_repository.purge_domain(domain_name)
 
         assert "Domain has some active kernels" in str(exc_info.value)
