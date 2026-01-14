@@ -3,19 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.services.session.base import SessionAction
 
 
 @dataclass
-class SearchKernelsAction(BaseAction):
+class SearchKernelsAction(SessionAction):
     querier: BatchQuerier
-
-    @override
-    @classmethod
-    def entity_type(cls) -> str:
-        return "kernel"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -24,7 +20,7 @@ class SearchKernelsAction(BaseAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "search"
+        return "search_kernels"
 
 
 @dataclass
