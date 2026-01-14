@@ -17,7 +17,7 @@ from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.storage.types import ArtifactStorageType, NamedStorageTarget
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
@@ -441,7 +441,10 @@ class ArtifactRevisionService:
                             ],
                             registry_name=huggingface_registry_data.name,
                             storage_step_mappings=StorageMappingResolverData(
-                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                storage_step_target_mappings={
+                                    step: NamedStorageTarget(storage_name=name)
+                                    for step, name in reservoir_config.resolve_storage_step_selection().items()
+                                },
                             ),
                         )
                     )
@@ -542,7 +545,10 @@ class ArtifactRevisionService:
                                 ],
                                 registry_name=registry_data.name,
                                 storage_step_mappings=StorageMappingResolverData(
-                                    storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                    storage_step_target_mappings={
+                                        step: NamedStorageTarget(storage_name=name)
+                                        for step, name in reservoir_config.resolve_storage_step_selection().items()
+                                    },
                                 ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
                             )

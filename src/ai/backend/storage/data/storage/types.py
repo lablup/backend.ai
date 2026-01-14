@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, Any
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep, VFolderStorageTarget
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+    NamedStorageTarget,
+    VFolderStorageTarget,
+)
 from ai.backend.common.dto.storage.request import StorageMappingResolverData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors.common import InvalidStorageTargetError
@@ -121,44 +125,63 @@ class StorageMappingResolver:
     def __init__(
         self,
         volume_pool: VolumePool,
-        storage_step_mappings: StorageMappingResolverData,
     ) -> None:
         self._volume_pool = volume_pool
-        self._storage_step_mappings = storage_step_mappings
 
-    def resolve(self) -> dict[ArtifactStorageImportStep, StorageTarget]:
+    def resolve(
+        self,
+        storage_step_mappings: StorageMappingResolverData,
+    ) -> dict[ArtifactStorageImportStep, StorageTarget]:
         """
         Resolve storage targets to StorageTarget objects.
 
+        Merges both storage_step_mappings (string-based) and storage_step_target_mappings
+        (structured targets). storage_step_target_mappings takes precedence for overlapping steps.
+
         For each import step:
         - If target is str: creates StorageTarget with storage name
+        - If target is NamedStorageTarget: creates StorageTarget with storage name
         - If target is VFolderStorageTarget: creates StorageTarget with VolumeStorageAdapter
+
+        Args:
+            storage_step_mappings: The storage mapping data from the request
 
         Returns:
             Dict mapping import steps to StorageTarget objects
         """
         result: dict[ArtifactStorageImportStep, StorageTarget] = {}
 
-        for step, target in self._storage_step_mappings.storage_step_mappings.items():
-            if isinstance(target, VFolderStorageTarget):
-                adapter_name = f"volume_storage_{current_request_id()}"
-                volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
-                adapter = VolumeStorageAdapter(
-                    name=adapter_name,
-                    volume=volume,
-                    vfolder_id=target.vfolder_id,
-                )
+        # First, process string-based mappings
+        if storage_step_mappings.storage_step_mappings:
+            for step, storage_name in storage_step_mappings.storage_step_mappings.items():
+                result[step] = StorageTarget.from_storage_name(storage_name)
 
-                log.info(
-                    "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
-                    adapter_name,
-                    target.vfolder_id,
-                    target.volume_name,
-                    type(volume).__name__,
-                )
+        # Then, process structured target mappings (takes precedence)
+        if storage_step_mappings.storage_step_target_mappings:
+            for step, target in storage_step_mappings.storage_step_target_mappings.items():
+                if isinstance(target, VFolderStorageTarget):
+                    adapter_name = f"volume_storage_{current_request_id()}"
+                    volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
+                    adapter = VolumeStorageAdapter(
+                        name=adapter_name,
+                        volume=volume,
+                        vfolder_id=target.vfolder_id,
+                    )
 
-                result[step] = StorageTarget.from_storage(adapter)
-            else:
-                result[step] = StorageTarget.from_storage_name(target)
+                    log.info(
+                        "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
+                        adapter_name,
+                        target.vfolder_id,
+                        target.volume_name,
+                        type(volume).__name__,
+                    )
+
+                    result[step] = StorageTarget.from_storage(adapter)
+                elif isinstance(target, NamedStorageTarget):
+                    result[step] = StorageTarget.from_storage_name(target.storage_name)
+                else:
+                    raise InvalidStorageTargetError(
+                        f"Unsupported storage target type: {type(target).__name__}"
+                    )
 
         return result

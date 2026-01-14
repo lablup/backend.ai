@@ -26,7 +26,6 @@ from ai.backend.storage.services.artifacts.reservoir import (
     create_reservoir_import_pipeline,
 )
 from ai.backend.storage.utils import log_client_api_entry
-from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -36,15 +35,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReservoirRegistryAPIHandler:
     _reservoir_service: ReservoirService
-    _volume_pool: VolumePool
+    _storage_mapping_resolver: StorageMappingResolver
 
     def __init__(
         self,
         reservoir_service: ReservoirService,
-        volume_pool: VolumePool,
+        storage_mapping_resolver: StorageMappingResolver,
     ) -> None:
         self._reservoir_service = reservoir_service
-        self._volume_pool = volume_pool
+        self._storage_mapping_resolver = storage_mapping_resolver
 
     @api_handler
     async def import_models(
@@ -56,10 +55,9 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
-        storage_step_mappings = StorageMappingResolver(
-            self._volume_pool,
+        storage_step_mappings = self._storage_mapping_resolver.resolve(
             body.parsed.storage_step_mappings,
-        ).resolve()
+        )
 
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
@@ -102,9 +100,10 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
+    storage_mapping_resolver = StorageMappingResolver(ctx.volume_pool)
     reservoir_api_handler = ReservoirRegistryAPIHandler(
         reservoir_service=reservoir_service,
-        volume_pool=ctx.volume_pool,
+        storage_mapping_resolver=storage_mapping_resolver,
     )
 
     app.router.add_route("POST", "/import", reservoir_api_handler.import_models)

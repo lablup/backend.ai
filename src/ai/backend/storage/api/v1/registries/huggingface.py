@@ -44,7 +44,6 @@ from ai.backend.storage.services.artifacts.huggingface import (
     create_huggingface_import_pipeline,
 )
 from ai.backend.storage.utils import log_client_api_entry
-from ai.backend.storage.volumes.pool import VolumePool
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -54,15 +53,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
-    _volume_pool: VolumePool
+    _storage_mapping_resolver: StorageMappingResolver
 
     def __init__(
         self,
         huggingface_service: HuggingFaceService,
-        volume_pool: VolumePool,
+        storage_mapping_resolver: StorageMappingResolver,
     ) -> None:
         self._huggingface_service = huggingface_service
-        self._volume_pool = volume_pool
+        self._storage_mapping_resolver = storage_mapping_resolver
 
     @api_handler
     async def scan_models(
@@ -182,10 +181,9 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
-        storage_step_mappings = StorageMappingResolver(
-            self._volume_pool,
+        storage_step_mappings = self._storage_mapping_resolver.resolve(
             body.parsed.storage_step_mappings,
-        ).resolve()
+        )
 
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
@@ -240,9 +238,10 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
+    storage_mapping_resolver = StorageMappingResolver(ctx.volume_pool)
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(
         huggingface_service=huggingface_service,
-        volume_pool=ctx.volume_pool,
+        storage_mapping_resolver=storage_mapping_resolver,
     )
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
