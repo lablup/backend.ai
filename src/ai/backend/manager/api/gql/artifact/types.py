@@ -538,7 +538,7 @@ class ImportArtifactsInput:
     )
     force: bool = strawberry.field(
         default=False,
-        description="Force re-download regardless of digest freshness check. Added in 25.18.0.",
+        description="Force re-download regardless of digest freshness check. Added in 26.1.0.",
     )
 
 
@@ -600,7 +600,7 @@ class DelegateImportArtifactsInput:
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
     force: bool = strawberry.field(
         default=False,
-        description="Force re-download regardless of digest freshness check. Added in 25.18.0.",
+        description="Force re-download regardless of digest freshness check. Added in 26.1.0.",
     )
 
 
