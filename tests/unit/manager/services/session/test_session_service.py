@@ -1626,3 +1626,219 @@ class TestSearch:
         assert result.total_count == 25
         assert result.has_next_page is True
         assert result.has_previous_page is True
+
+
+# ==================== SearchKernels Tests ====================
+
+
+@pytest.mark.asyncio
+class TestSearchKernels:
+    """Test cases for SessionService.search_kernels"""
+
+    @pytest.fixture
+    def sample_kernel_info(self) -> "KernelInfo":
+        """Create sample kernel info data."""
+        from ai.backend.common.types import KernelId, ResourceSlot, SessionResult, SessionTypes
+        from ai.backend.manager.data.kernel.types import (
+            ClusterConfig,
+            ImageInfo,
+            KernelInfo,
+            KernelStatus,
+            LifecycleStatus,
+            Metadata,
+            Metrics,
+            NetworkConfig,
+            RelatedSessionInfo,
+            ResourceInfo,
+            RuntimeConfig,
+            UserPermission,
+        )
+
+        kernel_id = KernelId(uuid4())
+        session_id = uuid4()
+        user_id = uuid4()
+        group_id = uuid4()
+
+        return KernelInfo(
+            id=kernel_id,
+            session=RelatedSessionInfo(
+                session_id=str(session_id),
+                creation_id="test-creation-id",
+                name="test-session",
+                session_type=SessionTypes.INTERACTIVE,
+            ),
+            user_permission=UserPermission(
+                user_uuid=user_id,
+                access_key="TESTKEY",
+                domain_name="default",
+                group_id=group_id,
+                uid=1000,
+                main_gid=1000,
+                gids=[1000],
+            ),
+            image=ImageInfo(
+                identifier=None,
+                registry="cr.backend.ai",
+                tag="latest",
+                architecture="x86_64",
+            ),
+            network=NetworkConfig(
+                kernel_host="localhost",
+                repl_in_port=2000,
+                repl_out_port=2001,
+                stdin_port=2002,
+                stdout_port=2003,
+                service_ports=None,
+                preopen_ports=None,
+                use_host_network=False,
+            ),
+            cluster=ClusterConfig(
+                cluster_mode="single-node",
+                cluster_size=1,
+                cluster_role="main",
+                cluster_idx=0,
+                local_rank=0,
+                cluster_hostname="main",
+            ),
+            resource=ResourceInfo(
+                scaling_group="default",
+                agent="test-agent",
+                agent_addr="localhost:6001",
+                container_id="container-123",
+                occupied_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
+                requested_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
+                occupied_shares={},
+                attached_devices={},
+                resource_opts={},
+            ),
+            runtime=RuntimeConfig(
+                environ=None,
+                mounts=None,
+                mount_map=None,
+                vfolder_mounts=None,
+                bootstrap_script=None,
+                startup_command=None,
+            ),
+            lifecycle=LifecycleStatus(
+                status=KernelStatus.RUNNING,
+                result=SessionResult.UNDEFINED,
+                created_at=datetime.now(tzutc()),
+                terminated_at=None,
+                starts_at=None,
+                status_changed=datetime.now(tzutc()),
+                status_info=None,
+                status_data=None,
+                status_history=None,
+                last_seen=datetime.now(tzutc()),
+            ),
+            metrics=Metrics(
+                num_queries=0,
+                last_stat=None,
+                container_log=None,
+            ),
+            metadata=Metadata(
+                callback_url=None,
+                internal_data=None,
+            ),
+        )
+
+    async def test_search_kernels_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_kernel_info: "KernelInfo",
+    ) -> None:
+        """Test successfully searching kernels."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+            SearchKernelsActionResult,
+        )
+
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[sample_kernel_info],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier)
+        result = await session_service.search_kernels(action)
+
+        assert isinstance(result, SearchKernelsActionResult)
+        assert result.data == [sample_kernel_info]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_session_repository.search_kernels.assert_called_once_with(querier)
+
+    async def test_search_kernels_empty_result(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+    ) -> None:
+        """Test searching kernels when no results are found."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+        )
+
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier)
+        result = await session_service.search_kernels(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_search_kernels_with_pagination(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_kernel_info: "KernelInfo",
+    ) -> None:
+        """Test searching kernels with pagination."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+        )
+
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[sample_kernel_info],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier)
+        result = await session_service.search_kernels(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
