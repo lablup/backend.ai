@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
@@ -28,7 +28,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderPermissionData,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.resource import DBOperationFailed, ProjectNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
@@ -63,11 +63,16 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -252,71 +257,69 @@ class VfolderRepository:
         Returns the created VFolderData.
         """
         async with self._db.begin_session() as session:
-            # Create the VFolder
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
-
-            query = sa.insert(VFolderRow).values(insert_values)
-            result = await session.execute(query)
-            if cast(CursorResult, result).rowcount != 1:
-                raise DBOperationFailed(
-                    f"Failed to insert vfolder: expected 1 row, got {cast(CursorResult, result).rowcount}"
-                )
+            # Determine scope based on ownership type
             match params.ownership_type:
                 case VFolderOwnershipType.USER:
-                    scope_id = ScopeId(ScopeType.USER, str(params.user))
+                    scope_type = ScopeType.USER
+                    scope_id = str(params.user)
                 case VFolderOwnershipType.GROUP:
-                    scope_id = ScopeId(ScopeType.PROJECT, str(params.group))
-            entity_scope_creator = Creator(
-                spec=AssociationScopesEntitiesCreatorSpec(
-                    scope_id=scope_id,
-                    object_id=ObjectId(
-                        entity_type=EntityType.VFOLDER,
-                        entity_id=str(params.id),
-                    ),
-                )
-            )
-            await self._role_manager.map_entity_to_scope(session, entity_scope_creator)
+                    scope_type = ScopeType.PROJECT
+                    scope_id = str(params.group)
 
-            # Create owner permission if requested
+            # Create VFolderCreatorSpec from params
+            spec = VFolderCreatorSpec(
+                id=params.id,
+                name=params.name,
+                domain_name=params.domain_name,
+                quota_scope_id=params.quota_scope_id,
+                usage_mode=params.usage_mode,
+                permission=params.permission,
+                host=params.host,
+                creator=params.creator,
+                ownership_type=params.ownership_type,
+                user=params.user,
+                group=params.group,
+                unmanaged_path=params.unmanaged_path,
+                cloneable=params.cloneable,
+                status=params.status,
+            )
+
+            # Use RBACEntityCreator for atomic entity + scope association creation
+            rbac_creator = RBACEntityCreator(
+                spec=spec,
+                scope_type=scope_type,
+                scope_id=scope_id,
+                entity_type=EntityType.VFOLDER,
+            )
+            result = await execute_rbac_entity_creator(session, rbac_creator)
+            created_row = result.row
+
+            # Create owner permission if requested (legacy compatibility)
             if create_owner_permission and params.user:
+                # Insert VFolderPermissionRow for legacy compatibility
                 permission_insert = sa.insert(VFolderPermissionRow).values({
                     "user": params.user,
                     "vfolder": params.id.hex,
                     "permission": VFolderPermission.OWNER_PERM,
                 })
                 await session.execute(permission_insert)
-                owner_scope_creator = Creator(
-                    spec=AssociationScopesEntitiesCreatorSpec(
-                        scope_id=ScopeId(ScopeType.USER, str(params.user)),
-                        object_id=ObjectId(
-                            entity_type=EntityType.VFOLDER,
-                            entity_id=str(params.id),
-                        ),
+
+                # Map entity to owner's user scope only if ownership type is GROUP
+                # (for USER ownership, RBACEntityCreator already mapped to user scope)
+                if params.ownership_type == VFolderOwnershipType.GROUP:
+                    owner_scope_creator = Creator(
+                        spec=AssociationScopesEntitiesCreatorSpec(
+                            scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                            object_id=ObjectId(
+                                entity_type=EntityType.VFOLDER,
+                                entity_id=str(params.id),
+                            ),
+                        )
                     )
                 )
                 await self._role_manager.map_entity_to_scope(session, owner_scope_creator)
 
-            # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
-            return self._vfolder_row_to_data(created_vfolder)
+            return created_row.to_data()
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_attribute(self, updater: Updater[VFolderRow]) -> VFolderData:
