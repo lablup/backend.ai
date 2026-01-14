@@ -25,6 +25,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.model_serving.types import (
+    EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
     EndpointAutoScalingRuleListResult,
     EndpointData,
@@ -113,6 +114,33 @@ class ModelServingRepository:
                 return None
 
             return endpoint.to_data()
+
+    @model_serving_repository_resilience.apply()
+    async def get_endpoint_access_validation_data(
+        self, endpoint_id: uuid.UUID
+    ) -> EndpointAccessValidationData | None:
+        """
+        Get minimal endpoint data required for access validation.
+        Returns None if endpoint doesn't exist.
+        """
+        async with self._db.begin_readonly_session() as session:
+            stmt = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(selectinload(EndpointRow.session_owner_row))
+            )
+            result = await session.execute(stmt)
+            endpoint_row = result.scalar_one_or_none()
+            if endpoint_row is None:
+                return None
+
+            return EndpointAccessValidationData(
+                session_owner_id=endpoint_row.session_owner,
+                session_owner_role=(
+                    endpoint_row.session_owner_row.role if endpoint_row.session_owner_row else None
+                ),
+                domain=endpoint_row.domain,
+            )
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_by_name_validated(

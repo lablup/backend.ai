@@ -36,7 +36,10 @@ from ai.backend.manager.services.model_serving.exceptions import (
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
-from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
+from ai.backend.manager.services.model_serving.services.utils import (
+    validate_endpoint_access,
+    validate_endpoint_access_by_validation_data,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -84,10 +87,12 @@ class AutoScalingService:
             raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
 
         # Validate access to the endpoint first
-        endpoint_data = await self._repository.get_endpoint_by_id(action.endpoint_id)
-        if not endpoint_data:
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.endpoint_id
+        )
+        if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Create auto scaling rule (access already validated)
@@ -120,10 +125,12 @@ class AutoScalingService:
             raise EndpointAutoScalingRuleNotFound
 
         # Validate access to the endpoint
-        endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
-        if not endpoint_data:
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            rule_data.endpoint
+        )
+        if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Update auto scaling rule (access already validated)
@@ -145,10 +152,12 @@ class AutoScalingService:
             raise EndpointAutoScalingRuleNotFound
 
         # Validate access to the endpoint
-        endpoint_data = await self._repository.get_endpoint_by_id(rule_data.endpoint)
-        if not endpoint_data:
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            rule_data.endpoint
+        )
+        if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Delete auto scaling rule (access already validated)
