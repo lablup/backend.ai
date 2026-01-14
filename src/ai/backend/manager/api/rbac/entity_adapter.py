@@ -5,6 +5,7 @@ Handles conversion of request DTOs to BatchQuerier objects.
 
 from __future__ import annotations
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.dto.manager.rbac.request import (
     SearchEntitiesRequest,
 )
@@ -15,6 +16,9 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
 )
+from ai.backend.manager.repositories.permission_controller.options import (
+    EntityScopeConditions,
+)
 
 __all__ = ("EntityAdapter",)
 
@@ -22,17 +26,31 @@ __all__ = ("EntityAdapter",)
 class EntityAdapter(BaseFilterAdapter):
     """Adapter for converting entity requests to BatchQuerier objects."""
 
-    def build_querier(self, request: SearchEntitiesRequest) -> BatchQuerier:
+    def build_querier(
+        self,
+        scope_type: ScopeType,
+        scope_id: str,
+        entity_type: EntityType,
+        request: SearchEntitiesRequest,
+    ) -> BatchQuerier:
         """Build a BatchQuerier for entity search.
 
         Args:
+            scope_type: The scope type to search within
+            scope_id: The scope ID to search within
+            entity_type: The type of entity to search
             request: The search request containing pagination info
 
         Returns:
-            BatchQuerier with pagination settings
+            BatchQuerier with scope conditions and pagination settings
         """
+        conditions = [
+            EntityScopeConditions.by_scope_type(scope_type),
+            EntityScopeConditions.by_scope_id(scope_id),
+            EntityScopeConditions.by_entity_type(entity_type),
+        ]
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
-        return BatchQuerier(conditions=[], orders=[], pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=[], pagination=pagination)
 
     def convert_to_dto(self, data: EntityData) -> EntityDTO:
         """Convert EntityData to DTO.

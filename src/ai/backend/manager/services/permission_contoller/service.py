@@ -2,7 +2,6 @@ import logging
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.types import SearchEntitiesParam
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -234,13 +233,7 @@ class PermissionControllerService:
 
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
-        param = SearchEntitiesParam(
-            scope_type=action.scope_type,
-            scope_id=action.scope_id,
-            entity_type=action.target_entity_type,
-            querier=action.querier,
-        )
-        result = await self._repository.search_entities(param)
+        result = await self._repository.search_entities(action.querier)
         return SearchEntitiesActionResult(
             items=result.items,
             total_count=result.total_count,

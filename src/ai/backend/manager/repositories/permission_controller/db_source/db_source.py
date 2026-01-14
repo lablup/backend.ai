@@ -34,7 +34,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeData,
     ScopeListResult,
     ScopeType,
-    SearchEntitiesParam,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
@@ -991,37 +990,34 @@ class PermissionDBSource:
 
     async def search_entities_in_scope(
         self,
-        param: SearchEntitiesParam,
+        querier: BatchQuerier,
     ) -> EntityListResult:
         """Search entities within a scope.
 
         Queries the association_scopes_entities table for entity IDs matching
-        the scope_type, scope_id, and entity_type.
+        the conditions in the querier (scope_type, scope_id, entity_type).
 
         Args:
-            param: Parameters containing scope_type, scope_id, entity_type, and querier.
+            querier: BatchQuerier with scope conditions and pagination settings.
 
         Returns:
-            EntityListResult containing entity IDs
+            EntityListResult containing entity data
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == param.scope_type,
-                    AssociationScopesEntitiesRow.scope_id == param.scope_id,
-                    AssociationScopesEntitiesRow.entity_type == param.entity_type,
-                )
+            query = sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                AssociationScopesEntitiesRow.entity_type,
             )
 
             result = await execute_batch_querier(
                 db_sess,
                 query,
-                param.querier,
+                querier,
             )
 
             items = [
                 EntityData(
-                    entity_type=param.entity_type,
+                    entity_type=row.entity_type,
                     entity_id=row.entity_id,
                 )
                 for row in result.rows

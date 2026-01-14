@@ -464,17 +464,14 @@ class RBACAPIHandler:
         if me is None or not me.is_superadmin:
             raise NotEnoughPermission("Only superadmin can search entities.")
 
-        # Build querier and action
-        scope_type = path.parsed.scope_type
-        scope_id = path.parsed.scope_id
-        entity_type = path.parsed.entity_type
-        querier = self._entity_adapter.build_querier(body.parsed)
-        action = SearchEntitiesAction(
-            scope_type=scope_type,
-            scope_id=scope_id,
-            target_entity_type=entity_type,
-            querier=querier,
+        # Build querier with scope conditions and create action
+        querier = self._entity_adapter.build_querier(
+            scope_type=path.parsed.scope_type,
+            scope_id=path.parsed.scope_id,
+            entity_type=path.parsed.entity_type,
+            request=body.parsed,
         )
+        action = SearchEntitiesAction(querier=querier)
 
         # Call service action
         action_result = await processors.permission_controller.search_entities.wait_for_complete(
