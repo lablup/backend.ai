@@ -442,7 +442,6 @@ class LayerType(enum.StrEnum):
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
     ERROR_LOG_DB_SOURCE = "error_log_db_source"
-    KERNEL_DB_SOURCE = "kernel_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
     RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
     SCHEDULE_DB_SOURCE = "schedule_db_source"

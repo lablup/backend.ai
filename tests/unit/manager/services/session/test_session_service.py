@@ -1651,8 +1651,13 @@ class TestSearchKernels:
     """Test cases for SessionService.search_kernels"""
 
     @pytest.fixture
-    def sample_kernel_info(self) -> MagicMock:
+    def sample_kernel_info(self) -> KernelInfo:
         """Create sample kernel info data"""
+        from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+        from ai.backend.manager.data.kernel.types import (
+            KernelInfo,
+        )
+
         kernel_id = KernelId(uuid4())
         session_id = uuid4()
         user_id = uuid4()
@@ -1745,7 +1750,7 @@ class TestSearchKernels:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_kernel_info: MagicMock,
+        sample_kernel_info: KernelInfo,
     ) -> None:
         """Test searching kernels with querier"""
         from ai.backend.manager.data.kernel.types import KernelListResult
@@ -1811,7 +1816,7 @@ class TestSearchKernels:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_kernel_info: MagicMock,
+        sample_kernel_info: KernelInfo,
     ) -> None:
         """Test searching kernels with pagination"""
         from ai.backend.manager.data.kernel.types import KernelListResult

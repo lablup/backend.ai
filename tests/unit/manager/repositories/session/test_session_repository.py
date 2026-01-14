@@ -304,6 +304,7 @@ class TestSessionRepository:
                 name="default-project-policy",
                 max_vfolder_count=100,
                 max_quota_scope_size=-1,
+                max_network_count=10,
             )
             db_sess.add(project_resource_policy)
 
