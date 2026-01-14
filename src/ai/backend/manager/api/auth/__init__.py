@@ -1,3 +1,12 @@
+"""
+Auth API module providing authentication middleware, decorators, and REST API handlers.
+
+This module provides:
+- Authentication middleware for HMAC, JWT, and hook-based authentication
+- Authorization decorators (@auth_required, @admin_required, @superadmin_required)
+- REST API handlers for auth operations (authorize, signup, signout, etc.)
+"""
+
 from __future__ import annotations
 
 import functools
@@ -5,34 +14,26 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
-import aiohttp_cors
 import sqlalchemy as sa
-import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
-from ai.backend.common import validators as tx
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
-from ai.backend.common.dto.manager.auth.field import (
-    AuthResponseType,
-    AuthSuccessResponse,
-    AuthTokenType,
-)
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.api.utils import get_handler_attr, set_handler_attr
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
@@ -46,26 +47,28 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import execute_with_retry
-from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
-from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
-from ai.backend.manager.services.auth.actions.signout import SignoutAction
-from ai.backend.manager.services.auth.actions.signup import SignupAction
-from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
-from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
-from ai.backend.manager.services.auth.actions.update_password_no_auth import (
-    UpdatePasswordNoAuthAction,
-)
-from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
-
-from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_handler_attr, set_handler_attr
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+__all__ = (
+    # Middleware
+    "auth_middleware",
+    # Decorators
+    "auth_required",
+    "auth_required_for_method",
+    "admin_required",
+    "superadmin_required",
+    # Utilities
+    "check_date",
+    "sign_request",
+    "validate_ip",
+    "_extract_auth_params",  # exposed for testing
+    # App factory
+    "create_app",
+)
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -299,7 +302,7 @@ _whois_timezone_info: Final = {
 whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
-def _extract_auth_params(request):
+def _extract_auth_params(request: web.Request) -> tuple[str, str, str] | None:
     """
     HTTP Authorization header must be formatted as:
     "Authorization: BackendAI signMethod=HMAC-SHA256,
@@ -398,7 +401,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature")
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]):
+def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     allowed_client_ip = user.get("allowed_client_ip", None)
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list
@@ -436,6 +439,7 @@ async def _query_cred_by_access_key(
     Returns:
         Tuple of (user_row, keypair_row) or (None, None) if not found
     """
+
     async with root_ctx.db.begin_readonly() as conn:
         # Query keypair with resource policy
         j = keypairs.join(
@@ -717,7 +721,7 @@ def _setup_user_context(request: web.Request) -> ExitStack:
 
 
 @web.middleware
-async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+async def auth_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
     """
     Unified authentication middleware - routes to appropriate authentication flow.
 
@@ -760,9 +764,9 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
 
 
-def auth_required(handler):
+def auth_required(handler: Any) -> Any:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -772,9 +776,11 @@ def auth_required(handler):
     return wrapped
 
 
-def auth_required_for_method(method):
+def auth_required_for_method(method: Any) -> Any:
     @functools.wraps(method)
-    async def wrapped(self, request, *args, **kwargs):
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -784,9 +790,9 @@ def auth_required_for_method(method):
     return wrapped
 
 
-def admin_required(handler):
+def admin_required(handler: Any) -> Any:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_admin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -796,9 +802,9 @@ def admin_required(handler):
     return wrapped
 
 
-def superadmin_required(handler):
+def superadmin_required(handler: Any) -> Any:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_superadmin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -808,320 +814,40 @@ def superadmin_required(handler):
     return wrapped
 
 
-@auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("echo"): t.String,
-    })
-)
-async def test(request: web.Request, params: Any) -> web.Response:
-    log.info("AUTH.TEST(ak:{})", request["keypair"]["access_key"])
-    resp_data = {"authorized": "yes"}
-    if "echo" in params:
-        resp_data["echo"] = params["echo"]
-    return web.json_response(resp_data)
-
-
-@auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("group", default=None): t.Null | tx.UUID,
-    })
-)
-async def get_role(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    log.info(
-        "AUTH.ROLES(ak:{}, d:{}, g:{})",
-        request["keypair"]["access_key"],
-        request["user"]["domain_name"],
-        params["group"],
-    )
-    action = GetRoleAction(
-        user_id=request["user"]["uuid"],
-        group_id=params["group"],
-        is_superadmin=request["is_superadmin"],
-        is_admin=request["is_admin"],
-    )
-    result = await root_ctx.processors.auth.get_role.wait_for_complete(action)
-    resp_data = {
-        "global_role": result.global_role,
-        "domain_role": result.domain_role,
-        "group_role": result.group_role,
-    }
-    return web.json_response(resp_data)
-
-
-@check_api_params(
-    t.Dict({
-        t.Key("type"): t.Enum("keypair", "jwt"),
-        t.Key("domain"): t.String,
-        t.Key("username"): t.String,
-        t.Key("password"): t.String,
-    }).allow_extra("*")
-)
-async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
-    log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
-    root_ctx: RootContext = request.app["_root.context"]
-    stoken = params.get("stoken") or params.get("sToken")
-    action = AuthorizeAction(
-        request=request,
-        type=AuthTokenType(params["type"]),
-        domain_name=params["domain"],
-        email=params["username"],
-        password=params["password"],
-        stoken=stoken,
-    )
-    result = await root_ctx.processors.auth.authorize.wait_for_complete(action)
-
-    if result.stream_response is not None:
-        return result.stream_response
-
-    if result.authorization_result is None:
-        raise AuthorizationFailed("Authorization result is missing")
-    auth_result = result.authorization_result
-    data = AuthSuccessResponse(
-        response_type=AuthResponseType.SUCCESS,
-        access_key=auth_result.access_key,
-        secret_key=auth_result.secret_key,
-        role=auth_result.role,
-        status=auth_result.status,
-    )
-
-    return web.json_response({
-        "data": data.to_dict(),
-    })
-
-
-@check_api_params(
-    t.Dict({
-        t.Key("domain"): t.String,
-        t.Key("email"): t.String,
-        t.Key("password"): t.String,
-    }).allow_extra("*")
-)
-async def signup(request: web.Request, params: Any) -> web.Response:
-    log.info("AUTH.SIGNUP(d:{}, email:{}, passwd:****)", params["domain"], params["email"])
-    root_ctx: RootContext = request.app["_root.context"]
-    action = SignupAction(
-        request=request,
-        domain_name=params["domain"],
-        email=params["email"],
-        password=params["password"],
-        username=params.get("username"),
-        full_name=params.get("full_name"),
-        description=params.get("description"),
-    )
-    result = await root_ctx.processors.auth.signup.wait_for_complete(action)
-
-    resp_data = {
-        "access_key": result.access_key,
-        "secret_key": result.secret_key,
-    }
-
-    return web.json_response(resp_data, status=HTTPStatus.CREATED)
-
-
-@auth_required
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["email", "username"]): t.String,
-        t.Key("password"): t.String,
-    })
-)
-async def signout(request: web.Request, params: Any) -> web.Response:
-    domain_name = request["user"]["domain_name"]
-    email = params["email"]
-    password = params["password"]
-    log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, email)
-    root_ctx: RootContext = request.app["_root.context"]
-
-    await root_ctx.processors.auth.signout.wait_for_complete(
-        SignoutAction(
-            user_id=request["user"]["uuid"],
-            domain_name=domain_name,
-            requester_email=request["user"]["email"],
-            email=email,
-            password=password,
-        )
-    )
-
-    return web.json_response({})
-
-
-@auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("email"): t.String,
-        t.Key("full_name"): t.String,
-    })
-)
-async def update_full_name(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    domain_name = request["user"]["domain_name"]
-    email = request["user"]["email"]
-    log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
-    await root_ctx.processors.auth.update_full_name.wait_for_complete(
-        UpdateFullNameAction(
-            user_id=request["user"]["uuid"],
-            full_name=params["full_name"],
-            domain_name=domain_name,
-            email=email,
-        )
-    )
-    return web.json_response({}, status=HTTPStatus.OK)
-
-
-@auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("old_password"): t.String,
-        t.Key("new_password"): t.String,
-        t.Key("new_password2"): t.String,
-    })
-)
-async def update_password(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    domain_name = request["user"]["domain_name"]
-    email = request["user"]["email"]
-    log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", domain_name, email)
-
-    action = UpdatePasswordAction(
-        request=request,
-        user_id=request["user"]["uuid"],
-        domain_name=domain_name,
-        email=email,
-        old_password=params["old_password"],
-        new_password=params["new_password"],
-        new_password_confirm=params["new_password2"],
-    )
-    result = await root_ctx.processors.auth.update_password.wait_for_complete(action)
-    if not result.success:
-        return web.json_response(
-            {"error_msg": "new password mismatch"}, status=HTTPStatus.BAD_REQUEST
-        )
-    return web.json_response({}, status=HTTPStatus.OK)
-
-
-@check_api_params(
-    t.Dict({
-        t.Key("domain"): t.String,
-        t.Key("username"): t.String,
-        t.Key("current_password"): t.String,
-        t.Key("new_password"): t.String,
-    })
-)
-async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
-    """
-    Update user's password without any authorization
-    to allows users to update passwords that have expired
-    because it's been too long since a user changed the password.
-    """
-
-    root_ctx: RootContext = request.app["_root.context"]
-    log.info(
-        "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)",
-        params["domain"],
-        params["username"],
-    )
-
-    action = UpdatePasswordNoAuthAction(
-        request=request,
-        domain_name=params["domain"],
-        email=params["username"],
-        current_password=params["current_password"],
-        new_password=params["new_password"],
-    )
-    result = await root_ctx.processors.auth.update_password_no_auth.wait_for_complete(action)
-    return web.json_response(
-        {"password_changed_at": result.password_changed_at.isoformat()}, status=HTTPStatus.CREATED
-    )
-
-
-@auth_required
-async def get_ssh_keypair(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    domain_name = request["user"]["domain_name"]
-    access_key = request["keypair"]["access_key"]
-    log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
-    result = await root_ctx.processors.auth.get_ssh_keypair.wait_for_complete(
-        GetSSHKeypairAction(
-            user_id=request["user"]["uuid"],
-            access_key=access_key,
-        )
-    )
-    return web.json_response({"ssh_public_key": result.public_key}, status=HTTPStatus.OK)
-
-
-@auth_required
-async def generate_ssh_keypair(request: web.Request) -> web.Response:
-    domain_name = request["user"]["domain_name"]
-    access_key = request["keypair"]["access_key"]
-    log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
-    root_ctx: RootContext = request.app["_root.context"]
-    result = await root_ctx.processors.auth.generate_ssh_keypair.wait_for_complete(
-        GenerateSSHKeypairAction(
-            user_id=request["user"]["uuid"],
-            access_key=access_key,
-        )
-    )
-    data = {
-        "ssh_public_key": result.ssh_keypair.ssh_public_key,
-        "ssh_private_key": result.ssh_keypair.ssh_private_key,
-    }
-    return web.json_response(data, status=HTTPStatus.OK)
-
-
-@auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("pubkey"): t.String,
-        t.Key("privkey"): t.String,
-    })
-)
-async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
-    domain_name = request["user"]["domain_name"]
-    access_key = request["keypair"]["access_key"]
-    pubkey = f"{params['pubkey'].rstrip()}\n"
-    privkey = f"{params['privkey'].rstrip()}\n"
-    log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
-    root_ctx: RootContext = request.app["_root.context"]
-
-    result = await root_ctx.processors.auth.upload_ssh_keypair.wait_for_complete(
-        UploadSSHKeypairAction(
-            user_id=request["user"]["uuid"],
-            public_key=pubkey,
-            private_key=privkey,
-            access_key=access_key,
-        )
-    )
-    data = {
-        "ssh_public_key": result.ssh_keypair.ssh_public_key,
-        "ssh_private_key": result.ssh_keypair.ssh_private_key,
-    }
-    return web.json_response(data, status=HTTPStatus.OK)
-
-
 def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
+    default_cors_options: Any,
+) -> tuple[web.Application, list[Any]]:
+    """Create aiohttp application for auth API endpoints."""
+    import aiohttp_cors
+
+    from .handler import AuthAPIHandler
+
     app = web.Application()
-    app["prefix"] = "auth"  # slashed to distinguish with "/vN/authorize"
-    app["api_versions"] = (1, 2, 3, 4)
+    app["prefix"] = "auth"
+    app["api_versions"] = (1, 2, 3, 4, 5)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    handler = AuthAPIHandler()
+
+    # Auth test endpoints
     root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("GET", test))
-    cors.add(root_resource.add_route("POST", test))
+    cors.add(root_resource.add_route("GET", handler.test))
+    cors.add(root_resource.add_route("POST", handler.test))
     test_resource = cors.add(app.router.add_resource("/test"))
-    cors.add(test_resource.add_route("GET", test))
-    cors.add(test_resource.add_route("POST", test))
-    cors.add(app.router.add_route("POST", "/authorize", authorize))
-    cors.add(app.router.add_route("GET", "/role", get_role))
-    cors.add(app.router.add_route("POST", "/signup", signup))
-    cors.add(app.router.add_route("POST", "/signout", signout))
-    cors.add(app.router.add_route("POST", "/update-password-no-auth", update_password_no_auth))
-    cors.add(app.router.add_route("POST", "/update-password", update_password))
-    cors.add(app.router.add_route("POST", "/update-full-name", update_full_name))
-    cors.add(app.router.add_route("GET", "/ssh-keypair", get_ssh_keypair))
-    cors.add(app.router.add_route("PATCH", "/ssh-keypair", generate_ssh_keypair))
-    cors.add(app.router.add_route("POST", "/ssh-keypair", upload_ssh_keypair))
+    cors.add(test_resource.add_route("GET", handler.test))
+    cors.add(test_resource.add_route("POST", handler.test))
+
+    # Auth endpoints
+    cors.add(app.router.add_route("POST", "/authorize", handler.authorize))
+    cors.add(app.router.add_route("GET", "/role", handler.get_role))
+    cors.add(app.router.add_route("POST", "/signup", handler.signup))
+    cors.add(app.router.add_route("POST", "/signout", handler.signout))
+    cors.add(
+        app.router.add_route("POST", "/update-password-no-auth", handler.update_password_no_auth)
+    )
+    cors.add(app.router.add_route("POST", "/update-password", handler.update_password))
+    cors.add(app.router.add_route("POST", "/update-full-name", handler.update_full_name))
+    cors.add(app.router.add_route("GET", "/ssh-keypair", handler.get_ssh_keypair))
+    cors.add(app.router.add_route("PATCH", "/ssh-keypair", handler.generate_ssh_keypair))
+    cors.add(app.router.add_route("POST", "/ssh-keypair", handler.upload_ssh_keypair))
+
     return app, [auth_middleware]
