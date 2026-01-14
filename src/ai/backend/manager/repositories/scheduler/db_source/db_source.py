@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -62,7 +63,15 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.rbac.field_creator import (
+    RBACBulkFieldCreator,
+    execute_rbac_bulk_field_creator,
+)
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
@@ -93,6 +102,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionEnqueueData,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
+from ai.backend.manager.repositories.session.creators import (
+    KernelRowCreatorSpec,
+    SessionRowCreatorSpec,
+)
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
 )
@@ -1114,9 +1127,23 @@ class ScheduleDBSource:
                 )
                 kernels.append(kernel_row)
 
-            # Add session and kernels to database
-            db_sess.add(session)
-            db_sess.add_all(kernels)
+            # Use RBACEntityCreator to create session with RBAC scope association
+            rbac_creator = RBACEntityCreator(
+                spec=SessionRowCreatorSpec(row=session),
+                scope_type=ScopeType.USER,
+                scope_id=str(session_data.user_uuid),
+                entity_type=EntityType.SESSION,
+            )
+            await execute_rbac_entity_creator(db_sess, rbac_creator)
+
+            # Use RBACBulkFieldCreator to create kernels with RBAC field association
+            kernel_field_creator = RBACBulkFieldCreator(
+                specs=[KernelRowCreatorSpec(row=k) for k in kernels],
+                entity_type=EntityType.SESSION,
+                entity_id=str(session_data.id),
+                field_type=FieldType.KERNEL,
+            )
+            await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
             await db_sess.flush()
 
             # Add session dependencies if any
