@@ -32,6 +32,7 @@ from ai.backend.storage.services.artifacts.types import (
     ImportStepContext,
     VerifyStepResult,
 )
+from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -114,11 +115,11 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         )
 
         dst_storage = dst_storage_target.resolve_storage(context.storage_pool)
-        if not isinstance(dst_storage, VFSStorage):
+        if not isinstance(dst_storage, (VFSStorage, VFolderStorage)):
             raise ArtifactVerifyStorageTypeInvalid(
-                "Verify step requires VFS or VolumeStorageAdapter storage type"
+                "Verify step requires VFS or VFolderStorage storage type"
             )
-        dst_storage = cast(VFSStorage, dst_storage)
+        dst_storage = cast(VFSStorage | VFolderStorage, dst_storage)
 
         # Collect verification results from all verifiers
         verifier_results: dict[str, VerifierResult] = {}

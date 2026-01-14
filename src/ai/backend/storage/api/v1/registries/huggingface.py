@@ -24,6 +24,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
+    StorageMappingResolverData,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceGetCommitHashResponse,
@@ -37,7 +38,7 @@ from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     LegacyHuggingfaceConfig,
 )
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import StorageMappingResolver
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
@@ -53,9 +54,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
+    _storage_mapping_resolver: StorageMappingResolver
 
-    def __init__(self, huggingface_service: HuggingFaceService) -> None:
+    def __init__(
+        self,
+        huggingface_service: HuggingFaceService,
+        storage_mapping_resolver: StorageMappingResolver,
+    ) -> None:
         self._huggingface_service = huggingface_service
+        self._storage_mapping_resolver = storage_mapping_resolver
 
     @api_handler
     async def scan_models(
@@ -175,13 +182,13 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
-        # Convert string mappings to StorageTarget instances
-        storage_step_mappings = {
-            step: StorageTarget.from_storage_name(storage_name)
-            for step, storage_name in body.parsed.storage_step_mappings.items()
-        }
+        storage_step_mappings = self._storage_mapping_resolver.resolve(
+            StorageMappingResolverData(
+                storage_step_mappings=body.parsed.storage_step_mappings,
+                storage_step_target_mappings=body.parsed.storage_step_target_mappings,
+            ),
+        )
 
-        # Create import pipeline based on storage step mappings
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
@@ -196,6 +203,7 @@ class HuggingFaceRegistryAPIHandler:
             models=body.parsed.models,
             storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
+            storage_prefix=body.parsed.storage_prefix,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -235,7 +243,11 @@ def create_app(ctx: RootContext) -> web.Application:
             redis_client=ctx.valkey_artifact_client,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
+    storage_mapping_resolver = StorageMappingResolver(ctx.volume_pool)
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service,
+        storage_mapping_resolver=storage_mapping_resolver,
+    )
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)

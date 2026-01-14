@@ -699,6 +699,7 @@ class TestHuggingFaceDownloadStep:
                 storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
             # Verify the stream reader was created with correct parameters
@@ -747,6 +748,7 @@ class TestHuggingFaceDownloadStep:
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
     @pytest.mark.asyncio
@@ -784,6 +786,7 @@ class TestHuggingFaceDownloadStep:
                 storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
     @pytest.mark.asyncio
@@ -814,6 +817,7 @@ class TestHuggingFaceDownloadStep:
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
 
