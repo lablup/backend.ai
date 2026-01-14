@@ -11,38 +11,19 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
-    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.kernel.types import (
-    ClusterConfig,
-    ImageInfo,
-    KernelInfo,
-    KernelListResult,
-    KernelStatus,
-    LifecycleStatus,
-    Metadata,
-    Metrics,
-    NetworkConfig,
-    RelatedSessionInfo,
-    ResourceInfo,
-    RuntimeConfig,
-    UserPermission,
-)
 from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -63,15 +44,6 @@ from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
 )
-from ai.backend.manager.services.session.actions.execute_session import (
-    ExecuteSessionAction,
-    ExecuteSessionActionParams,
-    ExecuteSessionActionResult,
-)
-from ai.backend.manager.services.session.actions.get_container_logs import (
-    GetContainerLogsAction,
-    GetContainerLogsActionResult,
-)
 from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
@@ -83,14 +55,6 @@ from ai.backend.manager.services.session.actions.get_session_info import (
 from ai.backend.manager.services.session.actions.get_status_history import (
     GetStatusHistoryAction,
 )
-from ai.backend.manager.services.session.actions.interrupt_session import (
-    InterruptSessionAction,
-    InterruptSessionActionResult,
-)
-from ai.backend.manager.services.session.actions.list_files import (
-    ListFilesAction,
-    ListFilesActionResult,
-)
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
@@ -101,14 +65,9 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
-)
-from ai.backend.manager.services.session.actions.upload_files import (
-    UploadFilesAction,
-    UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 
@@ -809,6 +768,8 @@ class TestDownloadFiles:
         sample_user_id: UUID,
     ) -> None:
         """Test downloading too many files raises error"""
+        from ai.backend.manager.errors.storage import VFolderBadRequest
+
         mock_session = MagicMock()
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
@@ -918,6 +879,8 @@ class TestRenameSession:
         sample_access_key: AccessKey,
     ) -> None:
         """Test renaming non-running session raises error"""
+        from ai.backend.common.exception import InvalidAPIParameters
+
         mock_session = MagicMock()
         mock_session.status = SessionStatus.PENDING  # Not running
         mock_session_repository.update_session_name = AsyncMock(return_value=mock_session)
@@ -1057,6 +1020,8 @@ class TestUploadFiles:
         sample_access_key: AccessKey,
     ) -> None:
         """Test successfully uploading files"""
+        from aiohttp.multipart import BodyPartReader
+
         # Create a mock reader
         mock_file = MagicMock(spec=BodyPartReader)
         mock_file.filename = "test_file.txt"
@@ -1078,6 +1043,11 @@ class TestUploadFiles:
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.upload_file = AsyncMock()
+
+        from ai.backend.manager.services.session.actions.upload_files import (
+            UploadFilesAction,
+            UploadFilesActionResult,
+        )
 
         action = UploadFilesAction(
             session_name="test-session",
@@ -1103,6 +1073,10 @@ class TestUploadFiles:
         )
         mock_reader = MagicMock()
         mock_reader.next = AsyncMock(return_value=None)
+
+        from ai.backend.manager.services.session.actions.upload_files import (
+            UploadFilesAction,
+        )
 
         action = UploadFilesAction(
             session_name="nonexistent",
@@ -1144,6 +1118,12 @@ class TestExecute:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.execute = AsyncMock(return_value=expected_execute_response)
 
+        from ai.backend.manager.services.session.actions.execute_session import (
+            ExecuteSessionAction,
+            ExecuteSessionActionParams,
+            ExecuteSessionActionResult,
+        )
+
         params = ExecuteSessionActionParams(
             mode="query",
             options=None,
@@ -1175,6 +1155,11 @@ class TestExecute:
         """Test executing code when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.execute_session import (
+            ExecuteSessionAction,
+            ExecuteSessionActionParams,
         )
 
         params = ExecuteSessionActionParams(
@@ -1215,6 +1200,11 @@ class TestInterrupt:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.interrupt_session = AsyncMock(return_value={})
 
+        from ai.backend.manager.services.session.actions.interrupt_session import (
+            InterruptSessionAction,
+            InterruptSessionActionResult,
+        )
+
         action = InterruptSessionAction(
             session_name="test-session",
             owner_access_key=sample_access_key,
@@ -1236,6 +1226,10 @@ class TestInterrupt:
         """Test interrupting session when not found"""
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.interrupt_session import (
+            InterruptSessionAction,
         )
 
         action = InterruptSessionAction(
@@ -1271,6 +1265,11 @@ class TestListFiles:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.list_files = AsyncMock(return_value=expected_files)
 
+        from ai.backend.manager.services.session.actions.list_files import (
+            ListFilesAction,
+            ListFilesActionResult,
+        )
+
         action = ListFilesAction(
             user_id=sample_user_id,
             path="/home/work",
@@ -1295,6 +1294,10 @@ class TestListFiles:
         """Test listing files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.list_files import (
+            ListFilesAction,
         )
 
         action = ListFilesAction(
@@ -1333,6 +1336,11 @@ class TestGetContainerLogs:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.get_logs_from_agent = AsyncMock(return_value=agent_logs)
 
+        from ai.backend.manager.services.session.actions.get_container_logs import (
+            GetContainerLogsAction,
+            GetContainerLogsActionResult,
+        )
+
         action = GetContainerLogsAction(
             session_name="test-session",
             owner_access_key=sample_access_key,
@@ -1356,6 +1364,10 @@ class TestGetContainerLogs:
         """Test getting logs when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
+        )
+
+        from ai.backend.manager.services.session.actions.get_container_logs import (
+            GetContainerLogsAction,
         )
 
         action = GetContainerLogsAction(
@@ -1624,8 +1636,24 @@ class TestSearchKernels:
     """Test cases for SessionService.search_kernels"""
 
     @pytest.fixture
-    def sample_kernel_info(self) -> KernelInfo:
-        """Create sample kernel info data"""
+    def sample_kernel_info(self) -> "KernelInfo":
+        """Create sample kernel info data."""
+        from ai.backend.common.types import KernelId, ResourceSlot, SessionResult, SessionTypes
+        from ai.backend.manager.data.kernel.types import (
+            ClusterConfig,
+            ImageInfo,
+            KernelInfo,
+            KernelStatus,
+            LifecycleStatus,
+            Metadata,
+            Metrics,
+            NetworkConfig,
+            RelatedSessionInfo,
+            ResourceInfo,
+            RuntimeConfig,
+            UserPermission,
+        )
+
         kernel_id = KernelId(uuid4())
         session_id = uuid4()
         user_id = uuid4()
@@ -1714,13 +1742,19 @@ class TestSearchKernels:
             ),
         )
 
-    async def test_search_kernels(
+    async def test_search_kernels_success(
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_kernel_info: KernelInfo,
+        sample_kernel_info: "KernelInfo",
     ) -> None:
-        """Test searching kernels with querier"""
+        """Test successfully searching kernels."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+            SearchKernelsActionResult,
+        )
+
         mock_session_repository.search_kernels = AsyncMock(
             return_value=KernelListResult(
                 items=[sample_kernel_info],
@@ -1738,6 +1772,7 @@ class TestSearchKernels:
         action = SearchKernelsAction(querier=querier)
         result = await session_service.search_kernels(action)
 
+        assert isinstance(result, SearchKernelsActionResult)
         assert result.data == [sample_kernel_info]
         assert result.total_count == 1
         assert result.has_next_page is False
@@ -1749,7 +1784,12 @@ class TestSearchKernels:
         session_service: SessionService,
         mock_session_repository: MagicMock,
     ) -> None:
-        """Test searching kernels when no results are found"""
+        """Test searching kernels when no results are found."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+        )
+
         mock_session_repository.search_kernels = AsyncMock(
             return_value=KernelListResult(
                 items=[],
@@ -1774,9 +1814,14 @@ class TestSearchKernels:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_kernel_info: KernelInfo,
+        sample_kernel_info: "KernelInfo",
     ) -> None:
-        """Test searching kernels with pagination"""
+        """Test searching kernels with pagination."""
+        from ai.backend.manager.data.kernel.types import KernelListResult
+        from ai.backend.manager.services.session.actions.search_kernel import (
+            SearchKernelsAction,
+        )
+
         mock_session_repository.search_kernels = AsyncMock(
             return_value=KernelListResult(
                 items=[sample_kernel_info],
