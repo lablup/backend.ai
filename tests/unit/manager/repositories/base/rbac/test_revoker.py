@@ -132,7 +132,7 @@ class TestRevokerBasic:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Create role
             role = RoleRow(
                 id=uuid.uuid4(),
@@ -164,6 +164,7 @@ class TestRevokerBasic:
             for op in [OperationType.READ, OperationType.UPDATE]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=op,
@@ -189,7 +190,7 @@ class TestRevokerBasic:
         """Test that revoker removes object permissions from specified role."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             obj_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
@@ -218,7 +219,7 @@ class TestRevokerBasic:
         """Test that revoker with empty role_ids does nothing."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke with empty role_ids
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -241,7 +242,7 @@ class TestRevokerBasic:
         """Test that revoker only removes specified operations."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke for READ only
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -263,7 +264,7 @@ class TestRevokerBasic:
         """Test that operations=None revokes all operations."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke with operations=None
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -296,7 +297,7 @@ class TestRevokerPermissionGroupCleanup:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
                 name="test-role",
@@ -324,6 +325,7 @@ class TestRevokerPermissionGroupCleanup:
 
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=entity_id.entity_type,
                 entity_id=entity_id.entity_id,
                 operation=OperationType.READ,
@@ -356,7 +358,7 @@ class TestRevokerPermissionGroupCleanup:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
                 name="test-role",
@@ -385,6 +387,7 @@ class TestRevokerPermissionGroupCleanup:
 
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=OperationType.READ,
@@ -411,7 +414,7 @@ class TestRevokerPermissionGroupCleanup:
         """Test that revoker deletes orphaned permission groups."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             pg_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
@@ -440,7 +443,7 @@ class TestRevokerPermissionGroupCleanup:
         """Test that revoker preserves permission groups that have other entities."""
         ctx = two_entities_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke for entity1 only
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id1,
@@ -474,7 +477,7 @@ class TestRevokerPermissionGroupCleanup:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
                 name="test-role",
@@ -511,6 +514,7 @@ class TestRevokerPermissionGroupCleanup:
             # Create object permission
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=entity_id.entity_type,
                 entity_id=entity_id.entity_id,
                 operation=OperationType.READ,
@@ -536,7 +540,7 @@ class TestRevokerPermissionGroupCleanup:
         """Test that revoker preserves permission groups that have PermissionRow entries."""
         ctx = entity_with_permission_row
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -577,7 +581,7 @@ class TestRevokerMultipleRoles:
         perm_group_id1: UUID
         perm_group_id2: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Create two roles with permission groups
             role1 = RoleRow(
                 id=uuid.uuid4(),
@@ -617,9 +621,10 @@ class TestRevokerMultipleRoles:
             db_sess.add(assoc_row)
 
             # Create object permissions for both roles
-            for role in [role1, role2]:
+            for role, perm_group in [(role1, perm_group1), (role2, perm_group2)]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=OperationType.READ,
@@ -649,7 +654,7 @@ class TestRevokerMultipleRoles:
         """Test that revoker can revoke from multiple roles at once."""
         ctx = entity_with_two_roles
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke for both roles
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -677,7 +682,7 @@ class TestRevokerMultipleRoles:
         """Test that revoking from one role preserves other role's permissions."""
         ctx = entity_with_two_roles
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute revoke for role1 only
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
@@ -714,7 +719,7 @@ class TestRevokerIdempotent:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             role = RoleRow(
                 id=uuid.uuid4(),
                 name="test-role",
@@ -742,6 +747,7 @@ class TestRevokerIdempotent:
 
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=entity_id.entity_type,
                 entity_id=entity_id.entity_id,
                 operation=OperationType.READ,
@@ -767,7 +773,7 @@ class TestRevokerIdempotent:
         """Test that revoking same permissions twice is idempotent."""
         ctx = single_entity_with_role
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
                 target_role_ids=[ctx.role_id],

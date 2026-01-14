@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.data.permission.types import OperationType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 
@@ -160,15 +161,34 @@ async def _delete_object_permissions(
     return cast(CursorResult, result).rowcount or 0
 
 
-async def _delete_permission_groups(
+async def _delete_orphan_permission_groups(
     db_sess: SASession,
     ids: Collection[UUID],
 ) -> int:
-    """Delete PermissionGroupRows by IDs. Returns count of deleted rows."""
+    """Delete PermissionGroupRows only if they have no remaining references.
+
+    Uses NOT EXISTS to ensure no ObjectPermission or Permission references exist,
+    preventing race conditions with concurrent Granter operations.
+    """
     if not ids:
         return 0
+
     result = await db_sess.execute(
-        sa.delete(PermissionGroupRow).where(PermissionGroupRow.id.in_(ids))
+        sa.delete(PermissionGroupRow).where(
+            sa.and_(
+                PermissionGroupRow.id.in_(ids),
+                ~sa.exists(
+                    sa.select(ObjectPermissionRow.id).where(
+                        ObjectPermissionRow.permission_group_id == PermissionGroupRow.id
+                    )
+                ),
+                ~sa.exists(
+                    sa.select(PermissionRow.id).where(
+                        PermissionRow.permission_group_id == PermissionGroupRow.id
+                    )
+                ),
+            )
+        )
     )
     return cast(CursorResult, result).rowcount or 0
 
@@ -221,6 +241,6 @@ async def execute_rbac_revoker(
 
     # Execute deletions in order
     await _delete_object_permissions(db_sess, object_permission_ids)
-    await _delete_permission_groups(db_sess, permission_group_ids)
+    await _delete_orphan_permission_groups(db_sess, permission_group_ids)
 
     await db_sess.flush()

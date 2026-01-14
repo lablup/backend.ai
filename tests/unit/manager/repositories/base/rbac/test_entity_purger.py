@@ -237,7 +237,7 @@ class TestRBACEntityPurgerBasic:
         user_id = str(uuid.uuid4())
         entity_uuid = uuid.uuid4()
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
                 name="test-entity",
@@ -268,7 +268,7 @@ class TestRBACEntityPurgerBasic:
         """Test that purger deletes main row and scope-entity association."""
         ctx = entity_with_association
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
@@ -302,7 +302,7 @@ class TestRBACEntityPurgerBasic:
         """Test that purger returns None when row doesn't exist."""
         nonexistent_uuid = uuid.uuid4()
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=nonexistent_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
@@ -328,7 +328,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
                 name="test-entity",
@@ -364,6 +364,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
             for op in [OperationType.READ, OperationType.UPDATE]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(entity_uuid),
                     operation=op,
@@ -393,7 +394,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
         entity_uuid2 = uuid.uuid4()
         role_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             for entity_uuid, name in [(entity_uuid1, "entity-1"), (entity_uuid2, "entity-2")]:
                 entity_row = RBACEntityPurgerTestRow(
                     id=entity_uuid,
@@ -430,6 +431,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
             for entity_uuid in [entity_uuid1, entity_uuid2]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(entity_uuid),
                     operation=OperationType.READ,
@@ -454,7 +456,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
         """Test that purger deletes related object permissions."""
         ctx = entity_with_permissions
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
@@ -477,7 +479,7 @@ class TestRBACEntityPurgerWithObjectPermissions:
         """Test that purger preserves object permissions for other entities."""
         ctx = two_entities_with_permissions
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Delete only entity1
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
@@ -514,7 +516,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
                 name="test-entity",
@@ -550,6 +552,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
             # Create object permission (but no PermissionRow)
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(entity_uuid),
                 operation=OperationType.READ,
@@ -579,7 +582,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         entity_uuid2 = uuid.uuid4()
         role_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             for entity_uuid, name in [(entity_uuid1, "entity-1"), (entity_uuid2, "entity-2")]:
                 entity_row = RBACEntityPurgerTestRow(
                     id=entity_uuid,
@@ -616,6 +619,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
             for entity_uuid in [entity_uuid1, entity_uuid2]:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(entity_uuid),
                     operation=OperationType.READ,
@@ -640,7 +644,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         """Test that purger deletes permission groups with no remaining permissions."""
         ctx = single_entity_with_empty_perm_group
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
@@ -663,7 +667,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         """Test that purger preserves permission groups that have other scoped entities."""
         ctx = two_entities_with_empty_perm_group
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Delete entity1
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
@@ -701,7 +705,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Create entity with role's object_permission
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
@@ -756,6 +760,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
             # Create object permission ONLY for entity (not unrelated_entity)
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(entity_uuid),
                 operation=OperationType.READ,
@@ -789,7 +794,7 @@ class TestRBACEntityPurgerPermissionGroupCleanup:
         """
         ctx = entity_with_unrelated_entity_in_scope
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state: unrelated entity exists in same scope
             assoc_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
@@ -846,7 +851,7 @@ class TestRBACEntityPurgerMultipleRoles:
         vfolder_a_uuid = uuid.uuid4()
         vfolder_b_uuid = uuid.uuid4()
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Create vfolderA and vfolderB
             for entity_uuid, name in [
                 (vfolder_a_uuid, "vfolder-a"),
@@ -905,6 +910,7 @@ class TestRBACEntityPurgerMultipleRoles:
             # roleA: object_permission for vfolderA only
             obj_perm_a = ObjectPermissionRow(
                 role_id=role_a.id,
+                permission_group_id=perm_group_a.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(vfolder_a_uuid),
                 operation=OperationType.READ,
@@ -914,6 +920,7 @@ class TestRBACEntityPurgerMultipleRoles:
             # roleB: object_permission for vfolderA
             obj_perm_b1 = ObjectPermissionRow(
                 role_id=role_b.id,
+                permission_group_id=perm_group_b.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(vfolder_a_uuid),
                 operation=OperationType.READ,
@@ -923,6 +930,7 @@ class TestRBACEntityPurgerMultipleRoles:
             # roleB: object_permission for vfolderB
             obj_perm_b2 = ObjectPermissionRow(
                 role_id=role_b.id,
+                permission_group_id=perm_group_b.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(vfolder_b_uuid),
                 operation=OperationType.READ,
@@ -953,7 +961,7 @@ class TestRBACEntityPurgerMultipleRoles:
         """
         ctx = two_roles_one_entity
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             perm_group_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionGroupRow)
@@ -1008,7 +1016,7 @@ class TestRBACEntityPurgerMultipleScopes:
         shared_user_id = str(uuid.uuid4())
         entity_uuid = uuid.uuid4()
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
                 name="shared-entity",
@@ -1042,7 +1050,7 @@ class TestRBACEntityPurgerMultipleScopes:
         """Test that purger deletes associations across all scopes."""
         ctx = multi_scope_entity
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
                 row_class=RBACEntityPurgerTestRow,
@@ -1081,7 +1089,7 @@ class TestRBACEntityPurgerPermissionRowPreservation:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             entity_row = RBACEntityPurgerTestRow(
                 id=entity_uuid,
                 name="entity-with-perm-row",
@@ -1125,6 +1133,7 @@ class TestRBACEntityPurgerPermissionRowPreservation:
             # Create object permission for the entity
             obj_perm = ObjectPermissionRow(
                 role_id=role.id,
+                permission_group_id=perm_group.id,
                 entity_type=EntityType.VFOLDER,
                 entity_id=str(entity_uuid),
                 operation=OperationType.READ,
@@ -1154,7 +1163,7 @@ class TestRBACEntityPurgerPermissionRowPreservation:
         """
         ctx = entity_with_permission_row
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             perm_row_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(PermissionRow)
@@ -1226,7 +1235,7 @@ class TestRBACEntityBatchPurger:
         user_id = str(uuid.uuid4())
         entity_uuids = [uuid.uuid4() for _ in range(5)]
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             for i, entity_uuid in enumerate(entity_uuids):
                 entity_row = RBACEntityPurgerTestRow(
                     id=entity_uuid,
@@ -1262,7 +1271,7 @@ class TestRBACEntityBatchPurger:
         role_id: UUID
         perm_group_id: UUID
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             for i, entity_uuid in enumerate(entity_uuids):
                 entity_row = RBACEntityPurgerTestRow(
                     id=entity_uuid,
@@ -1302,6 +1311,7 @@ class TestRBACEntityBatchPurger:
             for entity_uuid in entity_uuids:
                 obj_perm = ObjectPermissionRow(
                     role_id=role.id,
+                    permission_group_id=perm_group.id,
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(entity_uuid),
                     operation=OperationType.READ,
@@ -1326,7 +1336,7 @@ class TestRBACEntityBatchPurger:
     ) -> None:
         """Test that batch purger deletes all entities and their associations."""
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             entity_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(RBACEntityPurgerTestRow)
@@ -1371,7 +1381,7 @@ class TestRBACEntityBatchPurger:
     ) -> None:
         """Test that batch purger cleans up object permissions and orphaned permission groups."""
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
             obj_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
@@ -1414,7 +1424,7 @@ class TestRBACEntityBatchPurger:
         create_tables: None,
     ) -> None:
         """Test that batch purger handles empty results gracefully."""
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             spec = TestEntityBatchPurgerSpec()
             purger: RBACEntityBatchPurger[RBACEntityPurgerTestRow] = RBACEntityBatchPurger(
                 spec=spec
@@ -1434,7 +1444,7 @@ class TestRBACEntityBatchPurger:
     ) -> None:
         """Test that batch purger processes in batches according to batch_size."""
 
-        async with database_connection.begin_session() as db_sess:
+        async with database_connection.begin_session_read_committed() as db_sess:
             # Execute batch purge with small batch size
             spec = TestEntityBatchPurgerSpec()
             purger: RBACEntityBatchPurger[RBACEntityPurgerTestRow] = RBACEntityBatchPurger(
@@ -1506,7 +1516,7 @@ class TestRBACEntityPurgerCompositePK:
             )
 
         try:
-            async with database_connection.begin_session() as db_sess:
+            async with database_connection.begin_session_read_committed() as db_sess:
                 spec = CompositePKPurgerSpec(entity_uuid="test-123")
                 purger = RBACEntityPurger(
                     row_class=CompositePKPurgerTestRow,
@@ -1533,7 +1543,7 @@ class TestRBACEntityPurgerCompositePK:
             )
 
         try:
-            async with database_connection.begin_session() as db_sess:
+            async with database_connection.begin_session_read_committed() as db_sess:
                 spec = CompositePKBatchPurgerSpec()
                 purger = RBACEntityBatchPurger(spec=spec)
 

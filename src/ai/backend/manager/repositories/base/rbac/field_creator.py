@@ -15,8 +15,6 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
-from .utils import bulk_insert_on_conflict_do_nothing
-
 TRow = TypeVar("TRow", bound=Base)
 
 
@@ -152,11 +150,8 @@ async def execute_rbac_bulk_field_creator(
         return RBACBulkFieldCreatorResult(rows=[])
 
     # 1. Build and add all rows
-    rows: list[TRow] = []
-    for spec in creator.specs:
-        row = spec.build_row()
-        db_sess.add(row)
-        rows.append(row)
+    rows = [spec.build_row() for spec in creator.specs]
+    db_sess.add_all(rows)
 
     mapper = inspect(type(rows[0]))
     pk_columns = mapper.primary_key
@@ -165,22 +160,18 @@ async def execute_rbac_bulk_field_creator(
             f"Creator only supports single-column primary keys (table: {mapper.local_table.name})",
         )
 
-    # 2. Flush to get DB-generated IDs
+    # 2. Flush to get DB-generated IDs and insert field mappings
     await db_sess.flush()
 
-    # 3. Extract field IDs and insert entity-field mappings
-    field_rows: list[EntityFieldRow] = []
-    for row in rows:
-        instance_state = inspect(row)
-        pk_value = instance_state.identity[0]
-        field_rows.append(
-            EntityFieldRow(
-                entity_type=creator.entity_type,
-                entity_id=creator.entity_id,
-                field_type=creator.field_type,
-                field_id=str(pk_value),
-            )
+    field_rows = [
+        EntityFieldRow(
+            entity_type=creator.entity_type,
+            entity_id=creator.entity_id,
+            field_type=creator.field_type,
+            field_id=str(inspect(row).identity[0]),
         )
-    await bulk_insert_on_conflict_do_nothing(db_sess, field_rows)
+        for row in rows
+    ]
+    db_sess.add_all(field_rows)
 
     return RBACBulkFieldCreatorResult(rows=rows)

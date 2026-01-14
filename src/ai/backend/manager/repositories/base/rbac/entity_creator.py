@@ -17,8 +17,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
-from .utils import bulk_insert_on_conflict_do_nothing
-
 TRow = TypeVar("TRow", bound=Base)
 
 
@@ -154,11 +152,8 @@ async def execute_rbac_bulk_entity_creator(
         return RBACBulkEntityCreatorResult(rows=[])
 
     # 1. Build and add all rows
-    rows: list[TRow] = []
-    for spec in creator.specs:
-        row = spec.build_row()
-        db_sess.add(row)
-        rows.append(row)
+    rows = [spec.build_row() for spec in creator.specs]
+    db_sess.add_all(rows)
 
     mapper = inspect(type(rows[0]))
     pk_columns = mapper.primary_key
@@ -167,21 +162,18 @@ async def execute_rbac_bulk_entity_creator(
             f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
         )
 
-    # 2. Flush to get DB-generated IDs
+    # 2. Flush to get DB-generated IDs and insert associations
     await db_sess.flush()
 
-    # 3. Extract RBAC entities and insert associations
-    associations = []
-    for row in rows:
-        pk_value = inspect(row).identity[0]
-        associations.append(
-            AssociationScopesEntitiesRow(
-                scope_type=creator.scope_type,
-                scope_id=creator.scope_id,
-                entity_type=creator.entity_type,
-                entity_id=str(pk_value),
-            )
+    associations = [
+        AssociationScopesEntitiesRow(
+            scope_type=creator.scope_type,
+            scope_id=creator.scope_id,
+            entity_type=creator.entity_type,
+            entity_id=str(inspect(row).identity[0]),
         )
-    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
+        for row in rows
+    ]
+    db_sess.add_all(associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
