@@ -39,6 +39,42 @@ class DomainFairShareConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(DomainFairShareRow.created_at)
+                .where(DomainFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return DomainFairShareRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(DomainFairShareRow.created_at)
+                .where(DomainFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return DomainFairShareRow.created_at > subquery
+
+        return inner
+
 
 class DomainFairShareOrders:
     """Query orders for DomainFairShareRow."""
@@ -87,6 +123,42 @@ class ProjectFairShareConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ProjectFairShareRow.created_at)
+                .where(ProjectFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ProjectFairShareRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ProjectFairShareRow.created_at)
+                .where(ProjectFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ProjectFairShareRow.created_at > subquery
 
         return inner
 
@@ -147,6 +219,42 @@ class UserFairShareConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(UserFairShareRow.created_at)
+                .where(UserFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return UserFairShareRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(UserFairShareRow.created_at)
+                .where(UserFairShareRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return UserFairShareRow.created_at > subquery
 
         return inner
 
