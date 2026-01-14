@@ -20,8 +20,12 @@ from .inputs import (
 )
 from .permission import (
     ObjectPermission,
+    ObjectPermissionConnection,
+    ObjectPermissionEdge,
     Scope,
     ScopedPermission,
+    ScopedPermissionConnection,
+    ScopedPermissionEdge,
 )
 from .role import (
     Role,
@@ -52,8 +56,12 @@ __all__ = [
     "UpdateRolePermissionsInput",
     # Permissions
     "ObjectPermission",
+    "ObjectPermissionConnection",
+    "ObjectPermissionEdge",
     "Scope",
     "ScopedPermission",
+    "ScopedPermissionConnection",
+    "ScopedPermissionEdge",
     # Role
     "Role",
     "RoleConnection",
