@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AgentV2GQL",
-    "KernelConnection",
+    "KernelConnectionV2",
     "KernelEdge",
     "KernelFilter",
     "KernelGQL",
@@ -41,10 +41,10 @@ __all__ = [
 # Enums
 
 
-KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 25.19.0")
+KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.1.0")
 
 
-@strawberry.enum(description="Added in 25.19.0. Fields available for ordering kernels.")
+@strawberry.enum(description="Added in 26.1.0. Fields available for ordering kernels.")
 class KernelOrderField(StrEnum):
     CREATED_AT = "created_at"
     ID = "id"
@@ -53,7 +53,7 @@ class KernelOrderField(StrEnum):
 # Filter types
 
 
-@strawberry.input(description="Added in 25.19.0. Filter for kernel status.")
+@strawberry.input(description="Added in 26.1.0. Filter for kernel status.")
 class KernelStatusFilter:
     in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelStatusGQL] | None = None
@@ -69,7 +69,7 @@ class KernelStatusFilter:
         return None
 
 
-@strawberry.input(description="Added in 25.19.0. Filter criteria for querying kernels.")
+@strawberry.input(description="Added in 26.1.0. Filter criteria for querying kernels.")
 class KernelFilter(GQLFilter):
     status: KernelStatusFilter | None = None
     session_id: UUID | None = None
@@ -88,7 +88,7 @@ class KernelFilter(GQLFilter):
 # OrderBy types
 
 
-@strawberry.input(description="Added in 25.19.0. Ordering specification for kernels.")
+@strawberry.input(description="Added in 26.1.0. Ordering specification for kernels.")
 class KernelOrderBy(GQLOrderBy):
     field: KernelOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -106,7 +106,8 @@ class KernelOrderBy(GQLOrderBy):
 
 
 @strawberry.type(
-    description="Added in 25.19.0. Represents a kernel (compute container) in Backend.AI."
+    name="KernelV2",
+    description="Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.",
 )
 class KernelGQL(Node):
     """
@@ -190,8 +191,8 @@ class KernelGQL(Node):
 KernelEdge = Edge[KernelGQL]
 
 
-@strawberry.type(description="Added in 25.19.0. Connection type for paginated kernel results.")
-class KernelConnection(Connection[KernelGQL]):
+@strawberry.type(description="Added in 26.1.0. Connection type for paginated kernel results.")
+class KernelConnectionV2(Connection[KernelGQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:
@@ -202,7 +203,9 @@ class KernelConnection(Connection[KernelGQL]):
 # Agent type
 
 
-@strawberry.type(description="Added in 25.19.0. Represents an agent (compute node) in Backend.AI.")
+@strawberry.type(
+    name="AgentV2", description="Added in 26.1.0. Represents an agent (compute node) in Backend.AI."
+)
 class AgentV2GQL:
     """
     AgentV2 type representing a compute node with kernels field.
@@ -212,7 +215,7 @@ class AgentV2GQL:
     _agent_id: strawberry.Private[AgentId]
 
     @strawberry.field(
-        description="Added in 25.19.0. List of kernels running on this agent with pagination support."
+        description="Added in 26.1.0. List of kernels running on this agent with pagination support."
     )
     async def kernels(
         self,
@@ -226,7 +229,7 @@ class AgentV2GQL:
         limit: int | None = None,
         offset: int | None = None,
         resource_occupied_only: bool = False,
-    ) -> KernelConnection:
+    ) -> KernelConnectionV2:
         """Fetch kernels associated with this agent."""
         from .fetcher import fetch_kernels_by_agent
 

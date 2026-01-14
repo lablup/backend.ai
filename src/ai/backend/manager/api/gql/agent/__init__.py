@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from .fetcher import fetch_kernels_by_agent
+from .resolver import agent_v2
 from .types import (
     AgentV2GQL,
-    KernelConnection,
+    KernelConnectionV2,
     KernelEdge,
     KernelFilter,
     KernelGQL,
@@ -16,12 +17,13 @@ from .types import (
 
 __all__ = [
     "AgentV2GQL",
-    "KernelConnection",
+    "KernelConnectionV2",
     "KernelEdge",
     "KernelFilter",
     "KernelGQL",
     "KernelOrderBy",
     "KernelOrderField",
     "KernelStatusGQL",
+    "agent_v2",
     "fetch_kernels_by_agent",
 ]

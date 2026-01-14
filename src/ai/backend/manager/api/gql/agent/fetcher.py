@@ -17,7 +17,7 @@ from ai.backend.manager.repositories.scheduler.options import KernelConditions, 
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 from .types import (
-    KernelConnection,
+    KernelConnectionV2,
     KernelEdge,
     KernelFilter,
     KernelGQL,
@@ -56,7 +56,7 @@ async def fetch_kernels_by_agent(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
     resource_occupied_only: bool = False,
-) -> KernelConnection:
+) -> KernelConnectionV2:
     """Fetch kernels associated with a specific agent.
 
     Args:
@@ -69,7 +69,7 @@ async def fetch_kernels_by_agent(
         resource_occupied_only: If True, only return kernels that are occupying resources
 
     Returns:
-        KernelConnection with paginated kernel results
+        KernelConnectionV2 with paginated kernel results
     """
     processors = info.context.processors
 
@@ -107,7 +107,7 @@ async def fetch_kernels_by_agent(
     nodes = [KernelGQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
     edges = [KernelEdge(node=node, cursor=encode_cursor(str(node.row_id))) for node in nodes]
 
-    return KernelConnection(
+    return KernelConnectionV2(
         count=action_result.total_count,
         edges=edges,
         page_info=PageInfo(
