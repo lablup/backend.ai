@@ -414,7 +414,6 @@ class LayerType(enum.StrEnum):
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
     IMAGE_REPOSITORY = "image_repository"
-    KERNEL_REPOSITORY = "kernel_repository"
     KEYPAIR_RESOURCE_POLICY_REPOSITORY = "keypair_resource_policy_repository"
     METRIC_REPOSITORY = "metric_repository"
     MODEL_SERVING_REPOSITORY = "model_serving_repository"
