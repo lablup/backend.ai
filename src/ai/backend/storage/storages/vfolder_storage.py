@@ -53,9 +53,9 @@ class VolumeDownloadStreamReader(StreamReader):
         return self._content_type
 
 
-class VolumeStorageAdapter(AbstractStorage):
+class VFolderStorage(AbstractStorage):
     """
-    Adapter that wraps AbstractVolume to implement AbstractStorage interface.
+    Storage implementation that wraps AbstractVolume to provide AbstractStorage interface.
 
     This enables using any volume backend (VFS, XFS, NetApp, GPFS, Weka, VAST, CephFS, etc.)
     as an artifact storage target without registering to StoragePool.
@@ -83,7 +83,7 @@ class VolumeStorageAdapter(AbstractStorage):
         self._vfolder_id = vfolder_id
 
         log.info(
-            "VolumeStorageAdapter initialized: name={}, vfolder_id={}, volume_type={}",
+            "VFolderStorage initialized: name={}, vfolder_id={}, volume_type={}",
             name,
             vfolder_id,
             type(volume).__name__,

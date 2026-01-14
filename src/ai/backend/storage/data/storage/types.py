@@ -15,7 +15,7 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.dto.storage.request import StorageMappingResolverData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors.common import InvalidStorageTargetError
-from ai.backend.storage.storages.volume_adapter import VolumeStorageAdapter
+from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
@@ -29,7 +29,7 @@ class StorageTarget:
     or a storage instance (AbstractStorage).
 
     When str: resolved via storage_pool.get_storage(name)
-    When AbstractStorage: used directly (e.g., VolumeStorageAdapter for VFolder imports)
+    When AbstractStorage: used directly (e.g., VFolderStorage for VFolder imports)
 
     Use class methods to create instances:
         - StorageTarget.from_storage_name(name) for string-based storage names
@@ -119,7 +119,7 @@ class ImportStepContext:
 class StorageMappingResolver:
     """
     Resolves raw storage step mappings to StorageTarget objects,
-    optionally wrapping with VolumeStorageAdapter when vfolder_id is provided.
+    optionally wrapping with VFolderStorage when vfolder_id is provided.
     """
 
     def __init__(
@@ -141,7 +141,7 @@ class StorageMappingResolver:
         For each import step:
         - If target is str: creates StorageTarget with storage name
         - If target is NamedStorageTarget: creates StorageTarget with storage name
-        - If target is VFolderStorageTarget: creates StorageTarget with VolumeStorageAdapter
+        - If target is VFolderStorageTarget: creates StorageTarget with VFolderStorage
 
         Args:
             storage_step_mappings: The storage mapping data from the request
@@ -162,14 +162,14 @@ class StorageMappingResolver:
                 if isinstance(target, VFolderStorageTarget):
                     adapter_name = f"volume_storage_{current_request_id()}"
                     volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
-                    adapter = VolumeStorageAdapter(
+                    adapter = VFolderStorage(
                         name=adapter_name,
                         volume=volume,
                         vfolder_id=target.vfolder_id,
                     )
 
                     log.info(
-                        "Created VolumeStorageAdapter: name={}, vfolder_id={}, volume_name={}, volume_type={}",
+                        "Created VFolderStorage: name={}, vfolder_id={}, volume_name={}, volume_type={}",
                         adapter_name,
                         target.vfolder_id,
                         target.volume_name,
