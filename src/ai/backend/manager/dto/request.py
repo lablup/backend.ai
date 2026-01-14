@@ -126,6 +126,10 @@ class ImportArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to import."
     )
+    vfolder_id: uuid.UUID | None = Field(
+        default=None,
+        description="Optional vfolder ID to import artifacts directly into.",
+    )
 
 
 class UpdateArtifactReqPathParam(BaseRequestModel):

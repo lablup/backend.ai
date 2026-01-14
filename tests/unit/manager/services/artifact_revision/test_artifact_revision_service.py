@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
@@ -97,6 +98,11 @@ class TestArtifactRevisionService:
         return MagicMock(spec=ReservoirRegistryRepository)
 
     @pytest.fixture
+    def mock_vfolder_repository(self) -> MagicMock:
+        """Create mocked VfolderRepository"""
+        return MagicMock(spec=VfolderRepository)
+
+    @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         """Create mocked StorageSessionManager"""
         return MagicMock()
@@ -126,6 +132,7 @@ class TestArtifactRevisionService:
         mock_storage_namespace_repository: MagicMock,
         mock_huggingface_repository: MagicMock,
         mock_reservoir_repository: MagicMock,
+        mock_vfolder_repository: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         mock_valkey_artifact_client: MagicMock,
@@ -140,6 +147,7 @@ class TestArtifactRevisionService:
             storage_namespace_repository=mock_storage_namespace_repository,
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
+            vfolder_repository=mock_vfolder_repository,
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -384,6 +392,11 @@ class TestArtifactServiceRevisionOperations:
     def mock_reservoir_repository(self) -> MagicMock:
         """Create mocked ReservoirRegistryRepository"""
         return MagicMock(spec=ReservoirRegistryRepository)
+
+    @pytest.fixture
+    def mock_vfolder_repository(self) -> MagicMock:
+        """Create mocked VfolderRepository"""
+        return MagicMock(spec=VfolderRepository)
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:

@@ -80,6 +80,7 @@ class ReservoirRegistryAPIHandler:
             storage_step_mappings=storage_step_mappings,
             pipeline=pipeline,
             artifact_revision_ids=[UUID(rev_id) for rev_id in body.parsed.artifact_revision_ids],
+            storage_prefix=body.parsed.storage_prefix,
         )
 
         return APIResponse.build(

@@ -10,10 +10,10 @@ from ai.backend.common.type_adapters import VFolderIDField
 class VFolderStorageTarget(BaseModel):
     """Target for direct import to a specific virtual folder."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     vfolder_id: VFolderIDField
     volume_name: str
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class NamedStorageTarget(BaseModel):
