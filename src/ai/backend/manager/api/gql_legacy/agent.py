@@ -27,9 +27,12 @@ from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAlloc
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent.row import ADMIN_PERMISSIONS, AgentRow, agents, get_permission_ctx
-from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
-
+from ai.backend.manager.models.agent.row import (
+    ADMIN_PERMISSIONS,
+    AgentRow,
+    agents,
+    get_permission_ctx,
+)
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
@@ -584,9 +587,10 @@ class Agent(graphene.ObjectType):
     ) -> Sequence[Any]:
         ret = []
         for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
+            clamped_stat = clamp_agent_cpu_util(stat)
+            if clamped_stat is not None:
                 try:
-                    ret.append(float(stat["node"]["cpu_util"]["pct"]))
+                    ret.append(float(clamped_stat["node"]["cpu_util"]["pct"]))
                 except (KeyError, TypeError, ValueError):
                     ret.append(0.0)
             else:
