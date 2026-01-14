@@ -168,13 +168,13 @@ class AutoScalingService:
 
         # Apply access control conditions based on role
         match action.requester_ctx.user_role:
-            case UserRole.SUPERADMIN:
-                pass  # No additional conditions for SUPERADMIN
+            case UserRole.SUPERADMIN | UserRole.MONITOR:
+                pass  # No additional conditions for SUPERADMIN and MONITOR
             case UserRole.ADMIN:
                 action.querier.conditions.append(
                     EndpointConditions.by_domain(action.requester_ctx.domain_name)
                 )
-            case UserRole.USER | UserRole.MONITOR:
+            case UserRole.USER:
                 action.querier.conditions.append(
                     EndpointConditions.by_session_owner(action.requester_ctx.user_id)
                 )
