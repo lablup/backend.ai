@@ -25,8 +25,8 @@ class DestroySessionAction(SessionAction):
     def operation_type(cls) -> str:
         # TODO: Handle this
         # if self.recursive:
-        #     return "destory_multi"
-        return "destory"
+        #     return "destroy_multi"
+        return "destroy"
 
 
 @dataclass
