@@ -114,6 +114,7 @@ BEP numbers start from 1000.
 | [1024](BEP-1024-agent-rpc-connection-pooling.md) | Agent RPC Connection Pooling | HyeokJin Kim | Implemented |
 | [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Draft |
 | [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Draft |
+| 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
