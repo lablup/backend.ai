@@ -386,7 +386,7 @@ class RBACAPIHandler:
         )
 
         # Build response
-        resp = GetScopeTypesResponse(scope_types=action_result.scope_types)
+        resp = GetScopeTypesResponse(items=action_result.scope_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
@@ -416,7 +416,7 @@ class RBACAPIHandler:
 
         # Build response using adapter
         resp = SearchScopesResponse(
-            scopes=[self._scope_adapter.convert_to_dto(item) for item in action_result.items],
+            items=[self._scope_adapter.convert_to_dto(item) for item in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -446,7 +446,7 @@ class RBACAPIHandler:
         )
 
         # Build response
-        resp = GetEntityTypesResponse(entity_types=action_result.entity_types)
+        resp = GetEntityTypesResponse(items=action_result.entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
@@ -480,7 +480,7 @@ class RBACAPIHandler:
 
         # Build response using adapter
         resp = SearchEntitiesResponse(
-            entities=[self._entity_adapter.convert_to_dto(item) for item in action_result.items],
+            items=[self._entity_adapter.convert_to_dto(item) for item in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
