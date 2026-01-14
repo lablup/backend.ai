@@ -11,19 +11,17 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreator,
     RBACBulkEntityCreatorResult,
-    RBACEntity,
     RBACEntityCreator,
     RBACEntityCreatorResult,
-    RBACEntityCreatorSpec,
     execute_rbac_bulk_entity_creator,
     execute_rbac_entity_creator,
 )
@@ -39,7 +37,7 @@ if TYPE_CHECKING:
 
 
 class RBACEntityCreatorTestRow(Base):
-    """ORM model implementing RBACEntityRow protocol for creator testing."""
+    """ORM model for creator testing."""
 
     __tablename__ = "test_rbac_creator"
     __table_args__ = {"extend_existing": True}
@@ -51,19 +49,13 @@ class RBACEntityCreatorTestRow(Base):
     owner_scope_type: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     owner_scope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
-    def scope_id(self) -> ScopeId:
-        return ScopeId(scope_type=ScopeType(self.owner_scope_type), scope_id=self.owner_scope_id)
-
-    def entity_id(self) -> ObjectId:
-        return ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self.id))
-
 
 # =============================================================================
 # Creator Spec Implementations
 # =============================================================================
 
 
-class SimpleRBACEntityCreatorSpec(RBACEntityCreatorSpec[RBACEntityCreatorTestRow]):
+class SimpleCreatorSpec(CreatorSpec[RBACEntityCreatorTestRow]):
     """Simple creator spec for entity testing."""
 
     def __init__(
@@ -87,12 +79,6 @@ class SimpleRBACEntityCreatorSpec(RBACEntityCreatorSpec[RBACEntityCreatorTestRow
         if self._entity_id is not None:
             row_kwargs["id"] = self._entity_id
         return RBACEntityCreatorTestRow(**row_kwargs)
-
-    def entity(self, row: RBACEntityCreatorTestRow) -> RBACEntity:
-        return RBACEntity(
-            scope=ScopeId(scope_type=self._scope_type, scope_id=self._scope_id),
-            entity=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(row.id)),
-        )
 
 
 # =============================================================================
@@ -137,12 +123,17 @@ class TestRBACEntityCreatorBasic:
 
         async with database_connection.begin_session() as db_sess:
             # Create entity
-            spec = SimpleRBACEntityCreatorSpec(
+            spec = SimpleCreatorSpec(
                 name="test-entity",
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
             )
-            creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(spec=spec)
+            creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
+                spec=spec,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+            )
             result = await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify result
@@ -179,12 +170,17 @@ class TestRBACEntityCreatorBasic:
         project_id = str(uuid.uuid4())
 
         async with database_connection.begin_session() as db_sess:
-            spec = SimpleRBACEntityCreatorSpec(
+            spec = SimpleCreatorSpec(
                 name="project-entity",
                 scope_type=ScopeType.PROJECT,
                 scope_id=project_id,
             )
-            creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(spec=spec)
+            creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
+                spec=spec,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                entity_type=EntityType.VFOLDER,
+            )
             await execute_rbac_entity_creator(db_sess, creator)
 
             # Verify association has correct scope
@@ -203,12 +199,17 @@ class TestRBACEntityCreatorBasic:
 
         async with database_connection.begin_session() as db_sess:
             for i in range(5):
-                spec = SimpleRBACEntityCreatorSpec(
+                spec = SimpleCreatorSpec(
                     name=f"entity-{i}",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
                 )
-                creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(spec=spec)
+                creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
+                    spec=spec,
+                    scope_type=ScopeType.USER,
+                    scope_id=user_id,
+                    entity_type=EntityType.VFOLDER,
+                )
                 result = await execute_rbac_entity_creator(db_sess, creator)
                 assert result.row.name == f"entity-{i}"
 
@@ -241,13 +242,18 @@ class TestRBACEntityCreatorIdempotent:
 
         async with database_connection.begin_session() as db_sess:
             # First creation
-            spec1 = SimpleRBACEntityCreatorSpec(
+            spec1 = SimpleCreatorSpec(
                 name="test-entity",
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
                 entity_id=entity_id,
             )
-            creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(spec=spec1)
+            creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
+                spec=spec1,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+            )
             result1 = await execute_rbac_entity_creator(db_sess, creator1)
             assert result1.row.id == entity_id
 
@@ -297,7 +303,7 @@ class TestRBACBulkEntityCreator:
 
         async with database_connection.begin_session() as db_sess:
             specs = [
-                SimpleRBACEntityCreatorSpec(
+                SimpleCreatorSpec(
                     name=f"entity-{i}",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
@@ -305,7 +311,10 @@ class TestRBACBulkEntityCreator:
                 for i in range(5)
             ]
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
-                specs=specs
+                specs=specs,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -333,7 +342,10 @@ class TestRBACBulkEntityCreator:
         """Test bulk creating with empty specs returns empty result."""
         async with database_connection.begin_session() as db_sess:
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
-                specs=[]
+                specs=[],
+                scope_type=ScopeType.USER,
+                scope_id="dummy",
+                entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -346,30 +358,32 @@ class TestRBACBulkEntityCreator:
             )
             assert entity_count == 0
 
-    async def test_bulk_create_with_different_scopes(
+    async def test_bulk_create_entities_same_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> None:
-        """Test bulk creating entities with different scopes."""
+        """Test bulk creating entities with same scope."""
         user_id = str(uuid.uuid4())
-        project_id = str(uuid.uuid4())
 
         async with database_connection.begin_session() as db_sess:
             specs = [
-                SimpleRBACEntityCreatorSpec(
-                    name="user-entity",
+                SimpleCreatorSpec(
+                    name="user-entity-1",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
                 ),
-                SimpleRBACEntityCreatorSpec(
-                    name="project-entity",
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=project_id,
+                SimpleCreatorSpec(
+                    name="user-entity-2",
+                    scope_type=ScopeType.USER,
+                    scope_id=user_id,
                 ),
             ]
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
-                specs=specs
+                specs=specs,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -379,6 +393,98 @@ class TestRBACBulkEntityCreator:
             assoc_rows = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
             assert len(assoc_rows) == 2
 
-            scope_types = {a.scope_type for a in assoc_rows}
-            assert ScopeType.USER in scope_types
-            assert ScopeType.PROJECT in scope_types
+            # All should have same scope
+            for assoc in assoc_rows:
+                assert assoc.scope_type == ScopeType.USER
+                assert assoc.scope_id == user_id
+
+
+# =============================================================================
+# Composite Primary Key Tests
+# =============================================================================
+
+
+class CompositePKTestRow(Base):
+    """ORM model with composite primary key for testing rejection."""
+
+    __tablename__ = "test_rbac_creator_composite_pk"
+    __table_args__ = {"extend_existing": True}
+
+    tenant_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class CompositePKCreatorSpec(CreatorSpec[CompositePKTestRow]):
+    """Creator spec for composite PK testing."""
+
+    def __init__(self, tenant_id: int, item_id: int, name: str) -> None:
+        self._tenant_id = tenant_id
+        self._item_id = item_id
+        self._name = name
+
+    def build_row(self) -> CompositePKTestRow:
+        return CompositePKTestRow(
+            tenant_id=self._tenant_id,
+            item_id=self._item_id,
+            name=self._name,
+        )
+
+
+class TestRBACEntityCreatorCompositePK:
+    """Tests for composite primary key rejection in RBAC entity creator."""
+
+    async def test_single_creator_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that single entity creator rejects composite PK tables."""
+        from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                spec = CompositePKCreatorSpec(tenant_id=1, item_id=1, name="test")
+                creator = RBACEntityCreator(
+                    spec=spec,
+                    scope_type=ScopeType.USER,
+                    scope_id="user-123",
+                    entity_type=EntityType.VFOLDER,
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_entity_creator(db_sess, creator)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(lambda c: CompositePKTestRow.__table__.drop(c, checkfirst=True))
+
+    async def test_bulk_creator_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that bulk entity creator rejects composite PK tables."""
+        from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                specs = [
+                    CompositePKCreatorSpec(tenant_id=1, item_id=i, name=f"test-{i}")
+                    for i in range(3)
+                ]
+                creator = RBACBulkEntityCreator(
+                    specs=specs,
+                    scope_type=ScopeType.USER,
+                    scope_id="user-123",
+                    entity_type=EntityType.VFOLDER,
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_bulk_entity_creator(db_sess, creator)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(lambda c: CompositePKTestRow.__table__.drop(c, checkfirst=True))

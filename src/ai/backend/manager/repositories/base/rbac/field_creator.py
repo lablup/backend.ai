@@ -2,67 +2,22 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.data.permission.id import FieldRef, ObjectId
+from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
-from .utils import bulk_insert_on_conflict_do_nothing, insert_on_conflict_do_nothing
+from .utils import bulk_insert_on_conflict_do_nothing
 
 TRow = TypeVar("TRow", bound=Base)
-
-
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-
-@dataclass
-class RBACField:
-    """Represents an RBAC field belonging to a parent entity.
-
-    Attributes:
-        parent_entity: ObjectId representing the parent entity.
-        field: FieldRef representing the field itself.
-    """
-
-    parent_entity: ObjectId
-    field: FieldRef
-
-
-# =============================================================================
-# Field Creator Spec
-# =============================================================================
-
-
-class RBACFieldCreatorSpec(CreatorSpec[TRow], ABC):
-    """Spec for building a field-scoped entity row.
-
-    Implementations specify what field to create by providing:
-    - build_row(): Build domain row (ID can use DB server_default)
-    - field(row): Extract RBAC field info from flushed row
-
-    The executor combines these to create the entity-field mapping.
-    """
-
-    @abstractmethod
-    def field(self, row: TRow) -> RBACField:
-        """Extract RBAC field information from flushed row.
-
-        Args:
-            row: Flushed ORM row (with ID assigned).
-
-        Returns:
-            RBACField containing parent entity and field information.
-        """
-        raise NotImplementedError
 
 
 # =============================================================================
@@ -70,31 +25,21 @@ class RBACFieldCreatorSpec(CreatorSpec[TRow], ABC):
 # =============================================================================
 
 
-async def _insert_entity_field_mapping(
-    db_sess: SASession,
-    rbac_field: RBACField,
-) -> None:
-    """Insert a single entity-field mapping."""
-    await insert_on_conflict_do_nothing(
-        db_sess,
-        EntityFieldRow(
-            entity_type=rbac_field.parent_entity.entity_type,
-            entity_id=rbac_field.parent_entity.entity_id,
-            field_type=rbac_field.field.field_type,
-            field_id=rbac_field.field.field_id,
-        ),
-    )
-
-
 @dataclass
 class RBACFieldCreator(Generic[TRow]):
     """Creator for a single field-scoped entity.
 
     Attributes:
-        spec: RBACFieldCreatorSpec implementation defining what to create.
+        spec: CreatorSpec implementation defining the row to create.
+        entity_type: The entity type of the parent entity.
+        entity_id: The ID of the parent entity.
+        field_type: The field type for RBAC field mapping.
     """
 
-    spec: RBACFieldCreatorSpec[TRow]
+    spec: CreatorSpec[TRow]
+    entity_type: EntityType
+    entity_id: str
+    field_type: EntityType
 
 
 @dataclass
@@ -113,7 +58,7 @@ async def execute_rbac_field_creator(
     Operations:
     1. Insert main field row
     2. Flush to get DB-generated ID
-    3. Extract RBAC info from spec
+    3. Extract field ID from row
     4. Insert EntityFieldRow (parent_entity -> field mapping)
 
     The EntityFieldRow maps the field to its parent entity,
@@ -127,17 +72,31 @@ async def execute_rbac_field_creator(
         RBACFieldCreatorResult containing the created row.
     """
     spec = creator.spec
+    row = spec.build_row()
+    mapper = inspect(type(row))
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Creator only supports single-column primary keys (table: {mapper.local_table.name})",
+        )
 
     # 1. Build and insert row
-    row = spec.build_row()
     db_sess.add(row)
 
     # 2. Flush to get DB-generated ID
     await db_sess.flush()
-    await db_sess.refresh(row)
 
-    # 3. Extract RBAC info and insert entity-field mapping
-    await _insert_entity_field_mapping(db_sess, spec.field(row))
+    # 3. Extract field ID and insert entity-field mapping
+    instance_state = inspect(row)
+    pk_value = instance_state.identity[0]
+    db_sess.add(
+        EntityFieldRow(
+            entity_type=creator.entity_type,
+            entity_id=creator.entity_id,
+            field_type=creator.field_type,
+            field_id=str(pk_value),
+        )
+    )
 
     return RBACFieldCreatorResult(row=row)
 
@@ -147,32 +106,21 @@ async def execute_rbac_field_creator(
 # =============================================================================
 
 
-async def _bulk_insert_entity_field_mappings(
-    db_sess: SASession,
-    rbac_fields: Sequence[RBACField],
-) -> None:
-    """Bulk insert entity-field mappings."""
-    entity_fields = [
-        EntityFieldRow(
-            entity_type=rbac_field.parent_entity.entity_type,
-            entity_id=rbac_field.parent_entity.entity_id,
-            field_type=rbac_field.field.field_type,
-            field_id=rbac_field.field.field_id,
-        )
-        for rbac_field in rbac_fields
-    ]
-    await bulk_insert_on_conflict_do_nothing(db_sess, entity_fields)
-
-
 @dataclass
 class RBACBulkFieldCreator(Generic[TRow]):
     """Bulk creator for multiple field-scoped entities.
 
     Attributes:
-        specs: Sequence of RBACFieldCreatorSpec implementations.
+        specs: Sequence of CreatorSpec implementations.
+        entity_type: The entity type of the parent entity for all fields.
+        entity_id: The ID of the parent entity for all fields.
+        field_type: The field type for all fields.
     """
 
-    specs: Sequence[RBACFieldCreatorSpec[TRow]]
+    specs: Sequence[CreatorSpec[TRow]]
+    entity_type: EntityType
+    entity_id: str
+    field_type: EntityType
 
 
 @dataclass
@@ -210,11 +158,29 @@ async def execute_rbac_bulk_field_creator(
         db_sess.add(row)
         rows.append(row)
 
+    mapper = inspect(type(rows[0]))
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Creator only supports single-column primary keys (table: {mapper.local_table.name})",
+        )
+
     # 2. Flush to get DB-generated IDs
     await db_sess.flush()
 
-    # 3. Extract RBAC fields and insert entity-field mappings
-    rbac_fields = [spec.field(row) for spec, row in zip(creator.specs, rows, strict=False)]
-    await _bulk_insert_entity_field_mappings(db_sess, rbac_fields)
+    # 3. Extract field IDs and insert entity-field mappings
+    field_rows: list[EntityFieldRow] = []
+    for row in rows:
+        instance_state = inspect(row)
+        pk_value = instance_state.identity[0]
+        field_rows.append(
+            EntityFieldRow(
+                entity_type=creator.entity_type,
+                entity_id=creator.entity_id,
+                field_type=creator.field_type,
+                field_id=str(pk_value),
+            )
+        )
+    await bulk_insert_on_conflict_do_nothing(db_sess, field_rows)
 
     return RBACBulkFieldCreatorResult(rows=rows)

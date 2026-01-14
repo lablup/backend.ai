@@ -17,16 +17,15 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     ScopeType,
 )
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.rbac.field_purger import (
-    RBACField,
     RBACFieldBatchPurger,
     RBACFieldBatchPurgerResult,
     RBACFieldBatchPurgerSpec,
     RBACFieldPurger,
     RBACFieldPurgerResult,
-    RBACFieldPurgerSpec,
     execute_rbac_field_batch_purger,
     execute_rbac_field_purger,
 )
@@ -60,23 +59,6 @@ class RBACFieldPurgerTestRow(Base):
 
     def field(self) -> FieldRef:
         return FieldRef(field_type=EntityType.VFOLDER, field_id=str(self.id))
-
-
-# =============================================================================
-# Purger Spec Implementations
-# =============================================================================
-
-
-class SimpleRBACFieldPurgerSpec(RBACFieldPurgerSpec):
-    """Simple spec for field purger testing."""
-
-    def __init__(self, field_uuid: UUID) -> None:
-        self._field_uuid = field_uuid
-
-    def field(self) -> RBACField:
-        return RBACField(
-            field=FieldRef(field_type=EntityType.VFOLDER, field_id=str(self._field_uuid))
-        )
 
 
 # =============================================================================
@@ -228,11 +210,11 @@ class TestRBACFieldPurgerBasic:
         ctx = field_entity
 
         async with database_connection.begin_session() as db_sess:
-            spec = SimpleRBACFieldPurgerSpec(field_uuid=ctx.field_uuid)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid,
-                spec=spec,
+                field_type=EntityType.VFOLDER,
+                field_id=str(ctx.field_uuid),
             )
             result = await execute_rbac_field_purger(db_sess, purger)
 
@@ -262,11 +244,11 @@ class TestRBACFieldPurgerBasic:
 
         async with database_connection.begin_session() as db_sess:
             # Delete only field1
-            spec = SimpleRBACFieldPurgerSpec(field_uuid=ctx.field_uuid1)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid1,
-                spec=spec,
+                field_type=EntityType.VFOLDER,
+                field_id=str(ctx.field_uuid1),
             )
             await execute_rbac_field_purger(db_sess, purger)
 
@@ -290,11 +272,11 @@ class TestRBACFieldPurgerBasic:
         nonexistent_uuid = uuid.uuid4()
 
         async with database_connection.begin_session() as db_sess:
-            spec = SimpleRBACFieldPurgerSpec(field_uuid=nonexistent_uuid)
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=nonexistent_uuid,
-                spec=spec,
+                field_type=EntityType.VFOLDER,
+                field_id=str(nonexistent_uuid),
             )
             result = await execute_rbac_field_purger(db_sess, purger)
             assert result is None
@@ -436,3 +418,83 @@ class TestRBACFieldBatchPurger:
                 sa.select(sa.func.count()).select_from(RBACFieldPurgerTestRow)
             )
             assert remaining_fields == 0
+
+
+# =============================================================================
+# Composite Primary Key Tests
+# =============================================================================
+
+
+class CompositePKFieldPurgerTestRow(Base):
+    """ORM model with composite primary key for testing rejection."""
+
+    __tablename__ = "test_rbac_field_purger_composite_pk"
+    __table_args__ = {"extend_existing": True}
+
+    tenant_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class CompositePKFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[CompositePKFieldPurgerTestRow]):
+    """Batch purger spec for composite PK testing."""
+
+    def build_subquery(self) -> sa.Select:
+        return sa.select(CompositePKFieldPurgerTestRow)
+
+    def field_type(self) -> EntityType:
+        return EntityType.VFOLDER
+
+
+class TestRBACFieldPurgerCompositePK:
+    """Tests for composite primary key rejection in RBAC field purger."""
+
+    async def test_single_purger_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that single field purger rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKFieldPurgerTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                purger = RBACFieldPurger(
+                    row_class=CompositePKFieldPurgerTestRow,
+                    pk_value=1,  # PK value (error raised before lookup due to composite PK)
+                    field_type=EntityType.VFOLDER,
+                    field_id="test-123",
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_field_purger(db_sess, purger)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKFieldPurgerTestRow.__table__.drop(c, checkfirst=True)
+                )
+
+    async def test_batch_purger_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that batch field purger rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKFieldPurgerTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                spec = CompositePKFieldBatchPurgerSpec()
+                purger = RBACFieldBatchPurger(spec=spec)
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_field_batch_purger(db_sess, purger)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKFieldPurgerTestRow.__table__.drop(c, checkfirst=True)
+                )

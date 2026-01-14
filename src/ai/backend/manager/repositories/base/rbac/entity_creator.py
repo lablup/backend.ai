@@ -2,69 +2,24 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
-from .utils import bulk_insert_on_conflict_do_nothing, insert_on_conflict_do_nothing
+from .utils import bulk_insert_on_conflict_do_nothing
 
 TRow = TypeVar("TRow", bound=Base)
-
-
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-
-@dataclass
-class RBACEntity:
-    """Represents an RBAC-scoped entity.
-
-    Attributes:
-        scope: ScopeId representing the scope the entity belongs to.
-        entity: ObjectId representing the entity itself.
-    """
-
-    scope: ScopeId
-    entity: ObjectId
-
-
-# =============================================================================
-# Entity Creator Spec
-# =============================================================================
-
-
-class RBACEntityCreatorSpec(CreatorSpec[TRow], ABC):
-    """Spec for building a scope-scoped entity row.
-
-    Implementations specify what entity to create by providing:
-    - build_row(): Build domain row (ID can use DB server_default)
-    - entity(row): Extract RBAC entity info from flushed row
-
-    The executor combines these to create the RBAC association.
-    """
-
-    @abstractmethod
-    def entity(self, row: TRow) -> RBACEntity:
-        """Extract RBAC entity information from flushed row.
-
-        Args:
-            row: Flushed ORM row (with ID assigned).
-
-        Returns:
-            RBACEntity containing scope and entity information.
-        """
-        raise NotImplementedError
 
 
 # =============================================================================
@@ -72,31 +27,21 @@ class RBACEntityCreatorSpec(CreatorSpec[TRow], ABC):
 # =============================================================================
 
 
-async def _insert_scope_entity_association(
-    db_sess: SASession,
-    rbac_entity: RBACEntity,
-) -> None:
-    """Insert a single scope-entity association."""
-    await insert_on_conflict_do_nothing(
-        db_sess,
-        AssociationScopesEntitiesRow(
-            scope_type=rbac_entity.scope.scope_type,
-            scope_id=rbac_entity.scope.scope_id,
-            entity_type=rbac_entity.entity.entity_type,
-            entity_id=rbac_entity.entity.entity_id,
-        ),
-    )
-
-
 @dataclass
 class RBACEntityCreator(Generic[TRow]):
     """Creator for a single scope-scoped entity.
 
     Attributes:
-        spec: RBACEntityCreatorSpec implementation defining what to create.
+        spec: CreatorSpec implementation defining the row to create.
+        scope_type: The scope type the entity belongs to.
+        scope_id: The scope ID the entity belongs to.
+        entity_type: The entity type for RBAC association.
     """
 
-    spec: RBACEntityCreatorSpec[TRow]
+    spec: CreatorSpec[TRow]
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
 
 
 @dataclass
@@ -129,17 +74,31 @@ async def execute_rbac_entity_creator(
         RBACEntityCreatorResult containing the created row.
     """
     spec = creator.spec
+    row = spec.build_row()
+    mapper = inspect(type(row))
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+        )
 
     # 1. Build and insert row
-    row = spec.build_row()
     db_sess.add(row)
 
     # 2. Flush to get DB-generated ID
     await db_sess.flush()
-    await db_sess.refresh(row)
 
     # 3. Extract RBAC info and insert association
-    await _insert_scope_entity_association(db_sess, spec.entity(row))
+    instance_state = inspect(row)
+    pk_value = instance_state.identity[0]
+    db_sess.add(
+        AssociationScopesEntitiesRow(
+            scope_type=creator.scope_type,
+            scope_id=creator.scope_id,
+            entity_type=creator.entity_type,
+            entity_id=str(pk_value),
+        ),
+    )
 
     return RBACEntityCreatorResult(row=row)
 
@@ -149,32 +108,21 @@ async def execute_rbac_entity_creator(
 # =============================================================================
 
 
-async def _bulk_insert_scope_entity_associations(
-    db_sess: SASession,
-    rbac_entities: Sequence[RBACEntity],
-) -> None:
-    """Bulk insert scope-entity associations."""
-    associations = [
-        AssociationScopesEntitiesRow(
-            scope_type=rbac_entity.scope.scope_type,
-            scope_id=rbac_entity.scope.scope_id,
-            entity_type=rbac_entity.entity.entity_type,
-            entity_id=rbac_entity.entity.entity_id,
-        )
-        for rbac_entity in rbac_entities
-    ]
-    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
-
-
 @dataclass
 class RBACBulkEntityCreator(Generic[TRow]):
     """Bulk creator for multiple scope-scoped entities.
 
     Attributes:
-        specs: Sequence of RBACEntityCreatorSpec implementations.
+        specs: Sequence of CreatorSpec implementations.
+        scope_type: The scope type for all entities.
+        scope_id: The scope ID for all entities.
+        entity_type: The entity type for all entities.
     """
 
-    specs: Sequence[RBACEntityCreatorSpec[TRow]]
+    specs: Sequence[CreatorSpec[TRow]]
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
 
 
 @dataclass
@@ -212,11 +160,28 @@ async def execute_rbac_bulk_entity_creator(
         db_sess.add(row)
         rows.append(row)
 
+    mapper = inspect(type(rows[0]))
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+        )
+
     # 2. Flush to get DB-generated IDs
     await db_sess.flush()
 
     # 3. Extract RBAC entities and insert associations
-    rbac_entities = [spec.entity(row) for spec, row in zip(creator.specs, rows, strict=False)]
-    await _bulk_insert_scope_entity_associations(db_sess, rbac_entities)
+    associations = []
+    for row in rows:
+        pk_value = inspect(row).identity[0]
+        associations.append(
+            AssociationScopesEntitiesRow(
+                scope_type=creator.scope_type,
+                scope_id=creator.scope_id,
+                entity_type=creator.entity_type,
+                entity_id=str(pk_value),
+            )
+        )
+    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)

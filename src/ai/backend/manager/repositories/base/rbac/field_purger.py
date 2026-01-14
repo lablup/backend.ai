@@ -21,37 +21,8 @@ from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurg
 from ai.backend.manager.repositories.base.purger import TRow
 
 # =============================================================================
-# Data Classes
+# Spec Classes (Batch Only)
 # =============================================================================
-
-
-@dataclass
-class RBACField:
-    """Represents an RBAC field to be purged.
-
-    Attributes:
-        field: FieldRef representing the field to delete.
-    """
-
-    field: FieldRef
-
-
-# =============================================================================
-# Spec Classes
-# =============================================================================
-
-
-class RBACFieldPurgerSpec(ABC):
-    """Spec for building RBAC field info for single-row purge.
-
-    Implementations specify which field to purge by providing:
-    - field(): Returns RBACField with the FieldRef to delete
-    """
-
-    @abstractmethod
-    def field(self) -> RBACField:
-        """Return the RBAC field information for deletion."""
-        raise NotImplementedError
 
 
 class RBACFieldBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
@@ -80,10 +51,12 @@ class RBACFieldPurger(BasePurger[TRow]):
     Inherits row_class and pk_value from BasePurger.
 
     Attributes:
-        spec: RBACFieldPurgerSpec providing field info for RBAC cleanup.
+        field_type: The field type for RBAC cleanup.
+        field_id: The field ID to delete.
     """
 
-    spec: RBACFieldPurgerSpec
+    field_type: EntityType
+    field_id: str
 
 
 @dataclass
@@ -201,19 +174,19 @@ async def execute_rbac_field_purger(
     Execute DELETE for a single field-scoped entity by primary key, along with related RBAC entries.
 
     Operations performed:
-    1. Get field info from spec
+    1. Build FieldRef from purger params
     2. Delete EntityFieldRow (field-entity mapping)
     3. Delete the main object row with RETURNING
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable)
-        purger: Purger containing row_class, pk_value, and spec
+        purger: Purger containing row_class, pk_value, field_type, and field_id
 
     Returns:
         RBACFieldPurgerResult containing the deleted row, or None if no row matched
     """
-    # 1. Get field info from spec
-    field_ref = purger.spec.field().field
+    # 1. Build FieldRef from flat params
+    field_ref = FieldRef(field_type=purger.field_type, field_id=purger.field_id)
 
     # 2. Delete RBAC entries (EntityFieldRow)
     await _delete_entity_field(db_sess, field_ref)

@@ -19,6 +19,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -1451,3 +1452,95 @@ class TestRBACEntityBatchPurger:
                 sa.select(sa.func.count()).select_from(RBACEntityPurgerTestRow)
             )
             assert remaining_entities == 0
+
+
+# =============================================================================
+# Composite Primary Key Tests
+# =============================================================================
+
+
+class CompositePKPurgerTestRow(Base):
+    """ORM model with composite primary key for testing rejection."""
+
+    __tablename__ = "test_rbac_purger_composite_pk"
+    __table_args__ = {"extend_existing": True}
+
+    tenant_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class CompositePKPurgerSpec(RBACEntityPurgerSpec):
+    """Purger spec for composite PK testing."""
+
+    def __init__(self, entity_uuid: str) -> None:
+        self._entity_uuid = entity_uuid
+
+    def entity(self) -> RBACEntity:
+        return RBACEntity(
+            entity=ObjectId(entity_type=EntityType.VFOLDER, entity_id=self._entity_uuid)
+        )
+
+
+class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTestRow]):
+    """Batch purger spec for composite PK testing."""
+
+    def build_subquery(self) -> sa.Select:
+        return sa.select(CompositePKPurgerTestRow)
+
+    def entity_type(self) -> EntityType:
+        return EntityType.VFOLDER
+
+
+class TestRBACEntityPurgerCompositePK:
+    """Tests for composite primary key rejection in RBAC entity purger."""
+
+    async def test_single_purger_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that single entity purger rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKPurgerTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                spec = CompositePKPurgerSpec(entity_uuid="test-123")
+                purger = RBACEntityPurger(
+                    row_class=CompositePKPurgerTestRow,
+                    pk_value=1,  # PK value (error raised before lookup due to composite PK)
+                    spec=spec,
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_entity_purger(db_sess, purger)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKPurgerTestRow.__table__.drop(c, checkfirst=True)
+                )
+
+    async def test_batch_purger_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that batch entity purger rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKPurgerTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                spec = CompositePKBatchPurgerSpec()
+                purger = RBACEntityBatchPurger(spec=spec)
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_entity_batch_purger(db_sess, purger)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKPurgerTestRow.__table__.drop(c, checkfirst=True)
+                )

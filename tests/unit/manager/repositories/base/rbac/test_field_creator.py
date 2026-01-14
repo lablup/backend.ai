@@ -13,15 +13,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.id import FieldRef, ObjectId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.field_creator import (
     RBACBulkFieldCreator,
     RBACBulkFieldCreatorResult,
-    RBACField,
     RBACFieldCreator,
     RBACFieldCreatorResult,
-    RBACFieldCreatorSpec,
     execute_rbac_bulk_field_creator,
     execute_rbac_field_creator,
 )
@@ -67,7 +67,7 @@ class RBACFieldCreatorTestRow(Base):
 # =============================================================================
 
 
-class SimpleRBACFieldCreatorSpec(RBACFieldCreatorSpec[RBACFieldCreatorTestRow]):
+class SimpleFieldCreatorSpec(CreatorSpec[RBACFieldCreatorTestRow]):
     """Simple creator spec for field testing."""
 
     def __init__(
@@ -97,15 +97,6 @@ class SimpleRBACFieldCreatorSpec(RBACFieldCreatorSpec[RBACFieldCreatorTestRow]):
         if self._field_id is not None:
             row_kwargs["id"] = self._field_id
         return RBACFieldCreatorTestRow(**row_kwargs)
-
-    def field(self, row: RBACFieldCreatorTestRow) -> RBACField:
-        return RBACField(
-            parent_entity=ObjectId(
-                entity_type=self._parent_entity_type,
-                entity_id=self._parent_entity_id,
-            ),
-            field=FieldRef(field_type=EntityType.VFOLDER, field_id=str(row.id)),
-        )
 
 
 # =============================================================================
@@ -151,13 +142,18 @@ class TestRBACFieldCreatorBasic:
 
         async with database_connection.begin_session() as db_sess:
             # Create field
-            spec = SimpleRBACFieldCreatorSpec(
+            spec = SimpleFieldCreatorSpec(
                 name="test-field",
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
                 parent_entity_id=parent_entity_id,
             )
-            creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(spec=spec)
+            creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(
+                spec=spec,
+                entity_type=EntityType.VFOLDER,
+                entity_id=parent_entity_id,
+                field_type=EntityType.VFOLDER,
+            )
             result = await execute_rbac_field_creator(db_sess, creator)
 
             # Verify result
@@ -196,13 +192,18 @@ class TestRBACFieldCreatorBasic:
 
         async with database_connection.begin_session() as db_sess:
             for i in range(3):
-                spec = SimpleRBACFieldCreatorSpec(
+                spec = SimpleFieldCreatorSpec(
                     name=f"field-{i}",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
                     parent_entity_id=parent_entity_id,
                 )
-                creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(spec=spec)
+                creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(
+                    spec=spec,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=parent_entity_id,
+                    field_type=EntityType.VFOLDER,
+                )
                 await execute_rbac_field_creator(db_sess, creator)
 
             # Verify counts
@@ -231,14 +232,19 @@ class TestRBACFieldCreatorIdempotent:
 
         async with database_connection.begin_session() as db_sess:
             # First creation
-            spec = SimpleRBACFieldCreatorSpec(
+            spec = SimpleFieldCreatorSpec(
                 name="test-field",
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
                 parent_entity_id=parent_entity_id,
                 field_id=field_id,
             )
-            creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(spec=spec)
+            creator: RBACFieldCreator[RBACFieldCreatorTestRow] = RBACFieldCreator(
+                spec=spec,
+                entity_type=EntityType.VFOLDER,
+                entity_id=parent_entity_id,
+                field_type=EntityType.VFOLDER,
+            )
             await execute_rbac_field_creator(db_sess, creator)
 
             # Verify one EntityFieldRow created
@@ -288,7 +294,7 @@ class TestRBACBulkFieldCreator:
 
         async with database_connection.begin_session() as db_sess:
             specs = [
-                SimpleRBACFieldCreatorSpec(
+                SimpleFieldCreatorSpec(
                     name=f"field-{i}",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
@@ -297,7 +303,10 @@ class TestRBACBulkFieldCreator:
                 for i in range(5)
             ]
             creator: RBACBulkFieldCreator[RBACFieldCreatorTestRow] = RBACBulkFieldCreator(
-                specs=specs
+                specs=specs,
+                entity_type=EntityType.VFOLDER,
+                entity_id=parent_entity_id,
+                field_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
@@ -324,7 +333,12 @@ class TestRBACBulkFieldCreator:
     ) -> None:
         """Test bulk creating with empty specs returns empty result."""
         async with database_connection.begin_session() as db_sess:
-            creator: RBACBulkFieldCreator[RBACFieldCreatorTestRow] = RBACBulkFieldCreator(specs=[])
+            creator: RBACBulkFieldCreator[RBACFieldCreatorTestRow] = RBACBulkFieldCreator(
+                specs=[],
+                entity_type=EntityType.VFOLDER,
+                entity_id="dummy",
+                field_type=EntityType.VFOLDER,
+            )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
             assert isinstance(result, RBACBulkFieldCreatorResult)
@@ -336,33 +350,35 @@ class TestRBACBulkFieldCreator:
             )
             assert field_count == 0
 
-    async def test_bulk_create_with_different_parent_entities(
+    async def test_bulk_create_same_parent_entity(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> None:
-        """Test bulk creating fields with different parent entities."""
+        """Test bulk creating fields with same parent entity."""
         user_id = str(uuid.uuid4())
-        parent_entity_id_1 = str(uuid.uuid4())
-        parent_entity_id_2 = str(uuid.uuid4())
+        parent_entity_id = str(uuid.uuid4())
 
         async with database_connection.begin_session() as db_sess:
             specs = [
-                SimpleRBACFieldCreatorSpec(
+                SimpleFieldCreatorSpec(
                     name="field-1",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
-                    parent_entity_id=parent_entity_id_1,
+                    parent_entity_id=parent_entity_id,
                 ),
-                SimpleRBACFieldCreatorSpec(
+                SimpleFieldCreatorSpec(
                     name="field-2",
                     scope_type=ScopeType.USER,
                     scope_id=user_id,
-                    parent_entity_id=parent_entity_id_2,
+                    parent_entity_id=parent_entity_id,
                 ),
             ]
             creator: RBACBulkFieldCreator[RBACFieldCreatorTestRow] = RBACBulkFieldCreator(
-                specs=specs
+                specs=specs,
+                entity_type=EntityType.VFOLDER,
+                entity_id=parent_entity_id,
+                field_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
@@ -372,6 +388,101 @@ class TestRBACBulkFieldCreator:
             entity_field_rows = (await db_sess.scalars(sa.select(EntityFieldRow))).all()
             assert len(entity_field_rows) == 2
 
-            parent_entity_ids = {ef.entity_id for ef in entity_field_rows}
-            assert parent_entity_id_1 in parent_entity_ids
-            assert parent_entity_id_2 in parent_entity_ids
+            # All should have same parent entity
+            for ef in entity_field_rows:
+                assert ef.entity_id == parent_entity_id
+
+
+# =============================================================================
+# Composite Primary Key Tests
+# =============================================================================
+
+
+class CompositePKFieldCreatorTestRow(Base):
+    """ORM model with composite primary key for testing rejection."""
+
+    __tablename__ = "test_rbac_field_creator_composite_pk"
+    __table_args__ = {"extend_existing": True}
+
+    tenant_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class CompositePKFieldCreatorSpec(CreatorSpec[CompositePKFieldCreatorTestRow]):
+    """Creator spec for composite PK testing."""
+
+    def __init__(self, tenant_id: int, item_id: int, name: str) -> None:
+        self._tenant_id = tenant_id
+        self._item_id = item_id
+        self._name = name
+
+    def build_row(self) -> CompositePKFieldCreatorTestRow:
+        return CompositePKFieldCreatorTestRow(
+            tenant_id=self._tenant_id,
+            item_id=self._item_id,
+            name=self._name,
+        )
+
+
+class TestRBACFieldCreatorCompositePK:
+    """Tests for composite primary key rejection in RBAC field creator."""
+
+    async def test_single_creator_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that single field creator rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKFieldCreatorTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                spec = CompositePKFieldCreatorSpec(tenant_id=1, item_id=1, name="test")
+                creator = RBACFieldCreator(
+                    spec=spec,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id="parent-123",
+                    field_type=EntityType.VFOLDER,
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_field_creator(db_sess, creator)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKFieldCreatorTestRow.__table__.drop(c, checkfirst=True)
+                )
+
+    async def test_bulk_creator_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that bulk field creator rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: CompositePKFieldCreatorTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                specs = [
+                    CompositePKFieldCreatorSpec(tenant_id=1, item_id=i, name=f"test-{i}")
+                    for i in range(3)
+                ]
+                creator = RBACBulkFieldCreator(
+                    specs=specs,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id="parent-123",
+                    field_type=EntityType.VFOLDER,
+                )
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_bulk_field_creator(db_sess, creator)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(
+                    lambda c: CompositePKFieldCreatorTestRow.__table__.drop(c, checkfirst=True)
+                )
