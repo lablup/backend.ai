@@ -53,5 +53,6 @@ class ObjectPermissionDeleteInput:
 class ObjectPermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
+    permission_group_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
