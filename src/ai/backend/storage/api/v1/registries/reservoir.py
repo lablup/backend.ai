@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.dto.storage.request import (
     ReservoirImportModelsReq,
+    StorageMappingResolverData,
 )
 from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
@@ -56,7 +57,10 @@ class ReservoirRegistryAPIHandler:
         await log_client_api_entry(log, "import_models", None)
 
         storage_step_mappings = self._storage_mapping_resolver.resolve(
-            body.parsed.storage_step_mappings,
+            StorageMappingResolverData(
+                storage_step_mappings=body.parsed.storage_step_mappings,
+                storage_step_target_mappings=body.parsed.storage_step_target_mappings,
+            ),
         )
 
         pipeline = create_reservoir_import_pipeline(

@@ -17,14 +17,13 @@ from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageType, NamedStorageTarget
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
     HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
-    StorageMappingResolverData,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
@@ -440,12 +439,7 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_step_mappings=StorageMappingResolverData(
-                                storage_step_target_mappings={
-                                    step: NamedStorageTarget(storage_name=name)
-                                    for step, name in reservoir_config.resolve_storage_step_selection().items()
-                                },
-                            ),
+                            storage_step_target_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -544,12 +538,7 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_step_mappings=StorageMappingResolverData(
-                                    storage_step_target_mappings={
-                                        step: NamedStorageTarget(storage_name=name)
-                                        for step, name in reservoir_config.resolve_storage_step_selection().items()
-                                    },
-                                ),
+                                storage_step_target_mappings=reservoir_config.resolve_storage_step_selection(),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
                             )
                         )

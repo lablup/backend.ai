@@ -318,12 +318,36 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_step_mappings: StorageMappingResolverData = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Storage target configuration for model import.
-        Provide either vfolder_id + volume_name for direct vfolder import,
-        or storage_step_mappings for storage pool based import.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
     )
 
 
@@ -376,12 +400,36 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["reservoir", "my-reservoir"],
     )
-    storage_step_mappings: StorageMappingResolverData = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Storage target configuration for model import.
-        Provide either vfolder_id + volume_name for direct vfolder import,
-        or storage_step_mappings for storage pool based import.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
     )
     # Used by storage proxy to fetch verification results from remote reservoir.
     # Must have 1:1 correspondence with the models list.

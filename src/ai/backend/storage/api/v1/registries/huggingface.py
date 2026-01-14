@@ -24,6 +24,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
+    StorageMappingResolverData,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceGetCommitHashResponse,
@@ -182,7 +183,10 @@ class HuggingFaceRegistryAPIHandler:
         await log_client_api_entry(log, "import_models", body.parsed)
 
         storage_step_mappings = self._storage_mapping_resolver.resolve(
-            body.parsed.storage_step_mappings,
+            StorageMappingResolverData(
+                storage_step_mappings=body.parsed.storage_step_mappings,
+                storage_step_target_mappings=body.parsed.storage_step_target_mappings,
+            ),
         )
 
         pipeline = create_huggingface_import_pipeline(
