@@ -22,10 +22,11 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -63,6 +64,7 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -1532,3 +1534,95 @@ class TestCheckAndTransitStatus:
 
         with pytest.raises(SessionNotFound):
             await session_service.check_and_transit_status(action)
+
+
+# ==================== Search Tests ====================
+
+
+@pytest.mark.asyncio
+class TestSearch:
+    """Test cases for SessionService.search"""
+
+    async def test_search_sessions(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+    ) -> None:
+        """Test searching sessions with querier"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[sample_session_data],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier)
+        result = await session_service.search(action)
+
+        assert result.data == [sample_session_data]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_session_repository.search.assert_called_once_with(querier)
+
+    async def test_search_sessions_empty_result(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+    ) -> None:
+        """Test searching sessions when no results are found"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier)
+        result = await session_service.search(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_search_sessions_with_pagination(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+    ) -> None:
+        """Test searching sessions with pagination"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[sample_session_data],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier)
+        result = await session_service.search(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
