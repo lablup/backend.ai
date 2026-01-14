@@ -17,7 +17,12 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    RoleSource,
+    ScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -38,7 +43,8 @@ from ai.backend.manager.errors.storage import (
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -753,17 +759,24 @@ class VfolderRepository:
 
     async def _get_user_role_id(self, session: SASession, user_id: uuid.UUID) -> uuid.UUID:
         """
-        Get the role_id associated with a user.
+        Get the system role_id associated with a user.
 
-        Looks up the PermissionGroupRow where scope_id matches the user_id string.
-        Raises ObjectNotFound if the user's role is not found.
+        Looks up the UserRoleRow joined with RoleRow where the role source is SYSTEM.
+        Raises ObjectNotFound if the user's system role is not found.
         """
-        stmt = sa.select(PermissionGroupRow.role_id).where(
-            PermissionGroupRow.scope_id == str(user_id)
+        stmt = (
+            sa.select(UserRoleRow.role_id)
+            .join(RoleRow, UserRoleRow.role_id == RoleRow.id)
+            .where(
+                sa.and_(
+                    UserRoleRow.user_id == user_id,
+                    RoleRow.source == RoleSource.SYSTEM,
+                )
+            )
         )
         result = await session.scalar(stmt)
         if result is None:
-            raise ObjectNotFound(object_name="user role", object_id=str(user_id))
+            raise ObjectNotFound(object_name="user system role", object_id=str(user_id))
         return result
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
