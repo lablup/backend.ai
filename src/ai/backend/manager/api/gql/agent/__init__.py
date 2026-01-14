@@ -1,24 +1,27 @@
-from .resolver import agent_stats, agents_v2
+"""GraphQL types and resolvers for agent and kernel management."""
+
+from __future__ import annotations
+
+from .fetcher import fetch_kernels_by_agent
 from .types import (
-    AgentFilterGQL,
-    AgentOrderByGQL,
-    AgentResourceGQL,
-    AgentStatsGQL,
-    AgentV2Connection,
-    AgentV2Edge,
     AgentV2GQL,
+    KernelConnection,
+    KernelEdge,
+    KernelFilter,
+    KernelGQL,
+    KernelOrderBy,
+    KernelOrderField,
+    KernelStatusGQL,
 )
 
-__all__ = (
-    # Types
-    "AgentFilterGQL",
-    "AgentOrderByGQL",
-    "AgentResourceGQL",
-    "AgentStatsGQL",
+__all__ = [
     "AgentV2GQL",
-    "AgentV2Connection",
-    "AgentV2Edge",
-    # Resolvers
-    "agent_stats",
-    "agents_v2",
-)
+    "KernelConnection",
+    "KernelEdge",
+    "KernelFilter",
+    "KernelGQL",
+    "KernelOrderBy",
+    "KernelOrderField",
+    "KernelStatusGQL",
+    "fetch_kernels_by_agent",
+]

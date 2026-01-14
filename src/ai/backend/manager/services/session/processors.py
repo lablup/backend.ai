@@ -99,6 +99,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search_kernel import (
+    SearchKernelsAction,
+    SearchKernelsActionResult,
+)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -154,6 +158,7 @@ class SessionProcessors(AbstractProcessorPackage):
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
+    search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
 
     def __init__(self, service: SessionService, action_monitors: list[ActionMonitor]) -> None:
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
@@ -189,6 +194,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
         )
+        self.search_kernels = ActionProcessor(service.search_kernels, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -220,4 +226,5 @@ class SessionProcessors(AbstractProcessorPackage):
             UploadFilesAction.spec(),
             ModifySessionAction.spec(),
             CheckAndTransitStatusAction.spec(),
+            SearchKernelsAction.spec(),
         ]

@@ -62,6 +62,13 @@ class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
+    def by_agent_ids(agent_ids: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.agent.in_(agent_ids)
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.session_id.in_(session_ids)
@@ -75,6 +82,24 @@ class KernelConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor: str) -> QueryCondition:
+        """Condition for forward pagination (after cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id > cursor
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor: str) -> QueryCondition:
+        """Condition for backward pagination (before cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id < cursor
+
+        return inner
+
 
 class KernelOrders:
     """Query orders for kernels."""
@@ -84,6 +109,18 @@ class KernelOrders:
         if ascending:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.created_at.asc()
+        return KernelRow.created_at.desc()
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.id.asc()
+        return KernelRow.id.desc()
 
 
 class UserConditions:
