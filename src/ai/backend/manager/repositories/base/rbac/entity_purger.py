@@ -24,10 +24,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec as BaseBatchPurgerSpec
-from ai.backend.manager.repositories.base.purger import Purger as BasePurger
-from ai.backend.manager.repositories.base.purger import PurgerResult as BasePurgerResult
-from ai.backend.manager.repositories.base.purger import TRow
+from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
 
 # =============================================================================
 # Data Classes
@@ -63,10 +60,10 @@ class RBACEntityPurgerSpec(ABC):
         raise NotImplementedError
 
 
-class RBACEntityBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
+class RBACEntityBatchPurgerSpec(BatchPurgerSpec[TRow], ABC):
     """Spec for RBAC entity batch purge operations.
 
-    Inherits build_subquery() from BaseBatchPurgerSpec.
+    Inherits build_subquery() from BatchPurgerSpec.
     Implementations must provide:
     - entity_type(): Returns the EntityType for constructing ObjectIds from row PKs
     """
@@ -83,10 +80,10 @@ class RBACEntityBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
 
 
 @dataclass
-class RBACEntityPurger(BasePurger[TRow]):
+class RBACEntityPurger(Purger[TRow]):
     """Single-row RBAC entity purger by primary key.
 
-    Inherits row_class and pk_value from BasePurger.
+    Inherits row_class and pk_value from Purger.
 
     Attributes:
         spec: RBACEntityPurgerSpec providing entity info for RBAC cleanup.
@@ -96,7 +93,7 @@ class RBACEntityPurger(BasePurger[TRow]):
 
 
 @dataclass
-class RBACEntityPurgerResult(BasePurgerResult[TRow]):
+class RBACEntityPurgerResult(PurgerResult[TRow]):
     """Result of executing a single-row RBAC entity purge."""
 
     pass
@@ -429,6 +426,20 @@ async def _batch_delete_scope_associations(
 
 
 # =============================================================================
+# Batch Orchestration Data
+# =============================================================================
+
+
+@dataclass
+class _RBACEntityBatchCleanupCounts:
+    """Internal result for batch RBAC cleanup counts."""
+
+    object_permission_count: int
+    permission_group_count: int
+    scope_association_count: int
+
+
+# =============================================================================
 # Orchestration
 # =============================================================================
 
@@ -454,6 +465,36 @@ async def _delete_rbac_for_entity(
     await _delete_object_permissions(db_sess, object_permission_ids)
     await _delete_permission_groups(db_sess, permission_group_ids)
     await _delete_scope_associations(db_sess, entity_id)
+
+
+async def _batch_delete_rbac_for_entities(
+    db_sess: SASession,
+    entity_ids: Collection[ObjectId],
+) -> _RBACEntityBatchCleanupCounts:
+    """Delete all RBAC entries for multiple entities.
+
+    Mirrors _delete_rbac_for_entity() but for batch operations with counts.
+
+    Deletion order:
+    1. ObjectPermissionRows - permissions granted on these entities
+    2. PermissionGroupRows - orphaned groups with no remaining permissions/entities
+    3. AssociationScopesEntitiesRows - scope-entity mappings
+    """
+    role_rows = await _get_related_roles_for_entities(db_sess, entity_ids)
+
+    obj_perm_ids = _find_object_permissions_for_entities(role_rows, entity_ids)
+    obj_perm_count = await _batch_delete_object_permissions(db_sess, obj_perm_ids)
+
+    perm_group_ids = _find_orphaned_perm_groups_for_entities(role_rows, entity_ids)
+    perm_group_count = await _batch_delete_permission_groups(db_sess, perm_group_ids)
+
+    scope_assoc_count = await _batch_delete_scope_associations(db_sess, entity_ids)
+
+    return _RBACEntityBatchCleanupCounts(
+        object_permission_count=obj_perm_count,
+        permission_group_count=perm_group_count,
+        scope_association_count=scope_assoc_count,
+    )
 
 
 async def _delete_row_by_pk_returning(
@@ -542,56 +583,47 @@ async def execute_rbac_entity_batch_purger(
     total_perm_group = 0
     total_scope_assoc = 0
 
-    # Get entity type from spec
+    # Get table and PK info from subquery
+    base_subquery = purger.spec.build_subquery()
+    table = cast(sa.Table, base_subquery.froms[0])
+    pk_columns = list(table.primary_key.columns)
+
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Batch purger only supports single-column primary keys (table: {table.name})",
+        )
+
+    pk_col = pk_columns[0]
     entity_type = purger.spec.entity_type()
 
     while True:
-        # 1. Select batch of rows to delete
-        subquery = purger.spec.build_subquery().limit(purger.batch_size)
-        rows = list((await db_sess.scalars(subquery)).all())
+        # 1. DELETE with RETURNING - get PKs and delete in one query
+        sub = purger.spec.build_subquery().subquery()
+        pk_subquery = sa.select(sub.c[pk_col.key]).limit(purger.batch_size)
 
-        if not rows:
+        stmt = sa.delete(table).where(pk_col.in_(pk_subquery)).returning(pk_col)
+        result = await db_sess.execute(stmt)
+        deleted_pks = result.fetchall()
+
+        if not deleted_pks:
             break
 
-        # 2. Get table and PK info
-        table = cast(sa.Table, purger.spec.build_subquery().froms[0])
-        pk_columns = list(table.primary_key.columns)
-
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Batch purger only supports single-column primary keys (table: {table.name})",
-            )
-
-        pk_col = pk_columns[0]
-
-        # 3. Extract entity_ids from rows using entity_type and row PKs
-        entity_ids: list[ObjectId] = [
-            ObjectId(entity_type=entity_type, entity_id=str(getattr(row, pk_col.key)))
-            for row in rows
-        ]
-
-        # 4. Clean up RBAC entries for entities
-        role_rows = await _get_related_roles_for_entities(db_sess, entity_ids)
-
-        # Find and delete object permissions
-        obj_perm_ids = _find_object_permissions_for_entities(role_rows, entity_ids)
-        total_obj_perm += await _batch_delete_object_permissions(db_sess, obj_perm_ids)
-
-        # Find and delete orphaned permission groups
-        perm_group_ids = _find_orphaned_perm_groups_for_entities(role_rows, entity_ids)
-        total_perm_group += await _batch_delete_permission_groups(db_sess, perm_group_ids)
-
-        # Delete scope associations
-        total_scope_assoc += await _batch_delete_scope_associations(db_sess, entity_ids)
-
-        # 5. Delete main rows
-        pk_values = [getattr(row, pk_col.key) for row in rows]
-
-        result = await db_sess.execute(sa.delete(table).where(pk_col.in_(pk_values)))
-        batch_deleted = cast(CursorResult, result).rowcount or 0
+        pk_values = [row[0] for row in deleted_pks]
+        batch_deleted = len(pk_values)
         total_deleted += batch_deleted
 
-        if len(rows) < purger.batch_size:
+        # 2. Construct entity_ids from deleted PKs
+        entity_ids: list[ObjectId] = [
+            ObjectId(entity_type=entity_type, entity_id=str(pk)) for pk in pk_values
+        ]
+
+        # 3. Clean up RBAC entries (after main row deletion - no FK constraint)
+        cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_ids)
+        total_obj_perm += cleanup.object_permission_count
+        total_perm_group += cleanup.permission_group_count
+        total_scope_assoc += cleanup.scope_association_count
+
+        if batch_deleted < purger.batch_size:
             break
 
     return RBACEntityBatchPurgerResult(

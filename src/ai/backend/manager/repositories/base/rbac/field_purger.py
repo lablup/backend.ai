@@ -246,44 +246,44 @@ async def execute_rbac_field_batch_purger(
     total_deleted = 0
     total_entity_field = 0
 
-    # Get field type from spec
+    # Get table and PK info from subquery
+    base_subquery = purger.spec.build_subquery()
+    table = cast(sa.Table, base_subquery.froms[0])
+    pk_columns = list(table.primary_key.columns)
+
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Batch purger only supports single-column primary keys (table: {table.name})",
+        )
+
+    pk_col = pk_columns[0]
     field_type = purger.spec.field_type()
 
     while True:
-        # 1. Select batch of rows to delete
-        subquery = purger.spec.build_subquery().limit(purger.batch_size)
-        rows = list((await db_sess.scalars(subquery)).all())
+        # 1. DELETE with RETURNING - get PKs and delete in one query
+        sub = purger.spec.build_subquery().subquery()
+        pk_subquery = sa.select(sub.c[pk_col.key]).limit(purger.batch_size)
 
-        if not rows:
+        stmt = sa.delete(table).where(pk_col.in_(pk_subquery)).returning(pk_col)
+        result = await db_sess.execute(stmt)
+        deleted_pks = result.fetchall()
+
+        if not deleted_pks:
             break
 
-        # 2. Get table and PK info
-        table = cast(sa.Table, purger.spec.build_subquery().froms[0])
-        pk_columns = list(table.primary_key.columns)
-
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Batch purger only supports single-column primary keys (table: {table.name})",
-            )
-
-        pk_col = pk_columns[0]
-
-        # 3. Extract field_ids from rows using field_type and row PKs
-        field_ids: list[FieldRef] = [
-            FieldRef(field_type=field_type, field_id=str(getattr(row, pk_col.key))) for row in rows
-        ]
-
-        # 4. Clean up RBAC entries for fields
-        total_entity_field += await _batch_delete_entity_fields(db_sess, field_ids)
-
-        # 5. Delete main rows
-        pk_values = [getattr(row, pk_col.key) for row in rows]
-
-        result = await db_sess.execute(sa.delete(table).where(pk_col.in_(pk_values)))
-        batch_deleted = cast(CursorResult, result).rowcount or 0
+        pk_values = [row[0] for row in deleted_pks]
+        batch_deleted = len(pk_values)
         total_deleted += batch_deleted
 
-        if len(rows) < purger.batch_size:
+        # 2. Construct field_ids from deleted PKs
+        field_ids: list[FieldRef] = [
+            FieldRef(field_type=field_type, field_id=str(pk)) for pk in pk_values
+        ]
+
+        # 3. Clean up RBAC entries (after main row deletion - no FK constraint)
+        total_entity_field += await _batch_delete_entity_fields(db_sess, field_ids)
+
+        if batch_deleted < purger.batch_size:
             break
 
     return RBACFieldBatchPurgerResult(
