@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import Optional
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, EntityType
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -33,6 +33,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeData,
     ScopeListResult,
     ScopeType,
+    SearchEntitiesParam,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -301,22 +302,14 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def search_entities(
         self,
-        scope_type: ScopeType,
-        scope_id: str,
-        entity_type: EntityType,
-        querier: BatchQuerier,
+        param: SearchEntitiesParam,
     ) -> EntityListResult:
         """Search entities within a scope.
 
         Args:
-            scope_type: The scope type to search within.
-            scope_id: The scope ID to search within.
-            entity_type: The type of entity to search.
-            querier: BatchQuerier with pagination settings.
+            param: Parameters containing scope_type, scope_id, entity_type, and querier.
 
         Returns:
             EntityListResult with matching entities.
         """
-        return await self._db_source.search_entities_in_scope(
-            scope_type, scope_id, entity_type, querier
-        )
+        return await self._db_source.search_entities_in_scope(param)

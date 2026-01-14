@@ -30,11 +30,11 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     ScopeData,
     ScopeListResult,
     ScopeType,
+    SearchEntitiesParam,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
@@ -991,10 +991,7 @@ class PermissionDBSource:
 
     async def search_entities_in_scope(
         self,
-        scope_type: ScopeType,
-        scope_id: str,
-        entity_type: EntityType,
-        querier: BatchQuerier,
+        param: SearchEntitiesParam,
     ) -> EntityListResult:
         """Search entities within a scope.
 
@@ -1002,10 +999,7 @@ class PermissionDBSource:
         the scope_type, scope_id, and entity_type.
 
         Args:
-            scope_type: The scope type to search within
-            scope_id: The scope ID to search within
-            entity_type: The type of entity to search for
-            querier: BatchQuerier containing pagination
+            param: Parameters containing scope_type, scope_id, entity_type, and querier.
 
         Returns:
             EntityListResult containing entity IDs
@@ -1013,21 +1007,21 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AssociationScopesEntitiesRow.entity_id).where(
                 sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == scope_type,
-                    AssociationScopesEntitiesRow.scope_id == scope_id,
-                    AssociationScopesEntitiesRow.entity_type == entity_type,
+                    AssociationScopesEntitiesRow.scope_type == param.scope_type,
+                    AssociationScopesEntitiesRow.scope_id == param.scope_id,
+                    AssociationScopesEntitiesRow.entity_type == param.entity_type,
                 )
             )
 
             result = await execute_batch_querier(
                 db_sess,
                 query,
-                querier,
+                param.querier,
             )
 
             items = [
                 EntityData(
-                    entity_type=entity_type,
+                    entity_type=param.entity_type,
                     entity_id=row.entity_id,
                 )
                 for row in result.rows

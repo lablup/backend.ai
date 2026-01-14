@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.data.permission.types import (
     GLOBAL_SCOPE_ID,
@@ -12,6 +13,9 @@ from ai.backend.common.data.permission.types import (
 
 from .id import ScopeId
 
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.base import BatchQuerier
+
 # Re-export types for easier access
 __all__ = (
     "GLOBAL_SCOPE_ID",
@@ -21,6 +25,7 @@ __all__ = (
     "ScopeData",
     "ScopeListResult",
     "ScopeType",
+    "SearchEntitiesParam",
 )
 
 
@@ -40,3 +45,13 @@ class ScopeListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class SearchEntitiesParam:
+    """Parameters for searching entities within a scope."""
+
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
+    querier: BatchQuerier
