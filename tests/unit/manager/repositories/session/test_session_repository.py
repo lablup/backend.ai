@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    DefaultForUnspecified,
     KernelId,
     ResourceSlot,
     SessionId,
@@ -25,6 +26,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -35,7 +37,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -237,6 +239,7 @@ class TestSessionRepository:
                 # FK dependency order: parents before children
                 DomainRow,
                 ScalingGroupRow,
+                AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -286,7 +289,7 @@ class TestSessionRepository:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts={},
+                scheduler_opts=ScalingGroupOpts(),
             )
             db_sess.add(scaling_group)
 
@@ -310,7 +313,7 @@ class TestSessionRepository:
 
             keypair_resource_policy = KeyPairResourcePolicyRow(
                 name="default-keypair-policy",
-                default_for_unspecified="UNLIMITED",
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots={},
                 max_session_lifetime=0,
                 max_concurrent_sessions=10,
@@ -413,12 +416,11 @@ class TestSessionRepository:
             kernel = KernelRow(
                 id=kernel_id,
                 session_id=session_id,
-                session_name="test-session",
-                access_key=access_key,
+                session_type=SessionTypes.INTERACTIVE,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_id,
-                session_type=SessionTypes.INTERACTIVE,
+                access_key=access_key,
                 cluster_mode=ClusterMode.SINGLE_NODE.value,
                 cluster_size=1,
                 cluster_role="main",
@@ -431,6 +433,11 @@ class TestSessionRepository:
                 agent=None,
                 agent_addr=None,
                 container_id=None,
+                repl_in_port=2000,
+                repl_out_port=2001,
+                stdin_port=2002,
+                stdout_port=2003,
+                use_host_network=False,
                 status=KernelStatus.RUNNING,
                 status_info=None,
                 status_data=None,
