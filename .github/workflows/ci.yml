@@ -502,6 +502,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v6
@@ -550,12 +551,29 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*
+    - name: mint API token
+      id: mint-token
+      run: |
+          # retrieve the ambient OIDC token
+          resp=$(curl --fail-with-body -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi")
+          oidc_token=$(jq -r '.value' <<< "${resp}")
+
+          # exchange the OIDC token for an API token
+          resp=$(curl --fail-with-body -X POST https://pypi.org/_/oidc/mint-token -d "{\"token\": \"${oidc_token}\"}")
+          api_token=$(jq -r '.token' <<< "${resp}")
+
+          # mask the newly minted API token, so that we don't accidentally leak it
+          echo "::add-mask::${api_token}"
+
+          # see the next step in the workflow for an example of using this step output
+          echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
     - name: Publish to PyPI
       env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
       # We don't use `pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
+      # wheels after building them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
     - name: Extract stable release version
