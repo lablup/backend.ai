@@ -13,6 +13,7 @@ from .options import (
     UserFairShareConditions,
     UserFairShareOrders,
 )
+from .repositories import FairShareRepositories
 from .repository import FairShareRepository
 from .upserters import (
     DomainFairShareUpserterSpec,
@@ -21,7 +22,8 @@ from .upserters import (
 )
 
 __all__ = (
-    # Repository
+    # Repositories
+    "FairShareRepositories",
     "FairShareRepository",
     # Creator specs
     "DomainFairShareCreatorSpec",

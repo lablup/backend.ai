@@ -282,6 +282,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".deployment",
     ".rbac",
     ".scheduling_history",
+    ".fair_share",
     ".export",
 ]
 

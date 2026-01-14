@@ -197,6 +197,7 @@ class DomainFairShareRow(Base):
         primaryjoin=_get_domain_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
@@ -372,12 +373,14 @@ class ProjectFairShareRow(Base):
         primaryjoin=_get_project_fair_share_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_project_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
@@ -564,18 +567,21 @@ class UserFairShareRow(Base):
         primaryjoin=_get_user_fair_share_user_join_condition,
         foreign_keys=[user_uuid],
         uselist=False,
+        viewonly=True,
     )
     project: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         primaryjoin=_get_user_fair_share_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_user_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (

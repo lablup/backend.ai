@@ -120,30 +120,35 @@ class KernelUsageRecordRow(Base):
         primaryjoin=_get_kernel_usage_record_kernel_join_condition,
         foreign_keys=[kernel_id],
         uselist=False,
+        viewonly=True,
     )
     session: Mapped[SessionRow | None] = relationship(
         "SessionRow",
         primaryjoin=_get_kernel_usage_record_session_join_condition,
         foreign_keys=[session_id],
         uselist=False,
+        viewonly=True,
     )
     user: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_kernel_usage_record_user_join_condition,
         foreign_keys=[user_uuid],
         uselist=False,
+        viewonly=True,
     )
     project: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         primaryjoin=_get_kernel_usage_record_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_kernel_usage_record_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
@@ -220,6 +225,7 @@ class DomainUsageBucketRow(Base):
         primaryjoin=_get_domain_usage_bucket_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
@@ -308,12 +314,14 @@ class ProjectUsageBucketRow(Base):
         primaryjoin=_get_project_usage_bucket_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_project_usage_bucket_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
@@ -414,18 +422,21 @@ class UserUsageBucketRow(Base):
         primaryjoin=_get_user_usage_bucket_user_join_condition,
         foreign_keys=[user_uuid],
         uselist=False,
+        viewonly=True,
     )
     project: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         primaryjoin=_get_user_usage_bucket_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_user_usage_bucket_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (

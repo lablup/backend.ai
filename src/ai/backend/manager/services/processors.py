@@ -47,6 +47,8 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
+from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.fair_share.service import FairShareService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
@@ -84,6 +86,8 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
+from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
@@ -142,6 +146,7 @@ class Services:
     domain: DomainService
     error_log: ErrorLogService
     export: ExportService
+    fair_share: FairShareService
     group: GroupService
     user: UserService
     image: ImageService
@@ -154,6 +159,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
+    resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
     model_serving: ModelServingServiceProtocol
@@ -195,6 +201,9 @@ class Services:
         )
         export_service = ExportService(
             repository=repositories.export.repository,
+        )
+        fair_share_service = FairShareService(
+            repository=repositories.fair_share.repository,
         )
         group_service = GroupService(
             args.storage_manager,
@@ -254,6 +263,9 @@ class Services:
         )
         resource_preset_service = ResourcePresetService(
             repositories.resource_preset.repository,
+        )
+        resource_usage_service = ResourceUsageService(
+            repository=repositories.resource_usage_history.repository,
         )
         scaling_group_service = ScalingGroupService(
             repositories.scaling_group.repository,
@@ -349,6 +361,7 @@ class Services:
             domain=domain_service,
             error_log=error_log_service,
             export=export_service,
+            fair_share=fair_share_service,
             group=group_service,
             user=user_service,
             image=image_service,
@@ -361,6 +374,7 @@ class Services:
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
+            resource_usage=resource_usage_service,
             scaling_group=scaling_group_service,
             utilization_metric=utilization_metric_service,
             model_serving=model_serving_service,
@@ -392,6 +406,7 @@ class Processors(AbstractProcessorPackage):
     domain: DomainProcessors
     error_log: ErrorLogProcessors
     export: ExportProcessors
+    fair_share: FairShareProcessors
     group: GroupProcessors
     user: UserProcessors
     image: ImageProcessors
@@ -404,6 +419,7 @@ class Processors(AbstractProcessorPackage):
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
+    resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
     model_serving: ModelServingProcessors
@@ -429,6 +445,7 @@ class Processors(AbstractProcessorPackage):
         domain_processors = DomainProcessors(services.domain, action_monitors)
         error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
         export_processors = ExportProcessors(services.export, action_monitors)
+        fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
         user_processors = UserProcessors(services.user, action_monitors)
         image_processors = ImageProcessors(services.image, action_monitors)
@@ -452,6 +469,9 @@ class Processors(AbstractProcessorPackage):
         )
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
+        )
+        resource_usage_processors = ResourceUsageProcessors(
+            services.resource_usage, action_monitors
         )
         scaling_group_processors = ScalingGroupProcessors(services.scaling_group, action_monitors)
         model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
@@ -494,6 +514,7 @@ class Processors(AbstractProcessorPackage):
             domain=domain_processors,
             error_log=error_log_processors,
             export=export_processors,
+            fair_share=fair_share_processors,
             group=group_processors,
             user=user_processors,
             image=image_processors,
@@ -506,6 +527,7 @@ class Processors(AbstractProcessorPackage):
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
+            resource_usage=resource_usage_processors,
             scaling_group=scaling_group_processors,
             utilization_metric=utilization_metric_processors,
             model_serving=model_serving_processors,
@@ -532,6 +554,7 @@ class Processors(AbstractProcessorPackage):
             *self.domain.supported_actions(),
             *self.error_log.supported_actions(),
             *self.export.supported_actions(),
+            *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
             *self.user.supported_actions(),
             *self.image.supported_actions(),
@@ -544,6 +567,7 @@ class Processors(AbstractProcessorPackage):
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.resource_preset.supported_actions(),
+            *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),
             *self.model_serving.supported_actions(),

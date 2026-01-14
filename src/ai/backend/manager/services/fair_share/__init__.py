@@ -14,11 +14,14 @@ from .actions import (
     SearchUserFairSharesAction,
     SearchUserFairSharesActionResult,
 )
+from .processors import FairShareProcessors
 from .service import FairShareService
 
 __all__ = (
     # Service
     "FairShareService",
+    # Processors
+    "FairShareProcessors",
     # Domain Actions
     "GetDomainFairShareAction",
     "GetDomainFairShareActionResult",

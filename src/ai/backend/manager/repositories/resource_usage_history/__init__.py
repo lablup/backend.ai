@@ -16,6 +16,7 @@ from .options import (
     UserUsageBucketConditions,
     UserUsageBucketOrders,
 )
+from .repositories import ResourceUsageHistoryRepositories
 from .repository import ResourceUsageHistoryRepository
 from .types import (
     DomainUsageBucketData,
@@ -34,7 +35,8 @@ from .upserters import (
 )
 
 __all__ = (
-    # Repository
+    # Repositories
+    "ResourceUsageHistoryRepositories",
     "ResourceUsageHistoryRepository",
     # Data types
     "KernelUsageRecordData",
