@@ -176,17 +176,15 @@ Configuration model for email channel
 This is the same as the SMTP Reporter implementation, which is also implemented using `smtplib` and an executor
 
 ```python
-class NotificationChannelConfig:
-    pass
 
-class WebhookConfig(NotificationChannelConfig):
-    url: str
-
-class EmailConfig(NotificationChannelConfig):
+class EmailConfig(BaseModel):
     """Email channel configuration."""
     smtp: SMTPConnectionConfig
     message: EmailMessageConfig
     auth: SMTPAuthConfig | None = None
+
+# Union type for config polymorphism
+NotificationChannelConfigType = WebhookConfig | EmailConfig
 
 class SMTPConnectionConfig(BaseModel):
     """SMTP server connection settings."""
@@ -259,21 +257,32 @@ class SMTPAuthConfigResponse(BaseModel):
 
 #### Polymorphic Config Design
 
-The notification channel config uses polymorphism at multiple layers:
+The notification channel config uses Union types with `model_validator(mode="before")` for type discrimination:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Data Layer (Pydantic)                             │
 │                                                                             │
-│   NotificationChannelConfig (abstract base)                                 │
-│          ▲                                                                  │
-│          │ extends                                                          │
-│   ┌──────┴──────┐                                                           │
-│   │             │                                                           │
-│ WebhookConfig  EmailConfig                                                  │
+│   Independent Config Models (no inheritance):                               │
+│   ┌────────────────────┐    ┌────────────────────┐                          │
+│   │   WebhookConfig    │    │    EmailConfig     │                          │
+│   │   (BaseModel)      │    │    (BaseModel)     │                          │
+│   └────────────────────┘    └────────────────────┘                          │
 │                                                                             │
 │   NotificationChannelConfigType = WebhookConfig | EmailConfig               │
-│   (Union type for Pydantic's smart union discrimination)                    │
+│   (Union type - no base class needed)                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Request DTO uses model_validator
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Request DTO Layer (Pydantic)                           │
+│                                                                             │
+│   @model_validator(mode="before") converts dict → appropriate Config:       │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  channel_type: "webhook" → WebhookConfig(**config)                  │   │
+│   │  channel_type: "email"   → EmailConfig(**config)                    │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       │ converted to
@@ -281,15 +290,10 @@ The notification channel config uses polymorphism at multiple layers:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         GraphQL Layer (Strawberry)                          │
 │                                                                             │
-│   Output (Interface pattern):                                               │
+│   Output (Union pattern):                                                   │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  NotificationChannelConfigGQL (interface)                           │   │
-│   │    - channel_type: NotificationChannelType  ← discriminator field   │   │
-│   │          ▲                                                          │   │
-│   │          │ implements                                               │   │
-│   │   ┌──────┴──────┐                                                   │   │
-│   │   │             │                                                   │   │
-│   │ WebhookConfigGQL  EmailConfigGQL                                    │   │
+│   │  config: WebhookConfigGQL | EmailConfigGQL                          │   │
+│   │    - Pattern matching on config type for conversion                 │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │   Input (OneOf pattern):                                                    │
@@ -301,12 +305,38 @@ The notification channel config uses polymorphism at multiple layers:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Why Interface for Output?**
-- GraphQL clients can query common fields (`channel_type`) across all config types
-- Type-specific fields are available via inline fragments (`... on EmailConfigGQL`)
-- `channel_type` serves as discriminator field for client-side type narrowing
+**Request DTO Implementation:**
 
-**Why OneOf for Input?**
+```python
+class CreateNotificationChannelRequest(BaseModel):
+    channel_type: NotificationChannelType
+    config: WebhookConfig | EmailConfig  # Union type
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_config(cls, data: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(data, dict):
+            return data
+
+        channel_type = data.get("channel_type")
+        config = data.get("config")
+
+        if isinstance(config, dict):
+            match channel_type:
+                case "webhook" | NotificationChannelType.WEBHOOK:
+                    data["config"] = WebhookConfig(**config)
+                case "email" | NotificationChannelType.EMAIL:
+                    data["config"] = EmailConfig(**config)
+        return data
+```
+
+**Why Union + model_validator instead of inheritance?**
+- DTO classes don't benefit from inheritance (no shared fields/methods)
+- `channel_type` already exists in request - use it as discriminator
+- Explicit conversion logic is clearer than Pydantic's smart union discrimination
+- No redundant `type` field needed in config
+
+**Why OneOf for GraphQL Input?**
 - Strawberry's `@strawberry.input(one_of=True)` ensures exactly one config type is provided
 - Type-safe input validation at GraphQL schema level
 - Clear API contract: webhook XOR email, not both
@@ -319,22 +349,18 @@ enum NotificationChannelType {
   EMAIL  # New
 }
 
-# Config output - Interface pattern with discriminator
-interface NotificationChannelConfigGQL {
-  channelType: NotificationChannelType!
-}
-
-type WebhookConfigGQL implements NotificationChannelConfigGQL {
-  channelType: NotificationChannelType!
+# Config output - Union pattern
+type WebhookConfigGQL {
   url: String!
 }
 
-type EmailConfigGQL implements NotificationChannelConfigGQL {
-  channelType: NotificationChannelType!
+type EmailConfigGQL {
   smtp: SMTPConnectionConfig!
   message: EmailMessageConfig!
-  auth: SMTPAuthConfig
+  auth: SMTPAuthConfig  # password excluded for security
 }
+
+union NotificationChannelConfigGQL = WebhookConfigGQL | EmailConfigGQL
 
 # Config input - OneOf pattern (exactly one must be provided)
 input NotificationChannelConfigInput @oneOf {
