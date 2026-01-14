@@ -352,9 +352,14 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
     storage_prefix: Optional[str] = Field(
         default=None,
         description="""
-        Custom prefix path for storing imported models.
-        If not specified (None), uses the default path.
-        If set to "/", files will be stored at the root.
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
         """,
         examples=["my-models", "custom/path", "/"],
     )
@@ -448,9 +453,14 @@ class ReservoirImportModelsReq(BaseRequestModel):
     storage_prefix: Optional[str] = Field(
         default=None,
         description="""
-        Custom prefix path for storing imported models.
-        If not specified (None), uses the default path.
-        If set to "/", files will be stored at the root.
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
         """,
         examples=["my-models", "custom/path", "/"],
     )
