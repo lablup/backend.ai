@@ -215,6 +215,7 @@ class APIHandler:
                     artifact_revision_id=artifact_revision_id,
                     vfolder_id=body.parsed.vfolder_id,
                     storage_prefix=storage_prefix,
+                    force=body.parsed.force,
                 )
             )
             imported_revisions.append(action_result.result)

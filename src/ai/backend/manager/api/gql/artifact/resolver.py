@@ -270,6 +270,7 @@ async def import_artifacts(
                     artifact_revision_id=UUID(revision_id),
                     vfolder_id=vfolder_id,
                     storage_prefix=storage_prefix,
+                    force=input.force,
                 )
             )
         )
@@ -385,6 +386,7 @@ async def delegate_import_artifacts(
             artifact_revision_ids=[
                 UUID(revision_id) for revision_id in input.artifact_revision_ids
             ],
+            force=input.force,
         )
     )
     artifact_revisions = [

@@ -144,6 +144,7 @@ class APIHandler:
                     if body.parsed.delegatee_target
                     else None,
                     artifact_revision_ids=body.parsed.artifact_revision_ids,
+                    force=body.parsed.force,
                 )
             )
         )

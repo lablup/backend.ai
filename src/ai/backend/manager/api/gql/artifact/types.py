@@ -536,6 +536,10 @@ class ImportArtifactsInput:
         default=None,
         description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
+    force: bool = strawberry.field(
+        default=False,
+        description="Force re-download regardless of digest freshness check. Added in 25.18.0.",
+    )
 
 
 @strawberry.input(description="Added in 25.15.0")
@@ -594,6 +598,10 @@ class DelegateImportArtifactsInput:
     )
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
+    force: bool = strawberry.field(
+        default=False,
+        description="Force re-download regardless of digest freshness check. Added in 25.18.0.",
+    )
 
 
 @strawberry.input(

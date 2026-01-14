@@ -120,6 +120,9 @@ class DelegateImportArtifactsReq(BaseRequestModel):
         default=None,
     )
     artifact_type: Optional[ArtifactType]
+    force: bool = Field(
+        default=False, description="Force re-download regardless of digest freshness check."
+    )
 
 
 class ImportArtifactsReq(BaseRequestModel):
@@ -129,6 +132,9 @@ class ImportArtifactsReq(BaseRequestModel):
     vfolder_id: uuid.UUID | None = Field(
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
+    )
+    force: bool = Field(
+        default=False, description="Force re-download regardless of digest freshness check."
     )
 
 

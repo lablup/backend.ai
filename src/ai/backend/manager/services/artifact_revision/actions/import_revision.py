@@ -12,6 +12,7 @@ class ImportArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
     vfolder_id: uuid.UUID | None = None
     storage_prefix: Optional[str] = None
+    force: bool = False
 
     @override
     def entity_id(self) -> Optional[str]:
