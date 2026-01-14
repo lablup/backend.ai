@@ -270,7 +270,7 @@ Capacity-based (Backend.AI approach):
 
 **Resource Weight Configuration:**
 
-Resource weights are configured in `scaling_groups.scheduler_opts`:
+Resource weights are configured in `resource_groups.scheduler_opts`:
 
 ```python
 # scheduler_opts
@@ -430,6 +430,23 @@ Result: Historical ratios remain stable despite capacity changes
 
 ### 3. Database Schema
 
+#### KernelRow Extension
+
+Add `last_usage_recorded_at` column to track the last usage measurement time:
+
+```python
+# In KernelRow (existing table)
+class KernelRow(Base):
+    # ... existing columns ...
+
+    # Last usage measurement timestamp (for batch aggregation)
+    last_usage_recorded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None,
+        comment="Timestamp of last usage record creation. "
+                "Used by UsageAggregationService to determine slice start time."
+    )
+```
+
 #### kernel_usage_records Table
 
 Raw data table storing per-period usage slices for kernels.
@@ -441,6 +458,9 @@ class KernelUsageRecordRow(Base):
     Each record represents kernel resource usage during a specific
     period (period_start ~ period_end). Generated in 5-minute intervals
     by batch aggregation.
+
+    Tracks resource_usage: Allocated resources × time (for Fair Share calculation).
+    Actual measured usage is available via Prometheus metrics (not stored in DB).
     """
 
     __tablename__ = "kernel_usage_records"
@@ -455,7 +475,7 @@ class KernelUsageRecordRow(Base):
     user_uuid: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
     project_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
     domain_name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    scaling_group: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource_group: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Period slice information
     period_start: Mapped[datetime] = mapped_column(
@@ -465,7 +485,8 @@ class KernelUsageRecordRow(Base):
         DateTime(timezone=True), nullable=False
     )
 
-    # Resource usage for the period (processor × seconds)
+    # Allocated resource usage for the period (allocated × seconds)
+    # Used for Fair Share calculation
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
@@ -479,7 +500,7 @@ class KernelUsageRecordRow(Base):
 
     # Composite indexes
     __table_args__ = (
-        Index("ix_kernel_usage_sg_period", "scaling_group", "period_start"),
+        Index("ix_kernel_usage_rg_period", "resource_group", "period_start"),
         Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
 ```
@@ -549,13 +570,13 @@ Recalculated from kernel_usage_records when decay configuration changes.
 
 **Tier Structure:**
 ```
-DomainUsageBucket     (domain_name, scaling_group, period)
-    └── ProjectUsageBucket  (project_id, domain_name, scaling_group, period)
-            └── UserUsageBucket   (user_uuid, project_id, domain_name, scaling_group, period)
+DomainUsageBucket     (domain_name, resource_group, period)
+    └── ProjectUsageBucket  (project_id, domain_name, resource_group, period)
+            └── UserUsageBucket   (user_uuid, project_id, domain_name, resource_group, period)
 ```
 
 **Note:** A User can belong to multiple Projects, so UserUsageBucket is uniquely identified
-by the `(user_uuid, project_id, domain_name, scaling_group, period_start)` combination.
+by the `(user_uuid, project_id, domain_name, resource_group, period_start)` combination.
 
 ##### domain_usage_buckets Table
 
@@ -564,6 +585,7 @@ class DomainUsageBucketRow(Base):
     """Per-domain period-based resource usage aggregation.
 
     Cache summing all Project/User usage within the domain.
+    Tracks both allocated and measured usage for multi-purpose use.
     """
 
     __tablename__ = "domain_usage_buckets"
@@ -574,7 +596,7 @@ class DomainUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False
     )
 
@@ -583,7 +605,8 @@ class DomainUsageBucketRow(Base):
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
     decay_unit_days: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
-    # Aggregated resource usage (resource-seconds unit)
+    # Aggregated allocated resource usage (resource-seconds unit)
+    # Used for Fair Share calculation
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
@@ -591,7 +614,7 @@ class DomainUsageBucketRow(Base):
     # Capacity snapshot for normalization
     capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
-        comment="Scaling group capacity at bucket period. "
+        comment="Resource group capacity at bucket period. "
                 "Sum of agent.available_slots for calculating usage ratio."
     )
 
@@ -609,10 +632,10 @@ class DomainUsageBucketRow(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "domain_name", "scaling_group", "period_start",
+            "domain_name", "resource_group", "period_start",
             name="uq_domain_usage_bucket"
         ),
-        Index("ix_domain_usage_bucket_lookup", "domain_name", "scaling_group", "period_start"),
+        Index("ix_domain_usage_bucket_lookup", "domain_name", "resource_group", "period_start"),
     )
 ```
 
@@ -636,7 +659,7 @@ class ProjectUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False
     )
 
@@ -645,7 +668,8 @@ class ProjectUsageBucketRow(Base):
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
     decay_unit_days: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
-    # Aggregated resource usage (resource-seconds unit)
+    # Aggregated allocated resource usage (resource-seconds unit)
+    # Used for Fair Share calculation
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
@@ -653,7 +677,7 @@ class ProjectUsageBucketRow(Base):
     # Capacity snapshot for normalization
     capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
-        comment="Scaling group capacity at bucket period. "
+        comment="Resource group capacity at bucket period. "
                 "Sum of agent.available_slots for calculating usage ratio."
     )
 
@@ -672,10 +696,10 @@ class ProjectUsageBucketRow(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "project_id", "scaling_group", "period_start",
+            "project_id", "resource_group", "period_start",
             name="uq_project_usage_bucket"
         ),
-        Index("ix_project_usage_bucket_lookup", "project_id", "scaling_group", "period_start"),
+        Index("ix_project_usage_bucket_lookup", "project_id", "resource_group", "period_start"),
     )
 ```
 
@@ -705,7 +729,7 @@ class UserUsageBucketRow(Base):
     domain_name: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False
     )
 
@@ -714,7 +738,8 @@ class UserUsageBucketRow(Base):
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
     decay_unit_days: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
-    # Aggregated resource usage (resource-seconds unit)
+    # Aggregated allocated resource usage (resource-seconds unit)
+    # Used for Fair Share calculation
     resource_usage: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot()
     )
@@ -722,7 +747,7 @@ class UserUsageBucketRow(Base):
     # Capacity snapshot for normalization
     capacity_snapshot: Mapped[ResourceSlot] = mapped_column(
         ResourceSlotColumn(), nullable=False, default=ResourceSlot(),
-        comment="Scaling group capacity at bucket period. "
+        comment="Resource group capacity at bucket period. "
                 "Sum of agent.available_slots for calculating usage ratio."
     )
 
@@ -742,10 +767,10 @@ class UserUsageBucketRow(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "user_uuid", "project_id", "scaling_group", "period_start",
+            "user_uuid", "project_id", "resource_group", "period_start",
             name="uq_user_usage_bucket"
         ),
-        Index("ix_user_usage_bucket_lookup", "user_uuid", "project_id", "scaling_group", "period_start"),
+        Index("ix_user_usage_bucket_lookup", "user_uuid", "project_id", "resource_group", "period_start"),
     )
 ```
 
@@ -934,7 +959,7 @@ slice_start = kernel.last_slice_end or kernel.started_at
 
 **Configuration Example:**
 ```python
-# scaling_groups.scheduler_opts
+# resource_groups.scheduler_opts
 {
     "gap_policy": "interpolate",  # or "ignore"
     "max_gap_hours": 24,          # Max gap period for interpolate (hours)
@@ -1001,7 +1026,7 @@ Share (Weight) is applied in a Domain → Project → User hierarchical structur
 
 ```
                     ┌─────────────────────┐
-                    │   Scaling Group     │
+                    │   Resource Group     │
                     │   Total: 100%       │
                     └──────────┬──────────┘
                                │
@@ -1055,7 +1080,7 @@ class SliceGapPolicy(StrEnum):
 class FairShareConfig:
     """Fair Share scheduling configuration.
 
-    Read from scaling group's scheduler_opts.
+    Read from resource group's scheduler_opts.
     Only Flat decay method is supported (Slurm compatible, computationally efficient).
     """
     half_life_days: int = 7           # Half-life (days)
@@ -1127,7 +1152,7 @@ class FairShareSequencer(WorkloadSequencer):
         if not workloads:
             return []
 
-        scaling_group = workloads[0].scaling_group
+        resource_group = workloads[0].resource_group
 
         # Collect (user_uuid, project_id) pairs from workloads
         user_project_pairs = {(w.user_uuid, w.project_id) for w in workloads}
@@ -1135,7 +1160,7 @@ class FairShareSequencer(WorkloadSequencer):
         # Query cached fair_share_factor from user_fair_shares table
         fair_shares = self._fair_share_repository.get_user_fair_shares(
             user_project_pairs=user_project_pairs,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
         )
         # Returns: Mapping[tuple[uuid.UUID, uuid.UUID], UserFairShareRow]
 
@@ -1237,7 +1262,7 @@ class UsageAggregationService:
                 user_uuid=kernel.user_uuid,
                 group_id=kernel.group_id,
                 domain_name=kernel.domain_name,
-                scaling_group=kernel.scaling_group,
+                resource_group=kernel.resource_group,
                 period_start=period_start,
                 period_end=period_end,
                 resource_usage=resource_usage,
@@ -1265,21 +1290,21 @@ class UsageAggregationService:
 
         # Query slices not yet reflected in buckets
         # (aggregate per user from kernel_usage_records)
-        for user_uuid, project_id, domain_name, scaling_group in user_project_combinations:
+        for user_uuid, project_id, domain_name, resource_group in user_project_combinations:
             # Query user's current active bucket
             current_bucket = await self._get_latest_bucket(
-                db_sess, user_uuid, project_id, scaling_group
+                db_sess, user_uuid, project_id, resource_group
             )
 
             # Sum new slices' usage
             new_usage = await self._sum_new_slices(
-                db_sess, user_uuid, project_id, scaling_group
+                db_sess, user_uuid, project_id, resource_group
             )
 
             if current_bucket is None:
                 # Create first bucket
                 await self._insert_bucket(
-                    db_sess, user_uuid, project_id, domain_name, scaling_group,
+                    db_sess, user_uuid, project_id, domain_name, resource_group,
                     period_start=today, period_end=today,
                     resource_usage=new_usage,
                 )
@@ -1290,7 +1315,7 @@ class UsageAggregationService:
             else:
                 # Exceeds decay_unit → create new bucket
                 await self._insert_bucket(
-                    db_sess, user_uuid, project_id, domain_name, scaling_group,
+                    db_sess, user_uuid, project_id, domain_name, resource_group,
                     period_start=today, period_end=today,
                     resource_usage=new_usage,
                 )
@@ -1302,7 +1327,7 @@ class UsageAggregationService:
     async def _update_fair_shares(self, db_sess: SASession) -> int:
         """Update fair_shares table based on buckets.
 
-        For each (user, project, scaling_group) combination:
+        For each (user, project, resource_group) combination:
         1. Query buckets within lookback_days range
         2. Calculate total_decayed_usage with decay applied
         3. Calculate Fair Share Factor: F = 2^(-UH/S)
@@ -1356,9 +1381,9 @@ def _make_sequencer_pool(
 
 #### Design Principles
 
-Share (Weight) is **managed per Scaling Group**:
+Share (Weight) is **managed per Resource Group**:
 - Weight may or may not be needed depending on scheduler type
-- Only meaningful in scaling groups using Fair Share scheduler
+- Only meaningful in resource groups using Fair Share scheduler
 - Not added directly to Domain/Group/User tables (entities independent of scheduler)
 
 #### Fair Shares Tables (Per-tier State Summary)
@@ -1397,7 +1422,7 @@ class DomainFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         GUID, primary_key=True, default=uuid.uuid4
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
     domain_name: Mapped[str] = mapped_column(
@@ -1477,8 +1502,8 @@ class DomainFairShareRow(Base):
     domain: Mapped[DomainRow | None] = relationship("DomainRow")
 
     __table_args__ = (
-        UniqueConstraint("scaling_group", "domain_name", name="uq_domain_fair_share"),
-        Index("ix_domain_fair_share_lookup", "scaling_group", "domain_name"),
+        UniqueConstraint("resource_group", "domain_name", name="uq_domain_fair_share"),
+        Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
 ```
 
@@ -1493,7 +1518,7 @@ class ProjectFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         GUID, primary_key=True, default=uuid.uuid4
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -1576,8 +1601,8 @@ class ProjectFairShareRow(Base):
     domain: Mapped[DomainRow | None] = relationship("DomainRow")
 
     __table_args__ = (
-        UniqueConstraint("scaling_group", "project_id", name="uq_project_fair_share"),
-        Index("ix_project_fair_share_lookup", "scaling_group", "project_id"),
+        UniqueConstraint("resource_group", "project_id", name="uq_project_fair_share"),
+        Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
 ```
 
@@ -1595,7 +1620,7 @@ class UserFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         GUID, primary_key=True, default=uuid.uuid4
     )
-    scaling_group: Mapped[str] = mapped_column(
+    resource_group: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column(
@@ -1685,10 +1710,10 @@ class UserFairShareRow(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "scaling_group", "user_uuid", "project_id",
+            "resource_group", "user_uuid", "project_id",
             name="uq_user_fair_share"
         ),
-        Index("ix_user_fair_share_lookup", "scaling_group", "user_uuid", "project_id"),
+        Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
 ```
 
@@ -1696,7 +1721,7 @@ class UserFairShareRow(Base):
 ```python
 # GPU cluster with research domain (2x weight configured)
 DomainFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     domain_name="research",
     weight=Decimal("2.0"),
     # Below are calculated/updated by batch
@@ -1709,7 +1734,7 @@ DomainFairShareRow(
 
 # GPU cluster with ml-team project
 ProjectFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     project_id=ml_team_id,
     domain_name="research",
     weight=Decimal("1.5"),
@@ -1722,7 +1747,7 @@ ProjectFairShareRow(
 
 # GPU cluster with specific user
 UserFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     user_uuid=user_uuid,
     project_id=ml_team_id,
     domain_name="research",
@@ -1748,7 +1773,7 @@ class FairShareDBSource:
         self,
         db_sess: SASession,
         user_project_pairs: set[tuple[uuid.UUID, uuid.UUID]],
-        scaling_group: str,
+        resource_group: str,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], UserFairShareRow]:
         """Query users' Fair Share info (per user_uuid, project_id).
 
@@ -1768,7 +1793,7 @@ class FairShareDBSource:
         stmt = (
             sa.select(UserFairShareRow)
             .where(
-                UserFairShareRow.scaling_group == scaling_group,
+                UserFairShareRow.resource_group == resource_group,
                 sa.or_(*conditions),
             )
         )
@@ -1781,7 +1806,7 @@ class FairShareDBSource:
         db_sess: SASession,
         domain_names: set[str],
         project_ids: set[uuid.UUID],
-        scaling_group: str,
+        resource_group: str,
     ) -> tuple[
         Mapping[str, DomainFairShareRow],
         Mapping[uuid.UUID, ProjectFairShareRow],
@@ -1791,7 +1816,7 @@ class FairShareDBSource:
         domain_stmt = (
             sa.select(DomainFairShareRow)
             .where(
-                DomainFairShareRow.scaling_group == scaling_group,
+                DomainFairShareRow.resource_group == resource_group,
                 DomainFairShareRow.domain_name.in_(domain_names),
             )
         )
@@ -1802,7 +1827,7 @@ class FairShareDBSource:
         project_stmt = (
             sa.select(ProjectFairShareRow)
             .where(
-                ProjectFairShareRow.scaling_group == scaling_group,
+                ProjectFairShareRow.resource_group == resource_group,
                 ProjectFairShareRow.project_id.in_(project_ids),
             )
         )
@@ -1814,7 +1839,7 @@ class FairShareDBSource:
     async def upsert_user_fair_share(
         self,
         db_sess: SASession,
-        scaling_group: str,
+        resource_group: str,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
         domain_name: str,
@@ -1826,7 +1851,7 @@ class FairShareDBSource:
         stmt = (
             sa.select(UserFairShareRow)
             .where(
-                UserFairShareRow.scaling_group == scaling_group,
+                UserFairShareRow.resource_group == resource_group,
                 UserFairShareRow.user_uuid == user_uuid,
                 UserFairShareRow.project_id == project_id,
             )
@@ -1836,7 +1861,7 @@ class FairShareDBSource:
 
         if row is None:
             row = UserFairShareRow(
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 user_uuid=user_uuid,
                 project_id=project_id,
                 domain_name=domain_name,
@@ -1855,11 +1880,11 @@ class FairShareDBSource:
         return row
 
     async def get_fair_share_config(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group: str
     ) -> FairShareConfig:
-        """Query scaling group's Fair Share configuration."""
+        """Query resource group's Fair Share configuration."""
         stmt = sa.select(ScalingGroupRow).where(
-            ScalingGroupRow.name == scaling_group
+            ScalingGroupRow.name == resource_group
         )
         result = await db_sess.execute(stmt)
         sg_row = result.scalar_one_or_none()
@@ -1887,27 +1912,27 @@ class FairShareRepository:
     async def get_user_fair_shares(
         self,
         user_project_pairs: set[tuple[uuid.UUID, uuid.UUID]],
-        scaling_group: str,
+        resource_group: str,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], UserFairShareRow]:
         """Query users' Fair Share info (per user_uuid, project_id)."""
         async with self._db_source._db.begin_readonly_session() as db_sess:
             return await self._db_source.get_user_fair_shares(
-                db_sess, user_project_pairs, scaling_group
+                db_sess, user_project_pairs, resource_group
             )
 
     async def get_fair_share_config(
-        self, scaling_group: str
+        self, resource_group: str
     ) -> FairShareConfig:
-        """Query scaling group's Fair Share configuration."""
+        """Query resource group's Fair Share configuration."""
         async with self._db_source._db.begin_readonly_session() as db_sess:
-            return await self._db_source.get_fair_share_config(db_sess, scaling_group)
+            return await self._db_source.get_fair_share_config(db_sess, resource_group)
 ```
 
 ## Configuration
 
-### Configuration Parameters (Per Scaling Group)
+### Configuration Parameters (Per Resource Group)
 
-Stored in the `scaling_groups.scheduler_opts` JSONB column.
+Stored in the `resource_groups.scheduler_opts` JSONB column.
 
 | Parameter | Type | Default | Description |
 |---------|------|--------|------|
@@ -1921,12 +1946,12 @@ Stored in the `scaling_groups.scheduler_opts` JSONB column.
 
 ### Per-tier Weight Configuration
 
-Managed per Scaling Group in `domain_fair_shares`, `project_fair_shares`, `user_fair_shares` tables.
+Managed per Resource Group in `domain_fair_shares`, `project_fair_shares`, `user_fair_shares` tables.
 
 ```python
 # GPU cluster with research domain at 2x weight
 DomainFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     domain_name="research",
     weight=Decimal("2.0"),
     # total_decayed_usage, fair_share_factor calculated by batch
@@ -1934,7 +1959,7 @@ DomainFairShareRow(
 
 # GPU cluster with ml-team project at 1.5x weight
 ProjectFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     project_id=ml_team_id,
     domain_name="research",
     weight=Decimal("1.5"),
@@ -1942,7 +1967,7 @@ ProjectFairShareRow(
 
 # GPU cluster with specific user at 1.0 weight (default)
 UserFairShareRow(
-    scaling_group="gpu-cluster",
+    resource_group="gpu-cluster",
     user_uuid=user_uuid,
     project_id=ml_team_id,
     domain_name="research",
@@ -1953,11 +1978,11 @@ UserFairShareRow(
 # User's effective_weight = domain × project × user = 2.0 × 1.5 × 1.0 = 3.0
 ```
 
-### Scaling Group Configuration Example
+### Resource Group Configuration Example
 
 ```python
-# Scheduler and options specified in Scaling Group configuration
-scaling_group = {
+# Scheduler and options specified in Resource Group configuration
+resource_group = {
     "name": "gpu-cluster",
     "scheduler": "fairshare",  # "fifo" | "lifo" | "drf" | "fairshare"
     "scheduler_opts": {
@@ -1974,7 +1999,7 @@ scaling_group = {
 ### Behavior When Decay Configuration Changes
 
 When `decay_unit_days` or `half_life_days` changes:
-1. Invalidate `user_usage_buckets` cache (per scaling group)
+1. Invalidate `user_usage_buckets` cache (per resource group)
 2. Regenerate buckets from `kernel_usage_records` raw data
 3. No scheduling pause required (can query raw directly during cache regeneration)
 
@@ -2049,7 +2074,7 @@ def parse_scheduler_config(
 
     Args:
         scheduler: Scheduler type string ("fifo", "drf", "fairshare", etc.)
-        scheduler_opts: scaling_groups.scheduler_opts JSONB value
+        scheduler_opts: resource_groups.scheduler_opts JSONB value
 
     Returns:
         Type-appropriate configuration object
@@ -2065,18 +2090,18 @@ def parse_scheduler_config(
 # Query configuration in Repository
 class ScalingGroupRepository:
     async def get_scheduler_config(
-        self, scaling_group: str
+        self, resource_group: str
     ) -> SchedulerConfig:
-        """Query scaling group's scheduler configuration."""
+        """Query resource group's scheduler configuration."""
         async with self._db.begin_readonly_session() as db_sess:
             stmt = sa.select(ScalingGroupRow).where(
-                ScalingGroupRow.name == scaling_group
+                ScalingGroupRow.name == resource_group
             )
             result = await db_sess.execute(stmt)
             sg_row = result.scalar_one_or_none()
 
             if not sg_row:
-                raise ScalingGroupNotFound(scaling_group)
+                raise ScalingGroupNotFound(resource_group)
 
             return parse_scheduler_config(
                 scheduler=sg_row.scheduler,
@@ -2089,7 +2114,7 @@ class FairShareSequencer(WorkloadSequencer):
     def sequence(
         self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
     ) -> Sequence[SessionWorkload]:
-        config = self._repository.get_scheduler_config(scaling_group)
+        config = self._repository.get_scheduler_config(resource_group)
 
         # Type check ensures FairShareConfig
         if not isinstance(config, FairShareConfig):
@@ -2113,11 +2138,11 @@ class FairShareSequencer(WorkloadSequencer):
 
 ### REST API
 
-#### Scaling Group Fair Share Configuration Read/Update
+#### Resource Group Fair Share Configuration Read/Update
 
 ```http
 # Read
-GET /resource-groups/{scaling_group}/scheduler-options
+GET /resource-groups/{resource_group}/scheduler-options
 Response: {
     "scheduler": "fairshare",
     "scheduler_opts": {
@@ -2131,7 +2156,7 @@ Response: {
 }
 
 # Update
-PATCH /resource-groups/{scaling_group}/scheduler-options
+PATCH /resource-groups/{resource_group}/scheduler-options
 Body: {
     "scheduler": "fairshare",
     "scheduler_opts": {
@@ -2144,7 +2169,7 @@ Body: {
 
 ```http
 # List weights
-GET /resource-groups/{scaling_group}/fair-share-weights
+GET /resource-groups/{resource_group}/fair-share-weights
 Response: {
     "items": [
         {"id": "...", "target_type": "domain", "target_id": "research", "weight": "2.0"},
@@ -2154,7 +2179,7 @@ Response: {
 }
 
 # Bulk Upsert weights (weight=null means delete)
-PUT /resource-groups/{scaling_group}/fair-share-weights
+PUT /resource-groups/{resource_group}/fair-share-weights
 Body: {
     "items": [
         {"target_type": "domain", "target_id": "research", "weight": "2.0"},   # upsert
@@ -2173,7 +2198,7 @@ Response: {
 
 ```http
 # Query specific user's current Fair Share Factor
-GET /resource-groups/{scaling_group}/fair-share-status?user_uuid={user_uuid}
+GET /resource-groups/{resource_group}/fair-share-status?user_uuid={user_uuid}
 Response: {
     "user_uuid": "...",
     "effective_usage": "1234.56",
@@ -2181,8 +2206,8 @@ Response: {
     "fair_share_factor": "0.125"
 }
 
-# All users' Fair Share ranking within Scaling Group
-GET /resource-groups/{scaling_group}/fair-share-status
+# All users' Fair Share ranking within Resource Group
+GET /resource-groups/{resource_group}/fair-share-status
 Response: {
     "items": [
         {"user_uuid": "...", "fair_share_factor": "1.0", "rank": 1},
@@ -2217,7 +2242,7 @@ Weight policy data configured by admin (stored in DB).
 ```graphql
 type FairShareWeightNode implements Node {
     id: ID!
-    scaling_group: String!
+    resource_group: String!
     target_type: FairShareWeightTargetType!
     target_id: String!
     weight: String!  # Configured weight (default 1.0 if not set)
@@ -2346,7 +2371,7 @@ Period-based usage history (aggregated data stored in DB).
 type DomainUsageBucketNode implements Node {
     id: ID!
     domain_name: String!
-    scaling_group: String!
+    resource_group: String!
     period_start: Date!
     period_end: Date!
     decay_unit_days: Int!
@@ -2371,7 +2396,7 @@ type ProjectUsageBucketNode implements Node {
     id: ID!
     project_id: UUID!
     domain_name: String!
-    scaling_group: String!
+    resource_group: String!
     period_start: Date!
     period_end: Date!
     decay_unit_days: Int!
@@ -2397,7 +2422,7 @@ type UserUsageBucketNode implements Node {
     user_uuid: UUID!
     project_id: UUID!
     domain_name: String!
-    scaling_group: String!
+    resource_group: String!
     period_start: Date!
     period_end: Date!
     decay_unit_days: Int!
@@ -2581,8 +2606,8 @@ type UpsertFairShareWeightsResult {
 
 ```graphql
 type Query {
-    # Scaling Group query (config only)
-    scaling_group(name: String!): ScalingGroup
+    # Resource Group query (config only)
+    resource_group(name: String!): ScalingGroup
 
     # ─────────────────────────────────────────────────────────────────
     # Fair Share Status Query (weight + calculated values combined)
@@ -2592,7 +2617,7 @@ type Query {
 
     # Domain-level Fair Share list
     domain_fair_shares(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2604,13 +2629,13 @@ type Query {
 
     # Specific Domain's Fair Share detail (includes sub-Projects)
     domain_fair_share(
-        scaling_group: String!
+        resource_group: String!
         domain_name: String!
     ): DomainFairShare
 
     # Project-level Fair Share list
     project_fair_shares(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2622,13 +2647,13 @@ type Query {
 
     # Specific Project's Fair Share detail (includes sub-Users)
     project_fair_share(
-        scaling_group: String!
+        resource_group: String!
         project_id: UUID!
     ): ProjectFairShare
 
     # User-level Fair Share list
     user_fair_shares(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2640,7 +2665,7 @@ type Query {
 
     # Specific User's Fair Share detail
     user_fair_share(
-        scaling_group: String!
+        resource_group: String!
         user_uuid: UUID!
         project_id: UUID!  # User can belong to multiple Projects
     ): UserFairShare
@@ -2651,7 +2676,7 @@ type Query {
 
     # Domain usage buckets
     domain_usage_buckets(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2663,7 +2688,7 @@ type Query {
 
     # Project usage buckets
     project_usage_buckets(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2675,7 +2700,7 @@ type Query {
 
     # User usage buckets
     user_usage_buckets(
-        scaling_group: String!
+        resource_group: String!
         first: Int
         last: Int
         before: String
@@ -2700,21 +2725,21 @@ type ScalingGroup {
 type Mutation {
     # Domain Fair Share Weight Configuration
     upsert_domain_fair_share(
-        scaling_group: String!
+        resource_group: String!
         domain_name: String!
         weight: Decimal!
     ): DomainFairShare!
 
     # Project Fair Share Weight Configuration
     upsert_project_fair_share(
-        scaling_group: String!
+        resource_group: String!
         project_id: UUID!
         weight: Decimal!
     ): ProjectFairShare!
 
     # User Fair Share Weight Configuration
     upsert_user_fair_share(
-        scaling_group: String!
+        resource_group: String!
         user_uuid: UUID!
         project_id: UUID!
         weight: Decimal!
@@ -2722,7 +2747,7 @@ type Mutation {
 
     # Weight Reset (restore to default 1.0)
     reset_fair_share_weight(
-        scaling_group: String!
+        resource_group: String!
         target_type: FairShareTargetType!  # DOMAIN | PROJECT | USER
         target_id: String!  # domain_name or UUID
     ): Boolean!
@@ -2733,11 +2758,11 @@ type Mutation {
 
 ##### Scenario 1: Verify Fair Share Scheduler Configuration
 
-**Purpose**: Check if Fair Share scheduler is configured for the Scaling Group and what parameters are set
+**Purpose**: Check if Fair Share scheduler is configured for the Resource Group and what parameters are set
 
 ```graphql
 query {
-    scaling_group(name: "gpu-cluster") {
+    resource_group(name: "gpu-cluster") {
         name
         scheduler        # Check if "fairshare"
         scheduler_opts   # Fair Share parameters
@@ -2762,7 +2787,7 @@ query {
 # 2-1. Query per-domain Fair Share (weight + calculated values together)
 query {
     domain_fair_shares(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         first: 100
         order: {field: FAIR_SHARE_FACTOR, direction: DESC}
     ) {
@@ -2782,7 +2807,7 @@ query {
 # 2-2. Query per-project Fair Share
 query {
     project_fair_shares(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         filter: {domain_name: {equals: "research"}}
     ) {
         edges {
@@ -2799,7 +2824,7 @@ query {
 # 2-3. Configure Weight (individual)
 mutation {
     upsert_domain_fair_share(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         domain_name: "research"
         weight: "2.0"
     ) {
@@ -2811,7 +2836,7 @@ mutation {
 
 mutation {
     upsert_project_fair_share(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         project_id: "550e8400-..."
         weight: "1.5"
     ) {
@@ -2824,7 +2849,7 @@ mutation {
 # 2-4. Reset Weight (restore default 1.0)
 mutation {
     reset_fair_share_weight(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         target_type: USER
         target_id: "6ba7b810-..."
     )
@@ -2839,7 +2864,7 @@ mutation {
 # 3-1. All users' priority ranking (highest first)
 query {
     user_fair_shares(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         first: 50
         order: {field: FAIR_SHARE_FACTOR, direction: DESC}
     ) {
@@ -2859,7 +2884,7 @@ query {
 # 3-2. Priority of users in specific domain
 query {
     user_fair_shares(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         filter: {domain_name: {equals: "research"}}
         order: {field: RANK, direction: ASC}
     ) {
@@ -2876,7 +2901,7 @@ query {
 # 3-3. Specific user's current Fair Share info
 query {
     user_fair_shares(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         filter: {user_uuid: {equals: "6ba7b810-..."}}
     ) {
         edges {
@@ -2900,7 +2925,7 @@ query {
 # 4-1. Query specific user's last 28 days usage buckets
 query {
     user_usage_buckets(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         filter: {user_uuid: {equals: "6ba7b810-..."}}
         first: 28
         order: {field: PERIOD_START, direction: DESC}
@@ -2921,7 +2946,7 @@ query {
 # 4-2. Query usage for specific period only
 query {
     user_usage_buckets(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         filter: {
             user_uuid: {equals: "6ba7b810-..."}
             period_start: {gte: "2026-01-01"}
@@ -2945,7 +2970,7 @@ query {
 ```graphql
 # Step 1: Check current state
 query {
-    user_fair_shares(scaling_group: "gpu-cluster", first: 10) {
+    user_fair_shares(resource_group: "gpu-cluster", first: 10) {
         edges {
             node { user_uuid, fair_share_factor, rank, effective_weight }
         }
@@ -2955,7 +2980,7 @@ query {
 # Step 2: Change weight
 mutation {
     upsert_domain_fair_share(
-        scaling_group: "gpu-cluster"
+        resource_group: "gpu-cluster"
         domain_name: "research"
         weight: "3.0"
     ) {
@@ -2967,7 +2992,7 @@ mutation {
 
 # Step 3: Check state after change (research domain users expected to rank higher)
 query {
-    user_fair_shares(scaling_group: "gpu-cluster", first: 10) {
+    user_fair_shares(resource_group: "gpu-cluster", first: 10) {
         edges {
             node { user_uuid, fair_share_factor, rank, effective_weight }
         }
@@ -2979,7 +3004,7 @@ query {
 
 The Admin UI provides the following features:
 
-1. **Scaling Group Settings Page**
+1. **Resource Group Settings Page**
    - Scheduler selection (FIFO/LIFO/DRF/FairShare)
    - Fair Share options configuration (half_life, lookback, gap_policy, etc.)
 
@@ -2997,7 +3022,7 @@ The Admin UI provides the following features:
 ### Backward Compatibility
 
 - **No impact on existing Sequencers**: FIFO, LIFO, DRF continue to work as before
-- **Opt-in approach**: Only activated when `scaling_group.scheduler = "fairshare"` is set
+- **Opt-in approach**: Only activated when `resource_group.scheduler = "fairshare"` is set
 - **No existing API changes**: GraphQL/REST API compatibility maintained
 
 ### Database Migration
@@ -3017,12 +3042,12 @@ def upgrade() -> None:
         sa.Column("user_uuid", GUID(), nullable=False),
         sa.Column("project_id", GUID(), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("period_start", sa.DateTime(timezone=True), nullable=False),
         sa.Column("period_end", sa.DateTime(timezone=True), nullable=False),
         sa.Column("resource_usage", ResourceSlotColumn(), nullable=False),
     )
-    op.create_index("ix_kernel_usage_sg_period", "kernel_usage_records", ["scaling_group", "period_start"])
+    op.create_index("ix_kernel_usage_sg_period", "kernel_usage_records", ["resource_group", "period_start"])
     op.create_index("ix_kernel_usage_user_period", "kernel_usage_records", ["user_uuid", "period_start"])
     op.create_index("ix_kernel_usage_kernel_id", "kernel_usage_records", ["kernel_id"])
 
@@ -3032,7 +3057,7 @@ def upgrade() -> None:
         "domain_usage_buckets",
         sa.Column("id", GUID(), primary_key=True),
         sa.Column("domain_name", sa.String(64), nullable=False),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
         sa.Column("decay_unit_days", sa.Integer(), nullable=False, default=1),
@@ -3043,9 +3068,9 @@ def upgrade() -> None:
     op.create_unique_constraint(
         "uq_domain_usage_bucket",
         "domain_usage_buckets",
-        ["domain_name", "scaling_group", "period_start"]
+        ["domain_name", "resource_group", "period_start"]
     )
-    op.create_index("ix_domain_usage_bucket_lookup", "domain_usage_buckets", ["domain_name", "scaling_group", "period_start"])
+    op.create_index("ix_domain_usage_bucket_lookup", "domain_usage_buckets", ["domain_name", "resource_group", "period_start"])
 
     # 3. project_usage_buckets table (Project aggregation cache)
     # Note: No ForeignKey - allows hard delete
@@ -3054,7 +3079,7 @@ def upgrade() -> None:
         sa.Column("id", GUID(), primary_key=True),
         sa.Column("project_id", GUID(), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
         sa.Column("decay_unit_days", sa.Integer(), nullable=False, default=1),
@@ -3065,9 +3090,9 @@ def upgrade() -> None:
     op.create_unique_constraint(
         "uq_project_usage_bucket",
         "project_usage_buckets",
-        ["project_id", "scaling_group", "period_start"]
+        ["project_id", "resource_group", "period_start"]
     )
-    op.create_index("ix_project_usage_bucket_lookup", "project_usage_buckets", ["project_id", "scaling_group", "period_start"])
+    op.create_index("ix_project_usage_bucket_lookup", "project_usage_buckets", ["project_id", "resource_group", "period_start"])
 
     # 4. user_usage_buckets table (User aggregation cache)
     # Note: No ForeignKey - allows hard delete
@@ -3078,7 +3103,7 @@ def upgrade() -> None:
         sa.Column("user_uuid", GUID(), nullable=False),
         sa.Column("project_id", GUID(), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
         sa.Column("decay_unit_days", sa.Integer(), nullable=False, default=1),
@@ -3089,15 +3114,15 @@ def upgrade() -> None:
     op.create_unique_constraint(
         "uq_user_usage_bucket",
         "user_usage_buckets",
-        ["user_uuid", "project_id", "scaling_group", "period_start"]
+        ["user_uuid", "project_id", "resource_group", "period_start"]
     )
-    op.create_index("ix_user_usage_bucket_lookup", "user_usage_buckets", ["user_uuid", "project_id", "scaling_group", "period_start"])
+    op.create_index("ix_user_usage_bucket_lookup", "user_usage_buckets", ["user_uuid", "project_id", "resource_group", "period_start"])
 
     # 5. domain_fair_shares table (Domain state summary)
     op.create_table(
         "domain_fair_shares",
         sa.Column("id", GUID(), primary_key=True),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
         # Configured value
         sa.Column("weight", sa.Numeric(precision=10, scale=4), nullable=False, default=Decimal("1.0")),
@@ -3117,14 +3142,14 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     )
-    op.create_unique_constraint("uq_domain_fair_share", "domain_fair_shares", ["scaling_group", "domain_name"])
-    op.create_index("ix_domain_fair_share_lookup", "domain_fair_shares", ["scaling_group", "domain_name"])
+    op.create_unique_constraint("uq_domain_fair_share", "domain_fair_shares", ["resource_group", "domain_name"])
+    op.create_index("ix_domain_fair_share_lookup", "domain_fair_shares", ["resource_group", "domain_name"])
 
     # 6. project_fair_shares table (Project state summary)
     op.create_table(
         "project_fair_shares",
         sa.Column("id", GUID(), primary_key=True),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("project_id", GUID(), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
         # Configured value
@@ -3145,14 +3170,14 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     )
-    op.create_unique_constraint("uq_project_fair_share", "project_fair_shares", ["scaling_group", "project_id"])
-    op.create_index("ix_project_fair_share_lookup", "project_fair_shares", ["scaling_group", "project_id"])
+    op.create_unique_constraint("uq_project_fair_share", "project_fair_shares", ["resource_group", "project_id"])
+    op.create_index("ix_project_fair_share_lookup", "project_fair_shares", ["resource_group", "project_id"])
 
     # 7. user_fair_shares table (User state summary)
     op.create_table(
         "user_fair_shares",
         sa.Column("id", GUID(), primary_key=True),
-        sa.Column("scaling_group", sa.String(64), nullable=False),
+        sa.Column("resource_group", sa.String(64), nullable=False),
         sa.Column("user_uuid", GUID(), nullable=False),
         sa.Column("project_id", GUID(), nullable=False),
         sa.Column("domain_name", sa.String(64), nullable=False),
@@ -3174,8 +3199,8 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     )
-    op.create_unique_constraint("uq_user_fair_share", "user_fair_shares", ["scaling_group", "user_uuid", "project_id"])
-    op.create_index("ix_user_fair_share_lookup", "user_fair_shares", ["scaling_group", "user_uuid", "project_id"])
+    op.create_unique_constraint("uq_user_fair_share", "user_fair_shares", ["resource_group", "user_uuid", "project_id"])
+    op.create_index("ix_user_fair_share_lookup", "user_fair_shares", ["resource_group", "user_uuid", "project_id"])
 
     # 8. Add last_slice_end column to kernels table
     op.add_column("kernels", sa.Column("last_slice_end", sa.DateTime(timezone=True), nullable=True))
@@ -3198,62 +3223,66 @@ def downgrade() -> None:
 
 ## Implementation Plan
 
-### Phase 1: Database Schema (BA-3812)
-- [ ] Create `KernelUsageRecordRow` model
-  - [ ] period_start/period_end slice structure
-  - [ ] user_uuid/project_id based (no access_key usage)
-  - [ ] Relationships setup (kernel, session, user, project, domain)
-- [ ] Create Usage Bucket models (3 tables per tier)
-  - [ ] `DomainUsageBucketRow` - domain_name based aggregation
-  - [ ] `ProjectUsageBucketRow` - project_id based aggregation
-  - [ ] `UserUsageBucketRow` - (user_uuid, project_id) combination based aggregation
-  - [ ] Mutable bucket strategy (period_end extension, new bucket when exceeding decay_unit)
-  - [ ] Relationships setup
-- [ ] Create Fair Share state table models (3 per tier)
-  - [ ] `DomainFairShareRow` - weight + total_decayed_usage + fair_share_factor
-  - [ ] `ProjectFairShareRow` - weight + total_decayed_usage + fair_share_factor
-  - [ ] `UserFairShareRow` - weight + total_decayed_usage + fair_share_factor
-  - [ ] last_calculated_at timestamp per table
-  - [ ] Calculation parameter columns (lookback_start/end, half_life_days, lookback_days, decay_unit_days)
-- [ ] Add `KernelRow.last_slice_end` column
-- [ ] Write Alembic migration
-- [ ] Implement Repository layer
-  - [ ] `UsageDBSource` / `UsageRepository`
-  - [ ] `FairShareDBSource` / `FairShareRepository`
+### Phase 1: Database Schema (BA-3812) - DONE
+- [x] Create `KernelUsageRecordRow` model
+  - [x] period_start/period_end slice structure
+  - [x] user_uuid/project_id based (no access_key usage)
+  - [x] resource_usage (allocated resources × time)
+  - [x] Relationships setup (kernel, session, user, project, domain)
+- [x] Create Usage Bucket models (3 tables per tier)
+  - [x] `DomainUsageBucketRow` - domain_name based aggregation
+  - [x] `ProjectUsageBucketRow` - project_id based aggregation
+  - [x] `UserUsageBucketRow` - (user_uuid, project_id) combination based aggregation
+  - [x] resource_usage for Fair Share calculation
+  - [x] Mutable bucket strategy (period_end extension, new bucket when exceeding decay_unit)
+  - [x] Relationships setup
+- [x] Create Fair Share state table models (3 per tier)
+  - [x] `DomainFairShareRow` - weight + total_decayed_usage + fair_share_factor
+  - [x] `ProjectFairShareRow` - weight + total_decayed_usage + fair_share_factor
+  - [x] `UserFairShareRow` - weight + total_decayed_usage + fair_share_factor
+  - [x] last_calculated_at timestamp per table
+  - [x] Calculation parameter columns (lookback_start/end, half_life_days, lookback_days, decay_unit_days)
+- [ ] Add `KernelRow.last_usage_recorded_at` column (renamed from last_slice_end)
+- [x] Write Alembic migration
+- [x] Implement Repository layer
+  - [x] `ResourceUsageHistoryDBSource` / `ResourceUsageHistoryRepository`
+  - [x] `FairShareDBSource` / `FairShareRepository`
 - [ ] Unit tests
 
-### Phase 2: Fair Share Calculation Service (BA-3063)
+### Phase 2: Fair Share Calculation Service (BA-3063) - TODO
 - [ ] Implement `UsageAggregationService`
   - [ ] Slice creation logic (trigger-based, not exact 5-minute intervals)
+  - [ ] Use `KernelRow.last_usage_recorded_at` for tracking last measurement
   - [ ] Terminated kernel handling (terminated_at based)
-  - [ ] Bucket aggregation logic (UPSERT)
+  - [ ] Bucket aggregation logic (UPSERT) - resource_usage only
   - [ ] Cache recalculation logic
-- [ ] Implement loss recovery strategy
-  - [ ] Apply `recovery_policy` configuration (recover_all / discard)
-  - [ ] Apply `max_recovery_hours` limit
+- [ ] Implement gap recovery strategy
+  - [ ] Apply `gap_policy` configuration (interpolate / ignore)
+  - [ ] Apply `max_gap_hours` limit
 - [ ] Flat decay calculation logic (Slurm compatible)
+- [ ] Background task registration (5-minute cycle)
 - [ ] Unit tests
 
-### Phase 3: FairShareSequencer (BA-3064)
+### Phase 3: FairShareSequencer (BA-3064) - TODO
 - [ ] Implement `FairShareSequencer` class
-  - [ ] Per-scaling-group config query
+  - [ ] Per-resource-group config query
   - [ ] Hierarchical weight calculation (relative ratio without normalization)
   - [ ] Flat decay method (fixed)
-- [ ] `FairShareConfig` configuration model (includes recovery_policy)
+- [ ] `FairShareConfig` configuration model (includes gap_policy)
 - [ ] `HierarchyWeight` dataclass
 - [ ] Register in sequencer pool
 - [ ] Integration tests
 
-### Phase 4: API & Integration (BA-3069)
-- [ ] Implement REST API
-  - [ ] Fair Share Weight CRUD
-  - [ ] Fair Share Status query
-- [ ] Implement GraphQL API
-  - [ ] domain_fair_shares/project_fair_shares/user_fair_shares queries
-  - [ ] upsert_*_fair_share mutations
-  - [ ] *_usage_buckets queries (for debugging)
+### Phase 4: API & Integration (BA-3069) - DONE
+- [x] Implement REST API
+  - [x] Fair Share Weight CRUD
+  - [x] Fair Share Status query
+- [x] Implement GraphQL API
+  - [x] domain_fair_shares/project_fair_shares/user_fair_shares queries
+  - [x] upsert_*_fair_share mutations
+  - [x] *_usage_buckets queries (for debugging)
 - [ ] Admin UI integration
-  - [ ] Scaling Group settings page
+  - [ ] Resource Group settings page
   - [ ] Fair Share Weight management page
   - [ ] Fair Share monitoring dashboard
 - [ ] End-to-end tests
@@ -3278,7 +3307,7 @@ def downgrade() -> None:
    - `max_gap_hours` to limit max gap period during long downtime
    - Use `server_started_at` for gap detection on server restart
 
-5. ~~**Per-Scaling-Group Config**~~
+5. ~~**Per-Resource-Group Config**~~
    - **Decision: FairShareRepository** - Query config at sequence() time
 
 6. ~~**Weight Storage Location**~~
@@ -3305,10 +3334,28 @@ def downgrade() -> None:
 11. ~~**Repository Pattern**~~
     - **Decision: Separate DBSource + Repository** - DB handled directly in DBSource
 
+12. ~~**Kernel Table Change**: Adding usage tracking column~~
+    - **Decision: Add `last_usage_recorded_at` column** (renamed from `last_slice_end`)
+    - Tracks the timestamp of last usage record creation
+    - Column performance is better than querying MAX(period_end) for each kernel
+    - Name reflects "usage measurement/recording" rather than internal "slice" concept
+
+13. ~~**Actual Usage Measurement**~~
+    - **Decision: Do NOT store `measured_usage` in DB**
+    - Only `resource_usage` (allocated × time) is stored for Fair Share calculation
+    - Actual measured usage is available via Prometheus metrics
+    - Billing claims can be addressed using Prometheus data
+    - Rationale: Avoid duplication, Prometheus already handles real-time metrics with proper retention
+
+14. ~~**resource_group → resource_group Naming**~~
+    - **Decision: Rename to `resource_group`** throughout all layers
+    - More consistent with external API terminology
+    - Applied to: Models, Repository, Service, API, Client, DTO layers
+
 ### Unresolved
 
-1. **Cross-Scaling-Group Usage**: When a user uses multiple scaling groups?
-   - Current proposal: Independent fair share calculation per scaling group
+1. **Cross-Resource-Group Usage**: When a user uses multiple resource groups?
+   - Current proposal: Independent fair share calculation per resource group
    - Alternative: Track global usage (increases complexity)
 
 2. **Resource Normalization Method**: ResourceSlot → Single metric conversion
@@ -3328,11 +3375,7 @@ def downgrade() -> None:
    - Current proposal: No limit (flexibility)
    - Alternative: decay_depth concept (multiples of half_life)
 
-6. **Kernel Table Change**: Adding `last_slice_end` column
-   - Current proposal: Addition required
-   - Alternative: Query MAX(period_end) from kernel_usage_records (performance degradation)
-
-7. **Rescheduling Scenario**: When a running kernel terminates and gets rescheduled
+6. **Rescheduling Scenario**: When a running kernel terminates and gets rescheduled
    - Issue: `started_at`, `terminated_at` can be updated again
    - Current proposal: Use new kernel_id for rescheduled kernels (distinguish from original)
    - Review needed: Detailed design for kernel_id separation
