@@ -65,3 +65,48 @@ class ObjectPermission(Node):
             entity_id=ID(data.object_id.entity_id),
             operation=OperationTypeGQL.from_internal(data.operation),
         )
+
+
+# ==============================================================================
+# Connection Types
+# ==============================================================================
+
+
+@strawberry.type(description="Edge type for scoped permission connections")
+class ScopedPermissionEdge:
+    node: ScopedPermission
+    cursor: str
+
+
+@strawberry.type(description="Connection for paginated scoped permission results")
+class ScopedPermissionConnection:
+    page_info: strawberry.relay.PageInfo
+    edges: list[ScopedPermissionEdge]
+    count: int
+
+    def __init__(
+        self, *, edges: list[ScopedPermissionEdge], page_info: strawberry.relay.PageInfo, count: int
+    ) -> None:
+        self.edges = edges
+        self.page_info = page_info
+        self.count = count
+
+
+@strawberry.type(description="Edge type for object permission connections")
+class ObjectPermissionEdge:
+    node: ObjectPermission
+    cursor: str
+
+
+@strawberry.type(description="Connection for paginated object permission results")
+class ObjectPermissionConnection:
+    page_info: strawberry.relay.PageInfo
+    edges: list[ObjectPermissionEdge]
+    count: int
+
+    def __init__(
+        self, *, edges: list[ObjectPermissionEdge], page_info: strawberry.relay.PageInfo, count: int
+    ) -> None:
+        self.edges = edges
+        self.page_info = page_info
+        self.count = count
