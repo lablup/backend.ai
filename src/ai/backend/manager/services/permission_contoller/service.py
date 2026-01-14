@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
@@ -19,6 +19,10 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
 from ai.backend.manager.services.permission_contoller.actions.delete_role import (
     DeleteRoleAction,
     DeleteRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
+    GetEntityTypesAction,
+    GetEntityTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
@@ -47,6 +51,10 @@ from ai.backend.manager.services.permission_contoller.actions.purge_role import 
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
     RevokeRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_entities import (
+    SearchEntitiesAction,
+    SearchEntitiesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -218,3 +226,17 @@ class PermissionControllerService:
     async def get_scope_types(self, action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
         return GetScopeTypesActionResult(scope_types=list(ScopeType))
+
+    async def get_entity_types(self, action: GetEntityTypesAction) -> GetEntityTypesActionResult:
+        """Get all available entity types."""
+        return GetEntityTypesActionResult(entity_types=list(EntityType))
+
+    async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
+        """Search entities within a scope."""
+        result = await self._repository.search_entities(action.querier)
+        return SearchEntitiesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

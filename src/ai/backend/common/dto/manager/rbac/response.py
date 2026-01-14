@@ -25,6 +25,8 @@ __all__ = (
     "DeleteObjectPermissionResponse",
     "DeletePermissionResponse",
     "DeleteRoleResponse",
+    "EntityDTO",
+    "GetEntityTypesResponse",
     "GetRoleResponse",
     "GetScopeTypesResponse",
     "ObjectPermissionDTO",
@@ -33,6 +35,7 @@ __all__ = (
     "RevokeRoleResponse",
     "RoleDTO",
     "ScopeDTO",
+    "SearchEntitiesResponse",
     "SearchRolesResponse",
     "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
@@ -168,7 +171,7 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
 class GetScopeTypesResponse(BaseResponseModel):
     """Response for getting available scope types."""
 
-    scope_types: list[ScopeType] = Field(description="List of available scope types")
+    items: list[ScopeType] = Field(description="List of available scope types")
 
 
 class ScopeDTO(BaseModel):
@@ -182,5 +185,25 @@ class ScopeDTO(BaseModel):
 class SearchScopesResponse(BaseResponseModel):
     """Response for searching scopes."""
 
-    scopes: list[ScopeDTO] = Field(description="List of scopes")
+    items: list[ScopeDTO] = Field(description="List of scopes")
+    pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class GetEntityTypesResponse(BaseResponseModel):
+    """Response for getting available entity types."""
+
+    items: list[EntityType] = Field(description="List of available entity types")
+
+
+class EntityDTO(BaseModel):
+    """DTO for entity data."""
+
+    entity_type: EntityType = Field(description="Entity type")
+    entity_id: str = Field(description="Entity ID")
+
+
+class SearchEntitiesResponse(BaseResponseModel):
+    """Response for searching entities within a scope."""
+
+    items: list[EntityDTO] = Field(description="List of entities")
     pagination: PaginationInfo = Field(description="Pagination information")
