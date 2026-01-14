@@ -167,7 +167,8 @@ Add `EmailChannel` to the NotificationCenter's channel registry:
 
 #### 1. EmailConfig Schema
 
-Configuration model for email channel:
+Configuration model for email channel
+This is the same as the SMTP Reporter implementation, which is also implemented using `smtplib` and an executor
 
 ```python
 class EmailConfig(NotificationChannelConfig):
@@ -224,37 +225,6 @@ class EmailChannel(AbstractNotificationChannel):
         # 5. Send email
         # 6. Close connection
         ...
-```
-
-This is same as SMTP Reporter implementation which is also implemented based on smtplib and executor
-
-```python
-class SMTPSender:
-    def __init__(self, args: SMTPSenderArgs) -> None:
-        self._config = args
-        self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
-
-    def send_email(self, subject: str, email_body: str) -> None:
-        self._executor.submit(self._send_email, subject, email_body)
-
-    def _send_email(self, subject: str, email_body: str) -> None:
-        message = MIMEText(email_body, "plain", "utf-8")
-        message["Subject"] = subject
-        message["From"] = self._config.sender
-        message["To"] = ",".join(self._config.recipients)
-
-        try:
-            with smtplib.SMTP(self._config.host, self._config.port) as server:
-                if self._config.use_tls:
-                    server.starttls()
-                server.login(self._config.username, self._config.password)
-                server.send_message(
-                    message,
-                    from_addr=self._config.sender,
-                    to_addrs=self._config.recipients,
-                )
-        except Exception as e:
-            log.error(f"Failed to send email: {e}")
 ```
 
 
