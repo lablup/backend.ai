@@ -172,3 +172,56 @@ class TestClampAgentCpuUtil:
         assert result["node"]["cpu_util"]["current"] == expected_current
         if expected_pct is not None:
             assert result["node"]["cpu_util"]["pct"] == expected_pct
+
+    @pytest.mark.parametrize(
+        "input_data,unchanged_field,unchanged_value",
+        [
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"pct": "invalid"}},
+                    "devices": {"cpu_util": {"cpu0": {}}},
+                },
+                "pct",
+                "invalid",
+                id="invalid_pct_string",
+            ),
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"pct": "abc123"}},
+                    "devices": {"cpu_util": {"cpu0": {}}},
+                },
+                "pct",
+                "abc123",
+                id="alphanumeric_pct",
+            ),
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"current": "not_a_number", "capacity": "100"}},
+                    "devices": {"cpu_util": {"cpu0": {}}},
+                },
+                "current",
+                "not_a_number",
+                id="invalid_current_string",
+            ),
+            pytest.param(
+                {
+                    "node": {"cpu_util": {"current": "500", "capacity": "invalid"}},
+                    "devices": {"cpu_util": {"cpu0": {}}},
+                },
+                "current",
+                "500",
+                id="invalid_capacity_string",
+            ),
+        ],
+    )
+    async def test_invalid_decimal_values_handled_gracefully(
+        self,
+        input_data: dict[str, Any],
+        unchanged_field: str,
+        unchanged_value: str,
+    ) -> None:
+        """Test that invalid decimal strings are handled gracefully without raising."""
+        result = clamp_agent_cpu_util(input_data)
+
+        assert result is not None
+        assert result["node"]["cpu_util"][unchanged_field] == unchanged_value

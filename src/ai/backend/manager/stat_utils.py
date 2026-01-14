@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from ai.backend.logging import BraceStyleAdapter
@@ -37,29 +37,39 @@ def clamp_agent_cpu_util(stat_data: dict[str, Any] | None) -> dict[str, Any] | N
     # Clamp pct
     original_pct = node_cpu_util.get("pct")
     if original_pct is not None:
-        max_cpu_util = num_cores * 100
-        if Decimal(original_pct) > Decimal(max_cpu_util):
-            stat_data["node"]["cpu_util"]["pct"] = str(max_cpu_util)
-            log.debug(
-                "Clamped node CPU utilization pct from {} to {} (max: {} cores * 100)",
-                original_pct,
-                max_cpu_util,
-                num_cores,
-            )
+        try:
+            max_cpu_util = num_cores * 100
+            if Decimal(original_pct) > Decimal(max_cpu_util):
+                stat_data["node"]["cpu_util"]["pct"] = str(max_cpu_util)
+                log.debug(
+                    "Clamped node CPU utilization pct from {} to {} (max: {} cores * 100)",
+                    original_pct,
+                    max_cpu_util,
+                    num_cores,
+                )
+        except InvalidOperation:
+            log.warning("Invalid CPU utilization pct value: {}", original_pct)
 
     # Clamp current
     original_current = node_cpu_util.get("current")
     original_capacity = node_cpu_util.get("capacity")
     if original_current is not None and original_capacity is not None:
-        max_current = Decimal(original_capacity) * num_cores
-        if Decimal(original_current) > max_current:
-            stat_data["node"]["cpu_util"]["current"] = str(max_current)
-            log.debug(
-                "Clamped node CPU utilization current from {} to {} (capacity {} * {} cores)",
+        try:
+            max_current = Decimal(original_capacity) * num_cores
+            if Decimal(original_current) > max_current:
+                stat_data["node"]["cpu_util"]["current"] = str(max_current)
+                log.debug(
+                    "Clamped node CPU utilization current from {} to {} (capacity {} * {} cores)",
+                    original_current,
+                    max_current,
+                    original_capacity,
+                    num_cores,
+                )
+        except InvalidOperation:
+            log.warning(
+                "Invalid CPU utilization current/capacity value: current={}, capacity={}",
                 original_current,
-                max_current,
                 original_capacity,
-                num_cores,
             )
 
     return stat_data
