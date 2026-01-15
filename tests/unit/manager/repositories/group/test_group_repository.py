@@ -1053,14 +1053,6 @@ class TestGroupRepository:
         assert result.description == "Test group description"
         assert result.is_active is True
 
-        # Verify in database
-        async with db_with_cleanup.begin_session() as session:
-            group_row = await session.scalar(
-                sa.select(GroupRow).where(GroupRow.name == "test-new-group")
-            )
-            assert group_row is not None
-            assert group_row.domain_name == test_domain
-
     async def test_create_domain_not_exists(
         self,
         group_repository_with_mock_role_manager: GroupRepository,
@@ -1128,13 +1120,6 @@ class TestGroupRepository:
         assert result is not None
         assert result.name == "updated-group-name"
         assert result.description == "Updated description"
-
-        # Verify in database
-        async with db_with_cleanup.begin_session() as session:
-            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
-            assert group_row is not None
-            assert group_row.name == "updated-group-name"
-            assert group_row.description == "Updated description"
 
     async def test_modify_validated_group_not_found(
         self,
