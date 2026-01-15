@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -17,13 +19,22 @@ class AgentStatefulSource:
     """
 
     _valkey_image: ValkeyImageClient
+    _valkey_stat: ValkeyStatClient
 
     def __init__(
         self,
         valkey_image: ValkeyImageClient,
+        valkey_stat: ValkeyStatClient,
     ) -> None:
         self._valkey_image = valkey_image
+        self._valkey_stat = valkey_stat
 
     async def read_agent_installed_images(self, agent_id: AgentId) -> list[InstalledImageInfo]:
         """Read installed images for the given agent IDs."""
         return await self._valkey_image.get_agent_installed_images(agent_id)
+
+    async def read_agent_container_counts(
+        self, agent_ids: Sequence[AgentId]
+    ) -> Mapping[AgentId, int]:
+        """Read container count for the given agent IDs."""
+        return await self._valkey_stat.get_agent_container_counts_as_dict(list(agent_ids))

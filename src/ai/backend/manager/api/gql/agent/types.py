@@ -5,12 +5,13 @@ from enum import StrEnum
 from typing import Self
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -283,6 +284,7 @@ class AgentNetworkInfoGQL:
     name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
 )
 class AgentV2GQL(Node):
+    _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(
         description=dedent_strip("""
@@ -326,11 +328,22 @@ class AgentV2GQL(Node):
         """)
     )
 
+    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")
+    async def container_count(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> int:
+        """
+        Get the container count for a specific agent.
+        """
+        return await info.context.data_loaders.container_count_loader.load(self._agent_id)
+
     @classmethod
     def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
         data = detail_data.agent
 
         return cls(
+            _agent_id=data.id,
             id=ID(data.id),
             resource_info=AgentResourceGQL(
                 capacity=data.available_slots.to_json(),
