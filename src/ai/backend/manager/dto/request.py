@@ -128,8 +128,8 @@ class DelegateImportArtifactsReq(BaseRequestModel):
         default=None,
     )
     artifact_type: Optional[ArtifactType]
-    options: Optional[ImportArtifactsOptions] = Field(
-        default=None,
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
         description="Options controlling import behavior such as forcing re-download.",
     )
 
@@ -142,8 +142,8 @@ class ImportArtifactsReq(BaseRequestModel):
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
     )
-    options: Optional[ImportArtifactsOptions] = Field(
-        default=None,
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
         description="Options controlling import behavior such as forcing re-download.",
     )
 
