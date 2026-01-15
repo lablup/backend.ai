@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
@@ -85,17 +86,25 @@ async def get_registry_url(
 
 async def fetch_artifact_revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter],
-    order_by: Optional[list[ArtifactRevisionOrderBy]],
-    before: Optional[str],
-    after: Optional[str],
-    first: Optional[int],
-    last: Optional[int],
-    limit: Optional[int],
-    offset: Optional[int],
+    filter: Optional[ArtifactRevisionFilter] = None,
+    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    base_conditions: Optional[list[QueryCondition]] = None,
 ) -> ArtifactRevisionConnection:
-    """
-    Fetch artifact revisions with optional filtering, ordering, and pagination.
+    """Fetch artifact revisions with optional filtering, ordering, and pagination.
+
+    Args:
+        info: GraphQL context info
+        filter: Optional filter criteria
+        order_by: Optional ordering specification
+        before/after/first/last: Cursor-based pagination parameters
+        limit/offset: Offset-based pagination parameters
+        base_conditions: Additional conditions to prepend (e.g., artifact_id filter)
     """
     # Build querier using adapter
     querier = info.context.gql_adapter.build_querier(
@@ -110,6 +119,7 @@ async def fetch_artifact_revisions(
         _get_artifact_revision_pagination_spec(),
         filter=filter,
         order_by=order_by,
+        base_conditions=base_conditions,
     )
 
     # Get artifact revisions using list action
