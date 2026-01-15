@@ -114,9 +114,10 @@ class RecorderContext(Generic[EntityIdT]):
         cls,
         name: str,
         success_detail: Optional[str] = None,
+        entity_ids: Optional[set[EntityIdT]] = None,
     ) -> Generator[None, None, None]:
         """
-        Record a shared phase that applies to all entities.
+        Record a shared phase that applies to all or specific entities.
 
         Shared phases are merged with entity-specific phases when
         the scope exits, sorted by started_at timestamp.
@@ -124,6 +125,8 @@ class RecorderContext(Generic[EntityIdT]):
         Args:
             name: Phase name (e.g., "sequencing")
             success_detail: Detail message on success
+            entity_ids: Optional set of entity IDs to apply this phase to.
+                        If None, applies to all entities in the scope.
 
         Raises:
             LookupError: If called outside of RecorderContext.scope()
@@ -131,14 +134,13 @@ class RecorderContext(Generic[EntityIdT]):
 
         Usage:
             with RecorderContext[SessionId].scope("op", entity_ids=ids) as pool:
-                with RecorderContext[SessionId].shared_phase("sequencing", success_detail="DRF"):
-                    with RecorderContext[SessionId].shared_step("drf", success_detail="Sequenced"):
-                        sequenced = sequencer.sequence(...)
-                # Entity-specific work
-                for session_id in ids:
-                    recorder = pool.recorder(session_id)
-                    with recorder.phase("allocation"):
-                        ...
+                # Phase for all entities
+                with RecorderContext[SessionId].shared_phase("sequencing"):
+                    ...
+                # Phase for specific entities only
+                successful_ids = {id1, id2}
+                with RecorderContext[SessionId].shared_phase("finalize", entity_ids=successful_ids):
+                    ...
         """
         pool = cls._get_current_pool()
 
@@ -148,10 +150,11 @@ class RecorderContext(Generic[EntityIdT]):
                 f"shared phase '{pool._current_shared_phase.name}' is already active"
             )
 
-        phase_ctx = _SharedPhaseContext(
+        phase_ctx: _SharedPhaseContext[EntityIdT] = _SharedPhaseContext(
             name=name,
             started_at=datetime.now(UTC),
             success_detail=success_detail,
+            entity_ids=entity_ids,
         )
         pool._current_shared_phase = phase_ctx
 

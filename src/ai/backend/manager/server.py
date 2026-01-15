@@ -282,6 +282,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".deployment",
     ".rbac",
     ".scheduling_history",
+    ".fair_share",
     ".export",
 ]
 
@@ -455,11 +456,9 @@ async def exception_middleware(
 
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
-    try:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
         yield
-    finally:
-        await root_ctx.etcd.close()
 
 
 @asynccontextmanager

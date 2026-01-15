@@ -245,16 +245,13 @@ class Context(metaclass=ABCMeta):
                 "user": halfstack.etcd_user,
                 "password": halfstack.etcd_password,
             }
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
             "local",
             scope_prefix_map,
             credentials=creds,
-        )
-        try:
+        ) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     async def etcd_put_json(self, key: str, value: Any) -> None:
         async with self.etcd_ctx() as etcd:

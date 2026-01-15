@@ -88,31 +88,35 @@ BEP numbers start from 1000.
 
 | Number | Title | Author | Status |
 |--------|-------|--------|--------|
-| [1000](BEP-1000-redefining-accelerator-metadata.md) | Redefining Accelerator Metadata | - | Draft |
-| [1001](BEP-1001-app-injection.md) | App Injection | - | Draft |
-| [1002](BEP-1002-agent-architecture.md) | Agent Architecture | - | Draft |
-| [1003](BEP-1003-define-test-scenario-verifying-agent-functionality.md) | Test Scenario for Agent Functionality | - | Draft |
-| [1004](BEP-1004-scenario-tester.md) | Scenario Tester | - | Draft |
-| [1005](BEP-1005-unified-appproxy.md) | Unified AppProxy | - | Draft |
-| [1006](BEP-1006-service-deployment-strategy.md) | Service Deployment Strategy | - | Accepted |
-| [1007](BEP-1007-storage-agent.md) | Storage Agent | - | Draft |
-| [1008](BEP-1008-RBAC.md) | RBAC | - | Draft |
-| [1009](BEP-1009-model-serving-registry.md) | Model Serving Registry | - | Draft |
+| [1000](BEP-1000-redefining-accelerator-metadata.md) | Redefining Accelerator Metadata | Joongi Kim | Draft |
+| [1001](BEP-1001-app-injection.md) | App Injection | Joongi Kim | Draft |
+| [1002](BEP-1002-agent-architecture.md) | Agent Architecture | HyeokJin Kim | Draft |
+| [1003](BEP-1003-define-test-scenario-verifying-agent-functionality.md) | Test Scenario for Agent Functionality | Bokeum Kim | Draft |
+| [1004](BEP-1004-scenario-tester.md) | Scenario Tester | HyeokJin Kim | Draft |
+| [1005](BEP-1005-unified-appproxy.md) | Unified AppProxy | Kyujin Cho | Draft |
+| [1006](BEP-1006-service-deployment-strategy.md) | Service Deployment Strategy | Jeongseok Kang | Accepted |
+| [1007](BEP-1007-storage-agent.md) | Storage Agent | Joongi Kim | Draft |
+| [1008](BEP-1008-RBAC.md) | RBAC | HyeokJin Kim | Draft |
+| [1009](BEP-1009-model-serving-registry.md) | Model Serving Registry | HyeokJin Kim | Draft |
 | [1010](BEP-1010-new-gql.md) | New GQL | - | Accepted |
-| [1012](BEP-1012-RBAC.md) | RBAC (detailed) | - | Draft |
-| [1013](BEP-1013-GraphQL-schema-for-new-model-service.md) | GraphQL Schema for New Model Service | - | Accepted |
-| [1014](BEP-1014-preemption-of-low-priority-sessions.md) | Preemption of Low Priority Sessions | - | Draft |
-| [1015](BEP-1015-keypair-user-project-resource-policy-reorg.md) | Keypair/User/Project Resource Policy Reorg | - | Draft |
-| [1016](BEP-1016-accelerator-interface-v2.md) | Accelerator Interface v2 | - | Draft |
+| [1012](BEP-1012-RBAC.md) | RBAC (detailed) | Sanghun Lee | Draft |
+| [1013](BEP-1013-GraphQL-schema-for-new-model-service.md) | GraphQL Schema for New Model Service | Bokeum Kim | Accepted |
+| [1014](BEP-1014-preemption-of-low-priority-sessions.md) | Preemption of Low Priority Sessions | Joongi Kim | Draft |
+| [1015](BEP-1015-keypair-user-project-resource-policy-reorg.md) | Keypair/User/Project Resource Policy Reorg | Joongi Kim | Draft |
+| [1016](BEP-1016-accelerator-interface-v2.md) | Accelerator Interface v2 | Joongi Kim | Draft |
 | [1017](BEP-1017-model-scanner-model-downloader.md) | Model Scanner and Downloader | Bokeum Kim | Accepted |
 | [1018](BEP-1018-local-cache-for-model-vfolders.md) | Local Cache for Model VFolders | Joongi Kim | Draft |
 | [1019](BEP-1019-minio-artifact-registry-storage.md) | MinIO Artifact Registry Storage | Gyubong Lee | Accepted |
-| 1020 | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
+| [1020](BEP-1020-vfolder-destination-support-for-artifact-import.md) | VFolder Destination Support for Artifact Import | Gyubong Lee | Draft |
 | [1021](BEP-1021-gql-string-filter-enhancement.md) | GQL StringFilter Enhancement | HyeokJin Kim | Implemented |
 | [1022](BEP-1022-pydantic-field-annotations.md) | Pydantic Field Metadata Annotation | HyeokJin Kim | Implemented |
 | [1023](BEP-1023-unified-config-consolidation.md) | UnifiedConfig Consolidation & Loader/CLI | HyeokJin Kim | Draft |
 | [1024](BEP-1024-agent-rpc-connection-pooling.md) | Agent RPC Connection Pooling | HyeokJin Kim | Implemented |
 | [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Draft |
+| [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Draft |
+| 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
+| [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Draft |
+| [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

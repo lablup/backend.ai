@@ -33,6 +33,36 @@ class ScalingGroupForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow])
 
 
 @dataclass
+class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
+    """PurgerSpec for disassociating multiple scaling groups from a domain."""
+
+    scaling_groups: list[str]
+    domain: str
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
+        return sa.select(ScalingGroupForDomainRow).where(
+            sa.and_(
+                ScalingGroupForDomainRow.scaling_group.in_(self.scaling_groups),
+                ScalingGroupForDomainRow.domain == self.domain,
+            )
+        )
+
+
+@dataclass
+class AllScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
+    """PurgerSpec for disassociating all scaling groups from a domain."""
+
+    domain: str
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
+        return sa.select(ScalingGroupForDomainRow).where(
+            ScalingGroupForDomainRow.domain == self.domain,
+        )
+
+
+@dataclass
 class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsRow]):
     """PurgerSpec for disassociating a scaling group from a keypair."""
 
@@ -44,6 +74,23 @@ class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsR
         return sa.select(ScalingGroupForKeypairsRow).where(
             sa.and_(
                 ScalingGroupForKeypairsRow.scaling_group == self.scaling_group,
+                ScalingGroupForKeypairsRow.access_key == self.access_key,
+            )
+        )
+
+
+@dataclass
+class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsRow]):
+    """PurgerSpec for disassociating multiple scaling groups from a keypair."""
+
+    scaling_groups: list[str]
+    access_key: AccessKey
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForKeypairsRow]]:
+        return sa.select(ScalingGroupForKeypairsRow).where(
+            sa.and_(
+                ScalingGroupForKeypairsRow.scaling_group.in_(self.scaling_groups),
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
@@ -91,6 +138,36 @@ class ScalingGroupForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow
                 ScalingGroupForProjectRow.scaling_group == self.scaling_group,
                 ScalingGroupForProjectRow.group == self.project,
             )
+        )
+
+
+@dataclass
+class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
+    """PurgerSpec for disassociating multiple scaling groups from a project (user group)."""
+
+    scaling_groups: list[str]
+    project: UUID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
+        return sa.select(ScalingGroupForProjectRow).where(
+            sa.and_(
+                ScalingGroupForProjectRow.scaling_group.in_(self.scaling_groups),
+                ScalingGroupForProjectRow.group == self.project,
+            )
+        )
+
+
+@dataclass
+class AllScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
+    """PurgerSpec for disassociating all scaling groups from a project (user group)."""
+
+    project: UUID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
+        return sa.select(ScalingGroupForProjectRow).where(
+            ScalingGroupForProjectRow.group == self.project,
         )
 
 

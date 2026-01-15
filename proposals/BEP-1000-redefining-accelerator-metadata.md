@@ -1,6 +1,10 @@
 ---
 Author: Joongi Kim (joongi@lablup.com)
 Status: Draft
+Created:
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Redefining Accelerator Metadata

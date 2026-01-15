@@ -2,6 +2,9 @@
 Author: Joongi Kim (joongi@lablup.com)
 Status: Draft
 Created: 2025-11-28
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Accelerator Interface v2

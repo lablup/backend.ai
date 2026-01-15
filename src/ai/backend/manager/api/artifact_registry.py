@@ -135,6 +135,7 @@ class APIHandler:
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
+        force = body.parsed.options.force
         action_result = (
             await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
                 DelegateImportArtifactRevisionBatchAction(
@@ -144,6 +145,7 @@ class APIHandler:
                     if body.parsed.delegatee_target
                     else None,
                     artifact_revision_ids=body.parsed.artifact_revision_ids,
+                    force=force,
                 )
             )
         )

@@ -9,12 +9,12 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.manager.api.gql.base import (
-    JSONString,
     OrderDirection,
     to_global_id,
 )
@@ -164,11 +164,11 @@ class ModelReplica(Node):
     weight: int = strawberry.field(
         description="Traffic weight for load balancing between replicas."
     )
-    detail: JSONString = strawberry.field(
+    detail: JSON = strawberry.field(
         description="Detailed information about the routing node including error or success messages."
     )
     created_at: datetime = strawberry.field(description="Timestamp when the replica was created.")
-    live_stat: JSONString = strawberry.field(
+    live_stat: JSON = strawberry.field(
         description="Live statistics of the routing node (CPU utilization, etc.)."
     )
 
@@ -200,9 +200,9 @@ class ModelReplica(Node):
             liveness_status=LivenessStatus(data.liveness_status),
             activeness_status=ActivenessStatus(data.activeness_status),
             weight=data.weight,
-            detail=JSONString.serialize(data.detail),
+            detail=data.detail,
             created_at=data.created_at,
-            live_stat=JSONString.serialize(data.live_stat),
+            live_stat=data.live_stat,
         )
 
 

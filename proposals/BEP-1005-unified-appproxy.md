@@ -2,6 +2,9 @@
 Author: Kyujin Cho (kyujin.cho@lablup.com)
 Status: Draft
 Created: 2025-06-13
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Backend.AI AppProxy Architecture Enhancement

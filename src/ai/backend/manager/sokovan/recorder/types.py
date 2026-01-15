@@ -49,20 +49,17 @@ class ExecutionRecord(BaseModel):
     Contains phases, each with their steps.
     """
 
-    operation: str  # e.g., "schedule", "terminate"
     started_at: datetime
     ended_at: datetime
-    status: StepStatus
     phases: list[PhaseRecord]
 
 
 class RecordBuildData(BaseModel):
     """Data required for building execution records.
 
-    Contains operation metadata and shared phases that apply to all entities in a scope.
+    Contains shared phases that apply to the entity.
     """
 
-    operation: str
     started_at: datetime
     ended_at: datetime
     shared_phases: list[PhaseRecord]

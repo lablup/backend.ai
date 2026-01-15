@@ -18,7 +18,6 @@ from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import (
-    JSONString,
     OrderDirection,
     StringFilter,
     to_global_id,
@@ -118,7 +117,7 @@ class ModelRuntimeConfig:
         description="Framework-specific configuration in JSON format.",
         default=None,
     )
-    environ: Optional[JSONString] = strawberry.field(
+    environ: Optional[JSON] = strawberry.field(
         description='Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.',
         default=None,
     )
@@ -128,7 +127,7 @@ class ModelRuntimeConfig:
         return cls(
             runtime_variant=data.runtime_variant,
             inference_runtime_config=data.inference_runtime_config,
-            environ=JSONString.serialize(data.environ) if data.environ else None,
+            environ=data.environ,
         )
 
 
@@ -142,10 +141,10 @@ class ResourceConfig:
     """
 
     _resource_group_name: strawberry.Private[str]
-    resource_slots: JSONString = strawberry.field(
+    resource_slots: JSON = strawberry.field(
         description='JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.'
     )
-    resource_opts: Optional[JSONString] = strawberry.field(
+    resource_opts: Optional[JSON] = strawberry.field(
         description='Additional resource options such as shared memory. Example: {"shmem": "64m"}.',
         default=None,
     )
@@ -162,8 +161,8 @@ class ResourceConfig:
     def from_dataclass(cls, data: ResourceConfigData) -> ResourceConfig:
         return cls(
             _resource_group_name=data.resource_group_name,
-            resource_slots=JSONString.from_resource_slot(data.resource_slot),
-            resource_opts=JSONString.serialize(data.resource_opts),
+            resource_slots=data.resource_slot.to_json(),
+            resource_opts=data.resource_opts,
         )
 
 
@@ -362,10 +361,10 @@ class ResourceGroupInput:
 @strawberry.input(description="Added in 25.19.0")
 class ResourceConfigInput:
     resource_group: ResourceGroupInput
-    resource_slots: JSONString = strawberry.field(
+    resource_slots: JSON = strawberry.field(
         description='Resources allocated for the deployment. Example: "resourceSlots": "{\\"cpu\\": \\"1\\", \\"mem\\": \\"1073741824\\", \\"cuda.device\\": \\"0\\"}"'
     )
-    resource_opts: Optional[JSONString] = strawberry.field(
+    resource_opts: Optional[JSON] = strawberry.field(
         description='Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\\"shmem\\": \\"64m\\"}"',
         default=None,
     )
@@ -380,7 +379,7 @@ class ImageInput:
 class ModelRuntimeConfigInput:
     runtime_variant: str
     inference_runtime_config: Optional[JSON] = None
-    environ: Optional[JSONString] = strawberry.field(
+    environ: Optional[JSON] = strawberry.field(
         description='Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}',
         default=None,
     )

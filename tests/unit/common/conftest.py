@@ -183,19 +183,16 @@ async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[
 
 @pytest.fixture
 async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         addrs=[etcd_container[1]],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
         },
-    )
-    try:
+    ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         yield etcd
-    finally:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        del etcd
 
 
 @pytest.fixture

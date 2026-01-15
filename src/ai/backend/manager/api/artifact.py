@@ -207,10 +207,16 @@ class APIHandler:
 
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
+        force = body.parsed.options.force if body.parsed.options else False
         for artifact_revision_id in body.parsed.artifact_revision_ids:
+            # When using VFolderStorage (vfolder_id provided), store at root path
+            storage_prefix = "/" if body.parsed.vfolder_id else None
             action_result = await processors.artifact_revision.import_revision.wait_for_complete(
                 ImportArtifactRevisionAction(
                     artifact_revision_id=artifact_revision_id,
+                    vfolder_id=body.parsed.vfolder_id,
+                    storage_prefix=storage_prefix,
+                    force=force,
                 )
             )
             imported_revisions.append(action_result.result)

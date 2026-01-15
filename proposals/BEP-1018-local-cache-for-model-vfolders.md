@@ -2,6 +2,9 @@
 Author: Joongi Kim (joongi@lablup.com)
 Status: Draft
 Created: 2025-07-09
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Local cache for model vfolders

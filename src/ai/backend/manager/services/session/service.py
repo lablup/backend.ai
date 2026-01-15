@@ -173,6 +173,14 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search import (
+    SearchSessionsAction,
+    SearchSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.search_kernel import (
+    SearchKernelsAction,
+    SearchKernelsActionResult,
+)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -1480,3 +1488,23 @@ class SessionService:
             result = {}
 
         return CheckAndTransitStatusBatchActionResult(session_status_map=result)
+
+    async def search(self, action: SearchSessionsAction) -> SearchSessionsActionResult:
+        """Search sessions with querier pattern."""
+        result = await self._session_repository.search(action.querier)
+        return SearchSessionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_kernels(self, action: SearchKernelsAction) -> SearchKernelsActionResult:
+        """Search kernels with querier pattern."""
+        result = await self._session_repository.search_kernels(action.querier)
+        return SearchKernelsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
