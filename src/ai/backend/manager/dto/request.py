@@ -109,6 +109,14 @@ class RejectArtifactRevisionReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to reject.")
 
 
+class ImportArtifactsOptions(BaseRequestModel):
+    """Options for importing artifact revisions."""
+
+    force: bool = Field(
+        default=False, description="Force re-download regardless of digest freshness check."
+    )
+
+
 class DelegateImportArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to delegate the import request."
@@ -120,6 +128,10 @@ class DelegateImportArtifactsReq(BaseRequestModel):
         default=None,
     )
     artifact_type: Optional[ArtifactType]
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
+        description="Options controlling import behavior such as forcing re-download.",
+    )
 
 
 class ImportArtifactsReq(BaseRequestModel):
@@ -129,6 +141,10 @@ class ImportArtifactsReq(BaseRequestModel):
     vfolder_id: uuid.UUID | None = Field(
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
+    )
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
+        description="Options controlling import behavior such as forcing re-download.",
     )
 
 

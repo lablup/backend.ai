@@ -46,7 +46,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import DelegateImportArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
+    ImportArtifactsOptions,
+)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -442,7 +445,10 @@ class ArtifactRevisionService:
 
                     # Skip import if artifact revision is already Available and commit hash matches
                     # If current_commit_hash is None, always proceed with import
-                    if self._is_latest_commit_hash(revision_data, latest_commit_hash):
+                    # If force is True, skip this check and always re-download
+                    if not action.force and self._is_latest_commit_hash(
+                        revision_data, latest_commit_hash
+                    ):
                         # Return early without calling import API
                         return ImportArtifactRevisionActionResult(
                             result=revision_data, task_id=None
@@ -715,7 +721,10 @@ class ArtifactRevisionService:
                 result: list[ArtifactRevisionData] = []
                 for revision_id in action.artifact_revision_ids:
                     import_result = await self.import_revision(
-                        ImportArtifactRevisionAction(artifact_revision_id=revision_id)
+                        ImportArtifactRevisionAction(
+                            artifact_revision_id=revision_id,
+                            force=action.force,
+                        )
                     )
                     task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
@@ -757,6 +766,7 @@ class ArtifactRevisionService:
             delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
+            options=ImportArtifactsOptions(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)

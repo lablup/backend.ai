@@ -2373,6 +2373,11 @@ input DelegateImportArtifactsInput
   delegatorReservoirId: ID = null
   artifactType: ArtifactType = null
   delegateeTarget: DelegateeTarget = null
+
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
@@ -3940,6 +3945,25 @@ input ImportArtifactsInput
 
   """Target vfolder ID to store the imported artifacts. Added in 26.1.0."""
   vfolderId: ID = null
+
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
+  options: ImportArtifactsOptionsGQL! = {force: false}
+}
+
+"""
+Added in 26.1.0.
+
+Options for importing artifact revisions.
+
+Controls import behavior such as forcing re-download regardless of digest freshness.
+"""
+input ImportArtifactsOptionsGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Force re-download regardless of digest freshness check."""
+  force: Boolean! = false
 }
 
 """

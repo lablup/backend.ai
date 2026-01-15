@@ -263,6 +263,7 @@ async def import_artifacts(
     vfolder_id = UUID(input.vfolder_id) if input.vfolder_id else None
     # When using VFolderStorage (vfolder_id provided), store at root path
     storage_prefix = "/" if vfolder_id else None
+    force = input.options.force
     for revision_id in input.artifact_revision_ids:
         action_result = (
             await info.context.processors.artifact_revision.import_revision.wait_for_complete(
@@ -270,6 +271,7 @@ async def import_artifacts(
                     artifact_revision_id=UUID(revision_id),
                     vfolder_id=vfolder_id,
                     storage_prefix=storage_prefix,
+                    force=force,
                 )
             )
         )
@@ -373,6 +375,7 @@ async def delegate_import_artifacts(
     imported_artifacts = []
     tasks = []
 
+    force = input.options.force
     action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
         DelegateImportArtifactRevisionBatchAction(
             delegator_reservoir_id=UUID(input.delegator_reservoir_id)
@@ -385,6 +388,7 @@ async def delegate_import_artifacts(
             artifact_revision_ids=[
                 UUID(revision_id) for revision_id in input.artifact_revision_ids
             ],
+            force=force,
         )
     )
     artifact_revisions = [
