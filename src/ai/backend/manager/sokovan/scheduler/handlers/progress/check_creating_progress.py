@@ -122,11 +122,8 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
             for session in sessions
         ]
 
-        with RecorderContext[SessionId].shared_phase(
-            "finalize_start",
-            success_detail="Session startup finalized",
-        ):
-            hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+        # Execute hooks concurrently (hooks have their own recording per session type)
+        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
         for session, hook_result in zip(sessions, hook_results, strict=True):
             session_info = session.session_info
@@ -154,7 +151,15 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
         # Update sessions with occupying_slots via repository
         if sessions_running_data:
-            await self._repository.update_sessions_to_running(sessions_running_data)
+            with RecorderContext[SessionId].shared_phase(
+                "finalize_start",
+                success_detail="Session startup finalized",
+            ):
+                with RecorderContext[SessionId].shared_step(
+                    "update_session_data",
+                    success_detail="Session data updated",
+                ):
+                    await self._repository.update_sessions_to_running(sessions_running_data)
 
             # Build success result - find matching SessionWithKernels for ScheduledSessionData
             session_map = {s.session_info.identity.id: s for s in sessions}

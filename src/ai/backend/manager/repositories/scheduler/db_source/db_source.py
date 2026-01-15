@@ -2748,34 +2748,21 @@ class ScheduleDBSource:
 
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state with occupying_slots.
+        Update sessions with occupying_slots.
+
+        Note: Status transition is handled by the Coordinator via SessionStatusBatchUpdaterSpec.
+        This method only updates the occupying_slots field.
         """
         if not sessions_data:
             return
 
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-
             # Update each session individually with its calculated occupying_slots
             for session_data in sessions_data:
                 stmt = (
                     sa.update(SessionRow)
-                    .where(
-                        sa.and_(
-                            SessionRow.id == session_data.session_id,
-                            SessionRow.status == SessionStatus.CREATING,
-                        )
-                    )
-                    .values(
-                        status=SessionStatus.RUNNING,
-                        status_info=None,  # Clear any previous error status
-                        occupying_slots=session_data.occupying_slots,
-                        status_history=sql_json_merge(
-                            SessionRow.__table__.c.status_history,
-                            (),
-                            {SessionStatus.RUNNING.name: now.isoformat()},
-                        ),
-                    )
+                    .where(SessionRow.id == session_data.session_id)
+                    .values(occupying_slots=session_data.occupying_slots)
                 )
                 await db_sess.execute(stmt)
 
@@ -2804,37 +2791,6 @@ class ScheduleDBSource:
                     ready_session_ids.append(session.id)
 
             return ready_session_ids
-
-    async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from TERMINATING to TERMINATED state.
-        """
-        if not session_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-            # Update session status to TERMINATED
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.TERMINATING,
-                    )
-                )
-                .values(
-                    status=SessionStatus.TERMINATED,
-                    terminated_at=now,
-                    # Keep status_info if it contains termination reason, otherwise clear
-                    status_history=sql_json_merge(
-                        SessionRow.__table__.c.status_history,
-                        (),
-                        {SessionStatus.TERMINATED.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]

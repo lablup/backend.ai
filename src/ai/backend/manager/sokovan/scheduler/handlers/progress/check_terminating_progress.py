@@ -154,10 +154,6 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
                 )
             )
 
-        # Update sessions to TERMINATED via repository
-        if result.successes:
-            await self._repository.update_sessions_to_terminated(result.success_ids())
-
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
