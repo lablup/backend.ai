@@ -32,7 +32,7 @@ class WebhookChannel(AbstractNotificationChannel):
 
         Args:
             http_client_pool: HTTP client pool for making requests
-            webhook_config: Webhook configuration
+            webhook_spec: Webhook specification
         """
         self._http_client_pool = http_client_pool
         self._webhook_spec = webhook_spec
