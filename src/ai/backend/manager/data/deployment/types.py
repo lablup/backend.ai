@@ -436,7 +436,7 @@ class ResourceConfigData:
 class ModelRuntimeConfigData:
     runtime_variant: RuntimeVariant
     inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[dict[str, str]] = None
+    environ: Optional[dict[str, Any]] = None
 
 
 @dataclass
