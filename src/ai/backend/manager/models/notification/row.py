@@ -106,9 +106,9 @@ class NotificationChannelRow(Base):
         parsed_config: WebhookSpec | EmailSpec
         match channel_type_enum:
             case NotificationChannelType.WEBHOOK:
-                parsed_config = WebhookSpec(**self.config)
+                parsed_config = WebhookSpec.model_validate(self.config)
             case NotificationChannelType.EMAIL:
-                parsed_config = EmailSpec(**self.config)
+                parsed_config = EmailSpec.model_validate(self.config)
 
         return NotificationChannelData(
             id=self.id,

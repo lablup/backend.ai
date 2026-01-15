@@ -16,6 +16,8 @@ from ai.backend.manager.notification.types import NotificationMessage, SendResul
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
+_DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
+
 
 class EmailChannel(AbstractNotificationChannel):
     """Email notification channel using SMTP."""
@@ -45,7 +47,7 @@ class EmailChannel(AbstractNotificationChannel):
         else:
             # Fallback: use first line of message as subject
             lines = message.message.split("\n", 1)
-            subject = lines[0] if lines else "Notification"
+            subject = lines[0] if lines else _DEFAULT_NOTIFICATION_SUBJECT
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

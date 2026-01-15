@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from http import HTTPStatus
+from typing import cast
 
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.notification.types import NotificationRuleType
+from ai.backend.common.data.notification.types import NotificationRuleType, WebhookSpec
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -102,13 +103,13 @@ class NotificationAPIHandler:
 
         # Convert request to creator
         # config validator in request DTO ensures this is WebhookConfig
-
+        validated_config = cast(WebhookSpec, body.parsed.config)
         creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name=body.parsed.name,
                 description=body.parsed.description,
                 channel_type=body.parsed.channel_type,
-                config=body.parsed.config,
+                config=validated_config,
                 enabled=body.parsed.enabled,
                 created_by=me.user_id,
             )

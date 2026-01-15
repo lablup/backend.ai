@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import smtplib
-from typing import TYPE_CHECKING
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,9 +17,6 @@ from ai.backend.common.data.notification.types import (
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.channels.email.channel import EmailChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 class TestEmailChannel:
