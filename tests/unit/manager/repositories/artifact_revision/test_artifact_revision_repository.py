@@ -11,10 +11,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pytest
-from strawberry import ID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.artifact.types import ArtifactRevisionFilter
+from ai.backend.manager.api.gql.base import UUIDFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
@@ -436,7 +436,9 @@ class TestArtifactRevisionRepository:
         """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
         fixture = sample_revisions_for_artifact_id_filtering
 
-        gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(fixture.target_artifact_id)))
+        gql_filter = ArtifactRevisionFilter(
+            artifact_id=UUIDFilter(equals=fixture.target_artifact_id)
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=gql_filter.build_conditions(),

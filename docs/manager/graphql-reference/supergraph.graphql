@@ -882,7 +882,7 @@ input ArtifactRevisionFilter
   """Added in 25.16.0"""
   remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
-  artifactId: ID = null
+  artifactId: UUIDFilter = null
   size: IntFilter = null
   AND: [ArtifactRevisionFilter!] = null
   OR: [ArtifactRevisionFilter!] = null
