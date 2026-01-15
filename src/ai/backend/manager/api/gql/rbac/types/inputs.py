@@ -95,6 +95,16 @@ class CreateRoleAssignmentInput:
     expires_at: Optional[datetime] = None
 
 
+@strawberry.input(description="Input for deleting a role")
+class DeleteRoleInput:
+    id: ID
+
+
+@strawberry.input(description="Input for purging a role")
+class PurgeRoleInput:
+    id: ID
+
+
 @strawberry.input(description="Input for deleting a role assignment")
 class DeleteRoleAssignmentInput:
     user_id: ID

@@ -16,6 +16,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
     DeleteRoleAssignmentInput,
+    DeleteRoleInput,
+    PurgeRoleInput,
     Role,
     RoleConnection,
     RoleFilter,
@@ -152,7 +154,7 @@ async def update_role(input: UpdateRoleInput, info: Info[StrawberryGQLContext]) 
 
 
 @strawberry.field(description="Delete a role (soft delete)")
-async def delete_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
+async def delete_role(input: DeleteRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Soft-delete a role.
 
     Requires: Superadmin permission.
@@ -163,7 +165,7 @@ async def delete_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
         raise NotEnoughPermission("Only superadmin can delete roles")
 
     processors = info.context.processors
-    role_id = uuid.UUID(id)
+    role_id = uuid.UUID(input.id)
 
     # Get role details before deletion
     detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
@@ -183,8 +185,8 @@ async def delete_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
     return Role.from_dataclass(detail_result_before.role)
 
 
-@strawberry.field(description="Delete a role (soft delete)")
-async def purge_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
+@strawberry.field(description="Purge a role (hard delete)")
+async def purge_role(input: PurgeRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Purge a role.
 
     Requires: Superadmin permission.
@@ -195,7 +197,7 @@ async def purge_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
         raise NotEnoughPermission("Only superadmin can delete roles")
 
     processors = info.context.processors
-    role_id = uuid.UUID(id)
+    role_id = uuid.UUID(input.id)
 
     # Get role details before deletion
     detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
