@@ -30,6 +30,20 @@ class QueryConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_value: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.id > cursor_value
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_value: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.id < cursor_value
+
+        return inner
+
 
 class QueryOrders:
     @staticmethod
