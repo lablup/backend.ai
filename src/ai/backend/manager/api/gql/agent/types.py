@@ -16,6 +16,11 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.kernel.types import (
+    KernelConnectionV2,
+    KernelFilter,
+    KernelOrderBy,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
@@ -26,12 +31,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-
-from ai.backend.manager.api.gql.kernel.types import (
-    KernelConnectionV2,
-    KernelFilter,
-    KernelOrderBy,
 )
 
 if TYPE_CHECKING:
