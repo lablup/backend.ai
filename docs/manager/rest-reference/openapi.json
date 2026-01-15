@@ -2396,17 +2396,8 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "echo",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "parameters": [],
+        "description": "Test authentication.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "post": {
         "operationId": "auth.test.2",
@@ -2423,26 +2414,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "echo": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "echo"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Test authentication.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/test": {
@@ -2461,17 +2434,8 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "echo",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "parameters": [],
+        "description": "Test authentication.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "post": {
         "operationId": "auth.test.4",
@@ -2488,26 +2452,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "echo": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "echo"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Test authentication.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/authorize": {
@@ -2521,42 +2467,8 @@
             "description": "Successful response"
           }
         },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "keypair",
-                      "jwt"
-                    ]
-                  },
-                  "domain": {
-                    "type": "string"
-                  },
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "domain",
-                  "username",
-                  "password"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": ""
+        "description": "Authorize a user with domain, username, and password.\n\nNote: This endpoint doesn't use @api_handler because it may return\na streaming response for 2FA flows.\n"
       }
     },
     "/auth/role": {
@@ -2575,18 +2487,8 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "group",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "in": "query"
-          }
-        ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "parameters": [],
+        "description": "Get user's role information.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/signup": {
@@ -2600,34 +2502,8 @@
             "description": "Successful response"
           }
         },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "domain": {
-                    "type": "string"
-                  },
-                  "email": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "domain",
-                  "email",
-                  "password"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": ""
+        "description": "Sign up a new user."
       }
     },
     "/auth/signout": {
@@ -2646,30 +2522,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "email",
-                  "password"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Sign out a user.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/update-password-no-auth": {
@@ -2683,38 +2537,8 @@
             "description": "Successful response"
           }
         },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "domain": {
-                    "type": "string"
-                  },
-                  "username": {
-                    "type": "string"
-                  },
-                  "current_password": {
-                    "type": "string"
-                  },
-                  "new_password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "domain",
-                  "username",
-                  "current_password",
-                  "new_password"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\nUpdate user's password without any authorization\nto allows users to update passwords that have expired\nbecause it's been too long since a user changed the password.\n"
+        "description": "Update user's password without authentication (for expired passwords)."
       }
     },
     "/auth/update-password": {
@@ -2733,34 +2557,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "old_password": {
-                    "type": "string"
-                  },
-                  "new_password": {
-                    "type": "string"
-                  },
-                  "new_password2": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "old_password",
-                  "new_password",
-                  "new_password2"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update user's password (requires authentication).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/update-full-name": {
@@ -2779,30 +2577,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "full_name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "email",
-                  "full_name"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update user's full name.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/auth/ssh-keypair": {
@@ -2822,7 +2598,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get user's SSH public key.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
         "operationId": "auth.generate_ssh_keypair",
@@ -2840,7 +2616,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a new SSH keypair for the user.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "post": {
         "operationId": "auth.upload_ssh_keypair",
@@ -2857,30 +2633,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "pubkey": {
-                    "type": "string"
-                  },
-                  "privkey": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "pubkey",
-                  "privkey"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upload a custom SSH keypair.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/folders": {
