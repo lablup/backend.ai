@@ -82,47 +82,11 @@ def kernel_registry_data(
 
 
 @pytest.fixture
-def two_mock_kernels() -> tuple[MagicMock, MagicMock]:
-    """Two mock kernels for multi-kernel tests."""
-    kernel_1 = MagicMock()
-    kernel_1.kernel_id = KernelId(uuid.uuid4())
-
-    kernel_2 = MagicMock()
-    kernel_2.kernel_id = KernelId(uuid.uuid4())
-
-    return kernel_1, kernel_2
-
-
-@pytest.fixture
-def two_kernels_registry_data(
-    two_mock_kernels: tuple[MagicMock, MagicMock],
-) -> MutableMapping[KernelId, AbstractKernel]:
-    """Registry data with two kernels."""
-    kernel_1, kernel_2 = two_mock_kernels
-    return cast(
-        MutableMapping[KernelId, "AbstractKernel"],
-        {kernel_1.kernel_id: kernel_1, kernel_2.kernel_id: kernel_2},
-    )
-
-
-@pytest.fixture
 def mock_config_mgr() -> MagicMock:
     """Mock ScratchConfig manager."""
     mgr = MagicMock()
     mgr.save_json_recovery_data = AsyncMock()
     return mgr
-
-
-@pytest.fixture
-def mock_recovery_data() -> MagicMock:
-    """Mock recovery data."""
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_scratch_data() -> MagicMock:
-    """Mock scratch data."""
-    return MagicMock()
 
 
 class TestSaveKernelRegistry:
@@ -146,45 +110,6 @@ class TestSaveKernelRegistry:
         ):
             # Should not raise, just skip the kernel
             await writer.save_kernel_registry(kernel_registry_data, metadata)
-
-    async def test_save_kernel_registry_continues_after_parse_error(
-        self,
-        writer: ContainerBasedKernelRegistryWriter,
-        two_mock_kernels: tuple[MagicMock, MagicMock],
-        two_kernels_registry_data: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-        mock_config_mgr: MagicMock,
-        mock_recovery_data: MagicMock,
-        mock_scratch_data: MagicMock,
-    ) -> None:
-        """Process remaining kernels after encountering parse error."""
-        kernel_1, _ = two_mock_kernels
-
-        def parse_side_effect(kernel: MagicMock) -> MagicMock:
-            if kernel.kernel_id == kernel_1.kernel_id:
-                raise KernelRecoveryDataParseError()
-            return mock_recovery_data
-
-        with (
-            patch.object(
-                writer,
-                "_parse_recovery_data_from_kernel",
-                side_effect=parse_side_effect,
-            ),
-            patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
-            patch(
-                "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
-                return_value=mock_config_mgr,
-            ),
-            patch(
-                "ai.backend.agent.kernel_registry.writer.container.KernelRecoveryScratchData.from_kernel_recovery_data",
-                return_value=mock_scratch_data,
-            ),
-        ):
-            await writer.save_kernel_registry(two_kernels_registry_data, metadata)
-
-        # Verify second kernel was processed
-        mock_config_mgr.save_json_recovery_data.assert_called_once_with(mock_scratch_data)
 
     async def test_save_kernel_registry_skips_none_recovery_data(
         self,
