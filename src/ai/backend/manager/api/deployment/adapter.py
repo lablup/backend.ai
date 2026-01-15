@@ -48,7 +48,6 @@ from ai.backend.common.dto.manager.deployment.types import (
 )
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
-from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     ModelRevisionCreator,
@@ -461,10 +460,7 @@ class CreateDeploymentAdapter:
                 else None
             ),
             environ=(
-                [
-                    EnvironmentVariableEntryData(name=k, value=v)
-                    for k, v in dict(revision_input.model_runtime_config.environ).items()
-                ]
+                dict(revision_input.model_runtime_config.environ)
                 if revision_input.model_runtime_config.environ
                 else None
             ),
