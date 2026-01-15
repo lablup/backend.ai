@@ -4,6 +4,7 @@ import logging
 from collections.abc import Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import aiohttp_cors
 import trafaret as t
@@ -11,7 +12,18 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.services.registry_quota.actions.create_registry_quota import (
+    CreateRegistryQuotaAction,
+)
+from ai.backend.manager.services.registry_quota.actions.delete_registry_quota import (
+    DeleteRegistryQuotaAction,
+)
+from ai.backend.manager.services.registry_quota.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
+)
+from ai.backend.manager.services.registry_quota.actions.update_registry_quota import (
+    UpdateRegistryQuotaAction,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -35,11 +47,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 async def update_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("UPDATE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
+    group_id = UUID(params["group_id"])
     quota = int(params["quota"])
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
+    action = UpdateRegistryQuotaAction(project_id=group_id, quota=quota)
+    await root_ctx.processors.registry_quota.update_registry_quota.wait_for_complete(action)
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -53,10 +64,9 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
 async def delete_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("DELETE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
+    group_id = UUID(params["group_id"])
+    action = DeleteRegistryQuotaAction(project_id=group_id)
+    await root_ctx.processors.registry_quota.delete_registry_quota.wait_for_complete(action)
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -71,11 +81,10 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
 async def create_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("CREATE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
+    group_id = UUID(params["group_id"])
     quota = int(params["quota"])
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
+    action = CreateRegistryQuotaAction(project_id=group_id, quota=quota)
+    await root_ctx.processors.registry_quota.create_registry_quota.wait_for_complete(action)
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -89,14 +98,10 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
 async def read_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("READ_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-
-    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(
-        scope_id,
-    )
-
-    return web.json_response({"result": quota})
+    group_id = UUID(params["group_id"])
+    action = ReadRegistryQuotaAction(project_id=group_id)
+    result = await root_ctx.processors.registry_quota.read_registry_quota.wait_for_complete(action)
+    return web.json_response({"result": result.quota})
 
 
 def create_app(

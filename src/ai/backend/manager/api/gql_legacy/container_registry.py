@@ -526,10 +526,8 @@ class CreateContainerRegistryQuota(graphene.Mutation):
         try:
             match scope_id:
                 case ProjectScope():
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.registry_quota._service.create_quota(
+                        scope_id, int(quota)
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -566,10 +564,8 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.update_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.registry_quota._service.update_quota(
+                        scope_id, int(quota)
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -604,11 +600,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
-                            scope_id
-                        )
-                    )
+                    await graph_ctx.processors.registry_quota._service.delete_quota(scope_id)
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
 
