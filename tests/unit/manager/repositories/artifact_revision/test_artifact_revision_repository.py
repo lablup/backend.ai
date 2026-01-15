@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pytest
+from strawberry import ID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.api.gql.artifact.types import ArtifactRevisionFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
@@ -48,6 +51,13 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass
+class ArtifactIdFilteringFixture:
+    target_artifact_id: uuid.UUID
+    target_revision_ids: list[uuid.UUID]
+    other_revision_id: uuid.UUID
 
 
 class TestArtifactRevisionRepository:
@@ -148,6 +158,71 @@ class TestArtifactRevisionRepository:
             await db_sess.flush()
 
         yield revision_id
+
+    @pytest.fixture
+    async def sample_revisions_for_artifact_id_filtering(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: uuid.UUID,
+    ) -> AsyncGenerator[ArtifactIdFilteringFixture, None]:
+        """Create two artifacts with revisions for artifact_id filtering test."""
+        fixture = ArtifactIdFilteringFixture(
+            target_artifact_id=uuid.uuid4(),
+            target_revision_ids=[uuid.uuid4(), uuid.uuid4()],
+            other_revision_id=uuid.uuid4(),
+        )
+        other_artifact_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ArtifactRow(
+                    id=fixture.target_artifact_id,
+                    name="target/artifact",
+                    type=ArtifactType.MODEL,
+                    registry_id=test_registry_id,
+                    registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    source_registry_id=test_registry_id,
+                    source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    readonly=True,
+                    availability=ArtifactAvailability.ALIVE.value,
+                )
+            )
+            db_sess.add(
+                ArtifactRow(
+                    id=other_artifact_id,
+                    name="other/artifact",
+                    type=ArtifactType.MODEL,
+                    registry_id=test_registry_id,
+                    registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    source_registry_id=test_registry_id,
+                    source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    readonly=True,
+                    availability=ArtifactAvailability.ALIVE.value,
+                )
+            )
+            await db_sess.flush()
+            for rid in fixture.target_revision_ids:
+                db_sess.add(
+                    ArtifactRevisionRow(
+                        id=rid,
+                        artifact_id=fixture.target_artifact_id,
+                        version=f"v{rid.hex[:4]}",
+                        size=1024,
+                        status=ArtifactStatus.AVAILABLE.value,
+                    )
+                )
+            db_sess.add(
+                ArtifactRevisionRow(
+                    id=fixture.other_revision_id,
+                    artifact_id=other_artifact_id,
+                    version="v1.0",
+                    size=1024,
+                    status=ArtifactStatus.AVAILABLE.value,
+                )
+            )
+            await db_sess.flush()
+
+        yield fixture
 
     @pytest.fixture
     async def sample_revisions_for_filtering(
@@ -356,23 +431,24 @@ class TestArtifactRevisionRepository:
     async def test_search_artifact_revisions_filter_by_artifact_id(
         self,
         artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
+        sample_revisions_for_artifact_id_filtering: ArtifactIdFilteringFixture,
     ) -> None:
-        """Test searching artifact revisions filtered by artifact_id returns only revisions of that artifact"""
-        target_artifact_id = sample_artifact_id
+        """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
+        fixture = sample_revisions_for_artifact_id_filtering
+
+        gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(fixture.target_artifact_id)))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: ArtifactRevisionRow.artifact_id == target_artifact_id,
-            ],
+            conditions=gql_filter.build_conditions(),
             orders=[],
         )
 
         result = await artifact_repository.search_artifact_revisions(querier=querier)
 
-        assert result.total_count == 1
-        assert result.items[0].artifact_id == sample_artifact_id
+        assert result.total_count == len(fixture.target_revision_ids)
+        result_ids = {r.id for r in result.items}
+        assert all(rid in result_ids for rid in fixture.target_revision_ids)
+        assert fixture.other_revision_id not in result_ids
 
     # =========================================================================
     # Tests - Search with ordering
