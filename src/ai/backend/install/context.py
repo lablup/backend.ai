@@ -52,6 +52,7 @@ from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
+    FrontendMode,
     HalfstackConfig,
     HostPortPair,
     ImageSource,
@@ -763,7 +764,6 @@ class Context(metaclass=ABCMeta):
         apphub_address = self.install_variable.apphub_address
         app_address = self.install_variable.app_address
         frontend_mode = self.install_variable.frontend_mode
-        use_wildcard_binding = self.install_variable.use_wildcard_binding
 
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
@@ -822,7 +822,6 @@ class Context(metaclass=ABCMeta):
             api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
             data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
 
-            data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
@@ -834,14 +833,19 @@ class Context(metaclass=ABCMeta):
             # set frontend mode (port or wildcard)
             data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
 
-            # configure wildcard domain binding
-            if use_wildcard_binding:
+            # configure based on frontend_mode
+            if frontend_mode == FrontendMode.WILDCARD:
+                # Remove port_proxy section for wildcard mode
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+
                 # Override api_advertised_addr with app_address and advertised_port
                 api_advertised_addr_table = tomlkit.inline_table()
                 api_advertised_addr_table["host"] = app_address
                 api_advertised_addr_table["port"] = advertised_port
                 data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
 
+                # Add wildcard_domain section
                 if wildcard_domain:
                     wildcard_table = tomlkit.table()
                     wildcard_table["domain"] = wildcard_domain
@@ -852,6 +856,9 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
                     data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            else:
+                # update port_proxy.advertised_host
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
