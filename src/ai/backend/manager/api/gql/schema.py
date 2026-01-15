@@ -2,9 +2,10 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .agent import agent_v2
-from .agent_stats import (
+from .agent import (
     agent_stats,
+    agent_v2,
+    agents_v2,
 )
 from .app_config import (
     delete_domain_app_config,
@@ -132,6 +133,7 @@ from .vfs_storage import (
 @strawberry.type
 class Query:
     agent_v2 = agent_v2
+    agents_v2 = agents_v2
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
