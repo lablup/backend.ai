@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.container_registry import get_container_registry_cls
