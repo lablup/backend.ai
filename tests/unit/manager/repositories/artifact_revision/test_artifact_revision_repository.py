@@ -358,31 +358,40 @@ class TestArtifactRevisionRepository:
     async def test_search_artifact_revisions_filter_by_artifact_id(
         self,
         artifact_repository: ArtifactRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test searching artifact revisions filtered by artifact_id returns only revisions of that artifact"""
-        target_artifact_id = sample_artifact_id
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: ArtifactRevisionRow.artifact_id == target_artifact_id,
-            ],
-            orders=[],
-        )
-
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
-
-        assert result.total_count == 1
-        assert result.items[0].artifact_id == sample_artifact_id
-
-    async def test_search_artifact_revisions_filter_by_artifact_id_using_gql_filter(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
+        sample_revisions_for_filtering: dict[ArtifactStatus, uuid.UUID],
+        test_registry_id: uuid.UUID,
     ) -> None:
         """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
+        # Create another artifact with a revision to verify filtering works
+        other_artifact_id = uuid.uuid4()
+        other_revision_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ArtifactRow(
+                    id=other_artifact_id,
+                    name="other/artifact",
+                    type=ArtifactType.MODEL,
+                    registry_id=test_registry_id,
+                    registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    source_registry_id=test_registry_id,
+                    source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+                    readonly=True,
+                    availability=ArtifactAvailability.ALIVE.value,
+                )
+            )
+            db_sess.add(
+                ArtifactRevisionRow(
+                    id=other_revision_id,
+                    artifact_id=other_artifact_id,
+                    version="v1.0",
+                    size=1024,
+                    status=ArtifactStatus.AVAILABLE.value,
+                )
+            )
+            await db_sess.flush()
+
         gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(sample_artifact_id)))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
@@ -392,9 +401,10 @@ class TestArtifactRevisionRepository:
 
         result = await artifact_repository.search_artifact_revisions(querier=querier)
 
-        assert result.total_count == 1
-        assert result.items[0].id == sample_revision_id
-        assert result.items[0].artifact_id == sample_artifact_id
+        assert result.total_count == len(sample_revisions_for_filtering)
+        result_ids = {r.id for r in result.items}
+        assert all(rid in result_ids for rid in sample_revisions_for_filtering.values())
+        assert other_revision_id not in result_ids
 
     # =========================================================================
     # Tests - Search with ordering
