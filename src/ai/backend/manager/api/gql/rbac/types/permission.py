@@ -19,7 +19,7 @@ from .enums import EntityTypeGQL, OperationTypeGQL
 
 
 @strawberry.type(
-    description="Scoped Permission: grants permission for an operation on ALL entities"
+    description="Added in 26.1.0. Scoped Permission: grants permission for an operation on ALL entities"
 )
 class ScopedPermission(Node):
     id: NodeID[str]
@@ -35,7 +35,9 @@ class ScopedPermission(Node):
         )
 
 
-@strawberry.type(description="Object Permission: grants permission for a SPECIFIC entity instance")
+@strawberry.type(
+    description="Added in 26.1.0. Object Permission: grants permission for a SPECIFIC entity instance"
+)
 class ObjectPermission(Node):
     id: NodeID[str]
     entity_type: EntityTypeGQL
