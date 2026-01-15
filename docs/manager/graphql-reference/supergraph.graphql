@@ -338,6 +338,17 @@ type AgentResource
   free: JSON!
 }
 
+"""Added in 26.1.0. Configuration for the agent selection strategy"""
+type AgentSelectorConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Maximum number of kernels that can be scheduled on the same endpoint.
+  Used by concentrated strategy to control endpoint spreading behavior.
+  """
+  kernelCountsAtSameEndpoint: Int!
+}
+
 """Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -7819,7 +7830,7 @@ type ScalingGroupSchedulerOptions
   Contents depend on the scheduler implementation (fifo/lifo/drf).
   Used for advanced scheduling behavior customization.
   """
-  config: JSON!
+  config: SchedulerConfig!
 
   """
   Algorithm for selecting target agents when scheduling sessions.
@@ -7834,7 +7845,7 @@ type ScalingGroupSchedulerOptions
   Structure varies by strategy - for example,
   concentrated strategy may specify endpoint spreading rules.
   """
-  agentSelectorConfig: JSON!
+  agentSelectorConfig: AgentSelectorConfig!
 
   """
   Whether inference service replicas should be distributed across different agents
@@ -8024,6 +8035,17 @@ type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.1.0. Scheduler-specific configuration options"""
+type SchedulerConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Number of scheduling retries to skip before attempting to schedule a session.
+  Used to prevent repeated scheduling attempts for sessions that previously failed.
+  """
+  numRetriesToSkip: Int!
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
