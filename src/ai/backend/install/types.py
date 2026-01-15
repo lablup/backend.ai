@@ -46,6 +46,16 @@ class Platform(enum.StrEnum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+class FrontendMode(enum.StrEnum):
+    PORT = "port"
+    WILDCARD = "wildcard"
+
+
+class EndpointProtocol(enum.StrEnum):
+    HTTP = "http"
+    HTTPS = "https"
+
+
 @dataclasses.dataclass()
 class CliArgs:
     mode: InstallModes | None
@@ -54,10 +64,12 @@ class CliArgs:
     non_interactive: bool
     public_facing_address: str
     accelerator: Optional[str] = None
-    public_mode: bool = False
     fqdn_prefix: Optional[str] = None
     tls_advertised: bool = False
     advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -189,10 +201,12 @@ class ServiceConfig:
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Optional[Accelerator] = None
-    public_mode: bool = False
     fqdn_prefix: Optional[str] = None
     tls_advertised: bool = False
     advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
 
     @property
     def apphub_address(self) -> str:
