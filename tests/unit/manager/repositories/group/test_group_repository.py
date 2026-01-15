@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -39,6 +40,8 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.testutils.db import with_tables
 
@@ -633,3 +636,138 @@ class TestGroupRepositoryDeleteEndpoints:
                 sa.select(EndpointRow).where(EndpointRow.id.in_(endpoint_ids))
             )
             assert len(endpoints_result.all()) == 0
+
+
+class TestGroupRepositoryCreateResourcePolicyValidation:
+    """Tests for resource_policy validation in GroupRepository.create()"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                GroupRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
+            await session.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def project_resource_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a project resource policy."""
+        policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(policy)
+            await session.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def group_repository_with_mock_role_manager(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> GroupRepository:
+        """GroupRepository with mocked RoleManager for create tests."""
+        repo = GroupRepository(
+            db=db_with_cleanup,
+            config_provider=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            storage_manager=MagicMock(spec=StorageSessionManager),
+        )
+        mock_role_manager = MagicMock()
+        mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        repo._role_manager = mock_role_manager
+        return repo
+
+    @pytest.mark.asyncio
+    async def test_create_succeeds_with_existing_project_resource_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository_with_mock_role_manager: GroupRepository,
+        test_domain: str,
+        project_resource_policy: str,
+    ) -> None:
+        """Test that group creation succeeds when project_resource_policy exists."""
+        spec = GroupCreatorSpec(
+            name=f"test-group-{uuid.uuid4().hex[:8]}",
+            domain_name=test_domain,
+            description="Test group",
+            is_active=True,
+            total_resource_slots=ResourceSlot({}),
+            allowed_vfolder_hosts={},
+            integration_id=None,
+            resource_policy=project_resource_policy,
+            type=ProjectType.GENERAL,
+        )
+        creator = Creator(spec=spec)
+
+        result = await group_repository_with_mock_role_manager.create(creator)
+
+        assert result.name == spec.name
+        assert result.resource_policy == project_resource_policy
+
+    @pytest.mark.asyncio
+    async def test_create_fails_with_nonexistent_project_resource_policy(
+        self,
+        group_repository_with_mock_role_manager: GroupRepository,
+        test_domain: str,
+    ) -> None:
+        """Test that group creation fails when project_resource_policy does not exist."""
+        nonexistent_policy = "nonexistent-policy"
+        spec = GroupCreatorSpec(
+            name=f"test-group-{uuid.uuid4().hex[:8]}",
+            domain_name=test_domain,
+            description="Test group",
+            is_active=True,
+            total_resource_slots=ResourceSlot({}),
+            allowed_vfolder_hosts={},
+            integration_id=None,
+            resource_policy=nonexistent_policy,
+            type=ProjectType.GENERAL,
+        )
+        creator = Creator(spec=spec)
+
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await group_repository_with_mock_role_manager.create(creator)
+
+        assert "Resource policy" in str(exc_info.value)
+        assert "does not exist" in str(exc_info.value)
