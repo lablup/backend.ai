@@ -48,6 +48,7 @@ from ai.backend.common.dto.manager.deployment.types import (
 )
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     ModelRevisionCreator,
@@ -57,7 +58,6 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
-    EnvironmentVariableEntryData,
     ExecutionSpec,
     ModelDeploymentData,
     ModelRevisionData,

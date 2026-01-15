@@ -55,6 +55,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -70,7 +71,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    EnvironmentVariableEntryData,
     ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,

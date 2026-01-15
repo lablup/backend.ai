@@ -3,6 +3,14 @@ from typing import Optional
 
 
 @dataclass
+class EnvironmentVariableEntryData:
+    """A single environment variable entry with name and value."""
+
+    name: str
+    value: str
+
+
+@dataclass
 class StringFilterData:
     """Data class that corresponds 1:1 with StringFilter for API requests."""
 

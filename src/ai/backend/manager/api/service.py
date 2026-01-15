@@ -36,12 +36,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
-    EnvironmentVariableEntryData,
     ExecutionSpec,
     ImageIdentifierDraft,
     ModelRevisionSpecDraft,

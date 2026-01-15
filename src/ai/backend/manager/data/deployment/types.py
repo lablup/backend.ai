@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     SessionId,
     VFolderMount,
 )
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
 
@@ -260,13 +261,6 @@ class ResourceSpec(ConfiguredModel):
     cluster_size: int
     resource_slots: Mapping[str, Any]
     resource_opts: Optional[Mapping[str, Any]] = None
-
-
-class EnvironmentVariableEntryData(ConfiguredModel):
-    """A single environment variable entry with name and value."""
-
-    name: str
-    value: str
 
 
 class ExecutionSpec(ConfiguredModel):
