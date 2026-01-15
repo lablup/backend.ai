@@ -14,18 +14,18 @@ from .types import (
     AgentV2GQL,
 )
 
-__all__ = [
+__all__ = (
     # Types
     "AgentFilterGQL",
     "AgentOrderByGQL",
     "AgentResourceGQL",
     "AgentStatsGQL",
+    "AgentV2GQL",
     "AgentV2Connection",
     "AgentV2Edge",
-    "AgentV2GQL",
     # Resolvers
     "agent_stats",
     "agents_v2",
     # Fetchers
     "fetch_agents",
-]
+)
