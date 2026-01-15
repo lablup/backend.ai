@@ -11,11 +11,9 @@ from strawberry.relay import Node, NodeID, PageInfo
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.data.permission.id import ScopeId as ScopeIdData
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission_group import PermissionGroupExtendedData
 from ai.backend.manager.data.permission.role import RoleDetailData
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -204,17 +202,16 @@ def _paginate_role_permissions_in_memory(
 # ==============================================================================
 
 
-@strawberry.type(description="Role: defines a collection of permissions bound to a specific scope")
+@strawberry.type(description="Role: defines a collection of permissions bound to specific scopes")
 class Role(Node):
     id: NodeID[str]
     name: str
     description: Optional[str]
-    scope: Scope
+    scopes: list[Scope]
     source: RoleSourceGQL
     created_at: datetime
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime]
-    additional_scopes: list[Scope]
 
     # Private fields for lazy loading
     # TODO: Refactor to fetch permissions via separate DB queries instead of in-memory pagination.
@@ -301,26 +298,25 @@ class Role(Node):
 
     @classmethod
     def from_dataclass(cls, data: RoleDetailData) -> Self:
-        # Extract scope from permission groups (use first one, or create default)
-        scope_id_data = (
-            data.permission_groups[0].scope_id
-            if data.permission_groups
-            else ScopeIdData(scope_type=ScopeType.GLOBAL, scope_id="")
-        )
-
-        # TODO: Implement additional scopes extraction from object permissions
-        additional_scopes: list[Scope] = []
+        # Extract all scopes from permission groups
+        # TODO: Retrieve `guest` flag directly from PermissionGroupExtendedData
+        #       instead of deriving it from the permission count.
+        scopes = [
+            Scope.from_dataclass(
+                permission_group.scope_id, guest=len(permission_group.permissions) == 0
+            )
+            for permission_group in data.permission_groups
+        ]
 
         return cls(
             id=ID(str(data.id)),
             name=data.name,
             description=data.description,
-            scope=Scope.from_dataclass(scope_id_data),
+            scopes=scopes,
             source=data.source,
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
-            additional_scopes=additional_scopes,
             # Store raw data for lazy loading
             _permission_groups=data.permission_groups,
             _object_permissions_data=data.object_permissions,
