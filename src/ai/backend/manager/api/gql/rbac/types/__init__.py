@@ -25,7 +25,6 @@ from .permission import (
     ObjectPermission,
     ObjectPermissionConnection,
     ObjectPermissionEdge,
-    Scope,
     ScopedPermission,
     ScopedPermissionConnection,
     ScopedPermissionEdge,
@@ -39,6 +38,7 @@ from .role import (
     RoleSourceFilter,
     ScopeTypeFilter,
 )
+from .scope import Scope
 
 __all__ = [
     # Enums

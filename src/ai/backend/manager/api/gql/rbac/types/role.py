@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Self, TypeVar, override
+from typing import Optional, Self, override
 
 import strawberry
 from strawberry import ID
@@ -12,7 +12,6 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
-from ai.backend.manager.data.permission.permission_group import PermissionGroupExtendedData
 from ai.backend.manager.data.permission.role import RoleDetailData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -23,15 +22,13 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.permission_controller.options import RoleConditions, RoleOrders
 
 from .enums import EntityTypeGQL, RoleOrderField, RoleSourceGQL, ScopeTypeGQL
+from .helper import paginate_in_memory
 from .permission import (
     ObjectPermission,
     ObjectPermissionConnection,
     ObjectPermissionEdge,
-    Scope,
-    ScopedPermission,
-    ScopedPermissionConnection,
-    ScopedPermissionEdge,
 )
+from .scope import Scope
 
 # ==============================================================================
 # Filter Types
@@ -144,60 +141,6 @@ class RoleOrderBy(GQLOrderBy):
 
 
 # ==============================================================================
-# Helper Functions
-# ==============================================================================
-
-T = TypeVar("T")
-
-DEFAULT_ROLE_PERMISSION_PAGE_SIZE = 25
-
-
-def _paginate_role_permissions_in_memory(
-    items: list[T],
-    first: Optional[int],
-    after: Optional[str],
-    last: Optional[int],
-    before: Optional[str],
-    limit: Optional[int],
-    offset: Optional[int],
-) -> tuple[list[T], bool, bool, int]:
-    """Paginate role permission items in memory.
-
-    This is an internal helper for Role.scoped_permissions and Role.object_permissions
-    fields. Since permissions are loaded upfront with the role, pagination is performed
-    in-memory rather than via separate DB queries.
-
-    Args:
-        items: The full list of permission items to paginate.
-        first: Cursor-based pagination - return first N items.
-        after: Cursor-based pagination - return items after cursor (not implemented).
-        last: Cursor-based pagination - return last N items (not implemented).
-        before: Cursor-based pagination - return items before cursor (not implemented).
-        limit: Offset-based pagination - maximum items to return.
-        offset: Offset-based pagination - number of items to skip.
-
-    Returns:
-        A tuple of (paginated_items, has_next_page, has_previous_page, total_count).
-    """
-    total = len(items)
-
-    # Offset-based pagination takes precedence if provided
-    if limit is not None or offset is not None:
-        start = offset or 0
-        end = start + (limit or DEFAULT_ROLE_PERMISSION_PAGE_SIZE)
-        paginated = items[start:end]
-        has_next = end < total
-        has_prev = start > 0
-    else:
-        # Cursor-based (simplified)
-        paginated = items[:first] if first else items
-        has_next = bool(first and len(items) > first)
-        has_prev = False
-
-    return paginated, has_next, has_prev, total
-
-
-# ==============================================================================
 # Object Types
 # ==============================================================================
 
@@ -216,51 +159,8 @@ class Role(Node):
     # Private fields for lazy loading
     # TODO: Refactor to fetch permissions via separate DB queries instead of in-memory pagination.
     #       Currently, all permissions are loaded upfront and paginated in memory.
-    #       For better performance, implement DB-level pagination by:
-    #       1. Adding separate service actions (e.g., GetRoleScopedPermissionsAction)
-    #       2. Using fetcher functions that query permissions independently
-    #       3. Passing `info.context` to resolver methods for DB access
-    _permission_groups: strawberry.Private[list[PermissionGroupExtendedData]]
+    #       For better performance, implement DB-level pagination.
     _object_permissions_data: strawberry.Private[list[ObjectPermissionData]]
-
-    @strawberry.field(description="Scoped permissions for this role")
-    def scoped_permissions(
-        self,
-        first: Optional[int] = None,
-        after: Optional[str] = None,
-        last: Optional[int] = None,
-        before: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> ScopedPermissionConnection:
-        """Fetch scoped permissions with optional pagination."""
-        # Flatten permissions from permission groups
-        all_perms = [
-            ScopedPermission.from_permission_group(pg, perm)
-            for pg in self._permission_groups
-            for perm in pg.permissions
-        ]
-
-        # Apply in-memory pagination
-        paginated, has_next, has_prev, total = _paginate_role_permissions_in_memory(
-            all_perms, first, after, last, before, limit, offset
-        )
-
-        edges = [
-            ScopedPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id)))
-            for perm in paginated
-        ]
-
-        return ScopedPermissionConnection(
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=has_next,
-                has_previous_page=has_prev,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=total,
-        )
 
     @strawberry.field(description="Object permissions for this role")
     def object_permissions(
@@ -275,36 +175,28 @@ class Role(Node):
         """Fetch object permissions with optional pagination."""
         all_perms = [ObjectPermission.from_dataclass(op) for op in self._object_permissions_data]
 
-        # Apply in-memory pagination
-        paginated, has_next, has_prev, total = _paginate_role_permissions_in_memory(
-            all_perms, first, after, last, before, limit, offset
-        )
+        result = paginate_in_memory(all_perms, first, after, last, before, limit, offset)
 
         edges = [
             ObjectPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id)))
-            for perm in paginated
+            for perm in result.items
         ]
 
         return ObjectPermissionConnection(
             edges=edges,
             page_info=PageInfo(
-                has_next_page=has_next,
-                has_previous_page=has_prev,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
-            count=total,
+            count=result.total_count,
         )
 
     @classmethod
     def from_dataclass(cls, data: RoleDetailData) -> Self:
-        # Extract all scopes from permission groups
-        # TODO: Retrieve `guest` flag directly from PermissionGroupExtendedData
-        #       instead of deriving it from the permission count.
         scopes = [
-            Scope.from_dataclass(
-                permission_group.scope_id, guest=len(permission_group.permissions) == 0
-            )
+            Scope.from_permission_group(permission_group)
             for permission_group in data.permission_groups
         ]
 
@@ -317,8 +209,6 @@ class Role(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
-            # Store raw data for lazy loading
-            _permission_groups=data.permission_groups,
             _object_permissions_data=data.object_permissions,
         )
 
