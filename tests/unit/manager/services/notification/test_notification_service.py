@@ -15,7 +15,7 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     SessionStartedMessage,
     SessionTerminatedMessage,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
@@ -106,7 +106,7 @@ class TestNotificationService:
             name="Test Webhook",
             description="Test webhook channel",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookConfig(
+            config=WebhookSpec(
                 url="https://example.com/webhook",
                 method="POST",
                 headers={"Authorization": "Bearer token"},
@@ -449,6 +449,8 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test creating a notification channel"""
+        # TODO: Remove isinstance check when Email channel is implemented
+        assert isinstance(sample_webhook_channel.config, WebhookSpec)
         creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name=sample_webhook_channel.name,

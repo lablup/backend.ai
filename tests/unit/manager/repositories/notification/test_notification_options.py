@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.api.gql.base import StringMatchSpec
@@ -215,7 +215,7 @@ class TestNotificationOptions:
 
             for name, channel_type, enabled in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -252,7 +252,7 @@ class TestNotificationOptions:
 
             for name, created_at, updated_at in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -279,7 +279,7 @@ class TestNotificationOptions:
         """Create a single channel for rule testing"""
         channel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            config = WebhookConfig(url="https://example.com/webhook")
+            config = WebhookSpec(url="https://example.com/webhook")
             channel = NotificationChannelRow(
                 id=channel_id,
                 name="Test Channel",
@@ -1124,7 +1124,7 @@ class TestNotificationCursorPagination:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{i}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{i}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel-{i}",

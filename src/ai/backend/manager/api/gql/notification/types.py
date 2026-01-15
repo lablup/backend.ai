@@ -14,7 +14,7 @@ from strawberry.relay import Node, NodeID
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -60,6 +60,8 @@ class NotificationChannelTypeGQL(StrEnum):
         match internal_type:
             case NotificationChannelType.WEBHOOK:
                 return cls.WEBHOOK
+            case _:
+                return cls.WEBHOOK  # TODO: Support email when implemented
 
     def to_internal(self) -> NotificationChannelType:
         """Convert GraphQL enum to internal NotificationChannelType."""
@@ -100,13 +102,11 @@ class NotificationRuleTypeGQL(StrEnum):
 
 
 @strawberry.type
-class WebhookConfigGQL:
-    """GraphQL type for webhook configuration."""
-
+class WebhookSpecGQL:
     url: str
 
     @classmethod
-    def from_dataclass(cls, config: WebhookConfig) -> Self:
+    def from_dataclass(cls, config: WebhookSpec) -> Self:
         return cls(
             url=config.url,
         )
@@ -118,18 +118,23 @@ class NotificationChannel(Node):
     name: str
     description: Optional[str]
     channel_type: NotificationChannelTypeGQL
-    config: WebhookConfigGQL
+    config: WebhookSpecGQL
     enabled: bool
     created_at: datetime
 
     @classmethod
     def from_dataclass(cls, data: NotificationChannelData) -> Self:
+        if not isinstance(data.config, WebhookSpec):
+            # # TODO: Support Email Spec when Email channel is implemented
+            raise ValueError(
+                f"Expected WebhookSpec for NotificationChannelData.config, got {type(data.config).__name__}"
+            )
         return cls(
             id=ID(str(data.id)),
             name=data.name,
             description=data.description,
             channel_type=NotificationChannelTypeGQL.from_internal(data.channel_type),
-            config=WebhookConfigGQL.from_dataclass(data.config),
+            config=WebhookSpecGQL.from_dataclass(data.config),
             enabled=data.enabled,
             created_at=data.created_at,
         )
@@ -345,11 +350,11 @@ class NotificationRuleOrderBy(GQLOrderBy):
 
 
 @strawberry.input(description="Input for webhook configuration")
-class WebhookConfigInput:
+class WebhookSpecInput:
     url: str
 
-    def to_dataclass(self) -> WebhookConfig:
-        return WebhookConfig(url=self.url)
+    def to_dataclass(self) -> WebhookSpec:
+        return WebhookSpec(url=self.url)
 
 
 @strawberry.input(description="Input for creating a notification channel")
@@ -357,7 +362,7 @@ class CreateNotificationChannelInput:
     name: str
     description: Optional[str] = None
     channel_type: NotificationChannelTypeGQL = NotificationChannelTypeGQL.WEBHOOK
-    config: WebhookConfigInput = strawberry.field()
+    config: WebhookSpecInput = strawberry.field()
     enabled: bool = True
 
     def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationChannelRow]:
@@ -378,16 +383,16 @@ class UpdateNotificationChannelInput:
     id: ID
     name: Optional[str] = UNSET
     description: Optional[str] = UNSET
-    config: Optional[WebhookConfigInput] = UNSET
+    config: Optional[WebhookSpecInput] = UNSET
     enabled: Optional[bool] = UNSET
 
     def to_updater(self, channel_id: uuid.UUID) -> Updater[NotificationChannelRow]:
-        config_state = OptionalState[WebhookConfig].nop()
+        config_state = OptionalState[WebhookSpec].nop()
         if self.config is not UNSET:
             if self.config is None:
-                config_state = OptionalState[WebhookConfig].nop()
+                config_state = OptionalState[WebhookSpec].nop()
             else:
-                config_state = OptionalState[WebhookConfig].update(self.config.to_dataclass())
+                config_state = OptionalState[WebhookSpec].update(self.config.to_dataclass())
 
         spec = NotificationChannelUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),

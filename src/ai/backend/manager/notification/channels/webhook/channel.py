@@ -9,7 +9,7 @@ import aiohttp
 
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.clients.http_client.client_pool import ClientKey
-from ai.backend.common.data.notification import WebhookConfig
+from ai.backend.common.data.notification.types import WebhookSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
@@ -24,9 +24,9 @@ class WebhookChannel(AbstractNotificationChannel):
     """Webhook notification channel handler using HTTP POST."""
 
     _http_client_pool: ClientPool
-    _webhook_config: WebhookConfig
+    _webhook_spec: WebhookSpec
 
-    def __init__(self, http_client_pool: ClientPool, webhook_config: WebhookConfig) -> None:
+    def __init__(self, http_client_pool: ClientPool, webhook_spec: WebhookSpec) -> None:
         """
         Initialize webhook channel handler.
 
@@ -35,7 +35,7 @@ class WebhookChannel(AbstractNotificationChannel):
             webhook_config: Webhook configuration
         """
         self._http_client_pool = http_client_pool
-        self._webhook_config = webhook_config
+        self._webhook_spec = webhook_spec
 
     async def send(
         self,
@@ -53,7 +53,7 @@ class WebhookChannel(AbstractNotificationChannel):
         Raises:
             Exception: If webhook delivery fails
         """
-        webhook_url = self._webhook_config.url
+        webhook_url = self._webhook_spec.url
 
         # Parse URL to get base endpoint
         parsed = urlparse(webhook_url)
@@ -68,9 +68,9 @@ class WebhookChannel(AbstractNotificationChannel):
         http_session = self._http_client_pool.load_client_session(client_key)
 
         # Send HTTP POST request with rendered message as body
-        timeout = aiohttp.ClientTimeout(total=self._webhook_config.timeout)
-        headers = self._webhook_config.headers.copy()
-        headers["Content-Type"] = self._webhook_config.content_type
+        timeout = aiohttp.ClientTimeout(total=self._webhook_spec.timeout)
+        headers = self._webhook_spec.headers.copy()
+        headers["Content-Type"] = self._webhook_spec.content_type
 
         async with http_session.post(
             path,
@@ -78,7 +78,7 @@ class WebhookChannel(AbstractNotificationChannel):
             headers=headers,
             timeout=timeout,
         ) as response:
-            if response.status in self._webhook_config.success_status_codes:
+            if response.status in self._webhook_spec.success_status_codes:
                 log.info(
                     "Webhook sent successfully to {} (status: {})",
                     webhook_url,

@@ -9,7 +9,7 @@ from uuid import UUID
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import CreatorSpec
@@ -21,7 +21,7 @@ class NotificationChannelCreatorSpec(CreatorSpec[NotificationChannelRow]):
 
     name: str
     channel_type: NotificationChannelType
-    config: WebhookConfig
+    config: WebhookSpec
     created_by: UUID
     description: Optional[str] = None
     enabled: bool = True

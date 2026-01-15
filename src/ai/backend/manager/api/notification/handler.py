@@ -13,6 +13,7 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -25,7 +26,6 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
-    NotificationRuleType,
     NotificationRuleTypeSchemaResponse,
     PaginationInfo,
     SearchNotificationChannelsRequest,

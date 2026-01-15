@@ -14,7 +14,7 @@ from ai.backend.client.session import Session
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
@@ -126,7 +126,7 @@ def create_channel_cmd(
             request = CreateNotificationChannelRequest(
                 name=name,
                 channel_type=NotificationChannelType(channel_type),
-                config=WebhookConfig(url=url),
+                config=WebhookSpec(url=url),
                 description=description,
                 enabled=not disabled,
             )
@@ -165,7 +165,7 @@ def update_channel_cmd(
         try:
             config = None
             if url:
-                config = WebhookConfig(url=url)
+                config = WebhookSpec(url=url)
 
             request = UpdateNotificationChannelRequest(
                 name=name,

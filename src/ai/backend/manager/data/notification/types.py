@@ -6,9 +6,10 @@ from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.common.data.notification import (
+    EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.manager.types import OptionalState, PartialModifier
 
@@ -19,9 +20,9 @@ class NotificationChannelData:
 
     id: UUID
     name: str
-    description: Optional[str]
+    description: str | None
     channel_type: NotificationChannelType
-    config: WebhookConfig
+    config: WebhookSpec | EmailSpec
     enabled: bool
     created_by: UUID
     created_at: datetime = field(compare=False)
@@ -52,7 +53,9 @@ class NotificationChannelModifier(PartialModifier):
     description: OptionalState[Optional[str]] = field(
         default_factory=OptionalState[Optional[str]].nop
     )
-    config: OptionalState[WebhookConfig] = field(default_factory=OptionalState[WebhookConfig].nop)
+    config: OptionalState[WebhookSpec | EmailSpec] = field(
+        default_factory=OptionalState[WebhookSpec | EmailSpec].nop
+    )
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @override

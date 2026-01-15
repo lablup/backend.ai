@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ai.backend.common.data.notification.types import (
+    WebhookSpec,
+)
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelDTO,
     NotificationChannelFilter,
@@ -22,7 +25,7 @@ from ai.backend.common.dto.manager.notification import (
     SearchNotificationRulesRequest,
     UpdateNotificationChannelRequest,
     UpdateNotificationRuleRequest,
-    WebhookConfigResponse,
+    WebhookSpecResponse,
 )
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.notification import (
@@ -61,12 +64,17 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: NotificationChannelData) -> NotificationChannelDTO:
         """Convert NotificationChannelData to DTO."""
+        # TODO: Support EmailSpec when Email channel is implemented
+        if not isinstance(data.config, WebhookSpec):
+            raise InvalidNotificationConfig(
+                f"Expected WebhookSpec, got {type(data.config).__name__}"
+            )
         return NotificationChannelDTO(
             id=data.id,
             name=data.name,
             description=data.description,
             channel_type=data.channel_type,
-            config=WebhookConfigResponse(url=data.config.url),
+            config=WebhookSpecResponse(url=data.config.url),
             enabled=data.enabled,
             created_at=data.created_at,
             created_by=data.created_by,
@@ -77,11 +85,10 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         self, request: UpdateNotificationChannelRequest, channel_id: UUID
     ) -> Updater[NotificationChannelRow]:
         """Convert update request to updater."""
-        from ai.backend.common.data.notification import WebhookConfig
 
         name = OptionalState[str].nop()
         description = OptionalState[str | None].nop()
-        config = OptionalState[WebhookConfig].nop()
+        config = OptionalState[WebhookSpec].nop()
         enabled = OptionalState[bool].nop()
 
         if request.name is not None:
@@ -89,10 +96,10 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         if request.description is not None:
             description = OptionalState.update(request.description)
         if request.config is not None:
-            # config validator ensures this is WebhookConfig
-            if not isinstance(request.config, WebhookConfig):
+            # config validator ensures this is WebhookSpec
+            if not isinstance(request.config, WebhookSpec):
                 raise InvalidNotificationConfig(
-                    f"Expected WebhookConfig, got {type(request.config).__name__}"
+                    f"Expected WebhookSpec, got {type(request.config).__name__}"
                 )
             config = OptionalState.update(request.config)
         if request.enabled is not None:

@@ -9,8 +9,11 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
-from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
-from ai.backend.common.data.notification import WebhookConfig as WebhookConfigData
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookSpec,
+)
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelDTO,
     NotificationChannelFilter,
@@ -24,7 +27,7 @@ from ai.backend.common.dto.manager.notification import (
     StringFilter,
     UpdateNotificationChannelRequest,
     UpdateNotificationRuleRequest,
-    WebhookConfigResponse,
+    WebhookSpecResponse,
 )
 from ai.backend.common.dto.manager.notification.request import (
     SearchNotificationChannelsRequest,
@@ -574,7 +577,7 @@ class TestNotificationChannelAdapterConversion:
             name="Test Channel",
             description="Test description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookConfigData(url="https://example.com/webhook"),
+            config=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,
@@ -589,7 +592,7 @@ class TestNotificationChannelAdapterConversion:
         assert dto.name == "Test Channel"
         assert dto.description == "Test description"
         assert dto.channel_type == NotificationChannelType.WEBHOOK
-        assert isinstance(dto.config, WebhookConfigResponse)
+        assert isinstance(dto.config, WebhookSpecResponse)
         assert dto.config.url == "https://example.com/webhook"
         assert dto.enabled is True
         assert dto.created_by == user_id
@@ -602,7 +605,7 @@ class TestNotificationChannelAdapterConversion:
         request = UpdateNotificationChannelRequest(
             name="Updated Name",
             description="Updated description",
-            config=WebhookConfigData(url="https://new-url.com"),
+            config=WebhookSpec(url="https://new-url.com"),
             enabled=False,
         )
 
@@ -612,7 +615,9 @@ class TestNotificationChannelAdapterConversion:
 
         assert spec.name.value() == "Updated Name"
         assert spec.description.value() == "Updated description"
-        assert spec.config.value().url == "https://new-url.com"
+        config_value = spec.config.value()
+        assert isinstance(config_value, WebhookSpec)
+        assert config_value.url == "https://new-url.com"
         assert spec.enabled.value() is False
         assert updater.pk_value == channel_id
 
@@ -650,7 +655,7 @@ class TestNotificationRuleAdapterConversion:
             name="Test Channel",
             description="Channel description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookConfigData(url="https://example.com/webhook"),
+            config=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,

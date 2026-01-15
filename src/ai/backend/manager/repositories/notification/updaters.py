@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
-from ai.backend.manager.data.notification.types import WebhookConfig
+from ai.backend.common.data.notification import WebhookSpec
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
@@ -17,7 +17,7 @@ class NotificationChannelUpdaterSpec(UpdaterSpec[NotificationChannelRow]):
     description: OptionalState[Optional[str]] = field(
         default_factory=OptionalState[Optional[str]].nop
     )
-    config: OptionalState[WebhookConfig] = field(default_factory=OptionalState[WebhookConfig].nop)
+    config: OptionalState[WebhookSpec] = field(default_factory=OptionalState[WebhookSpec].nop)
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
