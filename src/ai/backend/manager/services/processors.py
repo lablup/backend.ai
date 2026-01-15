@@ -84,6 +84,8 @@ from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.registry_quota.processors import RegistryQuotaProcessors
+from ai.backend.manager.services.registry_quota.service import RegistryQuotaService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
@@ -176,6 +178,7 @@ class Services:
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
     scheduling_history: SchedulingHistoryService
+    registry_quota: RegistryQuotaService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -221,6 +224,9 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
+        )
+        registry_quota_service = RegistryQuotaService(
+            repositories.registry_quota.repository,
         )
         vfolder_service = VFolderService(
             args.config_provider,
@@ -392,6 +398,7 @@ class Services:
             storage_namespace=storage_namespace_service,
             audit_log=audit_log_service,
             scheduling_history=scheduling_history_service,
+            registry_quota=registry_quota_service,
         )
 
 
@@ -437,6 +444,7 @@ class Processors(AbstractProcessorPackage):
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
     scheduling_history: SchedulingHistoryProcessors
+    registry_quota: RegistryQuotaProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -508,6 +516,9 @@ class Processors(AbstractProcessorPackage):
         scheduling_history_processors = SchedulingHistoryProcessors(
             services.scheduling_history, action_monitors
         )
+        registry_quota_processors = RegistryQuotaProcessors(
+            services.registry_quota, action_monitors
+        )
 
         return cls(
             agent=agent_processors,
@@ -545,6 +556,7 @@ class Processors(AbstractProcessorPackage):
             storage_namespace=storage_namespace_processors,
             audit_log=audit_log_processors,
             scheduling_history=scheduling_history_processors,
+            registry_quota=registry_quota_processors,
         )
 
     @override
@@ -585,4 +597,5 @@ class Processors(AbstractProcessorPackage):
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),
+            *self.registry_quota.supported_actions(),
         ]
