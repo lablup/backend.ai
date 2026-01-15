@@ -160,3 +160,7 @@ backup.*.json
 /DIST-INFO
 /INSTALL-INFO
 .serena/
+
+# Local scripts
+start-tmux.sh
+stop-tmux.sh
