@@ -263,7 +263,7 @@ class ResourceSpec(ConfiguredModel):
 
 
 class EnvironmentVariableEntryData(ConfiguredModel):
-    """A single environment variable with name and value."""
+    """A single environment variable entry with name and value."""
 
     name: str
     value: str
