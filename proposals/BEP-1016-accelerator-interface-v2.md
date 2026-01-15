@@ -36,6 +36,83 @@ See [BEP-1000](https://github.com/lablup/beps/blob/main/proposals/BEP-1000-redef
 
 ## Proposed Design
 
+### Class Decomposition Overview
+
+The following diagram shows how the monolithic `AbstractComputePlugin` is decomposed into purpose-specific classes in the new design:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              CURRENT DESIGN                                         │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                        AbstractComputePlugin                                  │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │ Node-level APIs:                                                        │  │  │
+│  │  │   list_devices(), get_metadata(), extra_info(), get_node_hwinfo(),      │  │  │
+│  │  │   gather_node_metrics()                                                 │  │  │
+│  │  ├─────────────────────────────────────────────────────────────────────────┤  │  │
+│  │  │ Agent-level APIs:                                                       │  │  │
+│  │  │   available_slots(), create_alloc_map(), get_attached_devices(),        │  │  │
+│  │  │   gather_container_metrics(), gather_process_metrics()                  │  │  │
+│  │  ├─────────────────────────────────────────────────────────────────────────┤  │  │
+│  │  │ Docker-specific APIs (workload config generation):                      │  │  │
+│  │  │   get_hooks(), generate_docker_args(), get_docker_networks(),           │  │  │
+│  │  │   generate_mounts(), generate_resource_data(), restore_from_container() │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                     │
+│  ┌─────────────────────────────┐                                                    │
+│  │   AbstractComputeDevice     │   Device metadata struct                           │
+│  └─────────────────────────────┘                                                    │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+                                        │
+                                        │ Decomposition
+                                        ▼
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              PROPOSED DESIGN                                        │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                    AbstractDeviceHostPlugin (Node-level)                      │  │
+│  │    list_devices(), configurable_slots(), get_node_info(),                     │  │
+│  │    gather_node_metrics(), create_agent_context()                              │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│         │                                                                           │
+│         │ creates (with device_mask)                                                │
+│         ▼                                                                           │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                     AbstractDevicePlugin (Agent-level)                        │  │
+│  │    list_devices(), available_slots(), create_alloc_map(),                     │  │
+│  │    alloc_to_devices(), gather_workload_metrics(), gather_process_metrics(),   │  │
+│  │    create_lifecycle_hook()                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│         │                                                                           │
+│         │ creates (per workload)                                                    │
+│         ▼                                                                           │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                     AbstractLifecycleHook (Workload-level)                    │  │
+│  │    pre_create() → WorkloadConfig, post_create(),                              │  │
+│  │    pre_terminate(), post_terminate()                                          │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                     │
+│  ┌─────────────────────────────┐  ┌──────────────┐  ┌───────────────────────────┐   │
+│  │      AbstractDevice         │  │   Workload   │  │     WorkloadConfig        │   │
+│  │  (formerly ComputeDevice)   │  │    Struct    │  │        Struct             │   │
+│  └─────────────────────────────┘  └──────────────┘  └───────────────────────────┘   │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key changes:**
+- **Node vs Agent separation**: APIs that operate on the entire node are now in `AbstractDeviceHostPlugin`, while agent-scoped APIs are in `AbstractDevicePlugin`
+- **Device masking**: Each `AbstractDevicePlugin` instance only sees its assigned subset of devices
+- **Lifecycle hooks**: Docker-specific methods are replaced by a generic `AbstractLifecycleHook` that returns backend-agnostic `WorkloadConfig`
+- **Cleaner struct naming**: `AbstractComputeDevice` → `AbstractDevice`
+
 ### Key Goals
 
 * Make it applicable to non-Docker agent backends
@@ -73,7 +150,7 @@ In a multi-agent deployment, a single physical compute node hosts multiple Backe
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### `AbstractComputePlugin` API (Node-level) ♻️
+### `AbstractDeviceHostPlugin` API (Node-level) ♻️
 
 These APIs are called once per node during the agent runtime initialization. They provide the global view of all available devices before partitioning.
 
@@ -83,11 +160,11 @@ These APIs are called once per node during the agent runtime initialization. The
 | `configurable_slots()` ✨              | List all possible resource slot types along with display metadata                                  |
 | `get_node_info()` ♻                    | Get the node information such as driver/runtime versions and hardware info using a structured dataclass |
 | `gather_node_metrics(stat_ctx)` ♻      | Collect node-level metrics such as total processor and memory utilization across all devices       |
-| `create_agent_context(device_mask)` ✨ | Create an `AbstractAgentContext` instance scoped to the specified device subset                    |
+| `create_agent_context(device_mask)` ✨ | Create an `AbstractDevicePlugin` instance scoped to the specified device subset                    |
 
-### `AbstractAgentContext` API (Agent-level) ✨
+### `AbstractDevicePlugin` API (Agent-level) ✨
 
-Each agent instance creates its own `AbstractAgentContext` with a device mask (allow list). This context provides agent-scoped operations that only see and manage the partitioned devices.
+Each agent instance creates its own `AbstractDevicePlugin` with a device mask (allow list). This context provides agent-scoped operations that only see and manage the partitioned devices.
 
 | Function                                                    | Role                                                                                                |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -99,6 +176,18 @@ Each agent instance creates its own `AbstractAgentContext` with a device mask (a
 | `alloc_to_devices(device_alloc)` ♻️                         | Extract the list of devices used in the given allocation, with their metadata                       |
 | `gather_workload_metrics(stat_ctx, workload_id)` ♻          | Collect metrics for a specific workload (container or process tree) managed by this agent           |
 | `gather_process_metrics(stat_ctx, pid)` ♻                   | Collect metrics for a specific process within a workload                                            |
+
+#### Struct ✨
+
+| Attribute       | Content                                                                              |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `host_plugin`   | Reference to the parent `AbstractDeviceHostPlugin` instance                             |
+| `device_mask`   | Frozen set of `DeviceId` values that this agent is allowed to access                 |
+| `agent_id`      | The unique identifier of the agent instance                                          |
+| `devices`       | Cached list of `AbstractDevice` filtered by `device_mask`                     |
+| `alloc_map`     | The `AbstractAllocMap` instance scoped to this agent's devices                       |
+
+The `AbstractDevicePlugin` acts as a facade that provides an agent-scoped view of the compute plugin. It ensures that all operations respect the device partitioning configured for the agent.
 
 Here the "workload" means either a container or a (native) process tree, depending on the agent backend implementation.
 
@@ -112,27 +201,15 @@ The `device_mask` is a set of `DeviceId` values that defines which devices an ag
     - `AUTO_SPLIT`: Devices are automatically divided among agents (e.g., 8 GPUs / 2 agents = 4 GPUs each)
     - `MANUAL`: Explicit device assignment per agent via configuration
 
-When `AbstractAgentContext` is created with a `device_mask`:
+When `AbstractDevicePlugin` is created with a `device_mask`:
 1. `list_devices()` returns only devices in the mask
 2. `available_slots()` reflects only the capacity of masked devices
 3. `create_alloc_map()` creates an allocation map that enforces the mask
 4. Allocation requests for devices outside the mask are rejected
 
-### `AbstractComputeDevice` Struct
+### `AbstractDevice` Struct (formerly `AbstractComputeDevice`)
 
 See [BEP-1000](https://github.com/lablup/beps/blob/main/proposals/BEP-1000-redefining-accelerator-metadata.md) for the new proposal.
-
-### `AbstractAgentContext` Struct ✨
-
-| Attribute       | Content                                                                              |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `plugin`        | Reference to the parent `AbstractComputePlugin` instance                             |
-| `device_mask`   | Frozen set of `DeviceId` values that this agent is allowed to access                 |
-| `agent_id`      | The unique identifier of the agent instance                                          |
-| `devices`       | Cached list of `AbstractComputeDevice` filtered by `device_mask`                     |
-| `alloc_map`     | The `AbstractAllocMap` instance scoped to this agent's devices                       |
-
-The `AbstractAgentContext` acts as a facade that provides an agent-scoped view of the compute plugin. It ensures that all operations respect the device partitioning configured for the agent.
 
 ### `AbstractLifecycleHook` API ✨
 
@@ -178,7 +255,7 @@ All fields are optional.
 
 #### Multi-Agent Specific Discussions ✨
 
-* **Device Mask Immutability**: Should `device_mask` be immutable after `AbstractAgentContext` creation, or should it support dynamic reconfiguration?
+* **Device Mask Immutability**: Should `device_mask` be immutable after `AbstractDevicePlugin` creation, or should it support dynamic reconfiguration?
     - Immutable: Simpler implementation, but requires agent restart for repartitioning
     - Mutable: More flexible, but adds complexity for handling in-flight workloads during reconfiguration
 
@@ -196,6 +273,6 @@ All fields are optional.
     - Option B: Node-level metrics are computed as aggregation of agent-level metrics
     - Need to consider overhead and accuracy tradeoffs
 
-* **Agent Context Lifecycle**: When an agent instance terminates (gracefully or due to crash), how should the `AbstractAgentContext` handle cleanup?
-    - Should there be a `close()` or `cleanup()` method on `AbstractAgentContext`?
+* **Agent Context Lifecycle**: When an agent instance terminates (gracefully or due to crash), how should the `AbstractDevicePlugin` handle cleanup?
+    - Should there be a `close()` or `cleanup()` method on `AbstractDevicePlugin`?
     - How to handle orphaned workloads when an agent crashes?
