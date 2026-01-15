@@ -7,7 +7,7 @@ from typing import Optional, Self, TypeVar, override
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -328,21 +328,12 @@ class Role(Node):
 # ==============================================================================
 
 
-@strawberry.type(description="Edge type for role connections")
-class RoleEdge:
-    node: Role
-    cursor: str
+RoleEdge = Edge[Role]
 
 
-@strawberry.type(description="Connection for paginated role results")
-class RoleConnection:
-    page_info: strawberry.relay.PageInfo
-    edges: list[RoleEdge]
+class RoleConnection(Connection[Role]):
     count: int
 
-    def __init__(
-        self, *, edges: list[RoleEdge], page_info: strawberry.relay.PageInfo, count: int
-    ) -> None:
-        self.edges = edges
-        self.page_info = page_info
+    def __init__(self, *args, count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.count = count
