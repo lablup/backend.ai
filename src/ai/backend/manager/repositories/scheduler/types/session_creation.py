@@ -121,10 +121,14 @@ class SessionCreationSpec:
         mount_spec = target_revision.mounts.to_mount_spec()
 
         # Prepare environment variables
-        environ = target_revision.execution.environ or {}
-        if "BACKEND_MODEL_NAME" not in environ:
+        environ_dict: dict[str, str] = (
+            {entry.name: entry.value for entry in target_revision.execution.environ}
+            if target_revision.execution.environ
+            else {}
+        )
+        if "BACKEND_MODEL_NAME" not in environ_dict:
             # Add model name to environment if not already present
-            environ["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
+            environ_dict["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
 
         # Create kernel specs for cluster
         DEFAULT_ROLE = "main"
@@ -140,7 +144,7 @@ class SessionCreationSpec:
                     "mounts": mount_spec.mounts,
                     "mount_map": mount_spec.mount_map,
                     "mount_options": mount_spec.mount_options,
-                    "environ": environ,
+                    "environ": environ_dict,
                     "resources": target_revision.resource_spec.resource_slots,
                     "resource_opts": target_revision.resource_spec.resource_opts,
                 },
@@ -174,7 +178,7 @@ class SessionCreationSpec:
                 "mount_options": mount_spec.mount_options,
                 "model_definition_path": target_revision.mounts.model_definition_path,
                 "runtime_variant": target_revision.execution.runtime_variant,
-                "environ": environ,
+                "environ": environ_dict,
                 "scaling_group": deployment_info.metadata.resource_group,
                 "resources": target_revision.resource_spec.resource_slots,
                 "resource_opts": target_revision.resource_spec.resource_opts,

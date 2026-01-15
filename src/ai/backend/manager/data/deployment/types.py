@@ -262,10 +262,17 @@ class ResourceSpec(ConfiguredModel):
     resource_opts: Optional[Mapping[str, Any]] = None
 
 
+class EnvironmentVariableEntryData(ConfiguredModel):
+    """A single environment variable with name and value."""
+
+    name: str
+    value: str
+
+
 class ExecutionSpec(ConfiguredModel):
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
-    environ: Optional[dict[str, str]] = None
+    environ: Optional[list[EnvironmentVariableEntryData]] = None
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     callback_url: Optional[yarl.URL] = None
     inference_runtime_config: Optional[Mapping[str, Any]] = None
@@ -436,7 +443,7 @@ class ResourceConfigData:
 class ModelRuntimeConfigData:
     runtime_variant: RuntimeVariant
     inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[dict[str, Any]] = None
+    environ: Optional[list[EnvironmentVariableEntryData]] = None
 
 
 @dataclass

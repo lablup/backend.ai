@@ -41,6 +41,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    EnvironmentVariableEntryData,
     ExecutionSpec,
     ImageIdentifierDraft,
     ModelRevisionSpecDraft,
@@ -591,7 +592,12 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
             execution=ExecutionSpec(
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
-                environ=self.config.environ,
+                environ=[
+                    EnvironmentVariableEntryData(name=k, value=v)
+                    for k, v in self.config.environ.items()
+                ]
+                if self.config.environ
+                else None,
                 runtime_variant=self.runtime_variant,
                 callback_url=yarl.URL(str(self.callback_url)) if self.callback_url else None,
             ),

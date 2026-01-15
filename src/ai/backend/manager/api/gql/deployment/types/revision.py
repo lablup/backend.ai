@@ -32,6 +32,7 @@ from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    EnvironmentVariableEntryData,
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
@@ -63,6 +64,31 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
 class ClusterMode(StrEnum):
     SINGLE_NODE = "SINGLE_NODE"
     MULTI_NODE = "MULTI_NODE"
+
+
+@strawberry.type(
+    name="EnvironmentVariableEntry",
+    description="Added in 26.1.0. A single environment variable with name and value.",
+)
+class EnvironmentVariableEntryGQL:
+    """Single environment variable entry."""
+
+    name: str = strawberry.field(
+        description="Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."
+    )
+    value: str = strawberry.field(description="Environment variable value.")
+
+
+@strawberry.type(
+    name="EnvironmentVariables",
+    description="Added in 26.1.0. A collection of environment variables for a service or container.",
+)
+class EnvironmentVariablesGQL:
+    """Collection of environment variables."""
+
+    entries: list[EnvironmentVariableEntryGQL] = strawberry.field(
+        description="List of environment variable entries."
+    )
 
 
 @strawberry.type
@@ -117,17 +143,25 @@ class ModelRuntimeConfig:
         description="Framework-specific configuration in JSON format.",
         default=None,
     )
-    environ: Optional[JSON] = strawberry.field(
-        description='Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.',
+    environ: Optional[EnvironmentVariablesGQL] = strawberry.field(
+        description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
     )
 
     @classmethod
     def from_dataclass(cls, data: ModelRuntimeConfigData) -> ModelRuntimeConfig:
+        environ_gql: EnvironmentVariablesGQL | None = None
+        if data.environ is not None:
+            environ_gql = EnvironmentVariablesGQL(
+                entries=[
+                    EnvironmentVariableEntryGQL(name=entry.name, value=entry.value)
+                    for entry in data.environ
+                ]
+            )
         return cls(
             runtime_variant=data.runtime_variant,
             inference_runtime_config=data.inference_runtime_config,
-            environ=data.environ,
+            environ=environ_gql,
         )
 
 
@@ -375,14 +409,53 @@ class ImageInput:
     id: ID
 
 
+@strawberry.input(
+    name="EnvironmentVariableEntryInput",
+    description="Added in 26.1.0. Input for a single environment variable.",
+)
+class EnvironmentVariableEntryInputGQL:
+    """Input for a single environment variable."""
+
+    name: str = strawberry.field(
+        description="Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."
+    )
+    value: str = strawberry.field(description="Environment variable value.")
+
+    def to_dataclass(self) -> EnvironmentVariableEntryData:
+        """Convert to EnvironmentVariableEntryData for internal use."""
+        return EnvironmentVariableEntryData(name=self.name, value=self.value)
+
+
+@strawberry.input(
+    name="EnvironmentVariablesInput",
+    description="Added in 26.1.0. Input for a collection of environment variables.",
+)
+class EnvironmentVariablesInputGQL:
+    """Input for collection of environment variables."""
+
+    entries: list[EnvironmentVariableEntryInputGQL] = strawberry.field(
+        description="List of environment variable entries."
+    )
+
+    def to_dataclass(self) -> list[EnvironmentVariableEntryData]:
+        """Convert to list of EnvironmentVariableEntryData for internal use."""
+        return [entry.to_dataclass() for entry in self.entries]
+
+
 @strawberry.input(description="Added in 25.19.0")
 class ModelRuntimeConfigInput:
     runtime_variant: str
     inference_runtime_config: Optional[JSON] = None
-    environ: Optional[JSON] = strawberry.field(
-        description='Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}',
+    environ: Optional[EnvironmentVariablesInputGQL] = strawberry.field(
+        description="Environment variables for the service.",
         default=None,
     )
+
+    def to_environ_entries(self) -> list[EnvironmentVariableEntryData] | None:
+        """Convert environ input to list of EnvironmentVariableEntryData for internal use."""
+        if self.environ is None:
+            return None
+        return self.environ.to_dataclass()
 
 
 @strawberry.input(description="Added in 25.19.0")
@@ -440,7 +513,7 @@ class CreateRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=cast(Optional[dict[str, str]], self.model_runtime_config.environ),
+            environ=self.model_runtime_config.to_environ_entries(),
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
             inference_runtime_config=cast(
                 Optional[dict[str, Any]], self.model_runtime_config.inference_runtime_config
@@ -497,7 +570,7 @@ class AddRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=cast(Optional[dict[str, str]], self.model_runtime_config.environ),
+            environ=self.model_runtime_config.to_environ_entries(),
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
             inference_runtime_config=cast(
                 Optional[dict[str, Any]], self.model_runtime_config.inference_runtime_config
