@@ -6,7 +6,7 @@ from typing import Optional, Self
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.data.permission.id import ScopeId as ScopeIdData
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -77,41 +77,23 @@ class ObjectPermission(Node):
 # ==============================================================================
 
 
-@strawberry.type(description="Edge type for scoped permission connections")
-class ScopedPermissionEdge:
-    node: ScopedPermission
-    cursor: str
+ScopedPermissionEdge = Edge[ScopedPermission]
 
 
-@strawberry.type(description="Connection for paginated scoped permission results")
-class ScopedPermissionConnection:
-    page_info: strawberry.relay.PageInfo
-    edges: list[ScopedPermissionEdge]
+class ScopedPermissionConnection(Connection[ScopedPermission]):
     count: int
 
-    def __init__(
-        self, *, edges: list[ScopedPermissionEdge], page_info: strawberry.relay.PageInfo, count: int
-    ) -> None:
-        self.edges = edges
-        self.page_info = page_info
+    def __init__(self, *args, count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.count = count
 
 
-@strawberry.type(description="Edge type for object permission connections")
-class ObjectPermissionEdge:
-    node: ObjectPermission
-    cursor: str
+ObjectPermissionEdge = Edge[ObjectPermission]
 
 
-@strawberry.type(description="Connection for paginated object permission results")
-class ObjectPermissionConnection:
-    page_info: strawberry.relay.PageInfo
-    edges: list[ObjectPermissionEdge]
+class ObjectPermissionConnection(Connection[ObjectPermission]):
     count: int
 
-    def __init__(
-        self, *, edges: list[ObjectPermissionEdge], page_info: strawberry.relay.PageInfo, count: int
-    ) -> None:
-        self.edges = edges
-        self.page_info = page_info
+    def __init__(self, *args, count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.count = count
