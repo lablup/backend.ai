@@ -153,8 +153,8 @@ class ModelRuntimeConfig:
         if data.environ is not None:
             environ_gql = EnvironmentVariablesGQL(
                 entries=[
-                    EnvironmentVariableEntryGQL(name=entry.name, value=entry.value)
-                    for entry in data.environ
+                    EnvironmentVariableEntryGQL(name=key, value=value)
+                    for key, value in data.environ.items()
                 ]
             )
         return cls(
