@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.permission.types import FieldType
 from ai.backend.manager.data.permission.id import FieldRef, ObjectId
 from ai.backend.manager.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError

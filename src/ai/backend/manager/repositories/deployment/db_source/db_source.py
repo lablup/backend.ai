@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -118,6 +118,10 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.field_creator import (
+    RBACFieldCreator,
+    execute_rbac_field_creator,
+)
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
     Updater,
@@ -127,6 +131,7 @@ from ai.backend.manager.repositories.base.updater import (
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
+    DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,
@@ -1932,8 +1937,16 @@ class DeploymentDBSource:
         This requires adding a `revision_history_limit` column to EndpointRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
+            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
+
+            rbac_creator: RBACFieldCreator[DeploymentRevisionRow] = RBACFieldCreator(
+                spec=spec,
+                entity_type=EntityType.MODEL_DEPLOYMENT,
+                entity_id=str(spec.endpoint_id),
+                field_type=FieldType.MODEL_REVISION,
+            )
+            rbac_result = await execute_rbac_field_creator(db_sess, rbac_creator)
+            return rbac_result.row.to_data()
 
     async def get_revision(
         self,
