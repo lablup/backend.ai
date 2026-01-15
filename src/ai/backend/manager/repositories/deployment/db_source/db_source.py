@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -103,11 +104,19 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    CreatorSpec,
+    execute_bulk_creator,
+)
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
     execute_purger,
+)
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -138,6 +147,19 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
+
+
+class _LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
+    """Wrapper CreatorSpec for legacy endpoint creation.
+
+    Wraps a pre-built EndpointRow for use with RBACEntityCreator.
+    """
+
+    def __init__(self, *, _row: EndpointRow) -> None:
+        self._row = _row
+
+    def build_row(self) -> EndpointRow:
+        return self._row
 
 
 class DeploymentDBSource:
@@ -225,9 +247,16 @@ class DeploymentDBSource:
         spec = cast(DeploymentCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
-            endpoint = spec.build_row()
-            db_sess.add(endpoint)
-            await db_sess.flush()
+
+            # Create endpoint with RBAC scope association
+            rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
+                spec=spec,
+                scope_type=ScopeType.USER,
+                scope_id=str(spec.metadata.created_user_id),
+                entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
+            rbac_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+            endpoint = rbac_result.row
 
             # Create deployment policy if provided
             if policy_config is not None:
@@ -267,8 +296,16 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, creator.domain, creator.project)
             endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
-            db_sess.add(endpoint)
-            await db_sess.flush()
+
+            # Create endpoint with RBAC scope association
+            rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
+                spec=_LegacyEndpointCreatorSpec(_row=endpoint),
+                scope_type=ScopeType.USER,
+                scope_id=str(creator.metadata.created_user),
+                entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
+            rbac_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+            endpoint = rbac_result.row
 
             # Create deployment policy if provided
             if creator.policy is not None:
