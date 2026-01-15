@@ -37,6 +37,38 @@ class HistoryRecord(Protocol):
     created_at: str
 
 
+def _format_local_time(utc_timestamp: str | None) -> str:
+    """Convert UTC timestamp to local time string.
+
+    Args:
+        utc_timestamp: UTC timestamp string in ISO format
+
+    Returns:
+        Formatted local time string (YYYY-MM-DD HH:MM:SS)
+    """
+    if not utc_timestamp:
+        return ""
+    try:
+        from datetime import UTC, datetime
+
+        # Handle ISO format with or without timezone
+        ts_str = utc_timestamp
+        if ts_str.endswith("Z"):
+            ts_str = ts_str[:-1] + "+00:00"
+        dt = datetime.fromisoformat(ts_str)
+
+        # If naive datetime, assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+
+        # Convert to local time
+        local_dt = dt.astimezone()
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        # Fallback to string slice if parsing fails
+        return utc_timestamp[:19]
+
+
 def _render_sub_steps(sub_steps: list[Any], prefix: str, *, verbose: bool = False) -> None:
     """Render sub_steps with tree structure."""
     for k, step in enumerate(sub_steps):
@@ -119,8 +151,8 @@ def _render_flat_view(
         if h.from_status or h.to_status:
             status_str = f" ({h.from_status or '?'} → {h.to_status or '?'})"
 
-        # Format timestamp
-        created = str(h.created_at)[:19] if h.created_at else ""
+        # Format timestamp (convert UTC to local time)
+        created = _format_local_time(str(h.created_at) if h.created_at else None)
 
         print(
             f"{main_prefix} {result_indicator} {entity_label} | {phase_str}{status_str} @ {created}"
@@ -208,8 +240,8 @@ def _render_grouped_view(
             if h.from_status or h.to_status:
                 status_str = f" ({h.from_status or '?'} → {h.to_status or '?'})"
 
-            # Format timestamp
-            created = str(h.created_at)[:19] if h.created_at else ""
+            # Format timestamp (convert UTC to local time)
+            created = _format_local_time(str(h.created_at) if h.created_at else None)
 
             print(f"{history_prefix} {result_indicator} {phase_str}{status_str} @ {created}")
 
