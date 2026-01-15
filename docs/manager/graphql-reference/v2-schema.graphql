@@ -1357,8 +1357,12 @@ type DeploymentHistoryEdge {
 input DeploymentHistoryFilter {
   id: UUIDFilter = null
   deploymentId: UUIDFilter = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
   result: [SchedulingResult!] = null
   errorCode: StringFilter = null
+  message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
 }
@@ -3363,8 +3367,12 @@ input RouteHistoryFilter {
   id: UUIDFilter = null
   routeId: UUIDFilter = null
   deploymentId: UUIDFilter = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
   result: [SchedulingResult!] = null
   errorCode: StringFilter = null
+  message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
 }
@@ -3792,8 +3800,12 @@ type SessionSchedulingHistoryEdge {
 input SessionSchedulingHistoryFilter {
   id: UUIDFilter = null
   sessionId: UUIDFilter = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
   result: [SchedulingResult!] = null
   errorCode: StringFilter = null
+  message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
 }

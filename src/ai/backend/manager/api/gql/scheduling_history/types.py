@@ -250,8 +250,12 @@ class RouteHistory(Node):
 class SessionSchedulingHistoryFilter(GQLFilter):
     id: Optional[UUIDFilter] = None
     session_id: Optional[UUIDFilter] = None
+    phase: Optional[StringFilter] = None
+    from_status: Optional[list[str]] = None
+    to_status: Optional[list[str]] = None
     result: Optional[list[SchedulingResultGQL]] = None
     error_code: Optional[StringFilter] = None
+    message: Optional[StringFilter] = None
     created_at: Optional[DateTimeFilter] = None
     updated_at: Optional[DateTimeFilter] = None
 
@@ -276,6 +280,22 @@ class SessionSchedulingHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        if self.phase is not None:
+            condition = self.phase.build_query_condition(
+                contains_factory=SessionSchedulingHistoryConditions.by_phase_contains,
+                equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
+                starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
+                ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.from_status is not None and len(self.from_status) > 0:
+            conditions.append(SessionSchedulingHistoryConditions.by_from_statuses(self.from_status))
+
+        if self.to_status is not None and len(self.to_status) > 0:
+            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(self.to_status))
+
         if self.result is not None and len(self.result) > 0:
             conditions.append(
                 SessionSchedulingHistoryConditions.by_results([
@@ -289,6 +309,16 @@ class SessionSchedulingHistoryFilter(GQLFilter):
                 equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.message is not None:
+            condition = self.message.build_query_condition(
+                contains_factory=SessionSchedulingHistoryConditions.by_message_contains,
+                equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
+                starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
+                ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
             )
             if condition:
                 conditions.append(condition)
@@ -334,8 +364,12 @@ class SessionSchedulingHistoryOrderBy(GQLOrderBy):
 class DeploymentHistoryFilter(GQLFilter):
     id: Optional[UUIDFilter] = None
     deployment_id: Optional[UUIDFilter] = None
+    phase: Optional[StringFilter] = None
+    from_status: Optional[list[str]] = None
+    to_status: Optional[list[str]] = None
     result: Optional[list[SchedulingResultGQL]] = None
     error_code: Optional[StringFilter] = None
+    message: Optional[StringFilter] = None
     created_at: Optional[DateTimeFilter] = None
     updated_at: Optional[DateTimeFilter] = None
 
@@ -360,6 +394,22 @@ class DeploymentHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        if self.phase is not None:
+            condition = self.phase.build_query_condition(
+                contains_factory=DeploymentHistoryConditions.by_phase_contains,
+                equals_factory=DeploymentHistoryConditions.by_phase_equals,
+                starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
+                ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.from_status is not None and len(self.from_status) > 0:
+            conditions.append(DeploymentHistoryConditions.by_from_statuses(self.from_status))
+
+        if self.to_status is not None and len(self.to_status) > 0:
+            conditions.append(DeploymentHistoryConditions.by_to_statuses(self.to_status))
+
         if self.result is not None and len(self.result) > 0:
             conditions.append(
                 DeploymentHistoryConditions.by_results([r.to_internal() for r in self.result])
@@ -371,6 +421,16 @@ class DeploymentHistoryFilter(GQLFilter):
                 equals_factory=DeploymentHistoryConditions.by_error_code_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.message is not None:
+            condition = self.message.build_query_condition(
+                contains_factory=DeploymentHistoryConditions.by_message_contains,
+                equals_factory=DeploymentHistoryConditions.by_message_equals,
+                starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
+                ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
             )
             if condition:
                 conditions.append(condition)
@@ -417,8 +477,12 @@ class RouteHistoryFilter(GQLFilter):
     id: Optional[UUIDFilter] = None
     route_id: Optional[UUIDFilter] = None
     deployment_id: Optional[UUIDFilter] = None
+    phase: Optional[StringFilter] = None
+    from_status: Optional[list[str]] = None
+    to_status: Optional[list[str]] = None
     result: Optional[list[SchedulingResultGQL]] = None
     error_code: Optional[StringFilter] = None
+    message: Optional[StringFilter] = None
     created_at: Optional[DateTimeFilter] = None
     updated_at: Optional[DateTimeFilter] = None
 
@@ -451,6 +515,22 @@ class RouteHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        if self.phase is not None:
+            condition = self.phase.build_query_condition(
+                contains_factory=RouteHistoryConditions.by_phase_contains,
+                equals_factory=RouteHistoryConditions.by_phase_equals,
+                starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
+                ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.from_status is not None and len(self.from_status) > 0:
+            conditions.append(RouteHistoryConditions.by_from_statuses(self.from_status))
+
+        if self.to_status is not None and len(self.to_status) > 0:
+            conditions.append(RouteHistoryConditions.by_to_statuses(self.to_status))
+
         if self.result is not None and len(self.result) > 0:
             conditions.append(
                 RouteHistoryConditions.by_results([r.to_internal() for r in self.result])
@@ -462,6 +542,16 @@ class RouteHistoryFilter(GQLFilter):
                 equals_factory=RouteHistoryConditions.by_error_code_equals,
                 starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.message is not None:
+            condition = self.message.build_query_condition(
+                contains_factory=RouteHistoryConditions.by_message_contains,
+                equals_factory=RouteHistoryConditions.by_message_equals,
+                starts_with_factory=RouteHistoryConditions.by_message_starts_with,
+                ends_with_factory=RouteHistoryConditions.by_message_ends_with,
             )
             if condition:
                 conditions.append(condition)

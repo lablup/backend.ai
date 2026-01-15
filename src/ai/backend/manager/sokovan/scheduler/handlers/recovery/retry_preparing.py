@@ -6,13 +6,11 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
-from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
@@ -112,13 +110,10 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Launcher's handler-specific method
-        with RecorderContext[SessionId].shared_phase(
-            "prepare_images",
-            success_detail="Image pull retried",
-        ):
-            retry_result = await self._launcher.retry_preparing_for_handler(
-                sessions_for_pull, image_configs
-            )
+        # Note: RecorderContext is handled inside Launcher
+        retry_result = await self._launcher.retry_preparing_for_handler(
+            sessions_for_pull, image_configs
+        )
 
         # Sessions that were retried are successes
         session_map = {s.session_info.identity.id: s for s in sessions}

@@ -73,9 +73,23 @@ class SessionSchedulingHistoryConditions:
         return inner
 
     @staticmethod
+    def by_from_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.from_status.in_(statuses)
+
+        return inner
+
+    @staticmethod
     def by_to_status(status: SessionStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionSchedulingHistoryRow.to_status == str(status)
+
+        return inner
+
+    @staticmethod
+    def by_to_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.to_status.in_(statuses)
 
         return inner
 
@@ -153,6 +167,122 @@ class SessionSchedulingHistoryConditions:
     def by_error_code_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             col = cast(sa.ColumnElement[str | None], SessionSchedulingHistoryRow.error_code)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    # String filter conditions for phase
+    @staticmethod
+    def by_phase_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], SessionSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], SessionSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_phase_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], SessionSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], SessionSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    # String filter conditions for message
+    @staticmethod
+    def by_message_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], SessionSchedulingHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], SessionSchedulingHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_message_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], SessionSchedulingHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], SessionSchedulingHistoryRow.message)
             if spec.case_insensitive:
                 col = sa.func.lower(col)
                 pattern = f"%{spec.value.lower()}"
@@ -478,6 +608,137 @@ class DeploymentHistoryConditions:
 
         return inner
 
+    # Status list filter conditions
+    @staticmethod
+    def by_from_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.from_status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_to_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.to_status.in_(statuses)
+
+        return inner
+
+    # String filter conditions for phase
+    @staticmethod
+    def by_phase_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], DeploymentHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], DeploymentHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_phase_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], DeploymentHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], DeploymentHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    # String filter conditions for message
+    @staticmethod
+    def by_message_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], DeploymentHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], DeploymentHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_message_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], DeploymentHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], DeploymentHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor)."""
@@ -728,6 +989,137 @@ class RouteHistoryConditions:
     def by_error_code_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             col = cast(sa.ColumnElement[str | None], RouteHistoryRow.error_code)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    # Status list filter conditions
+    @staticmethod
+    def by_from_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.from_status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_to_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.to_status.in_(statuses)
+
+        return inner
+
+    # String filter conditions for phase
+    @staticmethod
+    def by_phase_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], RouteHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], RouteHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_phase_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], RouteHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], RouteHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    # String filter conditions for message
+    @staticmethod
+    def by_message_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], RouteHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], RouteHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_message_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], RouteHistoryRow.message)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_message_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str | None], RouteHistoryRow.message)
             if spec.case_insensitive:
                 col = sa.func.lower(col)
                 pattern = f"%{spec.value.lower()}"

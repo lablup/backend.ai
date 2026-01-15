@@ -103,7 +103,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
@@ -560,7 +560,8 @@ class DeploymentDBSource:
         """Update lifecycle status and record history in same transaction.
 
         All batch updates and history creations are executed atomically
-        in a single transaction.
+        in a single transaction. Uses merge logic to prevent duplicate
+        history records when phase, error_code, and to_status match.
 
         Args:
             batch_updaters: Sequence of BatchUpdaters for status updates
@@ -579,10 +580,65 @@ class DeploymentDBSource:
                 update_result = await execute_batch_updater(db_sess, batch_updater)
                 total_updated += update_result.updated_count
 
-            # 2. Record all histories (same transaction)
-            await execute_bulk_creator(db_sess, bulk_creator)
+            if not bulk_creator.specs:
+                return total_updated
+
+            # 2. Build rows from specs
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            deployment_ids = [row.deployment_id for row in new_rows]
+
+            # 3. Get last history records for all deployments
+            last_records = await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[uuid.UUID] = []
+            create_rows: list[DeploymentHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(new_row.deployment_id)
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(DeploymentHistoryRow)
+                    .where(DeploymentHistoryRow.id.in_(merge_ids))
+                    .values(attempts=DeploymentHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
 
             return total_updated
+
+    async def _get_last_deployment_histories_bulk(
+        self,
+        db_sess: SASession,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments efficiently."""
+        if not deployment_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per deployment
+        query = (
+            sa.select(DeploymentHistoryRow)
+            .where(DeploymentHistoryRow.deployment_id.in_(deployment_ids))
+            .distinct(DeploymentHistoryRow.deployment_id)
+            .order_by(
+                DeploymentHistoryRow.deployment_id,
+                DeploymentHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {row.deployment_id: row for row in rows}
 
     async def delete_endpoint_with_routes(
         self,
@@ -1383,7 +1439,8 @@ class DeploymentDBSource:
         """Update route status and record history in same transaction.
 
         All batch updates and history creations are executed atomically
-        in a single transaction.
+        in a single transaction. Uses merge logic to prevent duplicate
+        history records when phase, error_code, and to_status match.
 
         Args:
             batch_updaters: Sequence of BatchUpdaters for status updates
@@ -1402,10 +1459,65 @@ class DeploymentDBSource:
                 update_result = await execute_batch_updater(db_sess, batch_updater)
                 total_updated += update_result.updated_count
 
-            # 2. Record all histories (same transaction)
-            await execute_bulk_creator(db_sess, bulk_creator)
+            if not bulk_creator.specs:
+                return total_updated
+
+            # 2. Build rows from specs
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            route_ids = [row.route_id for row in new_rows]
+
+            # 3. Get last history records for all routes
+            last_records = await self._get_last_route_histories_bulk(db_sess, route_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[uuid.UUID] = []
+            create_rows: list[RouteHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(new_row.route_id)
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(RouteHistoryRow)
+                    .where(RouteHistoryRow.id.in_(merge_ids))
+                    .values(attempts=RouteHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
 
             return total_updated
+
+    async def _get_last_route_histories_bulk(
+        self,
+        db_sess: SASession,
+        route_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, RouteHistoryRow]:
+        """Get last history records for multiple routes efficiently."""
+        if not route_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per route
+        query = (
+            sa.select(RouteHistoryRow)
+            .where(RouteHistoryRow.route_id.in_(route_ids))
+            .distinct(RouteHistoryRow.route_id)
+            .order_by(
+                RouteHistoryRow.route_id,
+                RouteHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {row.route_id: row for row in rows}
 
     async def mark_terminating_route_status_bulk(
         self,

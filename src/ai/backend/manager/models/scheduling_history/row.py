@@ -75,13 +75,18 @@ class SessionSchedulingHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: SessionSchedulingHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> SessionSchedulingHistoryData:
         return SessionSchedulingHistoryData(
@@ -136,13 +141,18 @@ class KernelSchedulingHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: KernelSchedulingHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> KernelSchedulingHistoryData:
         return KernelSchedulingHistoryData(
@@ -205,13 +215,18 @@ class DeploymentHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: DeploymentHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> DeploymentHistoryData:
         return DeploymentHistoryData(
@@ -275,13 +290,18 @@ class RouteHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: RouteHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> RouteHistoryData:
         return RouteHistoryData(
