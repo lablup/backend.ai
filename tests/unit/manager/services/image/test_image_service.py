@@ -57,12 +57,8 @@ from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
-RESOURCE_LIMITS: dict[SlotName, dict[str, str | None]] = {
-    SlotName("cuda.device"): {"min": "1", "max": None}
-}
 
-
-class ImageServiceTestBase:
+class ImageServiceBaseFixtures:
     """Base class containing shared fixtures for image service tests."""
 
     @pytest.fixture
@@ -138,7 +134,9 @@ class ImageServiceTestBase:
             is_local=False,
             type=ImageType.COMPUTE,
             labels=ImageLabelsData(label_data={}),
-            resources=ImageResourcesData(resources_data=RESOURCE_LIMITS),
+            resources=ImageResourcesData(
+                resources_data={SlotName("cuda.device"): {"min": "1", "max": None}}
+            ),
             status=ImageStatus.ALIVE,
             created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC),
         )
@@ -157,7 +155,7 @@ class ImageServiceTestBase:
         )
 
 
-class TestAliasImage(ImageServiceTestBase):
+class TestAliasImage(ImageServiceBaseFixtures):
     """Tests for ImageService.alias_image"""
 
     async def test_alias_image_success(
@@ -205,7 +203,7 @@ class TestAliasImage(ImageServiceTestBase):
             await processors.alias_image.wait_for_complete(action)
 
 
-class TestDealiasImage(ImageServiceTestBase):
+class TestDealiasImage(ImageServiceBaseFixtures):
     """Tests for ImageService.dealias_image"""
 
     async def test_dealias_image_success(
@@ -244,7 +242,7 @@ class TestDealiasImage(ImageServiceTestBase):
             await processors.dealias_image.wait_for_complete(action)
 
 
-class TestForgetImage(ImageServiceTestBase):
+class TestForgetImage(ImageServiceBaseFixtures):
     """Tests for ImageService.forget_image"""
 
     async def test_forget_image_as_superadmin_success(
@@ -334,7 +332,7 @@ class TestForgetImage(ImageServiceTestBase):
             await processors.forget_image.wait_for_complete(action)
 
 
-class TestForgetImageById(ImageServiceTestBase):
+class TestForgetImageById(ImageServiceBaseFixtures):
     """Tests for ImageService.forget_image_by_id"""
 
     async def test_forget_image_by_id_as_superadmin_success(
@@ -418,7 +416,7 @@ class TestForgetImageById(ImageServiceTestBase):
             await processors.forget_image_by_id.wait_for_complete(action)
 
 
-class TestModifyImage(ImageServiceTestBase):
+class TestModifyImage(ImageServiceBaseFixtures):
     """Tests for ImageService.modify_image"""
 
     async def test_modify_image_update_one_column(
@@ -535,7 +533,7 @@ class TestModifyImage(ImageServiceTestBase):
             await processors.modify_image.wait_for_complete(action)
 
 
-class TestPurgeImageById(ImageServiceTestBase):
+class TestPurgeImageById(ImageServiceBaseFixtures):
     """Tests for ImageService.purge_image_by_id"""
 
     async def test_purge_image_by_id_as_superadmin_success(
@@ -617,7 +615,7 @@ class TestPurgeImageById(ImageServiceTestBase):
             await processors.purge_image_by_id.wait_for_complete(action)
 
 
-class TestPurgeImages(ImageServiceTestBase):
+class TestPurgeImages(ImageServiceBaseFixtures):
     """Tests for ImageService.purge_images"""
 
     async def test_purge_images_success(
@@ -709,7 +707,7 @@ class TestPurgeImages(ImageServiceTestBase):
         assert "Container in use" in result.errors[0]
 
 
-class TestUntagImageFromRegistry(ImageServiceTestBase):
+class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
     """Tests for ImageService.untag_image_from_registry"""
 
     async def test_untag_image_as_superadmin_success(
@@ -791,7 +789,7 @@ class TestUntagImageFromRegistry(ImageServiceTestBase):
             await processors.untag_image_from_registry.wait_for_complete(action)
 
 
-class TestClearImageCustomResourceLimit(ImageServiceTestBase):
+class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
     """Tests for ImageService.clear_image_custom_resource_limit"""
 
     async def test_clear_image_custom_resource_limit_success(
