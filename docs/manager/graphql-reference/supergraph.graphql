@@ -2095,7 +2095,7 @@ input CreateNotificationChannelInput
   name: String!
   description: String = null
   channelType: NotificationChannelType! = WEBHOOK
-  config: WebhookConfigInput!
+  config: WebhookSpecInput!
   enabled: Boolean! = true
 }
 
@@ -5791,7 +5791,7 @@ type NotificationChannel implements Node
   name: String!
   description: String
   channelType: NotificationChannelType!
-  config: WebhookConfigGQL!
+  config: WebhookSpec!
   enabled: Boolean!
   createdAt: DateTime!
 }
@@ -8511,7 +8511,7 @@ input UpdateNotificationChannelInput
   id: ID!
   name: String
   description: String
-  config: WebhookConfigInput
+  config: WebhookSpecInput
   enabled: Boolean
 }
 
@@ -9419,14 +9419,15 @@ type VirtualFolderPermissionList implements PaginatedList
   total_count: Int!
 }
 
-type WebhookConfigGQL
+"""Specification for webhook notification channel"""
+type WebhookSpec
   @join__type(graph: STRAWBERRY)
 {
   url: String!
 }
 
 """Input for webhook configuration"""
-input WebhookConfigInput
+input WebhookSpecInput
   @join__type(graph: STRAWBERRY)
 {
   url: String!
