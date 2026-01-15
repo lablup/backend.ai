@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import abc
 import logging
-from dataclasses import dataclass
-from typing import TypedDict, override
+from typing import override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.container_registry.harbor import (
     AbstractPerProjectRegistryQuotaClient,
     PerProjectHarborQuotaClient,
+)
+from ai.backend.manager.data.container_registry.types import (
+    HarborAuthArgs,
+    HarborProjectInfo,
 )
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
@@ -19,23 +22,6 @@ from ai.backend.manager.service.container_registry.base import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class HarborProjectInfo:
-    url: str
-    project: str
-    ssl_verify: bool
-
-
-class HarborAuthArgs(TypedDict):
-    username: str
-    password: str
-
-
-class HarborProjectQuotaInfo(TypedDict):
-    previous_quota: int
-    quota_id: int
 
 
 class AbstractPerProjectContainerRegistryQuotaService(abc.ABC):
