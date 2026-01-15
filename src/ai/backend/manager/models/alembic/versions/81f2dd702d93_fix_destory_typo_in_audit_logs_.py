@@ -22,11 +22,6 @@ def upgrade() -> None:
             "UPDATE audit_logs SET operation = 'destroy' WHERE operation = 'destory'"
         )
     )
-    op.execute(
-        sa.text(
-            "UPDATE audit_logs SET operation = 'destroy_multi' WHERE operation = 'destory_multi'"
-        )
-    )
 
 
 def downgrade() -> None:
@@ -34,10 +29,5 @@ def downgrade() -> None:
     op.execute(
         sa.text(
             "UPDATE audit_logs SET operation = 'destory' WHERE operation = 'destroy'"
-        )
-    )
-    op.execute(
-        sa.text(
-            "UPDATE audit_logs SET operation = 'destory_multi' WHERE operation = 'destroy_multi'"
         )
     )
