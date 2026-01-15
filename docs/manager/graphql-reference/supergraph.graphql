@@ -2232,17 +2232,16 @@ type CreateRevisionPayload
   revision: ModelRevision!
 }
 
-"""Input for creating a role assignment"""
+"""Added in 26.1.0. Input for creating a role assignment"""
 input CreateRoleAssignmentInput
   @join__type(graph: STRAWBERRY)
 {
   userId: ID!
   roleId: ID!
-  scope: ScopeInput!
   expiresAt: DateTime = null
 }
 
-"""Input for creating a new custom role"""
+"""Added in 26.1.0. Input for creating a new custom role"""
 input CreateRoleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2686,6 +2685,21 @@ type DeleteResourcePreset
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 26.1.0. Input for deleting a role assignment"""
+input DeleteRoleAssignmentInput
+  @join__type(graph: STRAWBERRY)
+{
+  userId: ID!
+  roleId: ID!
+}
+
+"""Added in 26.1.0. Input for deleting a role"""
+input DeleteRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
 }
 
 type DeleteScalingGroup
@@ -3459,23 +3473,25 @@ type EndpointTokenList implements PaginatedList
   total_count: Int!
 }
 
-"""Entity types managed by the RBAC system"""
+"""Added in 26.1.0. Entity types managed by the RBAC system"""
 enum EntityType
   @join__type(graph: STRAWBERRY)
 {
-  COMPUTE_SESSION @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
   VFOLDER @join__enumValue(graph: STRAWBERRY)
   IMAGE @join__enumValue(graph: STRAWBERRY)
-  MODEL_SERVICE @join__enumValue(graph: STRAWBERRY)
-  MODEL_ARTIFACT @join__enumValue(graph: STRAWBERRY)
+  SESSION @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
+  MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
   AGENT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
   STORAGE_HOST @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
-  NOTIFICATION @join__enumValue(graph: STRAWBERRY)
-  DOMAIN @join__enumValue(graph: STRAWBERRY)
-  PROJECT @join__enumValue(graph: STRAWBERRY)
-  USER @join__enumValue(graph: STRAWBERRY)
   ROLE @join__enumValue(graph: STRAWBERRY)
   ROLE_ASSIGNMENT @join__enumValue(graph: STRAWBERRY)
 }
@@ -5788,23 +5804,23 @@ type Mutation
   """Added in 25.19.0. Update the traffic status of a route."""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload! @join__field(graph: STRAWBERRY)
 
-  """Create a new custom role"""
+  """Added in 26.1.0. Create a new custom role"""
   createRole(input: CreateRoleInput!): Role! @join__field(graph: STRAWBERRY)
 
-  """Update an existing role"""
+  """Added in 26.1.0. Update an existing role"""
   updateRole(input: UpdateRoleInput!): Role! @join__field(graph: STRAWBERRY)
 
-  """Delete a role (soft delete)"""
-  deleteRole(id: ID!): Role! @join__field(graph: STRAWBERRY)
+  """Added in 26.1.0. Delete a role (soft delete)"""
+  deleteRole(input: DeleteRoleInput!): Role! @join__field(graph: STRAWBERRY)
 
-  """Update role permissions"""
+  """Added in 26.1.0. Update role permissions"""
   updateRolePermissions(input: UpdateRolePermissionsInput!): Role! @join__field(graph: STRAWBERRY)
 
-  """Assign a role to a user"""
+  """Added in 26.1.0. Assign a role to a user"""
   createRoleAssignment(input: CreateRoleAssignmentInput!): Role! @join__field(graph: STRAWBERRY)
 
-  """Revoke a role assignment"""
-  deleteRoleAssignment(id: ID!): Role! @join__field(graph: STRAWBERRY)
+  """Added in 26.1.0. Revoke a role assignment"""
+  deleteRoleAssignment(input: DeleteRoleAssignmentInput!): Role! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -6011,7 +6027,9 @@ enum NotificationRuleType
   ARTIFACT_DOWNLOAD_COMPLETED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Object Permission: grants permission for a SPECIFIC entity instance"""
+"""
+Added in 26.1.0. Object Permission: grants permission for a SPECIFIC entity instance
+"""
 type ObjectPermission implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -6023,24 +6041,30 @@ type ObjectPermission implements Node
   operation: OperationType!
 }
 
-"""Connection for paginated object permission results"""
+"""Added in 26.1.0. Connection type for paginated object permissions"""
 type ObjectPermissionConnection
   @join__type(graph: STRAWBERRY)
 {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [ObjectPermissionEdge!]!
   count: Int!
 }
 
-"""Edge type for object permission connections"""
+"""An edge in a connection."""
 type ObjectPermissionEdge
   @join__type(graph: STRAWBERRY)
 {
-  node: ObjectPermission!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectPermission!
 }
 
-"""Input for object permissions"""
+"""Added in 26.1.0. Input for object permissions"""
 input ObjectPermissionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -6088,7 +6112,7 @@ type ObjectStorageEdge
   node: ObjectStorage!
 }
 
-"""Operations that can be performed on entities"""
+"""Added in 26.1.0. Operations that can be performed on entities"""
 enum OperationType
   @join__type(graph: STRAWBERRY)
 {
@@ -7099,10 +7123,10 @@ type Query
   """List route history (superadmin only)"""
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY)
 
-  """Get a specific role by ID"""
+  """Added in 26.1.0. Get a specific role by ID"""
   role(id: ID!): Role @join__field(graph: STRAWBERRY)
 
-  """List roles with optional filtering and pagination"""
+  """Added in 26.1.0. List roles with optional filtering and pagination"""
   roles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
 }
 
@@ -7431,7 +7455,9 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Role: defines a collection of permissions bound to a specific scope"""
+"""
+Added in 26.1.0. Role: defines a collection of permissions bound to specific scopes
+"""
 type Role implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -7440,38 +7466,40 @@ type Role implements Node
   id: ID!
   name: String!
   description: String
-  scope: Scope!
+  scopes: [Scope!]!
   source: RoleSource!
   createdAt: DateTime!
   updatedAt: DateTime
   deletedAt: DateTime
-  additionalScopes: [Scope!]!
 
-  """Scoped permissions for this role"""
-  scopedPermissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ScopedPermissionConnection!
-
-  """Object permissions for this role"""
+  """Added in 26.1.0. Object permissions for this role"""
   objectPermissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ObjectPermissionConnection!
 }
 
-"""Connection for paginated role results"""
+"""Added in 26.1.0. Connection type for paginated roles"""
 type RoleConnection
   @join__type(graph: STRAWBERRY)
 {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [RoleEdge!]!
   count: Int!
 }
 
-"""Edge type for role connections"""
+"""An edge in a connection."""
 type RoleEdge
   @join__type(graph: STRAWBERRY)
 {
-  node: Role!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: Role!
 }
 
-"""Filter options for role queries"""
+"""Added in 26.1.0. Filter options for role queries"""
 input RoleFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -7485,7 +7513,7 @@ input RoleFilter
   NOT: [RoleFilter!] = null
 }
 
-"""Ordering options for role queries"""
+"""Added in 26.1.0. Ordering options for role queries"""
 input RoleOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -7493,7 +7521,7 @@ input RoleOrderBy
   direction: OrderDirection! = ASC
 }
 
-"""Fields available for ordering role queries"""
+"""Added in 26.1.0. Fields available for ordering role queries"""
 enum RoleOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -7502,7 +7530,7 @@ enum RoleOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Role source indicating how the role was created"""
+"""Added in 26.1.0. Role source indicating how the role was created"""
 enum RoleSource
   @join__type(graph: STRAWBERRY)
 {
@@ -7510,7 +7538,7 @@ enum RoleSource
   CUSTOM @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Filter for role source"""
+"""Added in 26.1.0. Filter for role source"""
 input RoleSourceFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -8217,45 +8245,59 @@ enum SchedulingStatus
   ERROR @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Scope represents a level in the permission hierarchy"""
+"""Added in 26.1.0. Scope represents a level in the permission hierarchy"""
 type Scope
   @join__type(graph: STRAWBERRY)
 {
   type: ScopeType!
-  id: ID
+  id: ID!
+
+  """
+  Added in 26.1.0. True if this is a guest permission group (scope visibility only)
+  """
+  guest: Boolean!
+
+  """Added in 26.1.0. Permissions granted within this scope"""
+  permissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ScopedPermissionConnection!
 }
 
-"""Scoped Permission: grants permission for an operation on ALL entities"""
+"""
+Added in 26.1.0. Scoped Permission: grants permission for an operation on ALL entities
+"""
 type ScopedPermission implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: ScopeType!
-  scopeId: ID!
   entityType: EntityType!
   operation: OperationType!
 }
 
-"""Connection for paginated scoped permission results"""
+"""Added in 26.1.0. Connection type for paginated scoped permissions"""
 type ScopedPermissionConnection
   @join__type(graph: STRAWBERRY)
 {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [ScopedPermissionEdge!]!
   count: Int!
 }
 
-"""Edge type for scoped permission connections"""
+"""An edge in a connection."""
 type ScopedPermissionEdge
   @join__type(graph: STRAWBERRY)
 {
-  node: ScopedPermission!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScopedPermission!
 }
 
-"""Input for scoped permissions"""
+"""Added in 26.1.0. Input for scoped permissions"""
 input ScopedPermissionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -8271,7 +8313,7 @@ Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE
 scalar ScopeField
   @join__type(graph: GRAPHENE)
 
-"""Input for specifying a scope in mutations"""
+"""Added in 26.1.0. Input for specifying a scope in mutations"""
 input ScopeInput
   @join__type(graph: STRAWBERRY)
 {
@@ -8279,17 +8321,17 @@ input ScopeInput
   id: ID = null
 }
 
-"""Scope types in the permission hierarchy"""
+"""Added in 26.1.0. Scope types in the permission hierarchy"""
 enum ScopeType
   @join__type(graph: STRAWBERRY)
 {
-  GLOBAL @join__enumValue(graph: STRAWBERRY)
   DOMAIN @join__enumValue(graph: STRAWBERRY)
   PROJECT @join__enumValue(graph: STRAWBERRY)
   USER @join__enumValue(graph: STRAWBERRY)
+  GLOBAL @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Filter for scope type"""
+"""Added in 26.1.0. Filter for scope type"""
 input ScopeTypeFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -8881,7 +8923,7 @@ type UpdateReservoirRegistryPayload
   reservoir: ReservoirRegistry!
 }
 
-"""Input for updating an existing role"""
+"""Added in 26.1.0. Input for updating an existing role"""
 input UpdateRoleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -8890,7 +8932,7 @@ input UpdateRoleInput
   description: String = null
 }
 
-"""Input for updating role permissions"""
+"""Added in 26.1.0. Input for updating role permissions"""
 input UpdateRolePermissionsInput
   @join__type(graph: STRAWBERRY)
 {
