@@ -18,6 +18,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    EnvironmentVariableEntryData,
     ExtraVFolderMountData,
     ModelMountConfigData,
     ModelRevisionData,
@@ -196,7 +197,11 @@ class DeploymentRevisionRow(Base):
             ),
             model_runtime_config=ModelRuntimeConfigData(
                 runtime_variant=self.runtime_variant,
-                environ=self.environ,
+                environ=[
+                    EnvironmentVariableEntryData(name=k, value=v) for k, v in self.environ.items()
+                ]
+                if self.environ
+                else None,
             ),
             model_mount_config=ModelMountConfigData(
                 vfolder_id=self.model,

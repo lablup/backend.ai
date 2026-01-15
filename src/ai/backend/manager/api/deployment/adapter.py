@@ -57,6 +57,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    EnvironmentVariableEntryData,
     ExecutionSpec,
     ModelDeploymentData,
     ModelRevisionData,
@@ -460,7 +461,10 @@ class CreateDeploymentAdapter:
                 else None
             ),
             environ=(
-                dict(revision_input.model_runtime_config.environ)
+                [
+                    EnvironmentVariableEntryData(name=k, value=v)
+                    for k, v in dict(revision_input.model_runtime_config.environ).items()
+                ]
                 if revision_input.model_runtime_config.environ
                 else None
             ),
