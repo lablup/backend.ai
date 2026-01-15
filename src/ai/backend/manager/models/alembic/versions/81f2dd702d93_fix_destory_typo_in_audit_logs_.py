@@ -1,7 +1,7 @@
 """fix_destory_typo_in_audit_logs_operation_column
 
 Revision ID: 81f2dd702d93
-Revises: 71343531dd5a
+Revises: a1b2c3d4e5f6
 Create Date: 2026-01-14 10:13:17.170033
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '81f2dd702d93'
-down_revision = '71343531dd5a'
+down_revision = 'a1b2c3d4e5f6'
 branch_labels = None
 depends_on = None
 
