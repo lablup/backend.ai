@@ -92,5 +92,10 @@ class UpdateRolePermissionsInput:
 class CreateRoleAssignmentInput:
     user_id: ID
     role_id: ID
-    scope: ScopeInput
     expires_at: Optional[datetime] = None
+
+
+@strawberry.input(description="Input for deleting a role assignment")
+class DeleteRoleAssignmentInput:
+    user_id: ID
+    role_id: ID

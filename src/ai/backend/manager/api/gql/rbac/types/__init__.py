@@ -12,6 +12,7 @@ from .enums import (
 from .inputs import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
+    DeleteRoleAssignmentInput,
     ObjectPermissionInput,
     ScopedPermissionInput,
     ScopeInput,
@@ -49,6 +50,7 @@ __all__ = [
     # Inputs
     "CreateRoleAssignmentInput",
     "CreateRoleInput",
+    "DeleteRoleAssignmentInput",
     "ObjectPermissionInput",
     "ScopeInput",
     "ScopedPermissionInput",

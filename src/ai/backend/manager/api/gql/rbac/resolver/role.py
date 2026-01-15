@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.rbac.fetcher import fetch_role, fetch_roles
 from ai.backend.manager.api.gql.rbac.types import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
+    DeleteRoleAssignmentInput,
     Role,
     RoleConnection,
     RoleFilter,
@@ -287,7 +288,7 @@ async def create_role_assignment(
 
 @strawberry.field(description="Revoke a role assignment")
 async def delete_role_assignment(
-    user_id: ID, role_id: ID, info: Info[StrawberryGQLContext]
+    input: DeleteRoleAssignmentInput, info: Info[StrawberryGQLContext]
 ) -> Role:
     """Revoke a role assignment (remove role from user).
 
@@ -300,8 +301,8 @@ async def delete_role_assignment(
         raise NotEnoughPermission("Only superadmin can revoke role assignments")
 
     processors = info.context.processors
-    user_uuid = uuid.UUID(user_id)
-    role_uuid = uuid.UUID(role_id)
+    user_uuid = uuid.UUID(input.user_id)
+    role_uuid = uuid.UUID(input.role_id)
 
     # Get role details before revocation
     detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
