@@ -77,6 +77,25 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.phase is not None:
+            condition = self.convert_string_filter(
+                filter.phase,
+                contains_factory=SessionSchedulingHistoryConditions.by_phase_contains,
+                equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
+                starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
+                ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.from_status is not None and len(filter.from_status) > 0:
+            conditions.append(
+                SessionSchedulingHistoryConditions.by_from_statuses(filter.from_status)
+            )
+
+        if filter.to_status is not None and len(filter.to_status) > 0:
+            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(filter.to_status))
+
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(
                 SessionSchedulingHistoryConditions.by_results([
@@ -91,6 +110,17 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.message is not None:
+            condition = self.convert_string_filter(
+                filter.message,
+                contains_factory=SessionSchedulingHistoryConditions.by_message_contains,
+                equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
+                starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
+                ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -153,6 +183,23 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.phase is not None:
+            condition = self.convert_string_filter(
+                filter.phase,
+                contains_factory=DeploymentHistoryConditions.by_phase_contains,
+                equals_factory=DeploymentHistoryConditions.by_phase_equals,
+                starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
+                ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.from_status is not None and len(filter.from_status) > 0:
+            conditions.append(DeploymentHistoryConditions.by_from_statuses(filter.from_status))
+
+        if filter.to_status is not None and len(filter.to_status) > 0:
+            conditions.append(DeploymentHistoryConditions.by_to_statuses(filter.to_status))
+
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(
                 DeploymentHistoryConditions.by_results([
@@ -167,6 +214,17 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentHistoryConditions.by_error_code_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.message is not None:
+            condition = self.convert_string_filter(
+                filter.message,
+                contains_factory=DeploymentHistoryConditions.by_message_contains,
+                equals_factory=DeploymentHistoryConditions.by_message_equals,
+                starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
+                ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -236,6 +294,23 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.phase is not None:
+            condition = self.convert_string_filter(
+                filter.phase,
+                contains_factory=RouteHistoryConditions.by_phase_contains,
+                equals_factory=RouteHistoryConditions.by_phase_equals,
+                starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
+                ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.from_status is not None and len(filter.from_status) > 0:
+            conditions.append(RouteHistoryConditions.by_from_statuses(filter.from_status))
+
+        if filter.to_status is not None and len(filter.to_status) > 0:
+            conditions.append(RouteHistoryConditions.by_to_statuses(filter.to_status))
+
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(
                 RouteHistoryConditions.by_results([
@@ -250,6 +325,17 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=RouteHistoryConditions.by_error_code_equals,
                 starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.message is not None:
+            condition = self.convert_string_filter(
+                filter.message,
+                contains_factory=RouteHistoryConditions.by_message_contains,
+                equals_factory=RouteHistoryConditions.by_message_equals,
+                starts_with_factory=RouteHistoryConditions.by_message_starts_with,
+                ends_with_factory=RouteHistoryConditions.by_message_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

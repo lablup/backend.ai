@@ -11,14 +11,13 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import AccessKey, SessionId
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
@@ -116,14 +115,11 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         sessions_for_pull_data = await self._repository.get_sessions_for_pull_by_ids(session_ids)
 
         # Trigger image pulling via Launcher with the full data
-        with RecorderContext[SessionId].shared_phase(
-            "prepare_images",
-            success_detail="Image pull requested",
-        ):
-            await self._launcher.trigger_image_pulling(
-                sessions_for_pull_data.sessions,
-                sessions_for_pull_data.image_configs,
-            )
+        # Note: RecorderContext is handled inside Launcher
+        await self._launcher.trigger_image_pulling(
+            sessions_for_pull_data.sessions,
+            sessions_for_pull_data.image_configs,
+        )
 
         # Mark all sessions as success for status transition
         for session in sessions:

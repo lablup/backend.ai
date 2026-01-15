@@ -332,7 +332,7 @@ class ScheduleCoordinator:
             result = await handler.execute(scaling_group, sessions)
 
             # Get recorded steps for history
-            all_records = pool.get_all_records()
+            all_records = pool.build_all_records()
 
             # Apply status transitions immediately for this scaling group
             await self._handle_status_transitions(handler, result, all_records)

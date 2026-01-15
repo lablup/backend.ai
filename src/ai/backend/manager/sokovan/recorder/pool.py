@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Generic, Optional
@@ -58,6 +58,7 @@ class RecordPool(Generic[EntityIdT]):
         self._recorders: dict[EntityIdT, TransitionRecorder[EntityIdT]] = {}
         self._shared_phases: list[_SharedPhaseRecord[EntityIdT]] = []
         self._current_shared_phase: Optional[_SharedPhaseContext[EntityIdT]] = None
+        self._built = False
 
         # Create recorders for all entity IDs upfront
         for entity_id in entity_ids:
@@ -111,18 +112,24 @@ class RecordPool(Generic[EntityIdT]):
             if sp.entity_ids is None or entity_id in sp.entity_ids
         ]
 
-    def _build_all_records(self) -> None:
-        """Build ExecutionRecords for all entities."""
-        ended_at = datetime.now(UTC)
-        for entity_id, recorder in self._recorders.items():
-            # Filter shared phases for this specific entity
-            entity_shared_phases = self._get_shared_phases_for_entity(entity_id)
-            build_data = RecordBuildData(
-                started_at=self.started_at,
-                ended_at=ended_at,
-                shared_phases=entity_shared_phases,
-            )
-            self.records[entity_id] = recorder.build_execution_record(build_data)
+    def build_all_records(self) -> Mapping[EntityIdT, ExecutionRecord]:
+        """Build and return all execution records.
+
+        Call this explicitly when you need records within a scope.
+        Subsequent calls return cached results.
+        """
+        if not self._built:
+            self._built = True
+            ended_at = datetime.now(UTC)
+            for entity_id, recorder in self._recorders.items():
+                entity_shared_phases = self._get_shared_phases_for_entity(entity_id)
+                build_data = RecordBuildData(
+                    started_at=self.started_at,
+                    ended_at=ended_at,
+                    shared_phases=entity_shared_phases,
+                )
+                self.records[entity_id] = recorder.build_execution_record(build_data)
+        return dict(self.records)
 
     def get_record(self, entity_id: EntityIdT) -> Optional[ExecutionRecord]:
         """Get the execution record for an entity."""

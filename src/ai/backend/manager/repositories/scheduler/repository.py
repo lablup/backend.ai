@@ -426,13 +426,6 @@ class SchedulerRepository:
         return await self._db_source.get_sessions_ready_to_terminate()
 
     @scheduler_repository_resilience.apply()
-    async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from TERMINATING to TERMINATED state.
-        """
-        await self._db_source.update_sessions_to_terminated(session_ids)
-
-    @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
         self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
     ) -> int:

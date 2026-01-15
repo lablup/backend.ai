@@ -182,7 +182,7 @@ class DeploymentCoordinator:
                 lifecycle_type.value, entity_ids=deployment_ids
             ) as pool:
                 result = await handler.execute(deployments)
-                all_records = pool.get_all_records()
+                all_records = pool.build_all_records()
 
                 # Handle status transitions with history recording
                 await self._handle_status_transitions(handler, result, all_records)

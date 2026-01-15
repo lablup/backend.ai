@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import json
 import logging
 import uuid
 from collections.abc import (
@@ -454,14 +453,16 @@ class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
     def coerce_compared_value(self, op, value):
         return JSONB()
 
-    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> str:
+    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> list:
+        # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
-            return json.dumps([item.model_dump(mode="json") for item in value])
-        return "[]"
+            return [item.model_dump(mode="json") for item in value]
+        return []
 
-    def process_result_value(self, value: str | None, dialect) -> list[TBaseModel]:
+    def process_result_value(self, value: list | None, dialect) -> list[TBaseModel]:
+        # JSONB returns already parsed Python objects, not strings
         if value is not None:
-            return [self._schema.model_validate(item) for item in json.loads(value)]
+            return [self._schema.model_validate(item) for item in value]
         return []
 
     def copy(self, **kw) -> Self:
