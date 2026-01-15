@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import AgentId, SlotName
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -28,6 +31,7 @@ from ai.backend.manager.errors.image import (
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
@@ -49,11 +53,111 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
+RESOURCE_LIMITS: dict[SlotName, dict[str, str | None]] = {
+    SlotName("cuda.device"): {"min": "1", "max": None}
+}
 
-class TestAliasImage:
+
+class ImageServiceTestBase:
+    """Base class containing shared fixtures for image service tests."""
+
+    @pytest.fixture
+    def mock_image_repository(self) -> MagicMock:
+        """Mock ImageRepository for testing."""
+        return MagicMock(spec=ImageRepository)
+
+    @pytest.fixture
+    def mock_agent_registry(self) -> MagicMock:
+        """Mock AgentRegistry for testing."""
+        return MagicMock(spec="AgentRegistry")
+
+    @pytest.fixture
+    def image_service(
+        self,
+        mock_image_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+    ) -> ImageService:
+        """Create ImageService with mock dependencies."""
+        return ImageService(
+            agent_registry=mock_agent_registry,
+            image_repository=mock_image_repository,
+        )
+
+    @pytest.fixture
+    def processors(self, image_service: ImageService) -> ImageProcessors:
+        """Create ImageProcessors with mock ImageService."""
+        return ImageProcessors(image_service, [])
+
+    @pytest.fixture
+    def container_registry_id(self) -> uuid.UUID:
+        """Container registry ID for test fixtures."""
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def image_id(self) -> uuid.UUID:
+        """Image ID for test fixtures."""
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def container_registry_data(self, container_registry_id: uuid.UUID) -> ContainerRegistryData:
+        """Sample container registry data."""
+        return ContainerRegistryData(
+            id=container_registry_id,
+            url="https://registry.example.com",
+            registry_name="registry.example.com",
+            type=ContainerRegistryType.DOCKER,
+            project="test_project",
+            username=None,
+            password=None,
+            ssl_verify=True,
+            is_global=True,
+            extra=None,
+        )
+
+    @pytest.fixture
+    def image_data(self, image_id: uuid.UUID, container_registry_id: uuid.UUID) -> ImageData:
+        """Sample image data for testing."""
+        return ImageData(
+            id=ImageID(image_id),
+            name=ImageCanonical("registry.example.com/test_project/python:3.9-ubuntu20.04"),
+            image="test_project/python",
+            project="test_project",
+            tag="3.9-ubuntu20.04",
+            registry="registry.example.com",
+            registry_id=container_registry_id,
+            architecture="x86_64",
+            accelerators="cuda",
+            config_digest="sha256:abcdefgh0123456789abcdefgh0123456789abcdefgh0123456789abcd".ljust(
+                72, " "
+            ),
+            size_bytes=12345678,
+            is_local=False,
+            type=ImageType.COMPUTE,
+            labels=ImageLabelsData(label_data={}),
+            resources=ImageResourcesData(resources_data=RESOURCE_LIMITS),
+            status=ImageStatus.ALIVE,
+            created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC),
+        )
+
+    @pytest.fixture
+    def image_alias_id(self) -> uuid.UUID:
+        """Image alias ID for test fixtures."""
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def image_alias_data(self, image_alias_id: uuid.UUID) -> ImageAliasData:
+        """Sample image alias data for testing."""
+        return ImageAliasData(
+            id=image_alias_id,
+            alias="python",
+        )
+
+
+class TestAliasImage(ImageServiceTestBase):
     """Tests for ImageService.alias_image"""
 
     async def test_alias_image_success(
@@ -101,7 +205,7 @@ class TestAliasImage:
             await processors.alias_image.wait_for_complete(action)
 
 
-class TestDealiasImage:
+class TestDealiasImage(ImageServiceTestBase):
     """Tests for ImageService.dealias_image"""
 
     async def test_dealias_image_success(
@@ -140,7 +244,7 @@ class TestDealiasImage:
             await processors.dealias_image.wait_for_complete(action)
 
 
-class TestForgetImage:
+class TestForgetImage(ImageServiceTestBase):
     """Tests for ImageService.forget_image"""
 
     async def test_forget_image_as_superadmin_success(
@@ -230,7 +334,7 @@ class TestForgetImage:
             await processors.forget_image.wait_for_complete(action)
 
 
-class TestForgetImageById:
+class TestForgetImageById(ImageServiceTestBase):
     """Tests for ImageService.forget_image_by_id"""
 
     async def test_forget_image_by_id_as_superadmin_success(
@@ -314,7 +418,7 @@ class TestForgetImageById:
             await processors.forget_image_by_id.wait_for_complete(action)
 
 
-class TestModifyImage:
+class TestModifyImage(ImageServiceTestBase):
     """Tests for ImageService.modify_image"""
 
     async def test_modify_image_update_one_column(
@@ -431,7 +535,7 @@ class TestModifyImage:
             await processors.modify_image.wait_for_complete(action)
 
 
-class TestPurgeImageById:
+class TestPurgeImageById(ImageServiceTestBase):
     """Tests for ImageService.purge_image_by_id"""
 
     async def test_purge_image_by_id_as_superadmin_success(
@@ -513,7 +617,7 @@ class TestPurgeImageById:
             await processors.purge_image_by_id.wait_for_complete(action)
 
 
-class TestPurgeImages:
+class TestPurgeImages(ImageServiceTestBase):
     """Tests for ImageService.purge_images"""
 
     async def test_purge_images_success(
@@ -605,7 +709,7 @@ class TestPurgeImages:
         assert "Container in use" in result.errors[0]
 
 
-class TestUntagImageFromRegistry:
+class TestUntagImageFromRegistry(ImageServiceTestBase):
     """Tests for ImageService.untag_image_from_registry"""
 
     async def test_untag_image_as_superadmin_success(
@@ -687,7 +791,7 @@ class TestUntagImageFromRegistry:
             await processors.untag_image_from_registry.wait_for_complete(action)
 
 
-class TestClearImageCustomResourceLimit:
+class TestClearImageCustomResourceLimit(ImageServiceTestBase):
     """Tests for ImageService.clear_image_custom_resource_limit"""
 
     async def test_clear_image_custom_resource_limit_success(
