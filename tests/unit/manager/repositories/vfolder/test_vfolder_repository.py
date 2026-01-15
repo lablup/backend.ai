@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, create_autospec
 
 import pytest
 import sqlalchemy as sa
@@ -51,7 +50,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 
@@ -247,22 +245,12 @@ class TestVfolderRepository:
         yield group_uuid
 
     @pytest.fixture
-    def mock_role_manager(self) -> RoleManager:
-        """Create a mock RoleManager with autospec"""
-        mock = create_autospec(RoleManager, instance=True)
-        mock.map_entity_to_scope = AsyncMock()
-        mock.add_object_permission_to_user_role = AsyncMock()
-        return mock
-
-    @pytest.fixture
     async def vfolder_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        mock_role_manager: RoleManager,
     ) -> AsyncGenerator[VfolderRepository, None]:
         """Create VfolderRepository instance with database and mocked RoleManager"""
         repo = VfolderRepository(db=db_with_cleanup)
-        repo._role_manager = mock_role_manager
         yield repo
 
     async def test_model_store_vfolder_permission_is_overridden_to_read_only(
