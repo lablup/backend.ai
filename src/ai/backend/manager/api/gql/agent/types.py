@@ -28,12 +28,13 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 
+from ai.backend.manager.api.gql.kernel.types import (
+    KernelConnectionV2,
+    KernelFilter,
+    KernelOrderBy,
+)
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.kernel.types import (
-        KernelConnectionV2,
-        KernelFilter,
-        KernelOrderBy,
-    )
     from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
