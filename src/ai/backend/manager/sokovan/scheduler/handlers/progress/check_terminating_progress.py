@@ -12,14 +12,13 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import AccessKey, SessionId
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -116,6 +115,7 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
         )
 
         # Execute hooks concurrently (best-effort - failures don't block termination)
+        # Note: Hooks handle their own RecorderContext per session type
         hook_coroutines = [
             self._hook_registry.get_hook(
                 session.session_info.metadata.session_type
@@ -123,11 +123,7 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
             for session in sessions
         ]
 
-        with RecorderContext[SessionId].shared_phase(
-            "finalize_termination",
-            success_detail="Session termination finalized",
-        ):
-            hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
         # All sessions proceed to termination regardless of hook failures
         for session, hook_result in zip(sessions, hook_results, strict=True):

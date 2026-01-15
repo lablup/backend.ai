@@ -19,7 +19,6 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
@@ -119,18 +118,11 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         sessions_data = await self._repository.search_sessions_with_kernels_and_user(querier)
 
         # Start kernels on agents via Launcher
-        with RecorderContext[SessionId].shared_phase(
-            "trigger_kernel_creation",
-            success_detail="Kernel creation triggered",
-        ):
-            with RecorderContext[SessionId].shared_step(
-                "try_create_kernel",
-                success_detail="Kernel creation triggered",
-            ):
-                await self._launcher.start_sessions_for_handler(
-                    sessions_data.sessions,
-                    sessions_data.image_configs,
-                )
+        # Note: RecorderContext is handled inside Launcher
+        await self._launcher.start_sessions_for_handler(
+            sessions_data.sessions,
+            sessions_data.image_configs,
+        )
 
         # Mark all sessions as success for status transition
         for session in sessions:

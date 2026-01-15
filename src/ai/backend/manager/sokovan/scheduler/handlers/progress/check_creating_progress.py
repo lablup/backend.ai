@@ -12,14 +12,13 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -151,15 +150,7 @@ class CheckCreatingProgressLifecycleHandler(SessionLifecycleHandler):
 
         # Update sessions with occupying_slots via repository
         if sessions_running_data:
-            with RecorderContext[SessionId].shared_phase(
-                "finalize_start",
-                success_detail="Session startup finalized",
-            ):
-                with RecorderContext[SessionId].shared_step(
-                    "update_session_data",
-                    success_detail="Session data updated",
-                ):
-                    await self._repository.update_sessions_to_running(sessions_running_data)
+            await self._repository.update_sessions_to_running(sessions_running_data)
 
             # Build success result - find matching SessionWithKernels for ScheduledSessionData
             session_map = {s.session_info.identity.id: s for s in sessions}
