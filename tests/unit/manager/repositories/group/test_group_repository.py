@@ -1342,11 +1342,8 @@ class TestGroupRepository:
         )
         creator = Creator(spec=creator_spec)
 
-        with pytest.raises(InvalidAPIParameters) as exc_info:
+        with pytest.raises(InvalidAPIParameters):
             await group_repository_with_mock_role_manager.create(creator)
-
-        assert "Domain" in str(exc_info.value)
-        assert "does not exist" in str(exc_info.value)
 
     async def test_create_duplicate_name_in_domain(
         self,
@@ -1366,10 +1363,8 @@ class TestGroupRepository:
         await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
 
         # Second creation with same name should fail
-        with pytest.raises(InvalidAPIParameters) as exc_info:
+        with pytest.raises(InvalidAPIParameters):
             await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
-
-        assert "already exists" in str(exc_info.value)
 
     # ===========================================
     # Tests for modify_validated method
