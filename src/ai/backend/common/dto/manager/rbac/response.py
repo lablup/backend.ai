@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.permission.types import ScopeType
 
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
@@ -24,13 +25,19 @@ __all__ = (
     "DeleteObjectPermissionResponse",
     "DeletePermissionResponse",
     "DeleteRoleResponse",
+    "EntityDTO",
+    "GetEntityTypesResponse",
     "GetRoleResponse",
+    "GetScopeTypesResponse",
     "ObjectPermissionDTO",
     "PaginationInfo",
     "PermissionDTO",
     "RevokeRoleResponse",
     "RoleDTO",
+    "ScopeDTO",
+    "SearchEntitiesResponse",
     "SearchRolesResponse",
+    "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
     "UpdateRoleResponse",
 )
@@ -159,3 +166,44 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
     """Response for deleting an object permission."""
 
     deleted: bool = Field(description="Whether the object permission was deleted")
+
+
+class GetScopeTypesResponse(BaseResponseModel):
+    """Response for getting available scope types."""
+
+    items: list[ScopeType] = Field(description="List of available scope types")
+
+
+class ScopeDTO(BaseModel):
+    """DTO for scope data."""
+
+    scope_type: ScopeType = Field(description="Scope type")
+    scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
+    name: str = Field(description="Scope display name")
+
+
+class SearchScopesResponse(BaseResponseModel):
+    """Response for searching scopes."""
+
+    items: list[ScopeDTO] = Field(description="List of scopes")
+    pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class GetEntityTypesResponse(BaseResponseModel):
+    """Response for getting available entity types."""
+
+    items: list[EntityType] = Field(description="List of available entity types")
+
+
+class EntityDTO(BaseModel):
+    """DTO for entity data."""
+
+    entity_type: EntityType = Field(description="Entity type")
+    entity_id: str = Field(description="Entity ID")
+
+
+class SearchEntitiesResponse(BaseResponseModel):
+    """Response for searching entities within a scope."""
+
+    items: list[EntityDTO] = Field(description="List of entities")
+    pagination: PaginationInfo = Field(description="Pagination information")

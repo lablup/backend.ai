@@ -202,7 +202,7 @@ from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
@@ -3133,19 +3133,24 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
 
-    def resolve_storage_step_selection(self) -> dict[ArtifactStorageImportStep, str]:
+    def resolve_storage_step_selection(
+        self,
+    ) -> dict[ArtifactStorageImportStep, NamedStorageTarget]:
         """
         Resolves the actual `storage_step_selection` to be passed to the storage proxy based on `storage_step_selection` and `storage_name`
         """
 
         _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
 
-        resolved_selection: dict[ArtifactStorageImportStep, str] = (
-            self.storage_step_selection.copy()
-        )
+        resolved_selection: dict[ArtifactStorageImportStep, NamedStorageTarget] = {
+            step: NamedStorageTarget(storage_name=name)
+            for step, name in self.storage_step_selection.items()
+        }
         for required_step in _REQUIRED_STEPS:
             if required_step not in resolved_selection:
-                resolved_selection[required_step] = self.storage_name
+                resolved_selection[required_step] = NamedStorageTarget(
+                    storage_name=self.storage_name
+                )
 
         return resolved_selection
 

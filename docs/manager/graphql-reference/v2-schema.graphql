@@ -94,17 +94,238 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
+"""Added in 26.1.0. Filter options for querying agents"""
+input AgentFilter {
+  id: StringFilter = null
+  status: AgentStatusFilter = null
+  schedulable: Boolean = null
+  scalingGroup: StringFilter = null
+  AND: [AgentFilter!] = null
+  OR: [AgentFilter!] = null
+  NOT: [AgentFilter!] = null
+}
+
+"""Added in 26.1.0. Network-related information for an agent"""
+type AgentNetworkInfo {
+  """Logical region where the agent is deployed."""
+  region: String!
+
+  """
+  Network address and port where the agent can be reached (format: "host:port").
+  This is the bind or advertised address used by the manager to communicate
+  with the agent for session lifecycle management and health monitoring.
+  """
+  addr: String!
+}
+
+"""Added in 26.1.0. Options for ordering agents"""
+input AgentOrderBy {
+  field: AgentOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.1.0. Order by specification for agents"""
+enum AgentOrderField {
+  ID
+  FIRST_CONTACT
+  SCALING_GROUP
+  SCHEDULABLE
+}
+
+"""Added in 26.1.0. Permissions related to agent operations"""
+enum AgentPermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_COMPUTE_SESSION
+  CREATE_SERVICE
+}
+
 """Added in 25.15.0"""
 type AgentResource {
-  free: JSON!
-  used: JSON!
+  """
+  Total hardware resource capacity available on the agent.
+  Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
+  Each slot represents the maximum amount of that resource type the agent can provide.
+  """
   capacity: JSON!
+
+  """
+  Total amount of resources currently consumed by running and scheduled compute sessions.
+  Includes both the requested resources for sessions being prepared and already allocated
+  resources for active sessions. The sum of occupied resources across all session states
+  that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
+  Expressed as a JSON object with the same structure as capacity.
+  """
+  used: JSON!
+
+  """
+  Available resources for scheduling new compute sessions (capacity - used).
+  This represents the maximum resources that can be allocated to new sessions
+  without exceeding the agent's capacity. Expressed as a JSON object with
+  the same structure as capacity.
+  """
+  free: JSON!
 }
 
 """Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
   totalResource: AgentResource!
+}
+
+enum AgentStatus {
+  ALIVE
+  LOST
+  RESTARTING
+  TERMINATED
+}
+
+"""
+Added in 26.1.0. Filter options for agent status within AgentFilter.
+It includes options to filter whether agent status is in a specific list or equals a specific value.
+"""
+input AgentStatusFilter {
+  in: [AgentStatus!] = null
+  equals: AgentStatus = null
+}
+
+"""Added in 26.1.0. Status and lifecycle information for an agent"""
+type AgentStatusInfo {
+  """
+  Current operational status of the agent.
+  Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
+  TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
+  """
+  status: AgentStatus!
+
+  """
+  Timestamp when the agent last changed its status.
+  Updated whenever the agent transitions between different status states
+  (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
+  Will be null if the agent status has never changed since initial registration.
+  """
+  statusChanged: DateTime
+
+  """
+  Timestamp when the agent first registered with the manager.
+  This value remains constant throughout the agent's lifecycle and can be used
+  to track the agent's age or identify when it was initially deployed.
+  """
+  firstContact: DateTime
+
+  """
+  Timestamp when the agent was marked as lost or unreachable.
+  Set when the manager detects the agent has stopped sending heartbeats.
+  Will be null if the agent has never been lost or is currently alive.
+  """
+  lostAt: DateTime
+
+  """
+  Indicates whether the agent is available for scheduling new compute sessions.
+  An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
+  When false, no new sessions will be assigned to this agent.
+  """
+  schedulable: Boolean!
+}
+
+"""Added in 26.1.0. System and configuration information for an agent"""
+type AgentSystemInfo {
+  """
+  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
+  Used to match compute sessions with compatible container images and ensure
+  proper binary execution on the agent.
+  """
+  architecture: String!
+
+  """
+  Version string of the Backend.AI agent software running on this node.
+  Follows semantic versioning (e.g., "26.1.0") and helps identify
+  compatibility and available features.
+  """
+  version: String!
+
+  """
+  Legacy configuration flag, no longer actively used in the system.
+  Retained for backward compatibility and schema consistency.
+  Originally intended to control automatic termination of misbehaving sessions.
+  """
+  autoTerminateAbusingKernel: Boolean! @deprecated(reason: "Legacy feature no longer in use.")
+
+  """
+  List of compute plugin metadata supported by this agent.
+  Each plugin represents a specific accelerator or resource type (e.g., CUDA).
+  Expressed as a JSON object where keys are plugin names and values contain
+  plugin-specific configuration and capabilities.
+  """
+  computePlugins: JSON!
+}
+
+"""Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
+type AgentV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Hardware resource capacity, usage, and availability information.
+  Contains capacity (total), used (occupied by sessions), and free (available) resource slots
+  including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
+  """
+  resourceInfo: AgentResource!
+
+  """
+  Current operational status and lifecycle timestamps.
+  Includes the agent's status (ALIVE, LOST, etc.), status change history,
+  initial registration time, and schedulability state.
+  """
+  statusInfo: AgentStatusInfo!
+
+  """
+  System configuration and software version information.
+  Contains the host architecture, agent software version, and available compute plugins
+  for accelerators and specialized hardware.
+  """
+  systemInfo: AgentSystemInfo!
+
+  """
+  Network location and connectivity information.
+  Provides the agent's region and network address for manager-to-agent communication.
+  """
+  networkInfo: AgentNetworkInfo!
+
+  """
+  List of permissions the current authenticated user has on this agent.
+  Determines which operations (read attributes, create sessions, etc.)
+  the user can perform on this specific agent based on RBAC policies.
+  """
+  permissions: [AgentPermission!]!
+
+  """
+  Name of the scaling group this agent belongs to.
+  Scaling groups are logical collections of agents used for resource scheduling,
+  quota management, and workload isolation across different user groups or projects.
+  """
+  scalingGroup: String!
+}
+
+"""
+Added in 26.1.0. Relay-style connection type for paginated lists of agents
+"""
+type AgentV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AgentV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AgentV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AgentV2!
 }
 
 """Added in 25.16.0. App configuration data"""
@@ -852,6 +1073,9 @@ type CreateVFSStoragePayload {
   vfsStorage: VFSStorage!
 }
 
+"""Date (isoformat)"""
+scalar Date
+
 """Date with time (isoformat)"""
 scalar DateTime
 
@@ -880,6 +1104,11 @@ input DelegateImportArtifactsInput {
   delegatorReservoirId: ID = null
   artifactType: ArtifactType = null
   delegateeTarget: DelegateeTarget = null
+
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
@@ -1219,8 +1448,214 @@ enum DeploymentStrategyType {
   BLUE_GREEN
 }
 
+"""
+Added in 26.1.0. Domain-level fair share data representing scheduling priority for an entire domain. The fair share factor determines resource allocation relative to other domains.
+"""
+type DomainFairShare implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Name of the scaling group this fair share belongs to."""
+  resourceGroup: String!
+
+  """Name of the domain this fair share is calculated for."""
+  domainName: String!
+
+  """Fair share specification parameters used for calculation."""
+  spec: FairShareSpec!
+
+  """Snapshot of the most recent fair share calculation results."""
+  calculationSnapshot: FairShareCalculationSnapshot!
+
+  """Timestamp when this record was created."""
+  createdAt: DateTime!
+
+  """Timestamp when this record was last updated."""
+  updatedAt: DateTime!
+
+  """
+  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group.
+  """
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+}
+
+"""
+Added in 26.1.0. Paginated connection for domain fair share records. Provides relay-style cursor-based pagination for efficient traversal of domain fair share data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type DomainFairShareConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DomainFairShareEdge!]!
+
+  """Total number of domain fair share records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DomainFairShareEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DomainFairShare!
+}
+
+"""
+Added in 26.1.0. Filter input for querying domain fair shares. Supports filtering by scaling group and domain name with various string matching operations. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input DomainFairShareFilter {
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where domains compete for resources. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [DomainFairShareFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [DomainFairShareFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [DomainFairShareFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for domain fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input DomainFairShareOrderBy {
+  """
+  The field to order by. See DomainFairShareOrderField for available options.
+  """
+  field: DomainFairShareOrderField!
+
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority domains first.
+  """
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.1.0. Fields available for ordering domain fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). DOMAIN_NAME: Order alphabetically by domain name. CREATED_AT: Order by record creation timestamp.
+"""
+enum DomainFairShareOrderField {
+  FAIR_SHARE_FACTOR
+  DOMAIN_NAME
+  CREATED_AT
+}
+
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in 26.1.0. Domain-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
+"""
+type DomainUsageBucket implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Name of the domain this usage bucket belongs to."""
+  domainName: String!
+
+  """Name of the scaling group this usage was recorded in."""
+  resourceGroup: String!
+
+  """Metadata about the usage measurement period and timestamps."""
+  metadata: UsageBucketMetadata!
+
+  """
+  Aggregated resource usage during this period. Contains the total compute resources consumed by all workloads in this domain during the measurement period (cpu cores, memory bytes, accelerator usage).
+  """
+  resourceUsage: ResourceSlot!
+
+  """
+  Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
+  """
+  capacitySnapshot: ResourceSlot!
+
+  """
+  Added in 26.1.0. Project usage buckets belonging to this domain. Returns paginated project-level usage history for all projects in this domain within the same scaling group.
+  """
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+}
+
+"""
+Added in 26.1.0. Paginated connection for domain usage bucket records. Provides relay-style cursor-based pagination for browsing historical usage data by time period. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type DomainUsageBucketConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DomainUsageBucketEdge!]!
+
+  """
+  Total number of domain usage bucket records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DomainUsageBucketEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DomainUsageBucket!
+}
+
+"""
+Added in 26.1.0. Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input DomainUsageBucketFilter {
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by domain name. This filters usage buckets for a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [DomainUsageBucketFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [DomainUsageBucketFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [DomainUsageBucketFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for domain usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
+"""
+input DomainUsageBucketOrderBy {
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
+  field: UsageBucketOrderField!
+
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
+  direction: OrderDirection! = DESC
 }
 
 type ExtraVFolderMount implements Node {
@@ -1253,6 +1688,71 @@ type ExtraVFolderMountEdge {
 input ExtraVFolderMountInput {
   vfolderId: ID!
   mountDestination: String
+}
+
+"""
+Added in 26.1.0. Snapshot of the most recent fair share calculation results. Contains the computed fair share factor and the intermediate values used in the calculation.
+"""
+type FairShareCalculationSnapshot {
+  """
+  Computed fair share factor ranging from 0 to 1. Higher values indicate more entitlement to resources (less historical usage relative to others). Used by the scheduler to prioritize workloads - entities with higher factors get scheduled first.
+  """
+  fairShareFactor: Decimal!
+
+  """
+  Sum of exponentially decayed historical usage across the lookback period. Recent usage contributes more than older usage based on the half-life decay function. This is the raw usage data before normalization.
+  """
+  totalDecayedUsage: ResourceSlot!
+
+  """
+  Single scalar value representing weighted resource consumption. Computed by applying resource weights to the decayed usage and summing. Used to compare usage across entities with different resource consumption patterns.
+  """
+  normalizedUsage: Decimal!
+
+  """
+  Start date of the lookback window used in this calculation (inclusive). Usage before this date is not considered in the fair share factor computation.
+  """
+  lookbackStart: Date!
+
+  """
+  End date of the lookback window used in this calculation (inclusive). Typically the current date or the date of the last calculation.
+  """
+  lookbackEnd: Date!
+
+  """
+  Timestamp when this fair share calculation was performed. Fair share factors are recalculated periodically by the scheduler.
+  """
+  lastCalculatedAt: DateTime!
+}
+
+"""
+Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation.
+"""
+type FairShareSpec {
+  """
+  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Default is 1.0. A weight of 2.0 means this entity is twice as important as one with weight 1.0.
+  """
+  weight: Decimal!
+
+  """
+  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
+  """
+  halfLifeDays: Int!
+
+  """
+  Total lookback period in days for usage aggregation. Only usage within this window is considered. Typical values range from 7 to 30 days depending on scheduling policy.
+  """
+  lookbackDays: Int!
+
+  """
+  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Smaller values provide more precision but require more storage. Typically 1 day.
+  """
+  decayUnitDays: Int!
+
+  """
+  Weights for each resource type when calculating normalized usage. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
+  """
+  resourceWeights: ResourceSlot!
 }
 
 """Added in 25.14.0"""
@@ -1330,6 +1830,26 @@ SCANNED → PULLING → PULLED → AVAILABLE status progression.
 """
 input ImportArtifactsInput {
   artifactRevisionIds: [ID!]!
+
+  """Target vfolder ID to store the imported artifacts. Added in 26.1.0."""
+  vfolderId: ID = null
+
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
+  options: ImportArtifactsOptionsGQL! = {force: false}
+}
+
+"""
+Added in 26.1.0.
+
+Options for importing artifact revisions.
+
+Controls import behavior such as forcing re-download regardless of digest freshness.
+"""
+input ImportArtifactsOptionsGQL {
+  """Force re-download regardless of digest freshness check."""
+  force: Boolean! = false
 }
 
 """
@@ -1358,9 +1878,6 @@ input IntFilter {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
-
-"""Added in 25.15.0"""
-scalar JSONString
 
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
@@ -1473,13 +1990,13 @@ type ModelReplica implements Node {
   """
   Detailed information about the routing node including error or success messages.
   """
-  detail: JSONString!
+  detail: JSON!
 
   """Timestamp when the replica was created."""
   createdAt: DateTime!
 
   """Live statistics of the routing node (CPU utilization, etc.)."""
-  liveStat: JSONString!
+  liveStat: JSON!
 
   """
   The session ID associated with the replica. This can be null right after replica creation.
@@ -1582,7 +2099,7 @@ type ModelRuntimeConfig {
   """
   Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
   """
-  environ: JSONString
+  environ: JSON
 }
 
 """Added in 25.19.0"""
@@ -1593,7 +2110,7 @@ input ModelRuntimeConfigInput {
   """
   Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
   """
-  environ: JSONString = null
+  environ: JSON = null
 }
 
 """
@@ -2093,9 +2610,238 @@ type PageInfo @shareable {
   endCursor: String
 }
 
+"""
+Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
+"""
+type ProjectFairShare implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Name of the scaling group this fair share belongs to."""
+  resourceGroup: String!
+
+  """UUID of the project this fair share is calculated for."""
+  projectId: UUID!
+
+  """Name of the domain the project belongs to."""
+  domainName: String!
+
+  """Fair share specification parameters used for calculation."""
+  spec: FairShareSpec!
+
+  """Snapshot of the most recent fair share calculation results."""
+  calculationSnapshot: FairShareCalculationSnapshot!
+
+  """Timestamp when this record was created."""
+  createdAt: DateTime!
+
+  """Timestamp when this record was last updated."""
+  updatedAt: DateTime!
+
+  """
+  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group.
+  """
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+}
+
+"""
+Added in 26.1.0. Paginated connection for project fair share records. Provides relay-style cursor-based pagination for efficient traversal of project fair share data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type ProjectFairShareConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ProjectFairShareEdge!]!
+
+  """
+  Total number of project fair share records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ProjectFairShareEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ProjectFairShare!
+}
+
+"""
+Added in 26.1.0. Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input ProjectFairShareFilter {
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where projects compete for resources within their domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by project UUID. Projects are containers for sessions and user activities. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
+  projectId: UUIDFilter = null
+
+  """
+  Filter by domain name. This filters projects belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [ProjectFairShareFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [ProjectFairShareFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [ProjectFairShareFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for project fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input ProjectFairShareOrderBy {
+  """
+  The field to order by. See ProjectFairShareOrderField for available options.
+  """
+  field: ProjectFairShareOrderField!
+
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority projects first.
+  """
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.1.0. Fields available for ordering project fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+"""
+enum ProjectFairShareOrderField {
+  FAIR_SHARE_FACTOR
+  CREATED_AT
+}
+
+"""
+Added in 26.1.0. Project-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
+"""
+type ProjectUsageBucket implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the project this usage bucket belongs to."""
+  projectId: UUID!
+
+  """Name of the domain the project belongs to."""
+  domainName: String!
+
+  """Name of the scaling group this usage was recorded in."""
+  resourceGroup: String!
+
+  """Metadata about the usage measurement period and timestamps."""
+  metadata: UsageBucketMetadata!
+
+  """
+  Aggregated resource usage during this period. Contains the total compute resources consumed by all workloads in this project during the measurement period (cpu cores, memory bytes, accelerator usage).
+  """
+  resourceUsage: ResourceSlot!
+
+  """
+  Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
+  """
+  capacitySnapshot: ResourceSlot!
+
+  """
+  Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
+  """
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+}
+
+"""
+Added in 26.1.0. Paginated connection for project usage bucket records. Provides relay-style cursor-based pagination for browsing historical usage data by time period. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type ProjectUsageBucketConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ProjectUsageBucketEdge!]!
+
+  """
+  Total number of project usage bucket records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ProjectUsageBucketEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ProjectUsageBucket!
+}
+
+"""
+Added in 26.1.0. Filter input for querying project usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for projects. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input ProjectUsageBucketFilter {
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by project UUID. This filters usage buckets for a specific project. Supports equals operation for exact match.
+  """
+  projectId: UUIDFilter = null
+
+  """
+  Filter by domain name. This filters usage buckets for projects within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [ProjectUsageBucketFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [ProjectUsageBucketFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [ProjectUsageBucketFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for project usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
+"""
+input ProjectUsageBucketOrderBy {
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
+  field: UsageBucketOrderField!
+
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
+  direction: OrderDirection! = DESC
+}
+
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
+
+  """Added in 25.15.0"""
+  agentStats: AgentStats!
+
+  """Added in 26.1.0"""
+  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
 
   """
   Added in 25.14.0.
@@ -2183,6 +2929,33 @@ type Query {
   """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment
 
+  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare
+
+  """Added in 26.1.0. List domain fair shares (superadmin only)."""
+  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
+  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+
+  """Added in 26.1.0. Get project fair share data (superadmin only)."""
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare
+
+  """Added in 26.1.0. List project fair shares (superadmin only)."""
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """Added in 26.1.0. List project usage buckets (superadmin only)."""
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+
+  """Added in 26.1.0. Get user fair share data (superadmin only)."""
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
+
+  """Added in 26.1.0. List user fair shares (superadmin only)."""
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """Added in 26.1.0. List user usage buckets (superadmin only)."""
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+
   """Added in 25.16.0"""
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
@@ -2242,9 +3015,6 @@ type Query {
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
-
-  """Added in 25.15.0"""
-  agentStats: AgentStats!
 
   """
   Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes
@@ -2404,12 +3174,12 @@ type ResourceConfig {
   """
   JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
   """
-  resourceSlots: JSONString!
+  resourceSlots: JSON!
 
   """
   Additional resource options such as shared memory. Example: {"shmem": "64m"}.
   """
-  resourceOpts: JSONString
+  resourceOpts: JSON
   resourceGroup: ScalingGroupNode!
 }
 
@@ -2420,17 +3190,42 @@ input ResourceConfigInput {
   """
   Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
   """
-  resourceSlots: JSONString!
+  resourceSlots: JSON!
 
   """
   Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
   """
-  resourceOpts: JSONString = null
+  resourceOpts: JSON = null
 }
 
 """Added in 25.19.0"""
 input ResourceGroupInput {
   name: String!
+}
+
+"""
+Added in 26.1.0. A collection of compute resource allocations. Represents the resources consumed, allocated, or available for a workload. Each entry specifies a resource type and its quantity.
+"""
+type ResourceSlot {
+  """
+  List of resource allocations. Each entry contains a resource type and quantity pair. The list may include cpu, mem, and various accelerator types depending on the cluster configuration.
+  """
+  entries: [ResourceSlotEntry!]!
+}
+
+"""
+Added in 26.1.0. A single entry representing one resource type and its allocated quantity. Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, rocm.device), and custom resources defined by plugins.
+"""
+type ResourceSlotEntry {
+  """
+  Resource type identifier. Common types include: 'cpu' (CPU cores), 'mem' (memory in bytes), 'cuda.shares' (fractional GPU), 'cuda.device' (whole GPU devices), 'rocm.device' (AMD GPU devices). Custom accelerator plugins may define additional types.
+  """
+  resourceType: String!
+
+  """
+  Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
+  """
+  quantity: String!
 }
 
 """
@@ -2481,7 +3276,7 @@ type Route implements Node {
   createdAt: DateTime
 
   """Error data if the route is in a failed state."""
-  errorData: JSONString
+  errorData: JSON
 
   """The deployment this route belongs to."""
   deployment: ModelDeployment!
@@ -3389,8 +4184,260 @@ type UpsertUserConfigPayload {
   appConfig: AppConfig!
 }
 
+"""
+Added in 26.1.0. Common metadata for usage bucket records including the measurement period and timestamps.
+"""
+type UsageBucketMetadata {
+  """Start date of the usage measurement period (inclusive)."""
+  periodStart: Date!
+
+  """End date of the usage measurement period (exclusive)."""
+  periodEnd: Date!
+
+  """Number of days in each decay unit for this bucket."""
+  decayUnitDays: Int!
+
+  """Timestamp when this record was created."""
+  createdAt: DateTime!
+
+  """Timestamp when this record was last updated."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.1.0. Fields available for ordering usage bucket query results. PERIOD_START: Order by the start date of the usage measurement period. Use DESC to get most recent buckets first, ASC for chronological order.
+"""
+enum UsageBucketOrderField {
+  PERIOD_START
+}
+
+"""
+Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.
+"""
+type UserFairShare implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Name of the scaling group this fair share belongs to."""
+  resourceGroup: String!
+
+  """UUID of the user this fair share is calculated for."""
+  userUuid: UUID!
+
+  """UUID of the project the user belongs to."""
+  projectId: UUID!
+
+  """Name of the domain the user belongs to."""
+  domainName: String!
+
+  """Fair share specification parameters used for calculation."""
+  spec: FairShareSpec!
+
+  """Snapshot of the most recent fair share calculation results."""
+  calculationSnapshot: FairShareCalculationSnapshot!
+
+  """Timestamp when this record was created."""
+  createdAt: DateTime!
+
+  """Timestamp when this record was last updated."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.1.0. Paginated connection for user fair share records. Provides relay-style cursor-based pagination for efficient traversal of user fair share data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type UserFairShareConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [UserFairShareEdge!]!
+
+  """Total number of user fair share records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type UserFairShareEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: UserFairShare!
+}
+
+"""
+Added in 26.1.0. Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input UserFairShareFilter {
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where users compete for resources within their project. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by user UUID. Users are individual accounts that create and run sessions. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
+  userUuid: UUIDFilter = null
+
+  """
+  Filter by project UUID. This filters users by their project membership. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
+  projectId: UUIDFilter = null
+
+  """
+  Filter by domain name. This filters users belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [UserFairShareFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [UserFairShareFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [UserFairShareFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for user fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input UserFairShareOrderBy {
+  """
+  The field to order by. See UserFairShareOrderField for available options.
+  """
+  field: UserFairShareOrderField!
+
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority users first.
+  """
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.1.0. Fields available for ordering user fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+"""
+enum UserFairShareOrderField {
+  FAIR_SHARE_FACTOR
+  CREATED_AT
+}
+
 extend type UserNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in 26.1.0. User-level usage bucket representing aggregated resource consumption for a specific time period. This is the most granular level of usage tracking.
+"""
+type UserUsageBucket implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user this usage bucket belongs to."""
+  userUuid: UUID!
+
+  """UUID of the project the user belongs to."""
+  projectId: UUID!
+
+  """Name of the domain the user belongs to."""
+  domainName: String!
+
+  """Name of the scaling group this usage was recorded in."""
+  resourceGroup: String!
+
+  """Metadata about the usage measurement period and timestamps."""
+  metadata: UsageBucketMetadata!
+
+  """
+  Aggregated resource usage during this period. Contains the total compute resources consumed by this user's workloads during the measurement period (cpu cores, memory bytes, accelerator usage).
+  """
+  resourceUsage: ResourceSlot!
+
+  """
+  Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
+  """
+  capacitySnapshot: ResourceSlot!
+}
+
+"""
+Added in 26.1.0. Paginated connection for user usage bucket records. Provides relay-style cursor-based pagination for browsing historical usage data by time period. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type UserUsageBucketConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [UserUsageBucketEdge!]!
+
+  """Total number of user usage bucket records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type UserUsageBucketEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: UserUsageBucket!
+}
+
+"""
+Added in 26.1.0. Filter input for querying user usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for users. This is the most granular level of usage bucket filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input UserUsageBucketFilter {
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  resourceGroup: StringFilter = null
+
+  """
+  Filter by user UUID. This filters usage buckets for a specific user. Supports equals operation for exact match.
+  """
+  userUuid: UUIDFilter = null
+
+  """
+  Filter by project UUID. This filters usage buckets for users within a specific project. Supports equals operation for exact match.
+  """
+  projectId: UUIDFilter = null
+
+  """
+  Filter by domain name. This filters usage buckets for users within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
+  domainName: StringFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [UserUsageBucketFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [UserUsageBucketFilter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [UserUsageBucketFilter!] = null
+}
+
+"""
+Added in 26.1.0. Specifies ordering for user usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
+"""
+input UserUsageBucketOrderBy {
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
+  field: UsageBucketOrderField!
+
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
+  direction: OrderDirection! = DESC
 }
 
 """Added in 25.16.0. VFS Storage configuration"""

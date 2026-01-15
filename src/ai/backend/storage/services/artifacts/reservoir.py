@@ -35,6 +35,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
@@ -467,9 +468,10 @@ class ReservoirService:
         registry_name: str,
         model: ModelTarget,
         reporter: ProgressReporter,
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
+        storage_prefix: Optional[str] = None,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -481,6 +483,9 @@ class ReservoirService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
             artifact_revision_id: The artifact revision ID for verification result lookup
+            storage_prefix: Custom prefix path for storing imported models.
+                If None, uses default path.
+                If "/", stores files at root.
         """
         success = False
         verification_result: Optional[VerificationStepResult] = None
@@ -495,6 +500,7 @@ class ReservoirService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
+                custom_storage_prefix=storage_prefix,
             )
 
             # Execute import pipeline
@@ -524,9 +530,10 @@ class ReservoirService:
         self,
         registry_name: str,
         models: list[ModelTarget],
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
+        storage_prefix: Optional[str] = None,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -563,6 +570,7 @@ class ReservoirService:
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
                             artifact_revision_id=artifact_revision_id,
+                            storage_prefix=storage_prefix,
                         )
 
                         successful_models += 1
@@ -634,11 +642,13 @@ class ReservoirDownloadStep(ImportStep[None]):
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
         # Get storage mapping for download step
-        download_storage_name = context.storage_step_mappings.get(
+        download_storage_target: StorageTarget | None = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
-        if not download_storage_name:
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
+
+        download_storage_name = download_storage_target.name
 
         # Get registry configuration
         registry_config = self._registry_configs.get(context.registry_name)
@@ -652,7 +662,10 @@ class ReservoirDownloadStep(ImportStep[None]):
         # In a real implementation, you'd query the database to get this information
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        model_prefix = f"{model.model_id}/{revision}"
+
+        # Default prefix: {model_id}/{revision}
+        default_prefix = f"{model.model_id}/{revision}"
+        model_prefix = self._resolve_storage_prefix(context, default_prefix)
 
         # Determine storage type based on the actual download storage object type
         if isinstance(self._download_storage, VFSStorage):
@@ -667,9 +680,11 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         if storage_type == "vfs":
             # Handle VFS storage type
-            dest_path = (
-                cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
-            )
+            base_path = cast(VFSStorage, self._download_storage).base_path
+            if model_prefix:
+                dest_path = base_path / model_prefix
+            else:
+                dest_path = base_path
             bytes_copied = await self._handle_vfs_download(
                 registry_config, context, model_prefix, dest_path
             )
@@ -1051,9 +1066,9 @@ class ReservoirArchiveStep(ModelArchiveStep):
 
 
 def create_reservoir_import_pipeline(
-    storage_pool: StoragePool,
+    storage_pool: AbstractStoragePool,
     registry_configs: dict[str, Any],
-    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
@@ -1066,11 +1081,11 @@ def create_reservoir_import_pipeline(
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
         # Get the download storage object from the pool
-        download_storage_name = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
-        if not download_storage_name:
+        download_storage_target = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
-        download_storage = storage_pool.get_storage(download_storage_name)
+        download_storage = download_storage_target.resolve_storage(storage_pool)
         steps.append(
             ReservoirDownloadStep(
                 registry_configs,

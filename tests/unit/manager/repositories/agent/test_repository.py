@@ -6,9 +6,13 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
+from copy import copy
+from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID, uuid4
 
 import pytest
 from dateutil.tz import tzutc
@@ -21,14 +25,19 @@ from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import (
     AgentId,
+    ClusterMode,
     DeviceName,
     ResourceSlot,
+    SessionResult,
+    SessionTypes,
     SlotName,
     SlotTypes,
     ValkeyTarget,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -53,8 +62,26 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass
+class ScalingGroupFixtureData:
+    """Data from scaling_group fixture"""
+
+    name: str
+
+
+@dataclass
+class AgentFixtureData:
+    """Data from agent fixtures (alive_agent, lost_agent)"""
+
+    agent_id: AgentId
+    scaling_group: str
 
 
 class TestAgentRepositoryDB:
@@ -95,12 +122,12 @@ class TestAgentRepositoryDB:
             yield database_connection
 
     @pytest.fixture
-    def sample_agent_info(self) -> AgentInfo:
+    def sample_agent_info(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
         """Create sample agent info for testing"""
         return AgentInfo(
             ip="192.168.1.100",
             version="24.12.0",
-            scaling_group="default",
+            scaling_group=scaling_group.name,
             available_resource_slots=ResourceSlot({
                 SlotName("cpu"): "8",
                 SlotName("mem"): "32768",
@@ -122,12 +149,12 @@ class TestAgentRepositoryDB:
         )
 
     @pytest.fixture
-    def sample_agent_info_with_new_slots(self) -> AgentInfo:
+    def sample_agent_info_with_new_slots(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
         """Create sample agent info with additional slot types for testing resource slot updates"""
         return AgentInfo(
             ip="192.168.1.101",
             version="24.12.0",
-            scaling_group="default",
+            scaling_group=scaling_group.name,
             available_resource_slots=ResourceSlot({
                 SlotName("cpu"): "8",
                 SlotName("mem"): "32768",
@@ -197,9 +224,9 @@ class TestAgentRepositoryDB:
     async def scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
         """Create default scaling group in database"""
-        name = "default"
+        name = str(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
                 name=name,
@@ -213,23 +240,23 @@ class TestAgentRepositoryDB:
                 use_host_network=False,
             )
             db_sess.add(scaling_group)
-        yield name
+        yield ScalingGroupFixtureData(name=name)
 
     @pytest.fixture
     async def alive_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: str,
-    ) -> AsyncGenerator[AgentId, None]:
+        scaling_group: ScalingGroupFixtureData,
+    ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create an alive agent in database"""
-        agent_id = AgentId("agent-alive")
+        agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group,
+                scaling_group=scaling_group.name,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -244,23 +271,23 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield agent_id
+        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
 
     @pytest.fixture
     async def lost_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: str,
-    ) -> AsyncGenerator[AgentId, None]:
+        scaling_group: ScalingGroupFixtureData,
+    ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create a lost agent in database"""
-        agent_id = AgentId("agent-lost")
+        agent_id = AgentId(str(uuid4()))
         async with db_with_cleanup.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.LOST,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group,
+                scaling_group=scaling_group.name,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -275,21 +302,21 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield agent_id
+        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
 
     # ==================== get_by_id tests ====================
 
     async def test_get_by_id_existing_agent(
         self,
         agent_repository: AgentRepository,
-        alive_agent: AgentId,
+        alive_agent: AgentFixtureData,
     ) -> None:
         """Test getting an existing agent by ID"""
-        result = await agent_repository.get_by_id(alive_agent)
+        result = await agent_repository.get_by_id(alive_agent.agent_id)
 
-        assert result.id == alive_agent
+        assert result.id == alive_agent.agent_id
         assert result.status == AgentStatus.ALIVE
-        assert result.scaling_group == "default"
+        assert result.scaling_group == alive_agent.scaling_group
 
     async def test_get_by_id_nonexistent_agent(
         self,
@@ -304,7 +331,6 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_new_agent(
         self,
         agent_repository: AgentRepository,
-        scaling_group: str,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat creates a new agent"""
@@ -326,49 +352,69 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_existing_agent_alive(
         self,
         agent_repository: AgentRepository,
-        alive_agent: AgentId,
+        alive_agent: AgentFixtureData,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat updates an existing alive agent"""
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=alive_agent,
+            agent_id=alive_agent.agent_id,
             agent_info=sample_agent_info,
             heartbeat_received=datetime.now(tzutc()),
         )
 
-        result = await agent_repository.sync_agent_heartbeat(alive_agent, upsert_data)
+        result = await agent_repository.sync_agent_heartbeat(alive_agent.agent_id, upsert_data)
 
         assert result.was_revived is False
 
     async def test_sync_agent_heartbeat_revived_agent(
         self,
         agent_repository: AgentRepository,
-        lost_agent: AgentId,
+        lost_agent: AgentFixtureData,
         sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat revives a previously lost agent"""
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=lost_agent,
+            agent_id=lost_agent.agent_id,
             agent_info=sample_agent_info,
             heartbeat_received=datetime.now(tzutc()),
         )
 
-        result = await agent_repository.sync_agent_heartbeat(lost_agent, upsert_data)
+        result = await agent_repository.sync_agent_heartbeat(lost_agent.agent_id, upsert_data)
 
         assert result.was_revived is True
-        agent = await agent_repository.get_by_id(lost_agent)
+        agent = await agent_repository.get_by_id(lost_agent.agent_id)
         assert agent.status == AgentStatus.ALIVE
 
     async def test_sync_agent_heartbeat_scaling_group_not_found(
         self,
         agent_repository: AgentRepository,
-        sample_agent_info: AgentInfo,
     ) -> None:
         """Test sync_agent_heartbeat raises ScalingGroupNotFound for non-existent scaling group"""
         agent_id = AgentId("agent-no-sgroup")
+        agent_info_with_nonexistent_sg = AgentInfo(
+            ip="192.168.1.100",
+            version="24.12.0",
+            scaling_group="nonexistent-scaling-group",
+            available_resource_slots=ResourceSlot({
+                SlotName("cpu"): "8",
+                SlotName("mem"): "32768",
+            }),
+            slot_key_and_units={
+                SlotName("cpu"): SlotTypes.COUNT,
+                SlotName("mem"): SlotTypes.BYTES,
+            },
+            compute_plugins={DeviceName("cpu"): {}},
+            addr="tcp://192.168.1.100:6001",
+            public_key=PublicKey(b"test-public-key"),
+            public_host="192.168.1.100",
+            images=b"\x82\xc4\x00\x00",
+            region="us-west-1",
+            architecture="x86_64",
+            auto_terminate_abusing_kernel=False,
+        )
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
             agent_id=agent_id,
-            agent_info=sample_agent_info,
+            agent_info=agent_info_with_nonexistent_sg,
             heartbeat_received=datetime.now(tzutc()),
         )
 
@@ -378,7 +424,6 @@ class TestAgentRepositoryDB:
     async def test_sync_agent_heartbeat_with_new_resource_slots(
         self,
         agent_repository: AgentRepository,
-        scaling_group: str,
         sample_agent_info_with_new_slots: AgentInfo,
         mock_config_provider: MagicMock,
     ) -> None:
@@ -516,3 +561,346 @@ class TestAgentRepositoryCache:
 
         stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
         assert stored_map == alloc_map
+
+
+@dataclass
+class KernelFilteringTestCase:
+    """Test case for kernel filtering validation via actual_occupied_slots"""
+
+    test_id: str
+    agent_id: AgentId
+    occupied_kernel_count: int
+    non_occupied_kernel_count: int
+    cpu_per_kernel: Decimal
+    expected_actual_occupied_cpu: Decimal
+
+
+class TestAgentDBSourceKernelFiltering:
+    """Test kernel filtering with with_loader_criteria at db_source level"""
+
+    @pytest.fixture
+    async def db_with_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables for kernel filtering tests"""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create default domain"""
+        domain_name = str(uuid4())
+        async with db_with_tables.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot({}),
+            )
+            db_sess.add(domain)
+        yield domain_name
+
+    @pytest.fixture
+    async def test_resource_policy(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create default project resource policy"""
+        policy_name = str(uuid4())
+        async with db_with_tables.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=-1,
+                max_network_count=10,
+            )
+            db_sess.add(policy)
+        yield policy_name
+
+    @pytest.fixture
+    async def test_group(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_resource_policy: str,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Create default group"""
+        group_id = uuid4()
+        async with db_with_tables.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name="default-group",
+                domain_name=test_domain,
+                total_resource_slots=ResourceSlot({}),
+                integration_id=None,
+                resource_policy=test_resource_policy,
+            )
+            db_sess.add(group)
+        yield (str(group_id), test_domain)
+
+    @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create default scaling group"""
+        name = str(uuid4())
+        async with db_with_tables.begin_session() as db_sess:
+            scaling_group = ScalingGroupRow(
+                name=name,
+                description="Test scaling group",
+                is_active=True,
+                is_public=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+                use_host_network=False,
+            )
+            db_sess.add(scaling_group)
+        yield name
+
+    @pytest.fixture
+    async def agent_with_kernels(
+        self,
+        request: pytest.FixtureRequest,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_group: tuple[str, str],
+        scaling_group: str,
+    ) -> AsyncGenerator[KernelFilteringTestCase, None]:
+        """Create ONE agent with kernels based on the test case from indirect parametrization"""
+        test_case: KernelFilteringTestCase = request.param
+        group_id_str, domain_name = test_group
+
+        # Generate random IDs and values for this test execution
+        random_suffix = uuid4().hex[:8]
+        actual_agent_id = AgentId(f"{test_case.agent_id}-{random_suffix}")
+        random_ip_suffix = uuid4().int % 256  # Random IP octet (0-255)
+        random_ip = f"192.168.1.{random_ip_suffix}"
+        session_id = uuid4()
+        session_name = f"test-session-{uuid4().hex[:12]}"
+
+        async with db_with_tables.begin_session() as db_sess:
+            # Create agent
+            agent = AgentRow(
+                id=actual_agent_id,
+                status=AgentStatus.ALIVE,
+                status_changed=datetime.now(tzutc()),
+                region="us-west-1",
+                scaling_group=scaling_group,
+                available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
+                occupied_slots=ResourceSlot({}),
+                addr=f"tcp://{random_ip}:6001",
+                first_contact=datetime.now(tzutc()),
+                lost_at=None,
+                public_host=random_ip,
+                public_key=PublicKey(f"test-key-{random_suffix}".encode()),
+                version="24.12.0",
+                architecture="x86_64",
+                compute_plugins={},
+                schedulable=True,
+                auto_terminate_abusing_kernel=False,
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+
+            # Create session for all kernels
+            session = SessionRow(
+                id=session_id,
+                name=session_name,
+                session_type=SessionTypes.INTERACTIVE,
+                domain_name=domain_name,
+                group_id=UUID(group_id_str),
+                scaling_group_name=scaling_group,
+                status=SessionStatus.RUNNING,
+                status_info="test",
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                requested_slots=ResourceSlot({SlotName("cpu"): 16.0}),
+                created_at=datetime.now(tzutc()),
+                images=["python:3.11"],
+                vfolder_mounts=[],
+                environ={},
+                result=SessionResult.UNDEFINED,
+            )
+            db_sess.add(session)
+            await db_sess.flush()
+
+            # Create resource-occupied kernels
+            # Only RUNNING and TERMINATING are considered resource-occupied
+            occupied_statuses = [
+                KernelStatus.RUNNING,
+                KernelStatus.TERMINATING,
+            ]
+            for i in range(test_case.occupied_kernel_count):
+                status = occupied_statuses[i % len(occupied_statuses)]
+                kernel = KernelRow(
+                    id=uuid4(),
+                    session_id=session_id,
+                    agent=actual_agent_id,
+                    agent_addr=f"{random_ip}:6001",
+                    scaling_group=scaling_group,
+                    cluster_idx=i,
+                    cluster_role="main",
+                    cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
+                    image="python:3.11",
+                    architecture="x86_64",
+                    registry="docker.io",
+                    container_id=f"container-{uuid4().hex[:8]}",
+                    status=status,
+                    occupied_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
+                    requested_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
+                    domain_name=domain_name,
+                    group_id=UUID(group_id_str),
+                    user_uuid=uuid4(),
+                    access_key="AKTEST" + uuid4().hex[:12],
+                    environ={},
+                    mounts=[],
+                    vfolder_mounts=[],
+                    preopen_ports=[],
+                    repl_in_port=2001 + i * 4,
+                    repl_out_port=2002 + i * 4,
+                    stdin_port=2003 + i * 4,
+                    stdout_port=2004 + i * 4,
+                )
+                db_sess.add(kernel)
+
+            # Create non-occupied kernels
+            non_occupied_statuses = [
+                KernelStatus.TERMINATED,
+                KernelStatus.CANCELLED,
+            ]
+            for i in range(test_case.non_occupied_kernel_count):
+                status = non_occupied_statuses[i % len(non_occupied_statuses)]
+                kernel = KernelRow(
+                    id=uuid4(),
+                    session_id=session_id,
+                    agent=actual_agent_id,
+                    agent_addr=f"{random_ip}:6001",
+                    scaling_group=scaling_group,
+                    cluster_idx=test_case.occupied_kernel_count + i,
+                    cluster_role="main",
+                    cluster_hostname=f"main{test_case.occupied_kernel_count + i}-{uuid4().hex[:6]}",
+                    image="python:3.11",
+                    architecture="x86_64",
+                    registry="docker.io",
+                    container_id=f"container-{uuid4().hex[:8]}",
+                    status=status,
+                    occupied_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
+                    requested_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
+                    domain_name=domain_name,
+                    group_id=UUID(group_id_str),
+                    user_uuid=uuid4(),
+                    access_key="AKTEST" + uuid4().hex[:12],
+                    environ={},
+                    mounts=[],
+                    vfolder_mounts=[],
+                    preopen_ports=[],
+                    repl_in_port=2001 + (test_case.occupied_kernel_count + i) * 4,
+                    repl_out_port=2002 + (test_case.occupied_kernel_count + i) * 4,
+                    stdin_port=2003 + (test_case.occupied_kernel_count + i) * 4,
+                    stdout_port=2004 + (test_case.occupied_kernel_count + i) * 4,
+                )
+                db_sess.add(kernel)
+
+        # Create a copy of test_case with the actual random agent_id
+        test_case_with_random_id = copy(test_case)
+        test_case_with_random_id.agent_id = actual_agent_id
+
+        yield test_case_with_random_id
+
+    @pytest.fixture
+    async def db_source(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[AgentDBSource, None]:
+        """Create AgentDBSource for testing"""
+        db_source = AgentDBSource(db=db_with_tables)
+        yield db_source
+
+    @pytest.mark.parametrize(
+        "agent_with_kernels",
+        [
+            KernelFilteringTestCase(
+                test_id="mixed_kernels",
+                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
+                occupied_kernel_count=3,
+                non_occupied_kernel_count=2,
+                cpu_per_kernel=Decimal("1.0"),
+                expected_actual_occupied_cpu=Decimal("3.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="only_occupied",
+                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
+                occupied_kernel_count=4,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("2.0"),
+                expected_actual_occupied_cpu=Decimal("8.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="only_non_occupied",
+                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
+                occupied_kernel_count=0,
+                non_occupied_kernel_count=5,
+                cpu_per_kernel=Decimal("1.0"),
+                expected_actual_occupied_cpu=Decimal("0.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="no_kernels",
+                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
+                occupied_kernel_count=0,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("0.0"),
+                expected_actual_occupied_cpu=Decimal("0.0"),
+            ),
+        ],
+        indirect=True,
+        ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
+    )
+    async def test_search_agents_validates_actual_occupied_slots(
+        self,
+        db_source: AgentDBSource,
+        agent_with_kernels: KernelFilteringTestCase,
+    ) -> None:
+        """Test that actual_occupied_slots correctly reflects kernel filtering via with_loader_criteria"""
+        # Filter to only this test case's agent
+        querier = BatchQuerier(
+            pagination=OffsetPagination(offset=0, limit=10),
+            conditions=[lambda: AgentRow.id == agent_with_kernels.agent_id],
+        )
+
+        result = await db_source.search_agents(querier)
+
+        assert len(result.items) == 1
+        agent_detail = result.items[0]
+
+        # Validate actual_occupied_slots reflects only resource-occupied kernels
+        actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
+        assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu

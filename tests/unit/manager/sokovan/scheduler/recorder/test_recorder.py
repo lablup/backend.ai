@@ -225,7 +225,6 @@ class TestStructuredRecords:
 
         assert record is not None
         assert isinstance(record, ExecutionRecord)
-        assert record.operation == "schedule"
         assert len(record.phases) == 1
 
     def test_phase_record_contains_steps(
@@ -321,45 +320,6 @@ class TestStructuredRecords:
         assert record.phases[0].name == "validation"
         assert record.phases[1].name == "allocation"
 
-    def test_execution_record_status_success_when_all_phases_succeed(
-        self,
-        session_id: SessionId,
-    ) -> None:
-        """Test that ExecutionRecord.status is SUCCESS when all phases succeed."""
-        with RecorderContext[SessionId].scope("schedule", entity_ids=[session_id]) as pool:
-            recorder = pool.recorder(session_id)
-            with recorder.phase("validation"):
-                with recorder.step("validate"):
-                    pass
-
-            with recorder.phase("allocation"):
-                with recorder.step("allocate"):
-                    pass
-
-        record = pool.get_record(session_id)
-        assert record is not None
-        assert record.status == StepStatus.SUCCESS
-
-    def test_execution_record_status_failed_when_phase_fails(
-        self,
-        session_id: SessionId,
-    ) -> None:
-        """Test that ExecutionRecord.status is FAILED when a phase fails."""
-        with RecorderContext[SessionId].scope("schedule", entity_ids=[session_id]) as pool:
-            recorder = pool.recorder(session_id)
-            with pytest.raises(ValueError, match="Allocation failed"):
-                with recorder.phase("validation"):
-                    with recorder.step("validate"):
-                        pass
-
-                with recorder.phase("allocation"):
-                    with recorder.step("allocate"):
-                        raise ValueError("Allocation failed")
-
-        record = pool.get_record(session_id)
-        assert record is not None
-        assert record.status == StepStatus.FAILED
-
     def test_get_all_records_returns_all_entities(self) -> None:
         """Test that get_all_records() returns records for all entities."""
         session1 = SessionId(uuid4())
@@ -404,7 +364,6 @@ class TestStructuredRecords:
 
         # Should be deserializable back
         restored = ExecutionRecord.model_validate_json(json_data)
-        assert restored.operation == "schedule"
         assert len(restored.phases) == 1
         assert restored.phases[0].name == "validation"
 
@@ -874,7 +833,6 @@ class TestRecordBuildData:
 
         ended_at = datetime.now(UTC)
         build_data = RecordBuildData(
-            operation="test_op",
             started_at=started_at,
             ended_at=ended_at,
             shared_phases=[],
@@ -882,7 +840,6 @@ class TestRecordBuildData:
 
         record = recorder.build_execution_record(build_data)
 
-        assert record.operation == "test_op"
         assert record.started_at == started_at
         assert record.ended_at == ended_at
         assert len(record.phases) == 1

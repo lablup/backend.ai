@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -28,9 +29,16 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ai.backend.manager.data.permission.types import OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    OperationType,
+    ScopeData,
+    ScopeListResult,
+    ScopeType,
+)
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -887,6 +895,135 @@ class PermissionDBSource:
             ]
 
             return AssignedUserListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_domain_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all domains using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DomainRow.name)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.name),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_project_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all projects using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow.id, GroupRow.name)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.id)),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_user_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all users using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserRow.uuid, UserRow.username, UserRow.email)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.uuid)),
+                    name=row.username if row.username is not None else row.email,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_entities_in_scope(
+        self,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Queries the association_scopes_entities table for entity IDs matching
+        the conditions in the querier (scope_type, scope_id, entity_type).
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            EntityListResult containing entity data
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                AssociationScopesEntitiesRow.entity_type,
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                EntityData(
+                    entity_type=row.entity_type,
+                    entity_id=row.entity_id,
+                )
+                for row in result.rows
+            ]
+
+            return EntityListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

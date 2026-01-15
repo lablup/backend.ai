@@ -95,7 +95,7 @@ class TransitionRecorder(Generic[EntityIdT]):
         """Build the final ExecutionRecord when scope exits.
 
         Args:
-            build_data: Data containing operation metadata and shared phases.
+            build_data: Data containing shared phases for this entity.
         """
         # Merge shared phases (copied) with entity phases
         all_phases = [p.model_copy(deep=True) for p in build_data.shared_phases]
@@ -104,14 +104,9 @@ class TransitionRecorder(Generic[EntityIdT]):
         # Sort by started_at to maintain execution order
         all_phases.sort(key=lambda p: p.started_at)
 
-        # Determine status from last phase
-        status = all_phases[-1].status if all_phases else StepStatus.SUCCESS
-
         return ExecutionRecord(
-            operation=build_data.operation,
             started_at=build_data.started_at,
             ended_at=build_data.ended_at,
-            status=status,
             phases=all_phases,
         )
 

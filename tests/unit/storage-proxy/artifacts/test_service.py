@@ -26,6 +26,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
@@ -239,8 +240,8 @@ def mock_import_step_context(
 ) -> ImportStepContext:
     """Mock ImportStepContext."""
     storage_step_mappings = {
-        ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-        ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+        ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
     }
 
     return ImportStepContext(
@@ -694,10 +695,11 @@ class TestHuggingFaceDownloadStep:
             await hf_download_step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=mock_import_step_context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
             # Verify the stream reader was created with correct parameters
@@ -742,10 +744,11 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
     @pytest.mark.asyncio
@@ -763,8 +766,8 @@ class TestHuggingFaceDownloadStep:
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
             storage_step_mappings={
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+                ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+                ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
             },
             step_metadata={},
         )
@@ -779,10 +782,11 @@ class TestHuggingFaceDownloadStep:
             await step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
     @pytest.mark.asyncio
@@ -809,10 +813,11 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
 

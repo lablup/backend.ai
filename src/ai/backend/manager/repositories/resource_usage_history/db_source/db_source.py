@@ -1,0 +1,339 @@
+"""Database source for Resource Usage History repository operations."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Mapping
+from datetime import date
+from typing import TYPE_CHECKING
+
+import sqlalchemy as sa
+
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.resource_usage_history import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkCreator,
+    Creator,
+    Upserter,
+    execute_batch_querier,
+    execute_bulk_creator,
+    execute_creator,
+    execute_upserter,
+)
+from ai.backend.manager.repositories.resource_usage_history.types import (
+    DomainUsageBucketData,
+    DomainUsageBucketSearchResult,
+    KernelUsageRecordData,
+    KernelUsageRecordSearchResult,
+    ProjectUsageBucketData,
+    ProjectUsageBucketSearchResult,
+    UserUsageBucketData,
+    UserUsageBucketSearchResult,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+__all__ = ("ResourceUsageHistoryDBSource",)
+
+
+class ResourceUsageHistoryDBSource:
+    """Database source for Resource Usage History operations."""
+
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db = db
+
+    # ==================== Kernel Usage Records ====================
+
+    async def create_kernel_usage_record(
+        self,
+        creator: Creator[KernelUsageRecordRow],
+    ) -> KernelUsageRecordData:
+        """Create a single kernel usage record."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return KernelUsageRecordData.from_row(result.row)
+
+    async def bulk_create_kernel_usage_records(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+    ) -> list[KernelUsageRecordData]:
+        """Bulk create kernel usage records.
+
+        This is the primary method used by UsageAggregationService to record
+        per-period usage slices for all running kernels.
+        """
+        async with self._db.begin_session() as db_sess:
+            result = await execute_bulk_creator(db_sess, bulk_creator)
+            return [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+    async def search_kernel_usage_records(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelUsageRecordSearchResult:
+        """Search kernel usage records with pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelUsageRecordRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [
+                KernelUsageRecordData.from_row(row.KernelUsageRecordRow) for row in result.rows
+            ]
+            return KernelUsageRecordSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ==================== Domain Usage Buckets ====================
+
+    async def create_domain_usage_bucket(
+        self,
+        creator: Creator[DomainUsageBucketRow],
+    ) -> DomainUsageBucketData:
+        """Create a new domain usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return DomainUsageBucketData.from_row(result.row)
+
+    async def upsert_domain_usage_bucket(
+        self,
+        upserter: Upserter[DomainUsageBucketRow],
+    ) -> DomainUsageBucketData:
+        """Upsert a domain usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_upserter(
+                db_sess,
+                upserter,
+                index_elements=["domain_name", "resource_group", "period_start"],
+            )
+            return DomainUsageBucketData.from_row(result.row)
+
+    async def search_domain_usage_buckets(
+        self,
+        querier: BatchQuerier,
+    ) -> DomainUsageBucketSearchResult:
+        """Search domain usage buckets with pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DomainUsageBucketRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [
+                DomainUsageBucketData.from_row(row.DomainUsageBucketRow) for row in result.rows
+            ]
+            return DomainUsageBucketSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ==================== Project Usage Buckets ====================
+
+    async def create_project_usage_bucket(
+        self,
+        creator: Creator[ProjectUsageBucketRow],
+    ) -> ProjectUsageBucketData:
+        """Create a new project usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return ProjectUsageBucketData.from_row(result.row)
+
+    async def upsert_project_usage_bucket(
+        self,
+        upserter: Upserter[ProjectUsageBucketRow],
+    ) -> ProjectUsageBucketData:
+        """Upsert a project usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_upserter(
+                db_sess,
+                upserter,
+                index_elements=["project_id", "resource_group", "period_start"],
+            )
+            return ProjectUsageBucketData.from_row(result.row)
+
+    async def search_project_usage_buckets(
+        self,
+        querier: BatchQuerier,
+    ) -> ProjectUsageBucketSearchResult:
+        """Search project usage buckets with pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ProjectUsageBucketRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [
+                ProjectUsageBucketData.from_row(row.ProjectUsageBucketRow) for row in result.rows
+            ]
+            return ProjectUsageBucketSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ==================== User Usage Buckets ====================
+
+    async def create_user_usage_bucket(
+        self,
+        creator: Creator[UserUsageBucketRow],
+    ) -> UserUsageBucketData:
+        """Create a new user usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_creator(db_sess, creator)
+            return UserUsageBucketData.from_row(result.row)
+
+    async def upsert_user_usage_bucket(
+        self,
+        upserter: Upserter[UserUsageBucketRow],
+    ) -> UserUsageBucketData:
+        """Upsert a user usage bucket."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_upserter(
+                db_sess,
+                upserter,
+                index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
+            )
+            return UserUsageBucketData.from_row(result.row)
+
+    async def search_user_usage_buckets(
+        self,
+        querier: BatchQuerier,
+    ) -> UserUsageBucketSearchResult:
+        """Search user usage buckets with pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserUsageBucketRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [UserUsageBucketData.from_row(row.UserUsageBucketRow) for row in result.rows]
+            return UserUsageBucketSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ==================== Aggregation Queries ====================
+
+    async def get_aggregated_usage_by_user(
+        self,
+        resource_group: str,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
+        """Get aggregated usage by (user_uuid, project_id) pairs.
+
+        This method aggregates resource_usage across all buckets within the
+        lookback period for each user-project pair.
+
+        Note: ResourceSlot is a JSONB type and cannot be aggregated in SQL,
+        so we fetch all rows and aggregate in Python.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            return await self._fetch_aggregated_usage_by_user(
+                db_sess, resource_group, lookback_start, lookback_end
+            )
+
+    async def _fetch_aggregated_usage_by_user(
+        self,
+        db_sess: SASession,
+        resource_group: str,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
+        """Private method to fetch and aggregate user usage."""
+        query = sa.select(
+            UserUsageBucketRow.user_uuid,
+            UserUsageBucketRow.project_id,
+            UserUsageBucketRow.resource_usage,
+        ).where(
+            sa.and_(
+                UserUsageBucketRow.resource_group == resource_group,
+                UserUsageBucketRow.period_start >= lookback_start,
+                UserUsageBucketRow.period_start <= lookback_end,
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.all()
+
+        # Aggregate in Python since ResourceSlot is JSONB
+        aggregated: dict[tuple[uuid.UUID, uuid.UUID], ResourceSlot] = {}
+        for row in rows:
+            key = (row.user_uuid, row.project_id)
+            if key not in aggregated:
+                aggregated[key] = ResourceSlot()
+            aggregated[key] = aggregated[key] + row.resource_usage
+        return aggregated
+
+    async def get_aggregated_usage_by_project(
+        self,
+        resource_group: str,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> Mapping[uuid.UUID, ResourceSlot]:
+        """Get aggregated usage by project_id.
+
+        This method aggregates resource_usage across all buckets within the
+        lookback period for each project.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                ProjectUsageBucketRow.project_id,
+                ProjectUsageBucketRow.resource_usage,
+            ).where(
+                sa.and_(
+                    ProjectUsageBucketRow.resource_group == resource_group,
+                    ProjectUsageBucketRow.period_start >= lookback_start,
+                    ProjectUsageBucketRow.period_start <= lookback_end,
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Aggregate in Python since ResourceSlot is JSONB
+            aggregated: dict[uuid.UUID, ResourceSlot] = {}
+            for row in rows:
+                if row.project_id not in aggregated:
+                    aggregated[row.project_id] = ResourceSlot()
+                aggregated[row.project_id] = aggregated[row.project_id] + row.resource_usage
+            return aggregated
+
+    async def get_aggregated_usage_by_domain(
+        self,
+        resource_group: str,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> Mapping[str, ResourceSlot]:
+        """Get aggregated usage by domain_name.
+
+        This method aggregates resource_usage across all buckets within the
+        lookback period for each domain.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                DomainUsageBucketRow.domain_name,
+                DomainUsageBucketRow.resource_usage,
+            ).where(
+                sa.and_(
+                    DomainUsageBucketRow.resource_group == resource_group,
+                    DomainUsageBucketRow.period_start >= lookback_start,
+                    DomainUsageBucketRow.period_start <= lookback_end,
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Aggregate in Python since ResourceSlot is JSONB
+            aggregated: dict[str, ResourceSlot] = {}
+            for row in rows:
+                if row.domain_name not in aggregated:
+                    aggregated[row.domain_name] = ResourceSlot()
+                aggregated[row.domain_name] = aggregated[row.domain_name] + row.resource_usage
+            return aggregated
