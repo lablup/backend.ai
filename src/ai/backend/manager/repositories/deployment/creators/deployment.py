@@ -99,7 +99,7 @@ class DeploymentExecutionFields:
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
-    environ: Optional[dict[str, str]] = None
+    environ: Optional[Mapping[str, str]] = None
     callback_url: Optional[yarl.URL] = None
 
 
@@ -164,7 +164,9 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             runtime_variant=self.revision.execution.runtime_variant,
             startup_command=self.revision.execution.startup_command,
             bootstrap_script=self.revision.execution.bootstrap_script,
-            environ=self.revision.execution.environ or {},
+            environ=dict(self.revision.execution.environ)
+            if self.revision.execution.environ
+            else {},
             callback_url=self.revision.execution.callback_url,
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
