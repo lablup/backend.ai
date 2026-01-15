@@ -278,8 +278,8 @@ def session() -> None:
 @click.option(
     "--order",
     type=click.Choice(["ASC", "DESC"]),
-    default="ASC",
-    help="Order direction",
+    default="DESC",
+    help="Order direction (default: DESC to get latest records)",
 )
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--group", "group_by_entity", is_flag=True, help="Group by session ID")
@@ -356,6 +356,11 @@ def list_session_history_cmd(
             )
             response = api_session.SchedulingHistory.list_session_history(request)
 
+            # Reverse for display when DESC (newest at bottom for readability)
+            display_items = (
+                list(reversed(response.items)) if order == "DESC" else list(response.items)
+            )
+
             if as_json:
                 print(
                     json.dumps(
@@ -367,7 +372,7 @@ def list_session_history_cmd(
             elif group_by_entity:
                 _render_grouped_view(
                     "Session",
-                    response.items,
+                    display_items,
                     lambda h: h.session_id,
                     lambda h: f"Session: {h.session_id}",
                     verbose=verbose,
@@ -375,7 +380,7 @@ def list_session_history_cmd(
             else:
                 _render_flat_view(
                     "Session",
-                    response.items,
+                    display_items,
                     lambda h: f"Session: {h.session_id}",
                     verbose=verbose,
                 )
@@ -424,8 +429,8 @@ def deployment() -> None:
 @click.option(
     "--order",
     type=click.Choice(["ASC", "DESC"]),
-    default="ASC",
-    help="Order direction",
+    default="DESC",
+    help="Order direction (default: DESC to get latest records)",
 )
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--group", "group_by_entity", is_flag=True, help="Group by deployment ID")
@@ -502,6 +507,11 @@ def list_deployment_history_cmd(
             )
             response = api_session.SchedulingHistory.list_deployment_history(request)
 
+            # Reverse for display when DESC (newest at bottom for readability)
+            display_items = (
+                list(reversed(response.items)) if order == "DESC" else list(response.items)
+            )
+
             if as_json:
                 print(
                     json.dumps(
@@ -513,7 +523,7 @@ def list_deployment_history_cmd(
             elif group_by_entity:
                 _render_grouped_view(
                     "Deployment",
-                    response.items,
+                    display_items,
                     lambda h: h.deployment_id,
                     lambda h: f"Deployment: {h.deployment_id}",
                     verbose=verbose,
@@ -521,7 +531,7 @@ def list_deployment_history_cmd(
             else:
                 _render_flat_view(
                     "Deployment",
-                    response.items,
+                    display_items,
                     lambda h: f"Deployment: {h.deployment_id}",
                     verbose=verbose,
                 )
@@ -571,8 +581,8 @@ def route() -> None:
 @click.option(
     "--order",
     type=click.Choice(["ASC", "DESC"]),
-    default="ASC",
-    help="Order direction",
+    default="DESC",
+    help="Order direction (default: DESC to get latest records)",
 )
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--group", "group_by_entity", is_flag=True, help="Group by route ID")
@@ -652,6 +662,11 @@ def list_route_history_cmd(
             )
             response = api_session.SchedulingHistory.list_route_history(request)
 
+            # Reverse for display when DESC (newest at bottom for readability)
+            display_items = (
+                list(reversed(response.items)) if order == "DESC" else list(response.items)
+            )
+
             def get_route_label(h: Any) -> str:
                 return f"Route: {h.route_id} (Deployment: {h.deployment_id})"
 
@@ -666,7 +681,7 @@ def list_route_history_cmd(
             elif group_by_entity:
                 _render_grouped_view(
                     "Route",
-                    response.items,
+                    display_items,
                     lambda h: h.route_id,
                     get_route_label,
                     verbose=verbose,
@@ -674,7 +689,7 @@ def list_route_history_cmd(
             else:
                 _render_flat_view(
                     "Route",
-                    response.items,
+                    display_items,
                     get_route_label,
                     verbose=verbose,
                 )
