@@ -1946,7 +1946,7 @@ type KernelV2 implements Node {
   agentAddr: String
   containerId: String
   resourceOpts: JSON
-  occupiedSlots: JSONString!
+  occupiedSlots: JSON!
   preopenPorts: [Int!]
 }
 

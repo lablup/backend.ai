@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from .fetcher import fetch_kernels_by_agent
 from .types import (
-    KernelConnectionV2,
-    KernelEdge,
-    KernelFilter,
+    KernelConnectionV2GQL,
+    KernelEdgeGQL,
+    KernelFilterGQL,
     KernelGQL,
-    KernelOrderBy,
-    KernelOrderField,
+    KernelOrderByGQL,
+    KernelOrderFieldGQL,
     KernelStatusGQL,
 )
 
 __all__ = [
     # Types
-    "KernelConnectionV2",
-    "KernelEdge",
-    "KernelFilter",
+    "KernelConnectionV2GQL",
+    "KernelEdgeGQL",
+    "KernelFilterGQL",
     "KernelGQL",
-    "KernelOrderBy",
-    "KernelOrderField",
+    "KernelOrderByGQL",
+    "KernelOrderFieldGQL",
     "KernelStatusGQL",
     # Fetchers
     "fetch_kernels_by_agent",

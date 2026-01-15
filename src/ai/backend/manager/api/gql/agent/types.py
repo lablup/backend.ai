@@ -17,9 +17,9 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
 )
 from ai.backend.manager.api.gql.kernel.types import (
-    KernelConnectionV2,
-    KernelFilter,
-    KernelOrderBy,
+    KernelConnectionV2GQL,
+    KernelFilterGQL,
+    KernelOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -347,8 +347,8 @@ class AgentV2GQL(Node):
     async def kernels(
         self,
         info: Info[StrawberryGQLContext],
-        filter: KernelFilter | None = None,
-        order_by: list[KernelOrderBy] | None = None,
+        filter: KernelFilterGQL | None = None,
+        order_by: list[KernelOrderByGQL] | None = None,
         before: str | None = None,
         after: str | None = None,
         first: int | None = None,
@@ -356,7 +356,7 @@ class AgentV2GQL(Node):
         limit: int | None = None,
         offset: int | None = None,
         resource_occupied_only: bool = False,
-    ) -> KernelConnectionV2:
+    ) -> KernelConnectionV2GQL:
         """Fetch kernels associated with this agent."""
         from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels_by_agent
 

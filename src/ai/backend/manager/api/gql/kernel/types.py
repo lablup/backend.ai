@@ -14,7 +14,6 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import (
-    JSONString,
     OrderDirection,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -25,14 +24,18 @@ from ai.backend.manager.repositories.scheduler.options import KernelConditions, 
 KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.1.0")
 
 
-@strawberry.enum(description="Added in 26.1.0. Fields available for ordering kernels.")
-class KernelOrderField(StrEnum):
+@strawberry.enum(
+    name="KernelOrderField", description="Added in 26.1.0. Fields available for ordering kernels."
+)
+class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     ID = "id"
 
 
-@strawberry.input(description="Added in 26.1.0. Filter for kernel status.")
-class KernelStatusFilter:
+@strawberry.input(
+    name="KernelStatusFilter", description="Added in 26.1.0. Filter for kernel status."
+)
+class KernelStatusFilterGQL:
     in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelStatusGQL] | None = None
 
@@ -47,9 +50,11 @@ class KernelStatusFilter:
         return None
 
 
-@strawberry.input(description="Added in 26.1.0. Filter criteria for querying kernels.")
-class KernelFilter(GQLFilter):
-    status: KernelStatusFilter | None = None
+@strawberry.input(
+    name="KernelFilter", description="Added in 26.1.0. Filter criteria for querying kernels."
+)
+class KernelFilterGQL(GQLFilter):
+    status: KernelStatusFilterGQL | None = None
     session_id: UUID | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
@@ -63,17 +68,19 @@ class KernelFilter(GQLFilter):
         return conditions
 
 
-@strawberry.input(description="Added in 26.1.0. Ordering specification for kernels.")
-class KernelOrderBy(GQLOrderBy):
-    field: KernelOrderField
+@strawberry.input(
+    name="KernelOrderBy", description="Added in 26.1.0. Ordering specification for kernels."
+)
+class KernelOrderByGQL(GQLOrderBy):
+    field: KernelOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case KernelOrderField.CREATED_AT:
+            case KernelOrderFieldGQL.CREATED_AT:
                 return KernelOrders.created_at(ascending)
-            case KernelOrderField.ID:
+            case KernelOrderFieldGQL.ID:
                 return KernelOrders.id(ascending)
 
 
@@ -113,7 +120,7 @@ class KernelGQL(Node):
     agent_addr: str | None
     container_id: str | None
     resource_opts: JSON | None
-    occupied_slots: JSONString
+    occupied_slots: JSON
     preopen_ports: list[int] | None
 
     @classmethod
@@ -152,16 +159,21 @@ class KernelGQL(Node):
             agent_addr=kernel_info.resource.agent_addr if not hide_agents else None,
             container_id=kernel_info.resource.container_id if not hide_agents else None,
             resource_opts=kernel_info.resource.resource_opts,
-            occupied_slots=JSONString.from_resource_slot(kernel_info.resource.occupied_slots),
+            occupied_slots=kernel_info.resource.occupied_slots.to_json()
+            if kernel_info.resource.occupied_slots
+            else {},
             preopen_ports=kernel_info.network.preopen_ports,
         )
 
 
-KernelEdge = Edge[KernelGQL]
+KernelEdgeGQL = Edge[KernelGQL]
 
 
-@strawberry.type(description="Added in 26.1.0. Connection type for paginated kernel results.")
-class KernelConnectionV2(Connection[KernelGQL]):
+@strawberry.type(
+    name="KernelConnectionV2",
+    description="Added in 26.1.0. Connection type for paginated kernel results.",
+)
+class KernelConnectionV2GQL(Connection[KernelGQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:

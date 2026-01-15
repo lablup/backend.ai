@@ -17,11 +17,11 @@ from ai.backend.manager.repositories.scheduler.options import KernelConditions, 
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 from .types import (
-    KernelConnectionV2,
-    KernelEdge,
-    KernelFilter,
+    KernelConnectionV2GQL,
+    KernelEdgeGQL,
+    KernelFilterGQL,
     KernelGQL,
-    KernelOrderBy,
+    KernelOrderByGQL,
 )
 
 if TYPE_CHECKING:
@@ -47,8 +47,8 @@ def _get_kernel_pagination_spec() -> PaginationSpec:
 async def fetch_kernels_by_agent(
     info: Info[StrawberryGQLContext],
     agent_id: AgentId,
-    filter: Optional[KernelFilter] = None,
-    order_by: Optional[list[KernelOrderBy]] = None,
+    filter: Optional[KernelFilterGQL] = None,
+    order_by: Optional[list[KernelOrderByGQL]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
     first: Optional[int] = None,
@@ -56,7 +56,7 @@ async def fetch_kernels_by_agent(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
     resource_occupied_only: bool = False,
-) -> KernelConnectionV2:
+) -> KernelConnectionV2GQL:
     """Fetch kernels associated with a specific agent.
 
     Args:
@@ -69,7 +69,7 @@ async def fetch_kernels_by_agent(
         resource_occupied_only: If True, only return kernels that are occupying resources
 
     Returns:
-        KernelConnectionV2 with paginated kernel results
+        KernelConnectionV2GQL with paginated kernel results
     """
     processors = info.context.processors
 
@@ -105,9 +105,9 @@ async def fetch_kernels_by_agent(
 
     # Convert to GraphQL types
     nodes = [KernelGQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
-    edges = [KernelEdge(node=node, cursor=encode_cursor(str(node.row_id))) for node in nodes]
+    edges = [KernelEdgeGQL(node=node, cursor=encode_cursor(str(node.row_id))) for node in nodes]
 
-    return KernelConnectionV2(
+    return KernelConnectionV2GQL(
         count=action_result.total_count,
         edges=edges,
         page_info=PageInfo(
