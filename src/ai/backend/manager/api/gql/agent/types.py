@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels_by_agent
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelFilterGQL,
@@ -358,7 +359,6 @@ class AgentV2GQL(Node):
         resource_occupied_only: bool = False,
     ) -> KernelConnectionV2GQL:
         """Fetch kernels associated with this agent."""
-        from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels_by_agent
 
         return await fetch_kernels_by_agent(
             info=info,
