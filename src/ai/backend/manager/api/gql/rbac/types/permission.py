@@ -24,7 +24,7 @@ class Scope:
     @classmethod
     def from_dataclass(cls, data: ScopeIdData) -> Self:
         return cls(
-            type=ScopeTypeGQL.from_internal(data.scope_type),
+            type=data.scope_type,
             id=ID(data.scope_id) if data.scope_id else None,
         )
 
@@ -43,10 +43,10 @@ class ScopedPermission(Node):
     def from_permission_group(cls, pg: PermissionGroupExtendedData, perm: PermissionData) -> Self:
         return cls(
             id=ID(str(perm.id)),
-            scope_type=ScopeTypeGQL.from_internal(pg.scope_id.scope_type),
+            scope_type=pg.scope_id.scope_type,
             scope_id=ID(pg.scope_id.scope_id),
-            entity_type=EntityTypeGQL.from_internal(perm.entity_type),
-            operation=OperationTypeGQL.from_internal(perm.operation),
+            entity_type=perm.entity_type,
+            operation=perm.operation,
         )
 
 
@@ -61,9 +61,9 @@ class ObjectPermission(Node):
     def from_dataclass(cls, data: ObjectPermissionData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            entity_type=EntityTypeGQL.from_internal(data.object_id.entity_type),
+            entity_type=data.object_id.entity_type,
             entity_id=ID(data.object_id.entity_id),
-            operation=OperationTypeGQL.from_internal(data.operation),
+            operation=data.operation,
         )
 
 

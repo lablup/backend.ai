@@ -15,7 +15,7 @@ from ai.backend.manager.data.permission.id import ScopeId as ScopeIdData
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission_group import PermissionGroupExtendedData
 from ai.backend.manager.data.permission.role import RoleDetailData
-from ai.backend.manager.data.permission.types import ScopeType as ScopeTypeInternal
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -83,12 +83,9 @@ class RoleFilter(GQLFilter):
         # Apply scope_type filter
         if self.scope_type:
             if self.scope_type.equals:
-                internal_type = self.scope_type.equals.to_internal()
-                field_conditions.append(RoleConditions.by_scope_type(internal_type))
+                field_conditions.append(RoleConditions.by_scope_type(self.scope_type.equals))
             elif self.scope_type.in_:
-                type_conditions = [
-                    RoleConditions.by_scope_type(st.to_internal()) for st in self.scope_type.in_
-                ]
+                type_conditions = [RoleConditions.by_scope_type(st) for st in self.scope_type.in_]
                 field_conditions.append(combine_conditions_or(type_conditions))
 
         # Apply scope_id filter
@@ -98,16 +95,13 @@ class RoleFilter(GQLFilter):
         # Apply source filter
         if self.source:
             if self.source.equals:
-                internal_sources = [self.source.equals.to_internal()]
-                field_conditions.append(RoleConditions.by_sources(internal_sources))
+                field_conditions.append(RoleConditions.by_sources([self.source.equals]))
             elif self.source.in_:
-                internal_sources = [s.to_internal() for s in self.source.in_]
-                field_conditions.append(RoleConditions.by_sources(internal_sources))
+                field_conditions.append(RoleConditions.by_sources(list(self.source.in_)))
 
         # Apply has_permission_for filter
         if self.has_permission_for:
-            internal_entity_type = self.has_permission_for.to_internal()
-            field_conditions.append(RoleConditions.by_has_permission_for(internal_entity_type))
+            field_conditions.append(RoleConditions.by_has_permission_for(self.has_permission_for))
 
         # Handle logical operators
         if self.AND:
@@ -296,7 +290,7 @@ class Role(Node):
         scope_id_data = (
             data.permission_groups[0].scope_id
             if data.permission_groups
-            else ScopeIdData(scope_type=ScopeTypeInternal.GLOBAL, scope_id="")
+            else ScopeIdData(scope_type=ScopeType.GLOBAL, scope_id="")
         )
 
         # TODO: Implement additional scopes extraction from object permissions
@@ -307,7 +301,7 @@ class Role(Node):
             name=data.name,
             description=data.description,
             scope=Scope.from_dataclass(scope_id_data),
-            source=RoleSourceGQL.from_internal(data.source),
+            source=data.source,
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
