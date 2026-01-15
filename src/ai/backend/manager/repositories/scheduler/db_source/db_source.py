@@ -3397,7 +3397,7 @@ class ScheduleDBSource:
         async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
 
-            # Update session status
+            # Update session status with status_history
             stmt = (
                 sa.update(SessionRow)
                 .where(SessionRow.id == session_id)
@@ -3405,11 +3405,16 @@ class ScheduleDBSource:
                     status=SessionStatus.CANCELLED,
                     status_info=reason,
                     status_data=error_info,  # Store ErrorStatusInfo as status_data in DB
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.CANCELLED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(stmt)
 
-            # Update kernel statuses
+            # Update kernel statuses with status_history
             kernel_stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.session_id == session_id)
@@ -3417,6 +3422,11 @@ class ScheduleDBSource:
                     status=KernelStatus.CANCELLED,
                     status_changed=now,
                     status_info=reason,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.CANCELLED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(kernel_stmt)
