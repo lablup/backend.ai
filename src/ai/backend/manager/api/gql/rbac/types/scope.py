@@ -20,18 +20,20 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.permission.permission_group import PermissionGroupExtendedData
 
 
-@strawberry.type(description="Scope represents a level in the permission hierarchy")
+@strawberry.type(
+    description="Added in 26.1.0. Scope represents a level in the permission hierarchy"
+)
 class Scope:
     type: ScopeTypeGQL
     id: ID
     guest: bool = strawberry.field(
         default=False,
-        description="True if this is a guest permission group (scope visibility only)",
+        description="Added in 26.1.0. True if this is a guest permission group (scope visibility only)",
     )
 
     _permissions: strawberry.Private[list[PermissionData]]
 
-    @strawberry.field(description="Permissions granted within this scope")
+    @strawberry.field(description="Added in 26.1.0. Permissions granted within this scope")
     def permissions(
         self,
         first: Optional[int] = None,

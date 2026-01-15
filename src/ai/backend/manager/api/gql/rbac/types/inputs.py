@@ -21,13 +21,13 @@ from ai.backend.manager.types import OptionalState, TriState
 from .enums import EntityTypeGQL, OperationTypeGQL, ScopeTypeGQL
 
 
-@strawberry.input(description="Input for specifying a scope in mutations")
+@strawberry.input(description="Added in 26.1.0. Input for specifying a scope in mutations")
 class ScopeInput:
     type: ScopeTypeGQL
     id: Optional[ID] = None
 
 
-@strawberry.input(description="Input for creating a new custom role")
+@strawberry.input(description="Added in 26.1.0. Input for creating a new custom role")
 class CreateRoleInput:
     name: str
     description: Optional[str] = None
@@ -45,7 +45,7 @@ class CreateRoleInput:
         )
 
 
-@strawberry.input(description="Input for updating an existing role")
+@strawberry.input(description="Added in 26.1.0. Input for updating an existing role")
 class UpdateRoleInput:
     id: ID
     name: Optional[str] = None
@@ -64,7 +64,7 @@ class UpdateRoleInput:
         )
 
 
-@strawberry.input(description="Input for scoped permissions")
+@strawberry.input(description="Added in 26.1.0. Input for scoped permissions")
 class ScopedPermissionInput:
     scope_type: ScopeTypeGQL
     scope_id: ID
@@ -72,14 +72,14 @@ class ScopedPermissionInput:
     operation: OperationTypeGQL
 
 
-@strawberry.input(description="Input for object permissions")
+@strawberry.input(description="Added in 26.1.0. Input for object permissions")
 class ObjectPermissionInput:
     entity_type: EntityTypeGQL
     entity_id: ID
     operation: OperationTypeGQL
 
 
-@strawberry.input(description="Input for updating role permissions")
+@strawberry.input(description="Added in 26.1.0. Input for updating role permissions")
 class UpdateRolePermissionsInput:
     role_id: ID
     scoped_permissions_to_add: Optional[list[ScopedPermissionInput]] = None
@@ -88,24 +88,24 @@ class UpdateRolePermissionsInput:
     object_permission_ids_to_delete: Optional[list[ID]] = None
 
 
-@strawberry.input(description="Input for creating a role assignment")
+@strawberry.input(description="Added in 26.1.0. Input for creating a role assignment")
 class CreateRoleAssignmentInput:
     user_id: ID
     role_id: ID
     expires_at: Optional[datetime] = None
 
 
-@strawberry.input(description="Input for deleting a role")
+@strawberry.input(description="Added in 26.1.0. Input for deleting a role")
 class DeleteRoleInput:
     id: ID
 
 
-@strawberry.input(description="Input for purging a role")
+@strawberry.input(description="Added in 26.1.0. Input for purging a role")
 class PurgeRoleInput:
     id: ID
 
 
-@strawberry.input(description="Input for deleting a role assignment")
+@strawberry.input(description="Added in 26.1.0. Input for deleting a role assignment")
 class DeleteRoleAssignmentInput:
     user_id: ID
     role_id: ID

@@ -35,19 +35,19 @@ from .scope import Scope
 # ==============================================================================
 
 
-@strawberry.input(description="Filter for scope type")
+@strawberry.input(description="Added in 26.1.0. Filter for scope type")
 class ScopeTypeFilter:
     in_: Optional[list[ScopeTypeGQL]] = strawberry.field(default=None, name="in")
     equals: Optional[ScopeTypeGQL] = None
 
 
-@strawberry.input(description="Filter for role source")
+@strawberry.input(description="Added in 26.1.0. Filter for role source")
 class RoleSourceFilter:
     in_: Optional[list[RoleSourceGQL]] = strawberry.field(default=None, name="in")
     equals: Optional[RoleSourceGQL] = None
 
 
-@strawberry.input(description="Filter options for role queries")
+@strawberry.input(description="Added in 26.1.0. Filter options for role queries")
 class RoleFilter(GQLFilter):
     scope_type: Optional[ScopeTypeFilter] = None
     scope_id: Optional[ID] = None
@@ -122,7 +122,7 @@ class RoleFilter(GQLFilter):
 # ==============================================================================
 
 
-@strawberry.input(description="Ordering options for role queries")
+@strawberry.input(description="Added in 26.1.0. Ordering options for role queries")
 class RoleOrderBy(GQLOrderBy):
     field: RoleOrderField
     direction: OrderDirection = OrderDirection.ASC
@@ -145,7 +145,9 @@ class RoleOrderBy(GQLOrderBy):
 # ==============================================================================
 
 
-@strawberry.type(description="Role: defines a collection of permissions bound to specific scopes")
+@strawberry.type(
+    description="Added in 26.1.0. Role: defines a collection of permissions bound to specific scopes"
+)
 class Role(Node):
     id: NodeID[str]
     name: str
@@ -162,7 +164,7 @@ class Role(Node):
     #       For better performance, implement DB-level pagination.
     _object_permissions_data: strawberry.Private[list[ObjectPermissionData]]
 
-    @strawberry.field(description="Object permissions for this role")
+    @strawberry.field(description="Added in 26.1.0. Object permissions for this role")
     def object_permissions(
         self,
         first: Optional[int] = None,
