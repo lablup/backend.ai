@@ -4,7 +4,6 @@ from strawberry.schema.config import StrawberryConfig
 
 from .agent import (
     agent_stats,
-    agent_v2,
     agents_v2,
 )
 from .app_config import (
@@ -132,7 +131,6 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
-    agent_v2 = agent_v2
     agents_v2 = agents_v2
     artifact = artifact
     artifacts = artifacts
