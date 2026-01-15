@@ -3462,6 +3462,48 @@ type EndpointTokenList implements PaginatedList
   total_count: Int!
 }
 
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+type EnvironmentVariableEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+input EnvironmentVariableEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+type EnvironmentVariables
+  @join__type(graph: STRAWBERRY)
+{
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntry!]!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+input EnvironmentVariablesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntryInput!]!
+}
+
 """Added in 24.03.4."""
 input ExtraMountInput
   @join__type(graph: GRAPHENE)
@@ -4621,10 +4663,8 @@ type ModelRuntimeConfig
   """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
-  """
-  environ: JSON
+  """Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0."""
+  environ: EnvironmentVariables
 }
 
 """Added in 25.19.0"""
@@ -4634,10 +4674,8 @@ input ModelRuntimeConfigInput
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON = null
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
-  """
-  environ: JSON = null
+  """Environment variables for the service."""
+  environ: EnvironmentVariablesInput = null
 }
 
 """

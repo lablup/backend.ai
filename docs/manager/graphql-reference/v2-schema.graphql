@@ -1664,18 +1664,38 @@ input DomainUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
-"""Input for email message settings"""
-input EmailMessageInput {
-  fromEmail: String!
-  toEmails: [String!]!
-  subjectTemplate: String = null
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+type EnvironmentVariableEntry {
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
 }
 
-"""Input for email notification channel configuration"""
-input EmailSpecInput {
-  smtp: SMTPConnectionInput!
-  message: EmailMessageInput!
-  auth: SMTPAuthInput = null
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+input EnvironmentVariableEntryInput {
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+type EnvironmentVariables {
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntry!]!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+input EnvironmentVariablesInput {
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntryInput!]!
 }
 
 type ExtraVFolderMount implements Node {
@@ -2108,10 +2128,8 @@ type ModelRuntimeConfig {
   """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
-  """
-  environ: JSON
+  """Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0."""
+  environ: EnvironmentVariables
 }
 
 """Added in 25.19.0"""
@@ -2119,10 +2137,8 @@ input ModelRuntimeConfigInput {
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON = null
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
-  """
-  environ: JSON = null
+  """Environment variables for the service."""
+  environ: EnvironmentVariablesInput = null
 }
 
 """
