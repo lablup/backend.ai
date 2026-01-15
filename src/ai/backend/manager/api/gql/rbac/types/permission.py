@@ -20,12 +20,17 @@ from .enums import EntityTypeGQL, OperationTypeGQL, ScopeTypeGQL
 class Scope:
     type: ScopeTypeGQL
     id: Optional[ID]
+    guest: bool = strawberry.field(
+        default=False,
+        description="True if this is a guest permission group (scope visibility only)",
+    )
 
     @classmethod
-    def from_dataclass(cls, data: ScopeIdData) -> Self:
+    def from_dataclass(cls, data: ScopeIdData, *, guest: bool = False) -> Self:
         return cls(
             type=data.scope_type,
             id=ID(data.scope_id) if data.scope_id else None,
+            guest=guest,
         )
 
 
