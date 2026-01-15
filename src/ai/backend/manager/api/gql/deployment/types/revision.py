@@ -29,10 +29,10 @@ from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFol
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    EnvironmentVariableEntryData,
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,

@@ -16,7 +16,7 @@ from ai.backend.common.types import (
     RuntimeVariant,
     VFolderMount,
 )
-from ai.backend.manager.data.deployment.types import EnvironmentVariableEntryData
+from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
