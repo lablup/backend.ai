@@ -1862,10 +1862,28 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
-<<<<<<< HEAD
-=======
-"""Added in 25.15.0"""
-scalar JSONString
+"""
+Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
+"""
+type KernelClusterInfo {
+  """The clustering mode (e.g., single-node, multi-node)."""
+  clusterMode: String!
+
+  """Total number of nodes in the cluster."""
+  clusterSize: Int!
+
+  """The role of this kernel in the cluster (e.g., main, sub)."""
+  clusterRole: String!
+
+  """The index of this kernel within the cluster (0-based)."""
+  clusterIdx: Int!
+
+  """The local rank of this kernel for distributed computing."""
+  localRank: Int!
+
+  """The hostname assigned to this kernel within the cluster network."""
+  clusterHostname: String!
+}
 
 """Added in 26.1.0. Connection type for paginated kernel results."""
 type KernelConnectionV2 {
@@ -1883,6 +1901,98 @@ input KernelFilter {
   sessionId: UUID = null
 }
 
+"""Added in 26.1.0. Container image information for a kernel."""
+type KernelImageInfo {
+  """
+  The canonical reference of the container image (e.g., registry/repo:tag).
+  """
+  reference: String!
+
+  """The container registry hosting the image."""
+  registry: String
+
+  """The tag of the container image."""
+  tag: String
+
+  """The CPU architecture the image is built for (e.g., x86_64, aarch64)."""
+  architecture: String!
+}
+
+"""Added in 26.1.0. Lifecycle and status information for a kernel."""
+type KernelLifecycleInfo {
+  """
+  Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
+  Indicates the kernel's position in its lifecycle.
+  """
+  status: KernelStatus!
+
+  """The result of the kernel execution (e.g., SUCCESS, FAILURE)."""
+  result: String!
+
+  """Timestamp when the kernel last changed status."""
+  statusChanged: DateTime
+
+  """Human-readable information about the current status."""
+  statusInfo: String
+
+  """Additional structured data about the current status."""
+  statusData: JSON
+
+  """History of status transitions with timestamps."""
+  statusHistory: JSON
+
+  """Timestamp when the kernel was created."""
+  createdAt: DateTime
+
+  """Timestamp when the kernel was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the kernel, if applicable."""
+  startsAt: DateTime
+
+  """Timestamp when the kernel was last seen active."""
+  lastSeen: DateTime
+}
+
+"""Added in 26.1.0. Additional metadata for a kernel."""
+type KernelMetadataInfo {
+  """URL to call back when kernel status changes."""
+  callbackUrl: String
+
+  """Internal data stored with the kernel for system use."""
+  internalData: JSON
+}
+
+"""Added in 26.1.0. Metrics and statistics for a kernel."""
+type KernelMetricsInfo {
+  """The number of queries/executions performed by this kernel."""
+  numQueries: Int!
+
+  """The last collected statistics for this kernel."""
+  lastStat: JSON
+}
+
+"""Added in 26.1.0. Network configuration for a kernel."""
+type KernelNetworkInfo {
+  """The hostname or IP address where the kernel is accessible."""
+  kernelHost: String
+
+  """The port for REPL input stream."""
+  replInPort: Int!
+
+  """The port for REPL output stream."""
+  replOutPort: Int!
+
+  """Mapping of service names to their exposed ports."""
+  servicePorts: JSON
+
+  """List of ports that are pre-opened for this kernel."""
+  preopenPorts: [Int!]
+
+  """Whether the kernel uses host network mode."""
+  useHostNetwork: Boolean!
+}
+
 """Added in 26.1.0. Ordering specification for kernels."""
 input KernelOrderBy {
   field: KernelOrderField!
@@ -1893,6 +2003,75 @@ input KernelOrderBy {
 enum KernelOrderField {
   CREATED_AT
   ID
+}
+
+"""Added in 26.1.0. Resource allocation information for a kernel."""
+type KernelResourceInfo {
+  """The scaling group this kernel is assigned to."""
+  scalingGroup: String
+
+  """
+  The ID of the agent running this kernel. Null if not yet assigned or hidden.
+  """
+  agentId: String
+
+  """The network address of the agent. Null if not yet assigned or hidden."""
+  agentAddr: String
+
+  """
+  The container ID on the agent. Null if container not yet created or hidden.
+  """
+  containerId: String
+
+  """
+  The resource slots currently occupied by this kernel.
+  Expressed as a JSON object with resource types as keys (e.g., cpu, mem, cuda.shares).
+  """
+  occupiedSlots: JSON!
+
+  """
+  The resource slots originally requested for this kernel.
+  May differ from occupied_slots due to scheduling adjustments.
+  """
+  requestedSlots: JSON!
+
+  """The fractional resource shares occupied by this kernel."""
+  occupiedShares: JSON!
+
+  """
+  Information about attached devices (e.g., GPUs) allocated to this kernel.
+  """
+  attachedDevices: JSON!
+
+  """Additional resource options and configurations for this kernel."""
+  resourceOpts: JSON
+}
+
+"""Added in 26.1.0. Runtime configuration for a kernel."""
+type KernelRuntimeInfo {
+  """Environment variables set for this kernel."""
+  environ: [String!]
+
+  """Bootstrap script executed when the kernel starts."""
+  bootstrapScript: String
+
+  """Startup command executed after bootstrap."""
+  startupCommand: String
+}
+
+"""Added in 26.1.0. Information about the session this kernel belongs to."""
+type KernelSessionInfo {
+  """The unique identifier of the session this kernel belongs to."""
+  sessionId: UUID!
+
+  """The creation ID used when creating the session."""
+  creationId: String
+
+  """The name of the session."""
+  name: String
+
+  """The type of session (e.g., INTERACTIVE, BATCH)."""
+  sessionType: String!
 }
 
 """Added in 26.1.0"""
@@ -1921,33 +2100,70 @@ input KernelStatusFilter {
 }
 
 """
+Added in 26.1.0. User permission and ownership information for a kernel.
+"""
+type KernelUserPermissionInfo {
+  """The UUID of the user who owns this kernel."""
+  userUuid: UUID!
+
+  """The access key used to create this kernel."""
+  accessKey: String!
+
+  """The domain this kernel belongs to."""
+  domainName: String!
+
+  """The group (project) ID this kernel belongs to."""
+  groupId: UUID!
+
+  """The Unix user ID for the kernel's container process."""
+  uid: Int
+
+  """The primary Unix group ID for the kernel's container process."""
+  mainGid: Int
+
+  """Additional Unix group IDs for the kernel's container process."""
+  gids: [Int!]
+}
+
+"""
 Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """The internal database row ID of the kernel."""
   rowId: UUID!
-  clusterIdx: Int!
-  localRank: Int!
-  clusterRole: String!
-  clusterHostname: String!
-  sessionId: UUID!
-  imageReference: String!
-  architecture: String!
-  status: KernelStatus!
-  statusChanged: DateTime
-  statusInfo: String
-  statusData: JSON
-  createdAt: DateTime
-  terminatedAt: DateTime
-  startsAt: DateTime
-  scheduledAt: DateTime
-  agentId: String
-  agentAddr: String
-  containerId: String
-  resourceOpts: JSON
-  occupiedSlots: JSON!
-  preopenPorts: [Int!]
+
+  """Information about the session this kernel belongs to."""
+  session: KernelSessionInfo!
+
+  """User permission and ownership information."""
+  userPermission: KernelUserPermissionInfo!
+
+  """Container image information."""
+  image: KernelImageInfo!
+
+  """Network configuration and exposed ports."""
+  network: KernelNetworkInfo!
+
+  """Cluster configuration for distributed computing."""
+  cluster: KernelClusterInfo!
+
+  """Resource allocation and agent information."""
+  resource: KernelResourceInfo!
+
+  """Runtime configuration (environment, scripts)."""
+  runtime: KernelRuntimeInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: KernelLifecycleInfo!
+
+  """Execution metrics and statistics."""
+  metrics: KernelMetricsInfo!
+
+  """Additional metadata and internal data."""
+  metadata: KernelMetadataInfo!
 }
 
 """An edge in a connection."""
@@ -1959,7 +2175,6 @@ type KernelV2Edge {
   node: KernelV2!
 }
 
->>>>>>> b901c2f60 (fix: Update scheman)
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
@@ -2210,22 +2425,22 @@ input ModelTarget {
 type Mutation {
   """
   Added in 25.14.0.
-
+  
   Scan external registries to discover available artifacts.
-
+  
   Searches HuggingFace or Reservoir registries for artifacts matching the specified
   criteria and registers them in the system with SCANNED status. The artifacts
   become available for import but are not downloaded until explicitly imported.
-
+  
   This is the first step in the artifact workflow: Scan → Import → Use.
   """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
 
   """
   Added in 25.14.0.
-
+  
   Perform detailed scanning of specific models.
-
+  
   Unlike the general scan_artifacts operation, this performs immediate detailed
   scanning of specified models including README content and file sizes.
   Returns artifact revisions with complete metadata ready for use.
@@ -2234,12 +2449,12 @@ type Mutation {
 
   """
   Added in 25.14.0.
-
+  
   Import scanned artifact revisions from external registries.
-
+  
   Downloads the actual files for the specified artifact revisions, transitioning
   them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
-
+  
   Returns background tasks that can be monitored for import progress.
   Once AVAILABLE, artifacts can be used by users in their sessions.
   """
@@ -2289,14 +2504,14 @@ type Mutation {
 
   """
   Added in 25.15.0.
-
+  
   Triggers artifact scanning on a remote reservoir registry.
-
+  
   This mutation instructs a reservoir-type registry to initiate a scan of artifacts
   from its associated remote reservoir registry source. The scan process will discover and
   catalog artifacts available in the remote reservoir, making them accessible
   through the local reservoir registry.
-
+  
   Requirements:
   - The delegator registry must be of type 'reservoir'
   - The delegator reservoir registry must have a valid remote registry configuration
@@ -2305,13 +2520,13 @@ type Mutation {
 
   """
   Added in 25.15.0.
-
+  
   Trigger import of artifact revisions from a remote reservoir registry.
-
+  
   This mutation instructs a reservoir-type registry to import specific artifact revisions
   that were previously discovered during a scan from its remote registry.
   Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
-
+  
   Requirements:
   - The delegator registry must be of type 'reservoir'
   - The delegator registry must have a valid remote registry configuration
@@ -2320,9 +2535,9 @@ type Mutation {
 
   """
   Added in 25.14.0.
-
+  
   Update artifact metadata properties.
-
+  
   Modifies artifact metadata such as readonly status and description.
   This operation does not affect the actual artifact files or revisions.
   """
@@ -2330,9 +2545,9 @@ type Mutation {
 
   """
   Added in 25.15.0.
-
+  
   Soft-delete artifacts from the system.
-
+  
   Marks artifacts as deleted without permanently removing them.
   Deleted artifacts can be restored using the restore_artifacts mutation.
   """
@@ -2340,9 +2555,9 @@ type Mutation {
 
   """
   Added in 25.15.0.
-
+  
   Restore previously deleted artifacts.
-
+  
   Reverses the soft-delete operation, making the artifacts available again
   for use in the system.
   """
@@ -2350,22 +2565,22 @@ type Mutation {
 
   """
   Added in 25.14.0.
-
+  
   Clean up stored artifact revision data to free storage space.
-
+  
   Removes the downloaded files for the specified artifact revisions and
   transitions them back to SCANNED status. The metadata remains, allowing
   the artifacts to be re-imported later if needed.
-
+  
   Use this operation to manage storage usage by removing unused artifacts.
   """
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
 
   """
   Added in 25.14.0.
-
+  
   Cancel an in-progress artifact import operation.
-
+  
   Stops the download process for the specified artifact revision and
   reverts its status back to SCANNED. The partially downloaded data is cleaned up.
   """
@@ -2446,14 +2661,14 @@ type Mutation {
 
   """
   Added in 25.15.0.
-
+  
   Registers a new namespace within a storage.
   """
   registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload!
 
   """
   Added in 25.15.0.
-
+  
   Unregisters an existing namespace from a storage.
   """
   unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload!
@@ -2484,9 +2699,9 @@ type Mutation {
 
   """
   Added in 25.14.0.
-
+  
   Approve an artifact revision for general use.
-
+  
   Admin-only operation to approve artifact revisions, typically used
   in environments with approval workflows for artifact deployment.
   """
@@ -2494,9 +2709,9 @@ type Mutation {
 
   """
   Added in 25.14.0.
-
+  
   Reject an artifact revision, preventing its use.
-
+  
   Admin-only operation to reject artifact revisions, typically used
   in environments with approval workflows for artifact deployment.
   """
@@ -2926,9 +3141,9 @@ type Query {
 
   """
   Added in 25.14.0.
-
+  
   Retrieve a specific artifact by its ID.
-
+  
   Returns detailed information about the artifact including its metadata,
   registry information, and availability status.
   """
@@ -2936,13 +3151,13 @@ type Query {
 
   """
   Added in 25.14.0.
-
+  
   Query artifacts with optional filtering, ordering, and pagination.
-
+  
   Returns artifacts that are available in the system, discovered through scanning
   external registries like HuggingFace or Reservoir. By default, only shows
   ALIVE (non-deleted) artifacts.
-
+  
   Use filters to narrow down results by type, name, registry, or availability.
   Supports cursor-based pagination for efficient browsing of large datasets.
   """
@@ -2950,9 +3165,9 @@ type Query {
 
   """
   Added in 25.14.0.
-
+  
   Retrieve a specific artifact revision by its ID.
-
+  
   Returns detailed information about the revision including its status,
   version, file size, and README content.
   """
@@ -2960,12 +3175,12 @@ type Query {
 
   """
   Added in 25.14.0.
-
+  
   Query artifact revisions with optional filtering, ordering, and pagination.
-
+  
   Returns specific versions/revisions of artifacts. Each revision represents
   a specific version of an artifact with its own status, file data, and metadata.
-
+  
   Use filters to find revisions by status, version, or artifact ID.
   Supports cursor-based pagination for efficient browsing.
   """
@@ -3974,9 +4189,9 @@ type SubStepResultGQL {
 type Subscription {
   """
   Added in 25.14.0.
-
+  
   Subscribe to real-time artifact status change notifications.
-
+  
   Receives updates when artifact revision statuses change during import,
   cleanup, or other operations. Useful for building reactive UIs that
   show live progress of artifact operations.
@@ -3985,9 +4200,9 @@ type Subscription {
 
   """
   Added in 25.14.0.
-
+  
   Subscribe to real-time artifact import progress updates.
-
+  
   Receives progress notifications during artifact import operations,
   including percentage completed and current status. Useful for displaying
   progress bars and real-time import status to users.
