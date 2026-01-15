@@ -2377,7 +2377,7 @@ input DelegateImportArtifactsInput
   """
   Options controlling import behavior such as forcing re-download. Added in 26.1.0.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
@@ -3949,7 +3949,7 @@ input ImportArtifactsInput
   """
   Options controlling import behavior such as forcing re-download. Added in 26.1.0.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
