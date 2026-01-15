@@ -1173,15 +1173,14 @@ type CreateRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Input for creating a role assignment"""
+"""Added in 26.1.0. Input for creating a role assignment"""
 input CreateRoleAssignmentInput {
   userId: ID!
   roleId: ID!
-  scope: ScopeInput!
   expiresAt: DateTime = null
 }
 
-"""Input for creating a new custom role"""
+"""Added in 26.1.0. Input for creating a new custom role"""
 input CreateRoleInput {
   name: String!
   description: String = null
@@ -1399,6 +1398,17 @@ input DeleteReservoirRegistryInput {
 
 """Added in 25.14.0"""
 type DeleteReservoirRegistryPayload {
+  id: ID!
+}
+
+"""Added in 26.1.0. Input for deleting a role assignment"""
+input DeleteRoleAssignmentInput {
+  userId: ID!
+  roleId: ID!
+}
+
+"""Added in 26.1.0. Input for deleting a role"""
+input DeleteRoleInput {
   id: ID!
 }
 
@@ -1790,6 +1800,7 @@ input DomainUsageBucketOrderBy {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 """
 Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
 """
@@ -1851,20 +1862,25 @@ input EnvironmentVariablesInput {
   entries: [EnvironmentVariableEntryInput!]!
 =======
 """Entity types managed by the RBAC system"""
+=======
+"""Added in 26.1.0. Entity types managed by the RBAC system"""
+>>>>>>> 748975662 (chore: update api schema dump)
 enum EntityType {
-  COMPUTE_SESSION
+  USER
+  PROJECT
+  DOMAIN
   VFOLDER
   IMAGE
-  MODEL_SERVICE
-  MODEL_ARTIFACT
+  SESSION
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  APP_CONFIG
+  NOTIFICATION_CHANNEL
+  NOTIFICATION_RULE
+  MODEL_DEPLOYMENT
   AGENT
   RESOURCE_GROUP
   STORAGE_HOST
-  APP_CONFIG
-  NOTIFICATION
-  DOMAIN
-  PROJECT
-  USER
   ROLE
   ROLE_ASSIGNMENT
 >>>>>>> eaeffc3c8 (chore: update api schema dump)
@@ -2668,6 +2684,7 @@ type Mutation {
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   """
   Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
@@ -2704,23 +2721,31 @@ type Mutation {
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
 =======
   """Create a new custom role"""
+=======
+  """Added in 26.1.0. Create a new custom role"""
+>>>>>>> 748975662 (chore: update api schema dump)
   createRole(input: CreateRoleInput!): Role!
 
-  """Update an existing role"""
+  """Added in 26.1.0. Update an existing role"""
   updateRole(input: UpdateRoleInput!): Role!
 
-  """Delete a role (soft delete)"""
-  deleteRole(id: ID!): Role!
+  """Added in 26.1.0. Delete a role (soft delete)"""
+  deleteRole(input: DeleteRoleInput!): Role!
 
-  """Update role permissions"""
+  """Added in 26.1.0. Update role permissions"""
   updateRolePermissions(input: UpdateRolePermissionsInput!): Role!
 
-  """Assign a role to a user"""
+  """Added in 26.1.0. Assign a role to a user"""
   createRoleAssignment(input: CreateRoleAssignmentInput!): Role!
 
+<<<<<<< HEAD
   """Revoke a role assignment"""
   deleteRoleAssignment(id: ID!): Role!
 >>>>>>> eaeffc3c8 (chore: update api schema dump)
+=======
+  """Added in 26.1.0. Revoke a role assignment"""
+  deleteRoleAssignment(input: DeleteRoleAssignmentInput!): Role!
+>>>>>>> 748975662 (chore: update api schema dump)
 }
 
 """An object with a Globally Unique ID"""
@@ -2863,7 +2888,9 @@ enum NotificationRuleType {
   ENDPOINT_LIFECYCLE_CHANGED
 }
 
-"""Object Permission: grants permission for a SPECIFIC entity instance"""
+"""
+Added in 26.1.0. Object Permission: grants permission for a SPECIFIC entity instance
+"""
 type ObjectPermission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -2872,20 +2899,26 @@ type ObjectPermission implements Node {
   operation: OperationType!
 }
 
-"""Connection for paginated object permission results"""
+"""Added in 26.1.0. Connection type for paginated object permissions"""
 type ObjectPermissionConnection {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [ObjectPermissionEdge!]!
   count: Int!
 }
 
-"""Edge type for object permission connections"""
+"""An edge in a connection."""
 type ObjectPermissionEdge {
-  node: ObjectPermission!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectPermission!
 }
 
-"""Input for object permissions"""
+"""Added in 26.1.0. Input for object permissions"""
 input ObjectPermissionInput {
   entityType: EntityType!
   entityId: ID!
@@ -2924,7 +2957,7 @@ type ObjectStorageEdge {
   node: ObjectStorage!
 }
 
-"""Operations that can be performed on entities"""
+"""Added in 26.1.0. Operations that can be performed on entities"""
 enum OperationType {
   CREATE
   READ
@@ -3400,10 +3433,10 @@ type Query {
   """List route history (superadmin only)"""
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
 
-  """Get a specific role by ID"""
+  """Added in 26.1.0. Get a specific role by ID"""
   role(id: ID!): Role
 
-  """List roles with optional filtering and pagination"""
+  """Added in 26.1.0. List roles with optional filtering and pagination"""
   roles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
 }
 
@@ -3763,40 +3796,44 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-"""Role: defines a collection of permissions bound to a specific scope"""
+"""
+Added in 26.1.0. Role: defines a collection of permissions bound to specific scopes
+"""
 type Role implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
   description: String
-  scope: Scope!
+  scopes: [Scope!]!
   source: RoleSource!
   createdAt: DateTime!
   updatedAt: DateTime
   deletedAt: DateTime
-  additionalScopes: [Scope!]!
 
-  """Scoped permissions for this role"""
-  scopedPermissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ScopedPermissionConnection!
-
-  """Object permissions for this role"""
+  """Added in 26.1.0. Object permissions for this role"""
   objectPermissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ObjectPermissionConnection!
 }
 
-"""Connection for paginated role results"""
+"""Added in 26.1.0. Connection type for paginated roles"""
 type RoleConnection {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [RoleEdge!]!
   count: Int!
 }
 
-"""Edge type for role connections"""
+"""An edge in a connection."""
 type RoleEdge {
-  node: Role!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: Role!
 }
 
-"""Filter options for role queries"""
+"""Added in 26.1.0. Filter options for role queries"""
 input RoleFilter {
   scopeType: ScopeTypeFilter = null
   scopeId: ID = null
@@ -3808,26 +3845,26 @@ input RoleFilter {
   NOT: [RoleFilter!] = null
 }
 
-"""Ordering options for role queries"""
+"""Added in 26.1.0. Ordering options for role queries"""
 input RoleOrderBy {
   field: RoleOrderField!
   direction: OrderDirection! = ASC
 }
 
-"""Fields available for ordering role queries"""
+"""Added in 26.1.0. Fields available for ordering role queries"""
 enum RoleOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
 }
 
-"""Role source indicating how the role was created"""
+"""Added in 26.1.0. Role source indicating how the role was created"""
 enum RoleSource {
   SYSTEM
   CUSTOM
 }
 
-"""Filter for role source"""
+"""Added in 26.1.0. Filter for role source"""
 input RoleSourceFilter {
   in: [RoleSource!] = null
   equals: RoleSource = null
@@ -4114,56 +4151,70 @@ enum SchedulingStatus {
   ERROR
 }
 
-"""Scope represents a level in the permission hierarchy"""
+"""Added in 26.1.0. Scope represents a level in the permission hierarchy"""
 type Scope {
   type: ScopeType!
-  id: ID
+  id: ID!
+
+  """
+  Added in 26.1.0. True if this is a guest permission group (scope visibility only)
+  """
+  guest: Boolean!
+
+  """Added in 26.1.0. Permissions granted within this scope"""
+  permissions(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ScopedPermissionConnection!
 }
 
-"""Input for specifying a scope in mutations"""
+"""Added in 26.1.0. Input for specifying a scope in mutations"""
 input ScopeInput {
   type: ScopeType!
   id: ID = null
 }
 
-"""Scope types in the permission hierarchy"""
+"""Added in 26.1.0. Scope types in the permission hierarchy"""
 enum ScopeType {
-  GLOBAL
   DOMAIN
   PROJECT
   USER
+  GLOBAL
 }
 
-"""Filter for scope type"""
+"""Added in 26.1.0. Filter for scope type"""
 input ScopeTypeFilter {
   in: [ScopeType!] = null
   equals: ScopeType = null
 }
 
-"""Scoped Permission: grants permission for an operation on ALL entities"""
+"""
+Added in 26.1.0. Scoped Permission: grants permission for an operation on ALL entities
+"""
 type ScopedPermission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: ScopeType!
-  scopeId: ID!
   entityType: EntityType!
   operation: OperationType!
 }
 
-"""Connection for paginated scoped permission results"""
+"""Added in 26.1.0. Connection type for paginated scoped permissions"""
 type ScopedPermissionConnection {
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
   edges: [ScopedPermissionEdge!]!
   count: Int!
 }
 
-"""Edge type for scoped permission connections"""
+"""An edge in a connection."""
 type ScopedPermissionEdge {
-  node: ScopedPermission!
+  """A cursor for use in pagination"""
   cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScopedPermission!
 }
 
-"""Input for scoped permissions"""
+"""Added in 26.1.0. Input for scoped permissions"""
 input ScopedPermissionInput {
   scopeType: ScopeType!
   scopeId: ID!
@@ -4539,6 +4590,7 @@ type UpdateReservoirRegistryPayload {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 """
 Added in 26.1.0. Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.
 """
@@ -4576,13 +4628,16 @@ type UpdateResourceGroupFairShareSpecPayload {
   resourceGroup: ResourceGroup!
 =======
 """Input for updating an existing role"""
+=======
+"""Added in 26.1.0. Input for updating an existing role"""
+>>>>>>> 748975662 (chore: update api schema dump)
 input UpdateRoleInput {
   id: ID!
   name: String = null
   description: String = null
 }
 
-"""Input for updating role permissions"""
+"""Added in 26.1.0. Input for updating role permissions"""
 input UpdateRolePermissionsInput {
   roleId: ID!
   scopedPermissionsToAdd: [ScopedPermissionInput!] = null
