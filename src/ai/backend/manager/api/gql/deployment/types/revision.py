@@ -29,7 +29,6 @@ from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFol
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
-from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -421,10 +420,6 @@ class EnvironmentVariableEntryInputGQL:
     )
     value: str = strawberry.field(description="Environment variable value.")
 
-    def to_dataclass(self) -> EnvironmentVariableEntryData:
-        """Convert to EnvironmentVariableEntryData for internal use."""
-        return EnvironmentVariableEntryData(name=self.name, value=self.value)
-
 
 @strawberry.input(
     name="EnvironmentVariablesInput",
@@ -437,9 +432,9 @@ class EnvironmentVariablesInputGQL:
         description="List of environment variable entries."
     )
 
-    def to_dataclass(self) -> list[EnvironmentVariableEntryData]:
-        """Convert to list of EnvironmentVariableEntryData for internal use."""
-        return [entry.to_dataclass() for entry in self.entries]
+    def to_dict(self) -> dict[str, str]:
+        """Convert to dict for internal use."""
+        return {entry.name: entry.value for entry in self.entries}
 
 
 @strawberry.input(description="Added in 25.19.0")
@@ -507,7 +502,7 @@ class CreateRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=self.model_runtime_config.environ.to_dataclass()
+            environ=self.model_runtime_config.environ.to_dict()
             if self.model_runtime_config.environ
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
@@ -566,7 +561,7 @@ class AddRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=self.model_runtime_config.environ.to_dataclass()
+            environ=self.model_runtime_config.environ.to_dict()
             if self.model_runtime_config.environ
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),

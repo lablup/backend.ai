@@ -55,7 +55,6 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -749,9 +748,7 @@ class EndpointRow(Base):
             startup_command=creator.model_revision.execution.startup_command,
             bootstrap_script=creator.model_revision.execution.bootstrap_script,
             callback_url=creator.model_revision.execution.callback_url,
-            environ={entry.name: entry.value for entry in creator.model_revision.execution.environ}
-            if creator.model_revision.execution.environ
-            else None,
+            environ=creator.model_revision.execution.environ,
             open_to_public=creator.network.open_to_public,
             runtime_variant=creator.model_revision.execution.runtime_variant,
             resource_slots=creator.model_revision.resource_spec.resource_slots,
@@ -838,12 +835,7 @@ class EndpointRow(Base):
                     execution=ExecutionSpec(
                         startup_command=revision.startup_command,
                         bootstrap_script=revision.bootstrap_script,
-                        environ=[
-                            EnvironmentVariableEntryData(name=k, value=v)
-                            for k, v in revision.environ.items()
-                        ]
-                        if revision.environ
-                        else None,
+                        environ=revision.environ,
                         runtime_variant=revision.runtime_variant,
                         callback_url=yarl.URL(revision.callback_url)
                         if revision.callback_url
@@ -906,12 +898,7 @@ class EndpointRow(Base):
                     execution=ExecutionSpec(
                         startup_command=self.startup_command,
                         bootstrap_script=self.bootstrap_script,
-                        environ=[
-                            EnvironmentVariableEntryData(name=k, value=v)
-                            for k, v in self.environ.items()
-                        ]
-                        if self.environ
-                        else None,
+                        environ=self.environ,
                         runtime_variant=self.runtime_variant,
                         callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
                     ),

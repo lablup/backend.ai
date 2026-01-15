@@ -16,7 +16,6 @@ from ai.backend.common.types import (
     RuntimeVariant,
     VFolderMount,
 )
-from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
@@ -100,7 +99,7 @@ class DeploymentExecutionFields:
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
-    environ: Optional[list[EnvironmentVariableEntryData]] = None
+    environ: Optional[dict[str, str]] = None
     callback_url: Optional[yarl.URL] = None
 
 
@@ -165,9 +164,7 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             runtime_variant=self.revision.execution.runtime_variant,
             startup_command=self.revision.execution.startup_command,
             bootstrap_script=self.revision.execution.bootstrap_script,
-            environ={entry.name: entry.value for entry in self.revision.execution.environ}
-            if self.revision.execution.environ
-            else {},
+            environ=self.revision.execution.environ or {},
             callback_url=self.revision.execution.callback_url,
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,

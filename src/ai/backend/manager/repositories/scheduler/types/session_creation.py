@@ -122,9 +122,7 @@ class SessionCreationSpec:
 
         # Prepare environment variables
         environ_dict: dict[str, str] = (
-            {entry.name: entry.value for entry in target_revision.execution.environ}
-            if target_revision.execution.environ
-            else {}
+            dict(target_revision.execution.environ) if target_revision.execution.environ else {}
         )
         if "BACKEND_MODEL_NAME" not in environ_dict:
             # Add model name to environment if not already present

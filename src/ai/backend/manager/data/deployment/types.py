@@ -33,7 +33,6 @@ from ai.backend.common.types import (
     SessionId,
     VFolderMount,
 )
-from ai.backend.manager.data.common.types import EnvironmentVariableEntryData
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
 
@@ -266,7 +265,7 @@ class ResourceSpec(ConfiguredModel):
 class ExecutionSpec(ConfiguredModel):
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
-    environ: Optional[list[EnvironmentVariableEntryData]] = None
+    environ: Optional[dict[str, str]] = None
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     callback_url: Optional[yarl.URL] = None
     inference_runtime_config: Optional[Mapping[str, Any]] = None
@@ -437,7 +436,7 @@ class ResourceConfigData:
 class ModelRuntimeConfigData:
     runtime_variant: RuntimeVariant
     inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[list[EnvironmentVariableEntryData]] = None
+    environ: Optional[dict[str, str]] = None
 
 
 @dataclass
