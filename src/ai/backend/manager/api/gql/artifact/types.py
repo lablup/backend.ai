@@ -350,10 +350,15 @@ class ArtifactRevisionFilter(GQLFilter):
                 field_conditions.append(version_condition)
 
         # Apply artifact_id filter
-        if self.artifact_id and self.artifact_id.equals:
-            field_conditions.append(
-                ArtifactRevisionConditions.by_artifact_id(self.artifact_id.equals)
-            )
+        if self.artifact_id:
+            if self.artifact_id.equals:
+                field_conditions.append(
+                    ArtifactRevisionConditions.by_artifact_id(self.artifact_id.equals)
+                )
+            elif self.artifact_id.in_:
+                field_conditions.append(
+                    ArtifactRevisionConditions.by_artifact_ids(self.artifact_id.in_)
+                )
 
         # Apply size filter
         if self.size:
