@@ -511,7 +511,6 @@ class TestGroupRepositoryDeleteEndpoints:
 
     # Test cases
 
-    @pytest.mark.asyncio
     async def test_delete_group_endpoints_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -539,7 +538,6 @@ class TestGroupRepositoryDeleteEndpoints:
             )
             assert len(routings_result.all()) == 0
 
-    @pytest.mark.asyncio
     async def test_delete_group_endpoints_with_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -576,7 +574,6 @@ class TestGroupRepositoryDeleteEndpoints:
             )
             assert len(endpoints_result.all()) == 0
 
-    @pytest.mark.asyncio
     async def test_delete_group_endpoints_with_active_endpoints(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -597,7 +594,6 @@ class TestGroupRepositoryDeleteEndpoints:
             )
             assert len(endpoints_result.all()) == 1
 
-    @pytest.mark.asyncio
     async def test_delete_group_endpoints_empty(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -613,7 +609,6 @@ class TestGroupRepositoryDeleteEndpoints:
 
         # Verify no errors occurred (test passes if no exception raised)
 
-    @pytest.mark.asyncio
     async def test_delete_group_endpoints_no_synchronize_session_error(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1035,7 +1030,6 @@ class TestGroupRepository:
     # Tests for create method
     # ===========================================
 
-    @pytest.mark.asyncio
     async def test_create_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1067,7 +1061,6 @@ class TestGroupRepository:
             assert group_row is not None
             assert group_row.domain_name == test_domain
 
-    @pytest.mark.asyncio
     async def test_create_domain_not_exists(
         self,
         group_repository_with_mock_role_manager: GroupRepository,
@@ -1087,7 +1080,6 @@ class TestGroupRepository:
         assert "Domain" in str(exc_info.value)
         assert "does not exist" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_create_duplicate_name_in_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1115,7 +1107,6 @@ class TestGroupRepository:
     # Tests for modify_validated method
     # ===========================================
 
-    @pytest.mark.asyncio
     async def test_modify_validated_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1145,7 +1136,6 @@ class TestGroupRepository:
             assert group_row.name == "updated-group-name"
             assert group_row.description == "Updated description"
 
-    @pytest.mark.asyncio
     async def test_modify_validated_group_not_found(
         self,
         group_repository: GroupRepository,
@@ -1163,7 +1153,6 @@ class TestGroupRepository:
                 user_role=UserRole.ADMIN,
             )
 
-    @pytest.mark.asyncio
     async def test_modify_validated_add_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1195,7 +1184,6 @@ class TestGroupRepository:
             assert test_users_for_group[0] in added_user_ids
             assert test_users_for_group[1] in added_user_ids
 
-    @pytest.mark.asyncio
     async def test_modify_validated_remove_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1241,7 +1229,6 @@ class TestGroupRepository:
     # Tests for mark_inactive method
     # ===========================================
 
-    @pytest.mark.asyncio
     async def test_mark_inactive_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1265,7 +1252,6 @@ class TestGroupRepository:
             assert group_row.is_active is False
             assert group_row.integration_id is None
 
-    @pytest.mark.asyncio
     async def test_mark_inactive_group_not_found(
         self,
         group_repository: GroupRepository,
@@ -1556,7 +1542,6 @@ class TestGroupRepository:
 
         return group_id
 
-    @pytest.mark.asyncio
     async def test_purge_group_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1573,7 +1558,6 @@ class TestGroupRepository:
             group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
             assert group_row is None
 
-    @pytest.mark.asyncio
     async def test_purge_group_with_active_kernels(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1591,7 +1575,6 @@ class TestGroupRepository:
             )
             assert group_row is not None
 
-    @pytest.mark.asyncio
     async def test_purge_group_with_active_endpoints(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1609,7 +1592,6 @@ class TestGroupRepository:
             )
             assert group_row is not None
 
-    @pytest.mark.asyncio
     async def test_purge_group_with_mounted_vfolders(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
