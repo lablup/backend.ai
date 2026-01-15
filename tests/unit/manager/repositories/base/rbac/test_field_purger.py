@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.manager.data.permission.id import FieldRef, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
+    FieldType,
     ScopeType,
 )
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
@@ -58,7 +59,7 @@ class RBACFieldPurgerTestRow(Base):
         return ScopeId(scope_type=ScopeType(self.owner_scope_type), scope_id=self.owner_scope_id)
 
     def field(self) -> FieldRef:
-        return FieldRef(field_type=EntityType.VFOLDER, field_id=str(self.id))
+        return FieldRef(field_type=FieldType.KERNEL, field_id=str(self.id))
 
 
 # =============================================================================
@@ -213,7 +214,7 @@ class TestRBACFieldPurgerBasic:
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
                 field_id=str(ctx.field_uuid),
             )
             result = await execute_rbac_field_purger(db_sess, purger)
@@ -247,7 +248,7 @@ class TestRBACFieldPurgerBasic:
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=ctx.field_uuid1,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
                 field_id=str(ctx.field_uuid1),
             )
             await execute_rbac_field_purger(db_sess, purger)
@@ -275,7 +276,7 @@ class TestRBACFieldPurgerBasic:
             purger: RBACFieldPurger[RBACFieldPurgerTestRow] = RBACFieldPurger(
                 row_class=RBACFieldPurgerTestRow,
                 pk_value=nonexistent_uuid,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
                 field_id=str(nonexistent_uuid),
             )
             result = await execute_rbac_field_purger(db_sess, purger)
@@ -293,8 +294,8 @@ class TestFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[RBACFieldPurgerTestRow])
     def build_subquery(self) -> sa.sql.Select[tuple[RBACFieldPurgerTestRow]]:
         return sa.select(RBACFieldPurgerTestRow)
 
-    def field_type(self) -> EntityType:
-        return EntityType.VFOLDER
+    def field_type(self) -> FieldType:
+        return FieldType.KERNEL
 
 
 class TestRBACFieldBatchPurger:
@@ -442,8 +443,8 @@ class CompositePKFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[CompositePKFieldP
     def build_subquery(self) -> sa.Select:
         return sa.select(CompositePKFieldPurgerTestRow)
 
-    def field_type(self) -> EntityType:
-        return EntityType.VFOLDER
+    def field_type(self) -> FieldType:
+        return FieldType.KERNEL
 
 
 class TestRBACFieldPurgerCompositePK:
@@ -464,7 +465,7 @@ class TestRBACFieldPurgerCompositePK:
                 purger = RBACFieldPurger(
                     row_class=CompositePKFieldPurgerTestRow,
                     pk_value=1,  # PK value (error raised before lookup due to composite PK)
-                    field_type=EntityType.VFOLDER,
+                    field_type=FieldType.KERNEL,
                     field_id="test-123",
                 )
 
