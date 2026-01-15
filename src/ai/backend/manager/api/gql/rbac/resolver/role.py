@@ -162,18 +162,18 @@ async def delete_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
         raise NotEnoughPermission("Only superadmin can delete roles")
 
     processors = info.context.processors
-    rold_id = uuid.UUID(id)
+    role_id = uuid.UUID(id)
 
     # Get role details before deletion
     detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=rold_id)
+        GetRoleDetailAction(role_id=role_id)
     )
 
     # Delete role
     spec = RoleUpdaterSpec(
         status=OptionalState.update(RoleStatus.DELETED),
     )
-    updater = Updater(spec=spec, pk_value=rold_id)
+    updater = Updater(spec=spec, pk_value=role_id)
     await processors.permission_controller.delete_role.wait_for_complete(
         DeleteRoleAction(updater=updater)
     )
@@ -194,15 +194,15 @@ async def purge_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
         raise NotEnoughPermission("Only superadmin can delete roles")
 
     processors = info.context.processors
-    rold_id = uuid.UUID(id)
+    role_id = uuid.UUID(id)
 
     # Get role details before deletion
     detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=rold_id)
+        GetRoleDetailAction(role_id=role_id)
     )
 
     # Delete role
-    purger = Purger(row_class=RoleRow, pk_value=rold_id)
+    purger = Purger(row_class=RoleRow, pk_value=role_id)
     await processors.permission_controller.purge_role.wait_for_complete(
         PurgeRoleAction(purger=purger)
     )
