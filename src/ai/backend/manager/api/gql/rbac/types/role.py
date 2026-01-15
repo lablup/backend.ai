@@ -223,6 +223,7 @@ class Role(Node):
 RoleEdge = Edge[Role]
 
 
+@strawberry.type(description="Added in 26.1.0. Connection type for paginated roles")
 class RoleConnection(Connection[Role]):
     count: int
 

@@ -62,6 +62,7 @@ class ObjectPermission(Node):
 ScopedPermissionEdge = Edge[ScopedPermission]
 
 
+@strawberry.type(description="Added in 26.1.0. Connection type for paginated scoped permissions")
 class ScopedPermissionConnection(Connection[ScopedPermission]):
     count: int
 
@@ -73,6 +74,7 @@ class ScopedPermissionConnection(Connection[ScopedPermission]):
 ObjectPermissionEdge = Edge[ObjectPermission]
 
 
+@strawberry.type(description="Added in 26.1.0. Connection type for paginated object permissions")
 class ObjectPermissionConnection(Connection[ObjectPermission]):
     count: int
 
