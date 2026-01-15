@@ -766,7 +766,7 @@ class ArtifactRevisionService:
             delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
-            options=ImportArtifactsOptions(force=action.force) if action.force else None,
+            options=ImportArtifactsOptions(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
