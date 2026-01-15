@@ -431,41 +431,12 @@ class TestArtifactRevisionRepository:
     async def test_search_artifact_revisions_filter_by_artifact_id(
         self,
         artifact_repository: ArtifactRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_artifact_id: uuid.UUID,
-        sample_revisions_for_filtering: dict[ArtifactStatus, uuid.UUID],
-        test_registry_id: uuid.UUID,
+        sample_revisions_for_artifact_id_filtering: ArtifactIdFilteringFixture,
     ) -> None:
         """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
-        # Create another artifact with a revision to verify filtering works
-        other_artifact_id = uuid.uuid4()
-        other_revision_id = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                ArtifactRow(
-                    id=other_artifact_id,
-                    name="other/artifact",
-                    type=ArtifactType.MODEL,
-                    registry_id=test_registry_id,
-                    registry_type=ArtifactRegistryType.HUGGINGFACE.value,
-                    source_registry_id=test_registry_id,
-                    source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
-                    readonly=True,
-                    availability=ArtifactAvailability.ALIVE.value,
-                )
-            )
-            db_sess.add(
-                ArtifactRevisionRow(
-                    id=other_revision_id,
-                    artifact_id=other_artifact_id,
-                    version="v1.0",
-                    size=1024,
-                    status=ArtifactStatus.AVAILABLE.value,
-                )
-            )
-            await db_sess.flush()
+        fixture = sample_revisions_for_artifact_id_filtering
 
-        gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(sample_artifact_id)))
+        gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(fixture.target_artifact_id)))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=gql_filter.build_conditions(),
@@ -474,10 +445,10 @@ class TestArtifactRevisionRepository:
 
         result = await artifact_repository.search_artifact_revisions(querier=querier)
 
-        assert result.total_count == len(sample_revisions_for_filtering)
+        assert result.total_count == len(fixture.target_revision_ids)
         result_ids = {r.id for r in result.items}
-        assert all(rid in result_ids for rid in sample_revisions_for_filtering.values())
-        assert other_revision_id not in result_ids
+        assert all(rid in result_ids for rid in fixture.target_revision_ids)
+        assert fixture.other_revision_id not in result_ids
 
     # =========================================================================
     # Tests - Search with ordering
