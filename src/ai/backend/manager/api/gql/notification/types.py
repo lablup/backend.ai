@@ -101,7 +101,10 @@ class NotificationRuleTypeGQL(StrEnum):
 # GraphQL object types
 
 
-@strawberry.type
+@strawberry.type(
+    name="WebhookSpec",
+    description="Specification for webhook notification channel",
+)
 class WebhookSpecGQL:
     url: str
 
