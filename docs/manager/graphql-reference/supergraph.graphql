@@ -4013,7 +4013,6 @@ schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
   @join__type(graph: GRAPHENE)
-  @join__type(graph: STRAWBERRY)
 
 """Added in 24.09.0."""
 type KernelConnection
@@ -4459,13 +4458,13 @@ type ModelReplica implements Node
   """
   Detailed information about the routing node including error or success messages.
   """
-  detail: JSONString!
+  detail: JSON!
 
   """Timestamp when the replica was created."""
   createdAt: DateTime!
 
   """Live statistics of the routing node (CPU utilization, etc.)."""
-  liveStat: JSONString!
+  liveStat: JSON!
 
   """
   The session ID associated with the replica. This can be null right after replica creation.
@@ -4587,7 +4586,7 @@ type ModelRuntimeConfig
   """
   Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
   """
-  environ: JSONString
+  environ: JSON
 }
 
 """Added in 25.19.0"""
@@ -4600,7 +4599,7 @@ input ModelRuntimeConfigInput
   """
   Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
   """
-  environ: JSONString = null
+  environ: JSON = null
 }
 
 """
@@ -7171,12 +7170,12 @@ type ResourceConfig
   """
   JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
   """
-  resourceSlots: JSONString!
+  resourceSlots: JSON!
 
   """
   Additional resource options such as shared memory. Example: {"shmem": "64m"}.
   """
-  resourceOpts: JSONString
+  resourceOpts: JSON
   resourceGroup: ScalingGroupNode!
 }
 
@@ -7189,12 +7188,12 @@ input ResourceConfigInput
   """
   Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
   """
-  resourceSlots: JSONString!
+  resourceSlots: JSON!
 
   """
   Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
   """
-  resourceOpts: JSONString = null
+  resourceOpts: JSON = null
 }
 
 """Added in 25.19.0"""
@@ -7321,7 +7320,7 @@ type Route implements Node
   createdAt: DateTime
 
   """Error data if the route is in a failed state."""
-  errorData: JSONString
+  errorData: JSON
 
   """The deployment this route belongs to."""
   deployment: ModelDeployment!
