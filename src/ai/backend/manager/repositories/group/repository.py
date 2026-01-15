@@ -45,7 +45,7 @@ from ai.backend.manager.models.kernel import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     kernels,
 )
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
@@ -125,7 +125,7 @@ class GroupRepository:
             # Validate resource policy exists
             policy_exists = await db_session.scalar(
                 sa.select(
-                    sa.exists().where(keypair_resource_policies.c.name == spec.resource_policy)
+                    sa.exists().where(project_resource_policies.c.name == spec.resource_policy)
                 )
             )
             if not policy_exists:
