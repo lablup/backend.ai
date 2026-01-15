@@ -1026,231 +1026,6 @@ class TestGroupRepository:
         repo._role_manager = mock_role_manager
         return repo
 
-    # ===========================================
-    # Tests for create method
-    # ===========================================
-
-    async def test_create_success(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
-        default_project_resource_policy: str,
-    ) -> None:
-        """Test successful group creation with valid domain and resource_policy."""
-        creator_spec = GroupCreatorSpec(
-            name="test-new-group",
-            domain_name=test_domain,
-            description="Test group description",
-            resource_policy=default_project_resource_policy,
-        )
-        creator = Creator(spec=creator_spec)
-
-        result = await group_repository_with_mock_role_manager.create(creator)
-
-        assert result.name == "test-new-group"
-        assert result.domain_name == test_domain
-        assert result.description == "Test group description"
-        assert result.is_active is True
-
-    async def test_create_domain_not_exists(
-        self,
-        group_repository_with_mock_role_manager: GroupRepository,
-        default_project_resource_policy: str,
-    ) -> None:
-        """Test group creation fails when domain does not exist"""
-        creator_spec = GroupCreatorSpec(
-            name="test-group",
-            domain_name="nonexistent-domain",
-            resource_policy=default_project_resource_policy,
-        )
-        creator = Creator(spec=creator_spec)
-
-        with pytest.raises(InvalidAPIParameters) as exc_info:
-            await group_repository_with_mock_role_manager.create(creator)
-
-        assert "Domain" in str(exc_info.value)
-        assert "does not exist" in str(exc_info.value)
-
-    async def test_create_duplicate_name_in_domain(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
-        test_domain: str,
-        default_project_resource_policy: str,
-    ) -> None:
-        """Test group creation fails with duplicate name in same domain"""
-        creator_spec = GroupCreatorSpec(
-            name="duplicate-group",
-            domain_name=test_domain,
-            resource_policy=default_project_resource_policy,
-        )
-
-        # First creation succeeds
-        await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
-
-        # Second creation with same name should fail
-        with pytest.raises(InvalidAPIParameters) as exc_info:
-            await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
-
-        assert "already exists" in str(exc_info.value)
-
-    # ===========================================
-    # Tests for modify_validated method
-    # ===========================================
-
-    async def test_modify_validated_success(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
-        test_group: uuid.UUID,
-    ) -> None:
-        """Test successful group modification of name and description"""
-        updater_spec = GroupUpdaterSpec(
-            name=OptionalState.update("updated-group-name"),
-            description=TriState.update("Updated description"),
-        )
-        updater = Updater(spec=updater_spec, pk_value=test_group)
-
-        result = await group_repository.modify_validated(
-            updater=updater,
-            user_role=UserRole.ADMIN,
-        )
-
-        assert result is not None
-        assert result.name == "updated-group-name"
-        assert result.description == "Updated description"
-
-    async def test_modify_validated_group_not_found(
-        self,
-        group_repository: GroupRepository,
-    ) -> None:
-        """Test modification fails when group does not exist"""
-        nonexistent_id = uuid.uuid4()
-        updater_spec = GroupUpdaterSpec(
-            description=TriState.update("New description"),
-        )
-        updater = Updater(spec=updater_spec, pk_value=nonexistent_id)
-
-        with pytest.raises(ProjectNotFound):
-            await group_repository.modify_validated(
-                updater=updater,
-                user_role=UserRole.ADMIN,
-            )
-
-    async def test_modify_validated_add_users(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
-        test_group: uuid.UUID,
-        test_users_for_group: list[uuid.UUID],
-    ) -> None:
-        """Test adding users to group with user_update_mode='add'"""
-        updater_spec = GroupUpdaterSpec()
-        updater = Updater(spec=updater_spec, pk_value=test_group)
-
-        await group_repository.modify_validated(
-            updater=updater,
-            user_role=UserRole.ADMIN,
-            user_update_mode="add",
-            user_uuids=test_users_for_group[:2],
-        )
-
-        # Verify users were added
-        async with db_with_cleanup.begin_session() as session:
-            assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_group
-                )
-            )
-            associations = assoc_result.fetchall()
-            assert len(associations) == 2
-            added_user_ids = {a.user_id for a in associations}
-            assert test_users_for_group[0] in added_user_ids
-            assert test_users_for_group[1] in added_user_ids
-
-    async def test_modify_validated_remove_users(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
-        test_group: uuid.UUID,
-        test_users_for_group: list[uuid.UUID],
-    ) -> None:
-        """Test removing users from group with user_update_mode='remove'"""
-        updater_spec = GroupUpdaterSpec()
-        updater = Updater(spec=updater_spec, pk_value=test_group)
-
-        # First add all users
-        await group_repository.modify_validated(
-            updater=updater,
-            user_role=UserRole.ADMIN,
-            user_update_mode="add",
-            user_uuids=test_users_for_group,
-        )
-
-        # Then remove first user
-        await group_repository.modify_validated(
-            updater=updater,
-            user_role=UserRole.ADMIN,
-            user_update_mode="remove",
-            user_uuids=test_users_for_group[:1],
-        )
-
-        # Verify user was removed
-        async with db_with_cleanup.begin_session() as session:
-            assoc_result = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_group
-                )
-            )
-            associations = assoc_result.fetchall()
-            assert len(associations) == 2  # 3 added - 1 removed = 2
-            remaining_user_ids = {a.user_id for a in associations}
-            assert test_users_for_group[0] not in remaining_user_ids
-            assert test_users_for_group[1] in remaining_user_ids
-            assert test_users_for_group[2] in remaining_user_ids
-
-    # ===========================================
-    # Tests for mark_inactive method
-    # ===========================================
-
-    async def test_mark_inactive_success(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
-        test_group: uuid.UUID,
-    ) -> None:
-        """Test successful group soft deletion sets is_active=False and integration_id=None"""
-        # Verify initial state
-        async with db_with_cleanup.begin_session() as session:
-            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
-            assert group_row is not None
-            assert group_row.is_active is True
-            assert group_row.integration_id == "test-integration-id"
-
-        await group_repository.mark_inactive(test_group)
-
-        # Verify group is marked inactive
-        async with db_with_cleanup.begin_session() as session:
-            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
-            assert group_row is not None
-            assert group_row.is_active is False
-            assert group_row.integration_id is None
-
-    async def test_mark_inactive_group_not_found(
-        self,
-        group_repository: GroupRepository,
-    ) -> None:
-        """Test mark_inactive fails when group does not exist"""
-        nonexistent_id = uuid.uuid4()
-
-        with pytest.raises(ProjectNotFound):
-            await group_repository.mark_inactive(nonexistent_id)
-
-    # ===========================================
-    # Tests for purge_group method
-    # ===========================================
-
     @pytest.fixture
     async def test_scaling_group(
         self,
@@ -1526,6 +1301,231 @@ class TestGroupRepository:
             await session.commit()
 
         return group_id
+
+    # ===========================================
+    # Tests for create method
+    # ===========================================
+
+    async def test_create_success(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository_with_mock_role_manager: GroupRepository,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Test successful group creation with valid domain and resource_policy."""
+        creator_spec = GroupCreatorSpec(
+            name="test-new-group",
+            domain_name=test_domain,
+            description="Test group description",
+            resource_policy=default_project_resource_policy,
+        )
+        creator = Creator(spec=creator_spec)
+
+        result = await group_repository_with_mock_role_manager.create(creator)
+
+        assert result.name == "test-new-group"
+        assert result.domain_name == test_domain
+        assert result.description == "Test group description"
+        assert result.is_active is True
+
+    async def test_create_domain_not_exists(
+        self,
+        group_repository_with_mock_role_manager: GroupRepository,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Test group creation fails when domain does not exist"""
+        creator_spec = GroupCreatorSpec(
+            name="test-group",
+            domain_name="nonexistent-domain",
+            resource_policy=default_project_resource_policy,
+        )
+        creator = Creator(spec=creator_spec)
+
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await group_repository_with_mock_role_manager.create(creator)
+
+        assert "Domain" in str(exc_info.value)
+        assert "does not exist" in str(exc_info.value)
+
+    async def test_create_duplicate_name_in_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository_with_mock_role_manager: GroupRepository,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Test group creation fails with duplicate name in same domain"""
+        creator_spec = GroupCreatorSpec(
+            name="duplicate-group",
+            domain_name=test_domain,
+            resource_policy=default_project_resource_policy,
+        )
+
+        # First creation succeeds
+        await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+
+        # Second creation with same name should fail
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+
+        assert "already exists" in str(exc_info.value)
+
+    # ===========================================
+    # Tests for modify_validated method
+    # ===========================================
+
+    async def test_modify_validated_success(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test successful group modification of name and description"""
+        updater_spec = GroupUpdaterSpec(
+            name=OptionalState.update("updated-group-name"),
+            description=TriState.update("Updated description"),
+        )
+        updater = Updater(spec=updater_spec, pk_value=test_group)
+
+        result = await group_repository.modify_validated(
+            updater=updater,
+            user_role=UserRole.ADMIN,
+        )
+
+        assert result is not None
+        assert result.name == "updated-group-name"
+        assert result.description == "Updated description"
+
+    async def test_modify_validated_group_not_found(
+        self,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test modification fails when group does not exist"""
+        nonexistent_id = uuid.uuid4()
+        updater_spec = GroupUpdaterSpec(
+            description=TriState.update("New description"),
+        )
+        updater = Updater(spec=updater_spec, pk_value=nonexistent_id)
+
+        with pytest.raises(ProjectNotFound):
+            await group_repository.modify_validated(
+                updater=updater,
+                user_role=UserRole.ADMIN,
+            )
+
+    async def test_modify_validated_add_users(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+        test_group: uuid.UUID,
+        test_users_for_group: list[uuid.UUID],
+    ) -> None:
+        """Test adding users to group with user_update_mode='add'"""
+        updater_spec = GroupUpdaterSpec()
+        updater = Updater(spec=updater_spec, pk_value=test_group)
+
+        await group_repository.modify_validated(
+            updater=updater,
+            user_role=UserRole.ADMIN,
+            user_update_mode="add",
+            user_uuids=test_users_for_group[:2],
+        )
+
+        # Verify users were added
+        async with db_with_cleanup.begin_session() as session:
+            assoc_result = await session.execute(
+                sa.select(association_groups_users).where(
+                    association_groups_users.c.group_id == test_group
+                )
+            )
+            associations = assoc_result.fetchall()
+            assert len(associations) == 2
+            added_user_ids = {a.user_id for a in associations}
+            assert test_users_for_group[0] in added_user_ids
+            assert test_users_for_group[1] in added_user_ids
+
+    async def test_modify_validated_remove_users(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+        test_group: uuid.UUID,
+        test_users_for_group: list[uuid.UUID],
+    ) -> None:
+        """Test removing users from group with user_update_mode='remove'"""
+        updater_spec = GroupUpdaterSpec()
+        updater = Updater(spec=updater_spec, pk_value=test_group)
+
+        # First add all users
+        await group_repository.modify_validated(
+            updater=updater,
+            user_role=UserRole.ADMIN,
+            user_update_mode="add",
+            user_uuids=test_users_for_group,
+        )
+
+        # Then remove first user
+        await group_repository.modify_validated(
+            updater=updater,
+            user_role=UserRole.ADMIN,
+            user_update_mode="remove",
+            user_uuids=test_users_for_group[:1],
+        )
+
+        # Verify user was removed
+        async with db_with_cleanup.begin_session() as session:
+            assoc_result = await session.execute(
+                sa.select(association_groups_users).where(
+                    association_groups_users.c.group_id == test_group
+                )
+            )
+            associations = assoc_result.fetchall()
+            assert len(associations) == 2  # 3 added - 1 removed = 2
+            remaining_user_ids = {a.user_id for a in associations}
+            assert test_users_for_group[0] not in remaining_user_ids
+            assert test_users_for_group[1] in remaining_user_ids
+            assert test_users_for_group[2] in remaining_user_ids
+
+    # ===========================================
+    # Tests for mark_inactive method
+    # ===========================================
+
+    async def test_mark_inactive_success(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository: GroupRepository,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test successful group soft deletion sets is_active=False and integration_id=None"""
+        # Verify initial state
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+            assert group_row.is_active is True
+            assert group_row.integration_id == "test-integration-id"
+
+        await group_repository.mark_inactive(test_group)
+
+        # Verify group is marked inactive
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+            assert group_row.is_active is False
+            assert group_row.integration_id is None
+
+    async def test_mark_inactive_group_not_found(
+        self,
+        group_repository: GroupRepository,
+    ) -> None:
+        """Test mark_inactive fails when group does not exist"""
+        nonexistent_id = uuid.uuid4()
+
+        with pytest.raises(ProjectNotFound):
+            await group_repository.mark_inactive(nonexistent_id)
+
+    # ===========================================
+    # Tests for purge_group method
+    # ===========================================
 
     async def test_purge_group_success(
         self,
