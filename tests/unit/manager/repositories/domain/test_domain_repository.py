@@ -14,16 +14,21 @@ import sqlalchemy as sa
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
-from ai.backend.manager.errors.resource import DomainDeletionFailed, DomainHasUsers
+from ai.backend.manager.errors.resource import (
+    DomainDeletionFailed,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, groups
+from ai.backend.manager.models.group import GroupRow, ProjectType, groups
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -184,7 +189,7 @@ class TestDomainRepository:
                 "is_active": True,
                 "created_at": datetime.now(tz=UTC),
                 "modified_at": datetime.now(tz=UTC),
-                "type": "GENERAL",
+                "type": ProjectType.GENERAL,
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
                 "integration_id": None,
@@ -203,7 +208,7 @@ class TestDomainRepository:
         return UserInfo(id=uuid.uuid4(), role=UserRole.SUPERADMIN, domain_name="default")
 
     @pytest.mark.asyncio
-    async def test_create_domain_validated_success(
+    async def test_create_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -218,9 +223,7 @@ class TestDomainRepository:
             assert result.first() is None
 
         # Create domain
-        created_domain = await domain_repository.create_domain_validated(
-            Creator(spec=sample_domain_creator)
-        )
+        created_domain = await domain_repository.create_domain(Creator(spec=sample_domain_creator))
 
         assert created_domain.name == sample_domain_creator.name
         assert created_domain.description == sample_domain_creator.description
@@ -246,14 +249,14 @@ class TestDomainRepository:
             assert group_row.name == "model-store"
 
     @pytest.mark.asyncio
-    async def test_create_domain_validated_duplicate_name(
+    async def test_create_domain_duplicate_name(
         self,
         domain_repository: DomainRepository,
         sample_domain_creator: DomainCreatorSpec,
     ) -> None:
         """Test domain creation with duplicate name"""
         # Create domain first
-        await domain_repository.create_domain_validated(Creator(spec=sample_domain_creator))
+        await domain_repository.create_domain(Creator(spec=sample_domain_creator))
 
         # Try to create another domain with same name
         duplicate_creator = Creator(
@@ -265,10 +268,10 @@ class TestDomainRepository:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await domain_repository.create_domain_validated(duplicate_creator)
+            await domain_repository.create_domain(duplicate_creator)
 
     @pytest.mark.asyncio
-    async def test_modify_domain_validated_success(
+    async def test_modify_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -291,7 +294,7 @@ class TestDomainRepository:
         )
 
         # Create domain
-        await domain_repository.create_domain_validated(domain_creator)
+        await domain_repository.create_domain(domain_creator)
 
         # Create updater
         updater_spec = DomainUpdaterSpec(
@@ -303,7 +306,7 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value=domain_name)
 
         # Modify domain
-        modified_domain = await domain_repository.modify_domain_validated(updater)
+        modified_domain = await domain_repository.modify_domain(updater)
 
         assert modified_domain is not None
         assert modified_domain.name == domain_name
@@ -317,7 +320,7 @@ class TestDomainRepository:
             assert domain_row.description == "Updated description"
 
     @pytest.mark.asyncio
-    async def test_modify_domain_validated_not_found(
+    async def test_modify_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
@@ -328,10 +331,10 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value="nonexistent-domain")
 
         with pytest.raises(DomainNotFound):
-            await domain_repository.modify_domain_validated(updater)
+            await domain_repository.modify_domain(updater)
 
     @pytest.mark.asyncio
-    async def test_soft_delete_domain_validated_success(
+    async def test_soft_delete_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -354,10 +357,10 @@ class TestDomainRepository:
         )
 
         # Create domain
-        await domain_repository.create_domain_validated(domain_creator)
+        await domain_repository.create_domain(domain_creator)
 
         # Soft delete domain (now returns None)
-        await domain_repository.soft_delete_domain_validated(domain_name)
+        await domain_repository.soft_delete_domain(domain_name)
 
         # Verify domain is marked as inactive
         async with db_with_default_resource_policies.begin() as conn:
@@ -367,16 +370,16 @@ class TestDomainRepository:
             assert domain_row.is_active is False
 
     @pytest.mark.asyncio
-    async def test_soft_delete_domain_validated_not_found(
+    async def test_soft_delete_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain soft deletion when domain not found"""
         with pytest.raises(DomainNotFound):
-            await domain_repository.soft_delete_domain_validated("nonexistent-domain")
+            await domain_repository.soft_delete_domain("nonexistent-domain")
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_success(
+    async def test_purge_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -405,7 +408,7 @@ class TestDomainRepository:
             await conn.commit()
 
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain_validated(domain_name)
+        await domain_repository.purge_domain(domain_name)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
@@ -414,7 +417,7 @@ class TestDomainRepository:
             assert domain_row is None
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_with_users(
+    async def test_purge_domain_with_users(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -479,18 +482,18 @@ class TestDomainRepository:
 
         # Try to purge domain (should fail due to users)
         with pytest.raises(DomainHasUsers) as exc_info:
-            await domain_repository.purge_domain_validated(domain_name)
+            await domain_repository.purge_domain(domain_name)
 
         assert "There are users bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_purge_domain_validated_not_found(
+    async def test_purge_domain_not_found(
         self,
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain purging when domain not found"""
         with pytest.raises(DomainDeletionFailed):
-            await domain_repository.purge_domain_validated("nonexistent-domain")
+            await domain_repository.purge_domain("nonexistent-domain")
 
     @pytest.mark.asyncio
     async def test_create_domain_with_all_fields(
@@ -522,7 +525,7 @@ class TestDomainRepository:
             )
         )
 
-        created_domain = await domain_repository.create_domain_validated(comprehensive_creator)
+        created_domain = await domain_repository.create_domain(comprehensive_creator)
 
         assert created_domain.name == "comprehensive-domain"
         assert created_domain.description == "Comprehensive domain with all features"
@@ -543,3 +546,163 @@ class TestDomainRepository:
             assert domain_row is not None
             assert domain_row.name == "comprehensive-domain"
             assert domain_row.is_active is True
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_with_groups(
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
+        domain_repository: DomainRepository,
+    ) -> None:
+        """Test domain purging when domain has groups"""
+        domain_name = "purge-with-groups-test"
+
+        # Create domain and group
+        async with db_with_default_resource_policies.begin() as conn:
+            domain_data = {
+                "name": domain_name,
+                "description": "Test domain with groups",
+                "is_active": False,
+                "total_resource_slots": ResourceSlot.from_user_input(
+                    {"cpu": "8", "mem": "16g"}, None
+                ),
+                "allowed_vfolder_hosts": VFolderHostPermissionMap({
+                    "local": ["modify-vfolder", "upload-file", "download-file"]
+                }),
+                "allowed_docker_registries": ["registry.example.com"],
+                "dotfiles": b"test dotfiles",
+                "integration_id": "test-integration",
+            }
+
+            await conn.execute(sa.insert(domains).values(domain_data))
+
+            # Create group in domain
+            group_data = {
+                "id": uuid.uuid4(),
+                "name": "test-group",
+                "description": "Test group",
+                "is_active": True,
+                "domain_name": domain_name,
+                "total_resource_slots": {},
+                "allowed_vfolder_hosts": {},
+                "integration_id": None,
+                "resource_policy": "default",
+                "type": ProjectType.GENERAL,
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
+            }
+
+            await conn.execute(sa.insert(groups).values(group_data))
+            await conn.commit()
+
+        # Try to purge domain (should fail due to groups)
+        with pytest.raises(DomainHasGroups) as exc_info:
+            await domain_repository.purge_domain(domain_name)
+
+        assert "There are groups bound to the domain" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_purge_domain_with_active_kernels(
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
+        domain_repository: DomainRepository,
+    ) -> None:
+        """Test domain purging when domain has active kernels"""
+        domain_name = "purge-with-kernels-test"
+        session_id = uuid.uuid4()
+        user_uuid = uuid.uuid4()
+        group_id = uuid.uuid4()
+
+        # Create domain, group, user with Core API
+        async with db_with_default_resource_policies.begin() as conn:
+            domain_data = {
+                "name": domain_name,
+                "description": "Test domain with active kernels",
+                "is_active": False,
+                "total_resource_slots": ResourceSlot.from_user_input(
+                    {"cpu": "8", "mem": "16g"}, None
+                ),
+                "allowed_vfolder_hosts": VFolderHostPermissionMap({
+                    "local": ["modify-vfolder", "upload-file", "download-file"]
+                }),
+                "allowed_docker_registries": ["registry.example.com"],
+                "dotfiles": b"test dotfiles",
+                "integration_id": "test-integration",
+            }
+
+            await conn.execute(sa.insert(domains).values(domain_data))
+
+            # Create group
+            group_data = {
+                "id": group_id,
+                "name": f"test-group-{uuid.uuid4().hex[:8]}",
+                "domain_name": domain_name,
+                "total_resource_slots": {},
+                "resource_policy": "default",
+                "type": ProjectType.GENERAL,
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
+            }
+            await conn.execute(sa.insert(groups).values(group_data))
+
+            # Create user
+            from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+            from ai.backend.manager.models.hasher.types import PasswordInfo
+
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=600_000,
+                salt_size=32,
+            )
+
+            user_data = {
+                "uuid": user_uuid,
+                "username": f"test-user-{uuid.uuid4().hex[:8]}",
+                "email": f"test-{uuid.uuid4().hex[:8]}@example.com",
+                "password": password_info,
+                "need_password_change": False,
+                "domain_name": domain_name,
+                "role": UserRole.USER,
+                "status": UserStatus.ACTIVE,
+                "created_at": datetime.now(tz=UTC),
+                "modified_at": datetime.now(tz=UTC),
+                "resource_policy": "default",
+            }
+            await conn.execute(sa.insert(users).values(user_data))
+            await conn.commit()
+
+        # Create session and kernel with ORM API
+        async with db_with_default_resource_policies.begin_session() as db_session:
+            sess = SessionRow(
+                id=session_id,
+                creation_id=str(uuid.uuid4()).replace("-", ""),
+                cluster_size=1,
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                vfolder_mounts={},
+            )
+            db_session.add(sess)
+
+            kernel = KernelRow(
+                session_id=session_id,
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                cluster_role="main",
+                status=KernelStatus.RUNNING,
+                occupied_slots={},
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
+                vfolder_mounts={},
+            )
+            db_session.add(kernel)
+            await db_session.commit()
+
+        # Try to purge domain (should fail due to active kernels)
+        with pytest.raises(DomainHasActiveKernels) as exc_info:
+            await domain_repository.purge_domain(domain_name)
+
+        assert "Domain has some active kernels" in str(exc_info.value)

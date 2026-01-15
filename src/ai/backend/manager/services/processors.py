@@ -193,9 +193,7 @@ class Services:
         app_config_service = AppConfigService(
             app_config_repository=repositories.app_config.repository,
         )
-        domain_service = DomainService(
-            repositories.domain.repository, repositories.domain.admin_repository
-        )
+        domain_service = DomainService(repositories.domain.repository)
         error_log_service = ErrorLogService(
             repository=repositories.error_log.repository,
         )
