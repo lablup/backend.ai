@@ -291,14 +291,10 @@ class SessionSchedulingHistoryFilter(GQLFilter):
                 conditions.append(condition)
 
         if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_from_statuses(self.from_status)
-            )
+            conditions.append(SessionSchedulingHistoryConditions.by_from_statuses(self.from_status))
 
         if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_to_statuses(self.to_status)
-            )
+            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(self.to_status))
 
         if self.result is not None and len(self.result) > 0:
             conditions.append(
@@ -409,14 +405,10 @@ class DeploymentHistoryFilter(GQLFilter):
                 conditions.append(condition)
 
         if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_from_statuses(self.from_status)
-            )
+            conditions.append(DeploymentHistoryConditions.by_from_statuses(self.from_status))
 
         if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_to_statuses(self.to_status)
-            )
+            conditions.append(DeploymentHistoryConditions.by_to_statuses(self.to_status))
 
         if self.result is not None and len(self.result) > 0:
             conditions.append(
@@ -534,14 +526,10 @@ class RouteHistoryFilter(GQLFilter):
                 conditions.append(condition)
 
         if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_from_statuses(self.from_status)
-            )
+            conditions.append(RouteHistoryConditions.by_from_statuses(self.from_status))
 
         if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_to_statuses(self.to_status)
-            )
+            conditions.append(RouteHistoryConditions.by_to_statuses(self.to_status))
 
         if self.result is not None and len(self.result) > 0:
             conditions.append(

@@ -46,7 +46,9 @@ def _render_sub_steps(sub_steps: list[Any], prefix: str, *, verbose: bool = Fals
         # Step result indicator with color
         is_success = step.result == "SUCCESS"
         step_icon = click.style("✓", fg="green") if is_success else click.style("✗", fg="red")
-        step_name = click.style(step.step, fg="green") if is_success else click.style(step.step, fg="red")
+        step_name = (
+            click.style(step.step, fg="green") if is_success else click.style(step.step, fg="red")
+        )
 
         # Duration
         duration_str = ""
@@ -54,8 +56,8 @@ def _render_sub_steps(sub_steps: list[Any], prefix: str, *, verbose: bool = Fals
             try:
                 from datetime import datetime
 
-                start = datetime.fromisoformat(str(step.started_at).replace("Z", "+00:00"))
-                end = datetime.fromisoformat(str(step.ended_at).replace("Z", "+00:00"))
+                start = datetime.fromisoformat(str(step.started_at))
+                end = datetime.fromisoformat(str(step.ended_at))
                 duration = (end - start).total_seconds()
                 duration_str = f" ({duration:.2f}s)"
             except Exception:
@@ -65,7 +67,9 @@ def _render_sub_steps(sub_steps: list[Any], prefix: str, *, verbose: bool = Fals
 
         # Add error message for failed steps
         if step.result != "SUCCESS" and step.message:
-            step_msg = step.message if verbose or len(step.message) <= 40 else step.message[:37] + "..."
+            step_msg = (
+                step.message if verbose or len(step.message) <= 40 else step.message[:37] + "..."
+            )
             step_line += f': "{step_msg}"'
 
         print(step_line)
@@ -118,7 +122,9 @@ def _render_flat_view(
         # Format timestamp
         created = str(h.created_at)[:19] if h.created_at else ""
 
-        print(f"{main_prefix} {result_indicator} {entity_label} | {phase_str}{status_str} @ {created}")
+        print(
+            f"{main_prefix} {result_indicator} {entity_label} | {phase_str}{status_str} @ {created}"
+        )
 
         # Show error info if failure
         has_sub_steps = bool(h.sub_steps)
@@ -245,7 +251,10 @@ def session() -> None:
 @click.option("--session-id", type=str, default=None, help="Filter by session ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")
 @click.option(
-    "--from-status", multiple=True, default=None, help="Filter by from_status (can specify multiple)"
+    "--from-status",
+    multiple=True,
+    default=None,
+    help="Filter by from_status (can specify multiple)",
 )
 @click.option(
     "--to-status", multiple=True, default=None, help="Filter by to_status (can specify multiple)"
@@ -314,7 +323,13 @@ def list_session_history_cmd(
         try:
             # Build filter if any filter options are provided
             has_filter = any([
-                session_id, phase, from_status, to_status, result, error_code, message
+                session_id,
+                phase,
+                from_status,
+                to_status,
+                result,
+                error_code,
+                message,
             ])
             filter_cond = None
             if has_filter:
@@ -382,7 +397,10 @@ def deployment() -> None:
 @click.option("--deployment-id", type=str, default=None, help="Filter by deployment ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")
 @click.option(
-    "--from-status", multiple=True, default=None, help="Filter by from_status (can specify multiple)"
+    "--from-status",
+    multiple=True,
+    default=None,
+    help="Filter by from_status (can specify multiple)",
 )
 @click.option(
     "--to-status", multiple=True, default=None, help="Filter by to_status (can specify multiple)"
@@ -451,7 +469,13 @@ def list_deployment_history_cmd(
         try:
             # Build filter if any filter options are provided
             has_filter = any([
-                deployment_id, phase, from_status, to_status, result, error_code, message
+                deployment_id,
+                phase,
+                from_status,
+                to_status,
+                result,
+                error_code,
+                message,
             ])
             filter_cond = None
             if has_filter:
@@ -520,7 +544,10 @@ def route() -> None:
 @click.option("--deployment-id", type=str, default=None, help="Filter by deployment ID")
 @click.option("--phase", type=str, default=None, help="Filter by phase (contains)")
 @click.option(
-    "--from-status", multiple=True, default=None, help="Filter by from_status (can specify multiple)"
+    "--from-status",
+    multiple=True,
+    default=None,
+    help="Filter by from_status (can specify multiple)",
 )
 @click.option(
     "--to-status", multiple=True, default=None, help="Filter by to_status (can specify multiple)"
@@ -590,7 +617,14 @@ def list_route_history_cmd(
         try:
             # Build filter if any filter options are provided
             has_filter = any([
-                route_id, deployment_id, phase, from_status, to_status, result, error_code, message
+                route_id,
+                deployment_id,
+                phase,
+                from_status,
+                to_status,
+                result,
+                error_code,
+                message,
             ])
             filter_cond = None
             if has_filter:

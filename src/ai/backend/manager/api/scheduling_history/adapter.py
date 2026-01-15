@@ -94,9 +94,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
             )
 
         if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_to_statuses(filter.to_status)
-            )
+            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(filter.to_status))
 
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(
@@ -197,14 +195,10 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 conditions.append(condition)
 
         if filter.from_status is not None and len(filter.from_status) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_from_statuses(filter.from_status)
-            )
+            conditions.append(DeploymentHistoryConditions.by_from_statuses(filter.from_status))
 
         if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_to_statuses(filter.to_status)
-            )
+            conditions.append(DeploymentHistoryConditions.by_to_statuses(filter.to_status))
 
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(
@@ -312,14 +306,10 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 conditions.append(condition)
 
         if filter.from_status is not None and len(filter.from_status) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_from_statuses(filter.from_status)
-            )
+            conditions.append(RouteHistoryConditions.by_from_statuses(filter.from_status))
 
         if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_to_statuses(filter.to_status)
-            )
+            conditions.append(RouteHistoryConditions.by_to_statuses(filter.to_status))
 
         if filter.result is not None and len(filter.result) > 0:
             conditions.append(

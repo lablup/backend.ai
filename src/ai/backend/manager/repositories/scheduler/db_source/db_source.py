@@ -63,7 +63,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
@@ -3768,6 +3768,8 @@ class ScheduleDBSource:
 
         This method combines batch status update with history recording,
         ensuring both operations are atomic within a single transaction.
+        Uses merge logic to prevent duplicate history records when status
+        doesn't change.
 
         Args:
             updater: BatchUpdater containing spec and conditions for session update
@@ -3780,10 +3782,65 @@ class ScheduleDBSource:
             # 1. Execute batch update
             update_result = await execute_batch_updater(db_sess, updater)
 
-            # 2. Create history records
-            await execute_bulk_creator(db_sess, bulk_creator)
+            if not bulk_creator.specs:
+                return update_result.updated_count
+
+            # 2. Build rows from specs (respects abstraction)
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            session_ids = [SessionId(row.session_id) for row in new_rows]
+
+            # 3. Get last history records for all sessions
+            last_records = await self._get_last_session_histories_bulk(db_sess, session_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[UUID] = []
+            create_rows: list[SessionSchedulingHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(SessionId(new_row.session_id))
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(SessionSchedulingHistoryRow)
+                    .where(SessionSchedulingHistoryRow.id.in_(merge_ids))
+                    .values(attempts=SessionSchedulingHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
 
             return update_result.updated_count
+
+    async def _get_last_session_histories_bulk(
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, SessionSchedulingHistoryRow]:
+        """Get last history records for multiple sessions efficiently."""
+        if not session_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per session
+        query = (
+            sa.select(SessionSchedulingHistoryRow)
+            .where(SessionSchedulingHistoryRow.session_id.in_(session_ids))
+            .distinct(SessionSchedulingHistoryRow.session_id)
+            .order_by(
+                SessionSchedulingHistoryRow.session_id,
+                SessionSchedulingHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {SessionId(row.session_id): row for row in rows}
 
     async def update_kernels_status_bulk(
         self,

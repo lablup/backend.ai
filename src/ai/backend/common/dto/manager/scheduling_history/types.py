@@ -50,7 +50,9 @@ class SessionHistoryFilter(BaseRequestModel):
         default=None, description="Filter by result (SUCCESS, FAILURE, STALE)"
     )
     error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(default=None, description="Filter by message (contains)")
+    message: Optional[StringFilter] = Field(
+        default=None, description="Filter by message (contains)"
+    )
 
 
 class SessionHistoryOrder(BaseRequestModel):
@@ -76,7 +78,9 @@ class DeploymentHistoryFilter(BaseRequestModel):
         default=None, description="Filter by result"
     )
     error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(default=None, description="Filter by message (contains)")
+    message: Optional[StringFilter] = Field(
+        default=None, description="Filter by message (contains)"
+    )
 
 
 class DeploymentHistoryOrder(BaseRequestModel):
@@ -103,7 +107,9 @@ class RouteHistoryFilter(BaseRequestModel):
         default=None, description="Filter by result"
     )
     error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(default=None, description="Filter by message (contains)")
+    message: Optional[StringFilter] = Field(
+        default=None, description="Filter by message (contains)"
+    )
 
 
 class RouteHistoryOrder(BaseRequestModel):
