@@ -146,7 +146,14 @@ class ArtifactRevisionConditions:
         return inner
 
     @staticmethod
-    def by_version_contains(version: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_artifact_id(artifact_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRevisionRow.artifact_id == artifact_id
+
+        return inner
+
+    @staticmethod
+    def by_version_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if case_insensitive:
                 return ArtifactRevisionRow.version.ilike(f"%{version}%")
