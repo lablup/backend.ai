@@ -286,13 +286,12 @@ async def create_role_assignment(
 
 
 @strawberry.field(description="Revoke a role assignment")
-async def delete_role_assignment(id: ID, info: Info[StrawberryGQLContext]) -> Role:
+async def delete_role_assignment(
+    user_id: ID, role_id: ID, info: Info[StrawberryGQLContext]
+) -> Role:
     """Revoke a role assignment (remove role from user).
 
     Requires: Superadmin permission.
-
-    NOTE: The 'id' parameter should be formatted as 'user_id:role_id' since we don't
-    have a separate RoleAssignment entity with its own ID in the current implementation.
 
     Returns the role that was revoked.
     """
@@ -301,26 +300,18 @@ async def delete_role_assignment(id: ID, info: Info[StrawberryGQLContext]) -> Ro
         raise NotEnoughPermission("Only superadmin can revoke role assignments")
 
     processors = info.context.processors
-
-    # Parse the composite ID (format: "user_id:role_id")
-    try:
-        user_id_str, role_id_str = str(id).split(":", 1)
-        user_id = uuid.UUID(user_id_str)
-        role_id = uuid.UUID(role_id_str)
-    except (ValueError, AttributeError) as e:
-        raise ValueError(
-            f"Invalid role assignment ID format: {id}. Expected 'user_id:role_id'"
-        ) from e
+    user_uuid = uuid.UUID(user_id)
+    role_uuid = uuid.UUID(role_id)
 
     # Get role details before revocation
     detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=role_id)
+        GetRoleDetailAction(role_id=role_uuid)
     )
 
     # Revoke assignment
     revocation_input = UserRoleRevocationInput(
-        user_id=user_id,
-        role_id=role_id,
+        user_id=user_uuid,
+        role_id=role_uuid,
     )
 
     await processors.permission_controller.revoke_role.wait_for_complete(
