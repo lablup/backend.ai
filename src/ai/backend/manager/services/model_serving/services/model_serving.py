@@ -384,16 +384,18 @@ class ModelServingService:
     async def delete(self, action: DeleteModelServiceAction) -> DeleteModelServiceActionResult:
         service_id = action.service_id
 
-        # Get endpoint
+        # Validate access
         await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(service_id)
+        validation_data = await self._repository.get_endpoint_access_validation_data(service_id)
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
+            raise EndpointAccessForbiddenError
 
+        # Get endpoint data
+        endpoint_data = await self._repository.get_endpoint_by_id(service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-
-        # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAccessForbiddenError
 
         # Determine lifecycle stage based on routes
         has_routes = endpoint_data.routings and len(endpoint_data.routings) > 0
@@ -547,16 +549,20 @@ class ModelServingService:
     async def get_model_service_info(
         self, action: GetModelServiceInfoAction
     ) -> GetModelServiceInfoActionResult:
-        # Get endpoint
+        # Validate access
         await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
+            raise EndpointAccessForbiddenError
 
+        # Get endpoint data
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-
-        # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAccessForbiddenError
 
         return GetModelServiceInfoActionResult(
             ServiceInfo(
@@ -586,14 +592,18 @@ class ModelServingService:
     async def list_errors(self, action: ListErrorsAction) -> ListErrorsActionResult:
         # Get endpoint
         await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
+            raise EndpointAccessForbiddenError
 
+        # Get endpoint data
+        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-
-        # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAccessForbiddenError
 
         error_routes = (
             [r for r in endpoint_data.routings if r.status == RouteStatus.FAILED_TO_START]
@@ -612,15 +622,14 @@ class ModelServingService:
         )
 
     async def clear_error(self, action: ClearErrorAction) -> ClearErrorActionResult:
-        # Get endpoint first to validate access
-        await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
-
-        if not endpoint_data:
-            raise ModelServiceNotFound
-
         # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        await self.check_requester_access(action.requester_ctx)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Clear errors
@@ -632,15 +641,14 @@ class ModelServingService:
         return ClearErrorActionResult(success=True)
 
     async def update_route(self, action: UpdateRouteAction) -> UpdateRouteActionResult:
-        # Get endpoint first to validate access
-        await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
-
-        if not endpoint_data:
-            raise ModelServiceNotFound
-
         # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        await self.check_requester_access(action.requester_ctx)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Update route traffic
@@ -657,15 +665,14 @@ class ModelServingService:
         return UpdateRouteActionResult(success=True)
 
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
-        # Get endpoint first to validate access
-        await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
-
-        if not endpoint_data:
-            raise ModelServiceNotFound
-
         # Validate access
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        await self.check_requester_access(action.requester_ctx)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Get route
@@ -695,13 +702,20 @@ class ModelServingService:
         return DeleteRouteActionResult(success=True)
 
     async def generate_token(self, action: GenerateTokenAction) -> GenerateTokenActionResult:
-        # Get endpoint with access validation
+        # Validate access
         await self.check_requester_access(action.requester_ctx)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
+            raise EndpointAccessForbiddenError
+
+        # Get endpoint data
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAccessForbiddenError
 
         # Get scaling group info
         scaling_group_data = await self._repository.get_scaling_group_info(
@@ -761,15 +775,17 @@ class ModelServingService:
         return GenerateTokenActionResult(data=service_token_data)
 
     async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
-        # Get endpoint with access validation
+        # Validate access
         await self.check_requester_access(action.requester_ctx)
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
-        if not endpoint_data:
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
             raise ModelServiceNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
-        await self._agent_registry.notify_endpoint_route_update_to_appproxy(endpoint_data.id)
+        await self._agent_registry.notify_endpoint_route_update_to_appproxy(action.service_id)
 
         return ForceSyncActionResult(success=True)
 

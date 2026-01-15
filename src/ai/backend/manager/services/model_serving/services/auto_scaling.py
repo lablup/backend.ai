@@ -36,10 +36,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
-from ai.backend.manager.services.model_serving.services.utils import (
-    validate_endpoint_access,
-    validate_endpoint_access_by_validation_data,
-)
+from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -60,13 +57,20 @@ class AutoScalingService:
     async def scale_service_replicas(
         self, action: ScaleServiceReplicasAction
     ) -> ScaleServiceReplicasActionResult:
-        # Get endpoint with access validation
+        # Validate access
         await self.check_requester_access(action.requester_ctx)
+        validation_data = await self._repository.get_endpoint_access_validation_data(
+            action.service_id
+        )
+        if not validation_data:
+            raise ModelServiceNotFound
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
+            raise EndpointAccessForbiddenError
+
+        # Get endpoint data
         endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
         if not endpoint_data:
             raise ModelServiceNotFound
-        if not validate_endpoint_access(endpoint_data, action.requester_ctx):
-            raise EndpointAccessForbiddenError
 
         # Update replicas (access already validated)
         success = await self._repository.update_endpoint_replicas(action.service_id, action.to)
@@ -92,7 +96,7 @@ class AutoScalingService:
         )
         if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Create auto scaling rule (access already validated)
@@ -130,7 +134,7 @@ class AutoScalingService:
         )
         if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Update auto scaling rule (access already validated)
@@ -157,7 +161,7 @@ class AutoScalingService:
         )
         if not validation_data:
             raise EndpointNotFound
-        if not validate_endpoint_access_by_validation_data(validation_data, action.requester_ctx):
+        if not validate_endpoint_access(validation_data, action.requester_ctx):
             raise EndpointAccessForbiddenError
 
         # Delete auto scaling rule (access already validated)

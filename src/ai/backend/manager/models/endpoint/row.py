@@ -682,7 +682,6 @@ class EndpointRow(Base):
             ),
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
-            session_owner_role=self.session_owner_row.role if self.session_owner_row else None,
             tag=self.tag,
             startup_command=self.startup_command,
             bootstrap_script=self.bootstrap_script,

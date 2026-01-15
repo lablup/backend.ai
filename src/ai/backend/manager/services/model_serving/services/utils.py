@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
 
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
@@ -14,9 +13,6 @@ from ai.backend.manager.services.model_serving.exceptions import (
     InvalidAPIParameters,
 )
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user_uuid
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.model_serving.types import EndpointData
 
 
 async def verify_user_access_scopes(
@@ -42,38 +38,10 @@ async def verify_user_access_scopes(
 
 
 def validate_endpoint_access(
-    endpoint_data: EndpointData,
-    ctx: RequesterCtx,
-) -> bool:
-    """Validate user access to endpoint based on role.
-
-    Returns True if the user has access to the endpoint, False otherwise.
-
-    Access rules:
-    - SUPERADMIN: Full access to all endpoints
-    - ADMIN: Access to endpoints in their domain, except those owned by SUPERADMIN
-    - USER/others: Access only to endpoints they own
-    """
-    if endpoint_data.session_owner_id is None:
-        return True
-
-    match ctx.user_role:
-        case UserRole.SUPERADMIN:
-            return True
-        case UserRole.ADMIN:
-            # ADMIN cannot access SUPERADMIN's resources
-            if endpoint_data.session_owner_role == UserRole.SUPERADMIN:
-                return False
-            return endpoint_data.domain == ctx.domain_name
-        case _:
-            return endpoint_data.session_owner_id == ctx.user_id
-
-
-def validate_endpoint_access_by_validation_data(
     validation_data: EndpointAccessValidationData,
     ctx: RequesterCtx,
 ) -> bool:
-    """Validate user access to endpoint based on role using minimal validation data.
+    """Validate user access to endpoint based on role.
 
     Returns True if the user has access to the endpoint, False otherwise.
 

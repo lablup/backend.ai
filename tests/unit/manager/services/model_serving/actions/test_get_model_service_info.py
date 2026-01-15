@@ -38,6 +38,15 @@ def mock_get_endpoint_by_id_get_info(mocker, mock_repositories):
     )
 
 
+@pytest.fixture
+def mock_get_endpoint_access_validation_data_get_info(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "get_endpoint_access_validation_data",
+        new_callable=AsyncMock,
+    )
+
+
 class TestGetModelServiceInfo:
     @pytest.mark.parametrize(
         "scenario",
@@ -115,10 +124,19 @@ class TestGetModelServiceInfo:
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_get_info,
         mock_get_endpoint_by_id_get_info,
+        mock_get_endpoint_access_validation_data_get_info,
     ):
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
         action = scenario.input
+
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_get_info.return_value = mock_validation_data
+
         mock_endpoint = MagicMock(
             id=expected.data.endpoint_id,
             model=expected.data.model_id,
@@ -141,9 +159,6 @@ class TestGetModelServiceInfo:
             url=str(expected.data.service_endpoint) if expected.data.service_endpoint else None,
             open_to_public=expected.data.is_public,
             runtime_variant=expected.data.runtime_variant,
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
         )
         mock_endpoint.name = expected.data.name
 

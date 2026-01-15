@@ -40,6 +40,15 @@ def mock_get_endpoint_by_id_scale(mocker, mock_repositories):
 
 
 @pytest.fixture
+def mock_get_endpoint_access_validation_data_scale(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "get_endpoint_access_validation_data",
+        new_callable=AsyncMock,
+    )
+
+
+@pytest.fixture
 def mock_update_endpoint_replicas(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
@@ -163,6 +172,7 @@ class TestScaleServiceReplicas:
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_requester_access_scale,
         mock_get_endpoint_by_id_scale,
+        mock_get_endpoint_access_validation_data_scale,
         mock_update_endpoint_replicas,
     ):
         expected = cast(ScaleServiceReplicasActionResult, scenario.expected)
@@ -170,26 +180,33 @@ class TestScaleServiceReplicas:
 
         # Mock endpoint data based on scenario
         if scenario.description in ["scale up", "scale down", "zero scale", "SUPERADMIN scale up"]:
-            mock_endpoint = MagicMock(
-                id=action.service_id,
-                routings=[MagicMock() for _ in range(expected.current_route_count)],
+            mock_validation_data = MagicMock(
                 session_owner_id=action.requester_ctx.user_id,
                 session_owner_role=action.requester_ctx.user_role,
                 domain=action.requester_ctx.domain_name,
+            )
+            mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
+            mock_endpoint = MagicMock(
+                id=action.service_id,
+                routings=[MagicMock() for _ in range(expected.current_route_count)],
             )
             mock_get_endpoint_by_id_scale.return_value = mock_endpoint
             mock_update_endpoint_replicas.return_value = True
 
         elif scenario.description == "non-existent service":
+            mock_get_endpoint_access_validation_data_scale.return_value = None
             mock_get_endpoint_by_id_scale.return_value = None
 
         elif scenario.description == "update operation failed":
-            mock_endpoint = MagicMock(
-                id=action.service_id,
-                routings=[MagicMock() for _ in range(2)],
+            mock_validation_data = MagicMock(
                 session_owner_id=action.requester_ctx.user_id,
                 session_owner_role=action.requester_ctx.user_role,
                 domain=action.requester_ctx.domain_name,
+            )
+            mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
+            mock_endpoint = MagicMock(
+                id=action.service_id,
+                routings=[MagicMock() for _ in range(2)],
             )
             mock_get_endpoint_by_id_scale.return_value = mock_endpoint
             mock_update_endpoint_replicas.return_value = False

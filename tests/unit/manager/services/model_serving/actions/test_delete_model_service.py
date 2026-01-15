@@ -26,6 +26,15 @@ def mock_get_endpoint_by_id(mocker, mock_repositories):
 
 
 @pytest.fixture
+def mock_get_endpoint_access_validation_data(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "get_endpoint_access_validation_data",
+        new_callable=AsyncMock,
+    )
+
+
+@pytest.fixture
 def mock_update_endpoint_lifecycle(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
@@ -113,22 +122,27 @@ class TestDeleteModelService:
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_endpoint_by_id,
+        mock_get_endpoint_access_validation_data,
         mock_update_endpoint_lifecycle,
         mock_check_requester_access,
     ):
         action = scenario.input
-        mock_endpoint = MagicMock(
-            routings=[],
+        mock_validation_data = MagicMock(
             session_owner_id=action.requester_ctx.user_id,
             session_owner_role=action.requester_ctx.user_role,
             domain=action.requester_ctx.domain_name,
         )
+        mock_endpoint = MagicMock(
+            routings=[],
+        )
 
         # Mock repository responses based on scenario
         if "successful" in scenario.description:
+            mock_get_endpoint_access_validation_data.return_value = mock_validation_data
             mock_get_endpoint_by_id.return_value = mock_endpoint
             mock_update_endpoint_lifecycle.return_value = None
         else:  # non-existent model
+            mock_get_endpoint_access_validation_data.return_value = None
             mock_get_endpoint_by_id.return_value = None
 
         async def delete_model_service(action: DeleteModelServiceAction):

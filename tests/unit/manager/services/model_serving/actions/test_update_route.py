@@ -29,10 +29,10 @@ def mock_check_requester_access_update_route(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_update_route(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_update_route(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -123,16 +123,15 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_get_endpoint_by_id_update_route,
+        mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
     ):
         action = scenario.input
 
-        # Mock endpoint data for access validation
-        mock_endpoint = MagicMock(
-            id=action.service_id,
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
             session_owner_id=action.requester_ctx.user_id,
             session_owner_role=action.requester_ctx.user_role,
             domain=action.requester_ctx.domain_name,
@@ -159,7 +158,7 @@ class TestUpdateRoute:
         )
 
         # Setup mocks - now uses single repository for all roles
-        mock_get_endpoint_by_id_update_route.return_value = mock_endpoint
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
         mock_update_route_traffic.return_value = mock_route_data
         mock_get_endpoint_for_appproxy_update.return_value = mock_endpoint_row
 
@@ -194,19 +193,18 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, Exception],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_get_endpoint_by_id_update_route,
+        mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
     ):
         action = scenario.input
 
-        # Mock endpoint for access validation
-        mock_endpoint = MagicMock(
-            id=action.service_id,
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
             session_owner_id=action.requester_ctx.user_id,
             session_owner_role=action.requester_ctx.user_role,
             domain=action.requester_ctx.domain_name,
         )
-        mock_get_endpoint_by_id_update_route.return_value = mock_endpoint
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
 
         # Mock repository to return None (route not found)
         mock_update_route_traffic.return_value = None
@@ -221,7 +219,7 @@ class TestUpdateRoute:
         self,
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_get_endpoint_by_id_update_route,
+        mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
@@ -238,14 +236,13 @@ class TestUpdateRoute:
             traffic_ratio=0.7,
         )
 
-        # Mock endpoint for access validation
-        mock_endpoint = MagicMock(
-            id=action.service_id,
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
             session_owner_id=action.requester_ctx.user_id,
             session_owner_role=action.requester_ctx.user_role,
             domain=action.requester_ctx.domain_name,
         )
-        mock_get_endpoint_by_id_update_route.return_value = mock_endpoint
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
 
         # Mock successful route update
         mock_update_route_traffic.return_value = MagicMock(id=action.service_id)

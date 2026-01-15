@@ -38,6 +38,15 @@ def mock_get_endpoint_by_id_list_errors(mocker, mock_repositories):
     )
 
 
+@pytest.fixture
+def mock_get_endpoint_access_validation_data_list_errors(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "get_endpoint_access_validation_data",
+        new_callable=AsyncMock,
+    )
+
+
 class TestListErrors:
     @pytest.mark.parametrize(
         "scenario",
@@ -109,10 +118,19 @@ class TestListErrors:
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_list_errors,
         mock_get_endpoint_by_id_list_errors,
+        mock_get_endpoint_access_validation_data_list_errors,
     ):
         # Mock repository responses
         expected = cast(ListErrorsActionResult, scenario.expected)
         action = scenario.input
+
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_list_errors.return_value = mock_validation_data
+
         mock_routings = [
             MagicMock(
                 status=RouteStatus.FAILED_TO_START,
@@ -131,9 +149,6 @@ class TestListErrors:
             id=scenario.input.service_id,
             routings=mock_routings,
             retries=expected.retries,
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
         )
 
         # Now uses single repository for all roles
