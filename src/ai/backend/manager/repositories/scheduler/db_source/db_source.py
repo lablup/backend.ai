@@ -63,7 +63,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
