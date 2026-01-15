@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self, override
+from typing import Any, Optional, Self, override
 
 import strawberry
 from strawberry.relay import Node, NodeID
@@ -15,6 +16,7 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
+    ScalingGroupDriverConfig,
     ScalingGroupMetadata,
     ScalingGroupNetworkConfig,
     ScalingGroupSchedulerConfig,
@@ -33,6 +35,9 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
+    "AgentSelectorConfigGQL",
+    "SchedulerConfigGQL",
+    "ScalingGroupDriverConfigGQL",
     "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
     "ScalingGroupNetworkConfigGQL",
@@ -128,6 +133,67 @@ class ScalingGroupNetworkConfigGQL:
 
 
 @strawberry.type(
+    name="ScalingGroupDriverConfig",
+    description="Added in 25.18.0. Driver configuration for resource allocation",
+)
+class ScalingGroupDriverConfigGQL:
+    name: str = strawberry.field(
+        description=dedent_strip("""
+            Agent resource driver implementation name.
+            'static' uses a predefined set of agents registered to this scaling group.
+        """)
+    )
+    options: JSON = strawberry.field(
+        description="Driver-specific configuration options. Contents vary by driver type."
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: ScalingGroupDriverConfig) -> Self:
+        return cls(
+            name=data.name,
+            options=data.options,
+        )
+
+
+@strawberry.type(
+    name="SchedulerConfig",
+    description="Added in 26.1.0. Scheduler-specific configuration options",
+)
+class SchedulerConfigGQL:
+    num_retries_to_skip: int = strawberry.field(
+        description=dedent_strip("""
+            Number of scheduling retries to skip before attempting to schedule a session.
+            Used to prevent repeated scheduling attempts for sessions that previously failed.
+        """)
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            num_retries_to_skip=data.get("num_retries_to_skip", 0),
+        )
+
+
+@strawberry.type(
+    name="AgentSelectorConfig",
+    description="Added in 26.1.0. Configuration for the agent selection strategy",
+)
+class AgentSelectorConfigGQL:
+    kernel_counts_at_same_endpoint: int = strawberry.field(
+        description=dedent_strip("""
+            Maximum number of kernels that can be scheduled on the same endpoint.
+            Used by concentrated strategy to control endpoint spreading behavior.
+        """)
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            kernel_counts_at_same_endpoint=data.get("kernel_counts_at_same_endpoint", 0),
+        )
+
+
+@strawberry.type(
     name="ScalingGroupSchedulerOptions",
     description="Added in 25.18.0. Scheduler configuration options",
 )
@@ -147,7 +213,7 @@ class ScalingGroupSchedulerOptionsGQL:
             Used to prevent indefinite resource waiting when no agents are available.
         """)
     )
-    config: JSON = strawberry.field(
+    config: SchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Scheduler-specific configuration options.
             Contents depend on the scheduler implementation (fifo/lifo/drf).
@@ -162,7 +228,7 @@ class ScalingGroupSchedulerOptionsGQL:
             'roundrobin' cycles through agents sequentially.
         """)
     )
-    agent_selector_config: JSON = strawberry.field(
+    agent_selector_config: AgentSelectorConfigGQL = strawberry.field(
         description=dedent_strip("""
             Configuration for the agent selection strategy.
             Structure varies by strategy - for example,
@@ -198,9 +264,9 @@ class ScalingGroupSchedulerOptionsGQL:
         return cls(
             allowed_session_types=[st.value for st in data.allowed_session_types],
             pending_timeout=data.pending_timeout.total_seconds(),
-            config=data.config,
+            config=SchedulerConfigGQL.from_mapping(data.config),
             agent_selection_strategy=data.agent_selection_strategy.value,
-            agent_selector_config=data.agent_selector_config,
+            agent_selector_config=AgentSelectorConfigGQL.from_mapping(data.agent_selector_config),
             enforce_spreading_endpoint_replica=data.enforce_spreading_endpoint_replica,
             allow_fractional_resource_fragmentation=data.allow_fractional_resource_fragmentation,
             route_cleanup_target_statuses=data.route_cleanup_target_statuses,
