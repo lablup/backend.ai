@@ -450,6 +450,26 @@ class TestArtifactRevisionRepository:
         assert all(rid in result_ids for rid in fixture.target_revision_ids)
         assert fixture.other_revision_id not in result_ids
 
+    async def test_search_artifact_revisions_filter_by_artifact_id_using_gql_filter(
+        self,
+        artifact_repository: ArtifactRepository,
+        sample_artifact_id: uuid.UUID,
+        sample_revision_id: uuid.UUID,
+    ) -> None:
+        """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
+        gql_filter = ArtifactRevisionFilter(artifact_id=ID(str(sample_artifact_id)))
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=gql_filter.build_conditions(),
+            orders=[],
+        )
+
+        result = await artifact_repository.search_artifact_revisions(querier=querier)
+
+        assert result.total_count == 1
+        assert result.items[0].id == sample_revision_id
+        assert result.items[0].artifact_id == sample_artifact_id
+
     # =========================================================================
     # Tests - Search with ordering
     # =========================================================================
