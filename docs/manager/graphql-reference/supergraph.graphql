@@ -3330,7 +3330,7 @@ input DomainUsageBucketOrderBy
 }
 
 """
-Added in 26.1.0. Information about a dotfile to be provisioned in a container.
+Added in 26.1.0. Information about a dotfile to be provisioned in the kernel.
 """
 type DotfileInfo
   @join__type(graph: STRAWBERRY)
@@ -4062,6 +4062,38 @@ type InferenceSessionErrorInfo
   repr: String!
 }
 
+"""Added in 26.1.0. Internal data stored with the kernel for system use."""
+type InternalData
+  @join__type(graph: STRAWBERRY)
+{
+  """List of dotfiles to be provisioned in the kernel's filesystem."""
+  dotfiles: [DotfileInfo!]
+
+  """SSH keypair for secure access to the kernel."""
+  sshKeypair: SSHKeypair
+
+  """Path to the model definition file for inference services."""
+  modelDefinitionPath: String
+
+  """Runtime variant identifier (e.g., 'custom')."""
+  runtimeVariant: String
+
+  """Whether sudo is enabled for this session."""
+  sudoSessionEnabled: Boolean
+
+  """Whether to block service ports. If true, no services can be started."""
+  blockServicePorts: Boolean
+
+  """Whether to prevent vfolder mounts (except .logs directory)."""
+  preventVfolderMounts: Boolean
+
+  """Docker credentials for private registry access."""
+  dockerCredentials: JSON
+
+  """List of domain socket paths to proxy into the container."""
+  domainSocketProxies: [String!]
+}
+
 input IntFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -4212,8 +4244,10 @@ type KernelLifecycleInfo
   """Human-readable information about the current status."""
   statusInfo: String
 
-  """Additional structured data about the current status."""
-  statusData: JSON
+  """
+  Structured data about the current status including error, scheduler, or lifecycle information.
+  """
+  statusData: StatusData
 
   """History of status transitions with timestamps."""
   statusHistory: StatusHistory
@@ -4239,7 +4273,7 @@ type KernelMetadataInfo
   callbackUrl: String
 
   """Internal data stored with the kernel for system use."""
-  internalData: JSON
+  internalData: InternalData
 }
 
 """Added in 26.1.0. Metrics and statistics for a kernel."""
@@ -4249,8 +4283,10 @@ type KernelMetricsInfo
   """The number of queries/executions performed by this kernel."""
   numQueries: Int!
 
-  """The last collected statistics for this kernel."""
-  lastStat: JSON
+  """
+  The last collected statistics for this kernel including CPU, memory, I/O, and network metrics.
+  """
+  lastStat: KernelStat
 }
 
 """Added in 26.1.0. Network configuration for a kernel."""
@@ -4412,6 +4448,29 @@ type KernelSessionInfo
   sessionType: SessionType!
 }
 
+"""
+Added in 26.1.0. Collection of kernel resource statistics. Contains utilization metrics for CPU, memory, I/O, network, and accelerators.
+"""
+type KernelStat
+  @join__type(graph: STRAWBERRY)
+{
+  """List of metric entries for this kernel."""
+  entries: [KernelStatEntry!]!
+}
+
+"""
+Added in 26.1.0. A single kernel statistic entry with metric key and value. Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx.
+"""
+type KernelStatEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Metric key name (e.g., 'cpu_util', 'mem', 'io_read')."""
+  key: String!
+
+  """The metric measurement value."""
+  value: MetricValue!
+}
+
 """Added in 26.1.0"""
 enum KernelStatus
   @join__type(graph: STRAWBERRY)
@@ -4431,6 +4490,16 @@ enum KernelStatus
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   ERROR @join__enumValue(graph: STRAWBERRY)
   CANCELLED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
+"""
+type KernelStatusData
+  @join__type(graph: STRAWBERRY)
+{
+  """Exit code of the kernel process. Null if not yet terminated."""
+  exitCode: Int
 }
 
 """Added in 26.1.0. Filter for kernel status."""
@@ -8767,6 +8836,16 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.1.0. Session-specific status data during lifecycle transitions.
+"""
+type SessionStatusData
+  @join__type(graph: STRAWBERRY)
+{
+  """Status string of the session (e.g., 'terminating')."""
+  status: String
+}
+
 """Added in 26.1.0. Type of compute session."""
 enum SessionType
   @join__type(graph: STRAWBERRY)
@@ -8797,7 +8876,7 @@ type SourceInfo
   url: String
 }
 
-"""Added in 26.1.0. SSH keypair for secure access."""
+"""Added in 26.1.0. SSH keypair for kernel access."""
 type SSHKeypair
   @join__type(graph: STRAWBERRY)
 {
@@ -8806,6 +8885,48 @@ type SSHKeypair
 
   """The private key in PEM format."""
   privateKey: String!
+}
+
+"""
+Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
+"""
+type StatusData
+  @join__type(graph: STRAWBERRY)
+{
+  """Error information when the kernel is in an error state."""
+  error: StatusErrorInfo
+
+  """Scheduler information during pending/scheduling states."""
+  scheduler: SchedulerInfo
+
+  """Kernel-specific status data during lifecycle transitions."""
+  kernel: KernelStatusData
+
+  """Session-specific status data during lifecycle transitions."""
+  session: SessionStatusData
+}
+
+"""
+Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
+"""
+type StatusErrorInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Source of the error: 'agent' for agent errors, 'other' for other errors.
+  """
+  src: String!
+
+  """
+  ID of the agent where the error occurred. Only present for agent errors.
+  """
+  agentId: String
+
+  """Name of the exception class."""
+  name: String
+
+  """String representation of the exception."""
+  repr: String
 }
 
 """

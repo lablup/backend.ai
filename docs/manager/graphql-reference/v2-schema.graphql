@@ -1703,7 +1703,7 @@ input DomainUsageBucketOrderBy {
 }
 
 """
-Added in 26.1.0. Information about a dotfile to be provisioned in a container.
+Added in 26.1.0. Information about a dotfile to be provisioned in the kernel.
 """
 type DotfileInfo {
   """The file path where the dotfile will be placed (relative or absolute)."""
@@ -1932,6 +1932,36 @@ input IntFilter {
   lessThanOrEqual: Int = null
 }
 
+"""Added in 26.1.0. Internal data stored with the kernel for system use."""
+type InternalData {
+  """List of dotfiles to be provisioned in the kernel's filesystem."""
+  dotfiles: [DotfileInfo!]
+
+  """SSH keypair for secure access to the kernel."""
+  sshKeypair: SSHKeypair
+
+  """Path to the model definition file for inference services."""
+  modelDefinitionPath: String
+
+  """Runtime variant identifier (e.g., 'custom')."""
+  runtimeVariant: String
+
+  """Whether sudo is enabled for this session."""
+  sudoSessionEnabled: Boolean
+
+  """Whether to block service ports. If true, no services can be started."""
+  blockServicePorts: Boolean
+
+  """Whether to prevent vfolder mounts (except .logs directory)."""
+  preventVfolderMounts: Boolean
+
+  """Docker credentials for private registry access."""
+  dockerCredentials: JSON
+
+  """List of domain socket paths to proxy into the container."""
+  domainSocketProxies: [String!]
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
@@ -2010,8 +2040,10 @@ type KernelLifecycleInfo {
   """Human-readable information about the current status."""
   statusInfo: String
 
-  """Additional structured data about the current status."""
-  statusData: JSON
+  """
+  Structured data about the current status including error, scheduler, or lifecycle information.
+  """
+  statusData: StatusData
 
   """History of status transitions with timestamps."""
   statusHistory: StatusHistory
@@ -2035,7 +2067,7 @@ type KernelMetadataInfo {
   callbackUrl: String
 
   """Internal data stored with the kernel for system use."""
-  internalData: JSON
+  internalData: InternalData
 }
 
 """Added in 26.1.0. Metrics and statistics for a kernel."""
@@ -2043,8 +2075,10 @@ type KernelMetricsInfo {
   """The number of queries/executions performed by this kernel."""
   numQueries: Int!
 
-  """The last collected statistics for this kernel."""
-  lastStat: JSON
+  """
+  The last collected statistics for this kernel including CPU, memory, I/O, and network metrics.
+  """
+  lastStat: KernelStat
 }
 
 """Added in 26.1.0. Network configuration for a kernel."""
@@ -2152,6 +2186,25 @@ type KernelSessionInfo {
   sessionType: SessionType!
 }
 
+"""
+Added in 26.1.0. Collection of kernel resource statistics. Contains utilization metrics for CPU, memory, I/O, network, and accelerators.
+"""
+type KernelStat {
+  """List of metric entries for this kernel."""
+  entries: [KernelStatEntry!]!
+}
+
+"""
+Added in 26.1.0. A single kernel statistic entry with metric key and value. Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx.
+"""
+type KernelStatEntry {
+  """Metric key name (e.g., 'cpu_util', 'mem', 'io_read')."""
+  key: String!
+
+  """The metric measurement value."""
+  value: MetricValue!
+}
+
 """Added in 26.1.0"""
 enum KernelStatus {
   PENDING
@@ -2169,6 +2222,14 @@ enum KernelStatus {
   TERMINATED
   ERROR
   CANCELLED
+}
+
+"""
+Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
+"""
+type KernelStatusData {
+  """Exit code of the kernel process. Null if not yet terminated."""
+  exitCode: Int
 }
 
 """Added in 26.1.0. Filter for kernel status."""
@@ -3863,7 +3924,7 @@ enum RouteTrafficStatus {
   INACTIVE
 }
 
-"""Added in 26.1.0. SSH keypair for secure access."""
+"""Added in 26.1.0. SSH keypair for kernel access."""
 type SSHKeypair {
   """The public key in OpenSSH format."""
   publicKey: String!
@@ -4348,6 +4409,14 @@ enum SessionSchedulingHistoryOrderField {
   UPDATED_AT
 }
 
+"""
+Added in 26.1.0. Session-specific status data during lifecycle transitions.
+"""
+type SessionStatusData {
+  """Status string of the session (e.g., 'terminating')."""
+  status: String
+}
+
 """Added in 26.1.0. Type of compute session."""
 enum SessionType {
   INTERACTIVE
@@ -4366,6 +4435,44 @@ Contains the name and URL of the registry where the artifact is stored or origin
 type SourceInfo {
   name: String
   url: String
+}
+
+"""
+Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
+"""
+type StatusData {
+  """Error information when the kernel is in an error state."""
+  error: StatusErrorInfo
+
+  """Scheduler information during pending/scheduling states."""
+  scheduler: SchedulerInfo
+
+  """Kernel-specific status data during lifecycle transitions."""
+  kernel: KernelStatusData
+
+  """Session-specific status data during lifecycle transitions."""
+  session: SessionStatusData
+}
+
+"""
+Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
+"""
+type StatusErrorInfo {
+  """
+  Source of the error: 'agent' for agent errors, 'other' for other errors.
+  """
+  src: String!
+
+  """
+  ID of the agent where the error occurred. Only present for agent errors.
+  """
+  agentId: String
+
+  """Name of the exception class."""
+  name: String
+
+  """String representation of the exception."""
+  repr: String
 }
 
 """
