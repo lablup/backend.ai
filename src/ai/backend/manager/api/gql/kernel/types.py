@@ -282,6 +282,191 @@ class StatusHistoryGQL:
         return cls(entries=entries)
 
 
+# ========== Status Data Types ==========
+
+
+@strawberry.type(
+    name="StatusErrorInfo",
+    description=(
+        "Added in 26.1.0. Error information when a kernel enters an error state. "
+        "Contains details about the source and nature of the error."
+    ),
+)
+class StatusErrorInfoGQL:
+    """Error information in status_data."""
+
+    src: str = strawberry.field(
+        description="Source of the error: 'agent' for agent errors, 'other' for other errors."
+    )
+    agent_id: str | None = strawberry.field(
+        description="ID of the agent where the error occurred. Only present for agent errors."
+    )
+    name: str | None = strawberry.field(description="Name of the exception class.")
+    repr: str | None = strawberry.field(description="String representation of the exception.")
+
+
+@strawberry.type(
+    name="SchedulerPredicate",
+    description=(
+        "Added in 26.1.0. A scheduler predicate result from scheduling attempts. "
+        "Predicates are conditions checked during session scheduling."
+    ),
+)
+class SchedulerPredicateGQL:
+    """A scheduler predicate entry."""
+
+    name: str = strawberry.field(
+        description="Name of the predicate (e.g., 'concurrency', 'reserved_time')."
+    )
+    msg: str | None = strawberry.field(
+        description="Message explaining why the predicate failed. Null for passed predicates."
+    )
+
+
+@strawberry.type(
+    name="SchedulerInfo",
+    description=(
+        "Added in 26.1.0. Scheduler information including retry attempts and predicate results. "
+        "Contains details about scheduling attempts when a session is pending."
+    ),
+)
+class SchedulerInfoGQL:
+    """Scheduler information in status_data."""
+
+    retries: int | None = strawberry.field(
+        description="Number of scheduling attempts made for this session."
+    )
+    last_try: str | None = strawberry.field(
+        description="ISO 8601 timestamp of the last scheduling attempt."
+    )
+    msg: str | None = strawberry.field(description="Message from the last scheduling attempt.")
+    failed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
+        description="List of predicates that failed during scheduling."
+    )
+    passed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
+        description="List of predicates that passed during scheduling."
+    )
+
+
+@strawberry.type(
+    name="KernelStatusData",
+    description="Added in 26.1.0. Kernel-specific status data during lifecycle transitions.",
+)
+class KernelStatusDataGQL:
+    """Kernel status data."""
+
+    exit_code: int | None = strawberry.field(
+        description="Exit code of the kernel process. Null if not yet terminated."
+    )
+
+
+@strawberry.type(
+    name="SessionStatusData",
+    description="Added in 26.1.0. Session-specific status data during lifecycle transitions.",
+)
+class SessionStatusDataGQL:
+    """Session status data."""
+
+    status: str | None = strawberry.field(
+        description="Status string of the session (e.g., 'terminating')."
+    )
+
+
+@strawberry.type(
+    name="StatusData",
+    description=(
+        "Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. "
+        "The populated fields depend on the kernel's current status and recent state transitions."
+    ),
+)
+class StatusDataGQL:
+    """Structured status data with optional sections."""
+
+    error: StatusErrorInfoGQL | None = strawberry.field(
+        description="Error information when the kernel is in an error state."
+    )
+    scheduler: SchedulerInfoGQL | None = strawberry.field(
+        description="Scheduler information during pending/scheduling states."
+    )
+    kernel: KernelStatusDataGQL | None = strawberry.field(
+        description="Kernel-specific status data during lifecycle transitions."
+    )
+    session: SessionStatusDataGQL | None = strawberry.field(
+        description="Session-specific status data during lifecycle transitions."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> StatusDataGQL | None:
+        """Convert a status_data mapping to GraphQL type."""
+        if data is None or not data:
+            return None
+
+        error = None
+        scheduler = None
+        kernel = None
+        session = None
+
+        # Parse error section
+        if "error" in data:
+            err = data["error"]
+            error = StatusErrorInfoGQL(
+                src=err.get("src", ""),
+                agent_id=err.get("agent_id"),
+                name=err.get("name"),
+                repr=err.get("repr"),
+            )
+
+        # Parse scheduler section (can be nested under "scheduler" or at top level)
+        scheduler_data = data.get("scheduler", {})
+        # Also check for top-level scheduler fields
+        if not scheduler_data and any(
+            k in data for k in ["retries", "last_try", "failed_predicates", "passed_predicates"]
+        ):
+            scheduler_data = data
+
+        if scheduler_data:
+            failed_predicates = None
+            passed_predicates = None
+
+            if "failed_predicates" in scheduler_data:
+                failed_predicates = [
+                    SchedulerPredicateGQL(name=p.get("name", ""), msg=p.get("msg"))
+                    for p in scheduler_data["failed_predicates"]
+                ]
+
+            if "passed_predicates" in scheduler_data:
+                passed_predicates = [
+                    SchedulerPredicateGQL(name=p.get("name", ""), msg=None)
+                    for p in scheduler_data["passed_predicates"]
+                ]
+
+            if any(
+                k in scheduler_data
+                for k in ["retries", "last_try", "msg", "failed_predicates", "passed_predicates"]
+            ):
+                scheduler = SchedulerInfoGQL(
+                    retries=scheduler_data.get("retries"),
+                    last_try=scheduler_data.get("last_try"),
+                    msg=scheduler_data.get("msg"),
+                    failed_predicates=failed_predicates,
+                    passed_predicates=passed_predicates,
+                )
+
+        # Parse kernel section
+        if "kernel" in data:
+            kernel = KernelStatusDataGQL(exit_code=data["kernel"].get("exit_code"))
+
+        # Parse session section
+        if "session" in data:
+            session = SessionStatusDataGQL(status=data["session"].get("status"))
+
+        # Return None if all sections are empty
+        if error is None and scheduler is None and kernel is None and session is None:
+            return None
+
+        return cls(error=error, scheduler=scheduler, kernel=kernel, session=session)
+
+
 # ========== Kernel Statistics Types ==========
 
 
@@ -702,8 +887,8 @@ class KernelLifecycleInfoGQL:
     status_info: str | None = strawberry.field(
         description="Human-readable information about the current status."
     )
-    status_data: JSON | None = strawberry.field(
-        description="Additional structured data about the current status."
+    status_data: StatusDataGQL | None = strawberry.field(
+        description="Structured data about the current status including error, scheduler, or lifecycle information."
     )
     status_history: StatusHistoryGQL | None = strawberry.field(
         description="History of status transitions with timestamps."
@@ -881,7 +1066,7 @@ class KernelGQL(Node):
                 result=SessionResultGQL(kernel_info.lifecycle.result),
                 status_changed=kernel_info.lifecycle.status_changed,
                 status_info=kernel_info.lifecycle.status_info,
-                status_data=kernel_info.lifecycle.status_data,
+                status_data=StatusDataGQL.from_mapping(kernel_info.lifecycle.status_data),
                 status_history=StatusHistoryGQL.from_mapping(kernel_info.lifecycle.status_history),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
