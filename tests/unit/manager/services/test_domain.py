@@ -26,6 +26,7 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.domain.updaters import (
@@ -77,12 +78,18 @@ class TestCreateDomain:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     @pytest.fixture
@@ -128,7 +135,7 @@ class TestCreateDomain:
         sample_domain_data: DomainData,
     ) -> None:
         """Create domain with valid data as admin should return created domain."""
-        mock_repository.create_domain = AsyncMock(return_value=sample_domain_data)
+        mock_repository.create_domain_validated = AsyncMock(return_value=sample_domain_data)
 
         action = CreateDomainAction(
             creator=Creator(
@@ -143,17 +150,17 @@ class TestCreateDomain:
         result = await service.create_domain(action)
 
         assert result.domain_data.name == sample_domain_data.name
-        mock_repository.create_domain.assert_called_once()
+        mock_repository.create_domain_validated.assert_called_once()
 
-    async def test_create_with_valid_data_as_superadmin_returns_domain(
+    async def test_create_with_valid_data_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_data: DomainData,
     ) -> None:
-        """Create domain as superadmin should return created domain."""
-        mock_repository.create_domain = AsyncMock(return_value=sample_domain_data)
+        """Create domain as superadmin should use force method."""
+        mock_admin_repository.create_domain_force = AsyncMock(return_value=sample_domain_data)
 
         action = CreateDomainAction(
             creator=Creator(
@@ -168,7 +175,7 @@ class TestCreateDomain:
         result = await service.create_domain(action)
 
         assert result.domain_data.name == sample_domain_data.name
-        mock_repository.create_domain.assert_called_once()
+        mock_admin_repository.create_domain_force.assert_called_once()
 
     async def test_create_with_duplicate_name_raises_error(
         self,
@@ -177,7 +184,7 @@ class TestCreateDomain:
         admin_user: UserInfo,
     ) -> None:
         """Create domain with duplicate name should raise InvalidAPIParameters."""
-        mock_repository.create_domain = AsyncMock(
+        mock_repository.create_domain_validated = AsyncMock(
             side_effect=InvalidAPIParameters("Domain already exists")
         )
 
@@ -221,7 +228,9 @@ class TestCreateDomain:
         complex_resource_domain_data: DomainData,
     ) -> None:
         """Create domain with complex resource slots should succeed."""
-        mock_repository.create_domain = AsyncMock(return_value=complex_resource_domain_data)
+        mock_repository.create_domain_validated = AsyncMock(
+            return_value=complex_resource_domain_data
+        )
 
         action = CreateDomainAction(
             creator=Creator(
@@ -252,12 +261,18 @@ class TestModifyDomain:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     @pytest.fixture
@@ -313,7 +328,7 @@ class TestModifyDomain:
         modified_domain_data: DomainData,
     ) -> None:
         """Modify domain with valid data should return updated domain."""
-        mock_repository.modify_domain = AsyncMock(return_value=modified_domain_data)
+        mock_repository.modify_domain_validated = AsyncMock(return_value=modified_domain_data)
         assert modified_domain_data.description is not None
 
         action = ModifyDomainAction(
@@ -329,17 +344,17 @@ class TestModifyDomain:
         result = await service.modify_domain(action)
 
         assert result.domain_data.description == modified_domain_data.description
-        mock_repository.modify_domain.assert_called_once()
+        mock_repository.modify_domain_validated.assert_called_once()
 
-    async def test_modify_as_superadmin_returns_domain(
+    async def test_modify_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         modified_domain_data: DomainData,
     ) -> None:
-        """Modify domain as superadmin should return domain."""
-        mock_repository.modify_domain = AsyncMock(return_value=modified_domain_data)
+        """Modify domain as superadmin should use force method."""
+        mock_admin_repository.modify_domain_force = AsyncMock(return_value=modified_domain_data)
         assert modified_domain_data.description is not None
 
         action = ModifyDomainAction(
@@ -355,7 +370,7 @@ class TestModifyDomain:
         result = await service.modify_domain(action)
 
         assert result.domain_data.description == modified_domain_data.description
-        mock_repository.modify_domain.assert_called_once()
+        mock_admin_repository.modify_domain_force.assert_called_once()
 
     async def test_modify_nonexistent_domain_raises_not_found(
         self,
@@ -364,7 +379,9 @@ class TestModifyDomain:
         admin_user: UserInfo,
     ) -> None:
         """Modify non-existent domain should raise DomainNotFound."""
-        mock_repository.modify_domain = AsyncMock(side_effect=DomainNotFound("Domain not found"))
+        mock_repository.modify_domain_validated = AsyncMock(
+            side_effect=DomainNotFound("Domain not found")
+        )
 
         action = ModifyDomainAction(
             user_info=admin_user,
@@ -387,7 +404,7 @@ class TestModifyDomain:
         deactivated_domain_data: DomainData,
     ) -> None:
         """Modify domain to deactivate should succeed."""
-        mock_repository.modify_domain = AsyncMock(return_value=deactivated_domain_data)
+        mock_repository.modify_domain_validated = AsyncMock(return_value=deactivated_domain_data)
 
         action = ModifyDomainAction(
             user_info=admin_user,
@@ -411,7 +428,7 @@ class TestModifyDomain:
         nullified_domain_data: DomainData,
     ) -> None:
         """Modify domain with tristate nullify should set fields to None."""
-        mock_repository.modify_domain = AsyncMock(return_value=nullified_domain_data)
+        mock_repository.modify_domain_validated = AsyncMock(return_value=nullified_domain_data)
 
         action = ModifyDomainAction(
             user_info=admin_user,
@@ -437,12 +454,18 @@ class TestDeleteDomain:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     async def test_delete_existing_domain_returns_name(
@@ -452,30 +475,30 @@ class TestDeleteDomain:
         admin_user: UserInfo,
     ) -> None:
         """Delete existing domain should return domain name."""
-        mock_repository.soft_delete_domain = AsyncMock(return_value=None)
+        mock_repository.soft_delete_domain_validated = AsyncMock(return_value=None)
 
         action = DeleteDomainAction(name="test-delete-domain", user_info=admin_user)
 
         result = await service.delete_domain(action)
 
         assert result.name == "test-delete-domain"
-        mock_repository.soft_delete_domain.assert_called_once_with("test-delete-domain")
+        mock_repository.soft_delete_domain_validated.assert_called_once_with("test-delete-domain")
 
-    async def test_delete_as_superadmin_returns_name(
+    async def test_delete_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
     ) -> None:
-        """Delete domain as superadmin should return domain name."""
-        mock_repository.soft_delete_domain = AsyncMock(return_value=None)
+        """Delete domain as superadmin should use force method."""
+        mock_admin_repository.soft_delete_domain_force = AsyncMock(return_value=None)
 
         action = DeleteDomainAction(name="test-delete-domain", user_info=superadmin_user)
 
         result = await service.delete_domain(action)
 
         assert result.name == "test-delete-domain"
-        mock_repository.soft_delete_domain.assert_called_once()
+        mock_admin_repository.soft_delete_domain_force.assert_called_once()
 
     async def test_delete_nonexistent_domain_raises_not_found(
         self,
@@ -484,7 +507,7 @@ class TestDeleteDomain:
         admin_user: UserInfo,
     ) -> None:
         """Delete non-existent domain should raise DomainNotFound."""
-        mock_repository.soft_delete_domain = AsyncMock(
+        mock_repository.soft_delete_domain_validated = AsyncMock(
             side_effect=DomainNotFound("Domain not found")
         )
 
@@ -502,12 +525,18 @@ class TestPurgeDomain:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     async def test_purge_existing_domain_as_admin(
@@ -517,30 +546,30 @@ class TestPurgeDomain:
         admin_user: UserInfo,
     ) -> None:
         """Purge existing domain as admin should call validated method."""
-        mock_repository.purge_domain = AsyncMock(return_value=None)
+        mock_repository.purge_domain_validated = AsyncMock(return_value=None)
 
         action = PurgeDomainAction(name="test-purge-domain", user_info=admin_user)
 
         result = await service.purge_domain(action)
 
         assert result.name == "test-purge-domain"
-        mock_repository.purge_domain.assert_called_once_with("test-purge-domain")
+        mock_repository.purge_domain_validated.assert_called_once_with("test-purge-domain")
 
-    async def test_purge_as_superadmin_returns_name(
+    async def test_purge_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
     ) -> None:
-        """Purge domain as superadmin should return domain name."""
-        mock_repository.purge_domain = AsyncMock(return_value=None)
+        """Purge domain as superadmin should use force method."""
+        mock_admin_repository.purge_domain_force = AsyncMock(return_value=None)
 
         action = PurgeDomainAction(name="test-purge-domain", user_info=superadmin_user)
 
         result = await service.purge_domain(action)
 
         assert result.name == "test-purge-domain"
-        mock_repository.purge_domain.assert_called_once()
+        mock_admin_repository.purge_domain_force.assert_called_once()
 
     async def test_purge_nonexistent_domain_raises_error(
         self,
@@ -549,7 +578,7 @@ class TestPurgeDomain:
         admin_user: UserInfo,
     ) -> None:
         """Purge non-existent domain should raise DomainDeletionFailed."""
-        mock_repository.purge_domain = AsyncMock(
+        mock_repository.purge_domain_validated = AsyncMock(
             side_effect=DomainDeletionFailed("Domain not found")
         )
 
@@ -565,7 +594,7 @@ class TestPurgeDomain:
         admin_user: UserInfo,
     ) -> None:
         """Purge domain with active kernels should raise DomainHasActiveKernels."""
-        mock_repository.purge_domain = AsyncMock(
+        mock_repository.purge_domain_validated = AsyncMock(
             side_effect=DomainHasActiveKernels("Domain has active kernels")
         )
 
@@ -581,7 +610,9 @@ class TestPurgeDomain:
         admin_user: UserInfo,
     ) -> None:
         """Purge domain with users should raise DomainHasUsers."""
-        mock_repository.purge_domain = AsyncMock(side_effect=DomainHasUsers("Domain has users"))
+        mock_repository.purge_domain_validated = AsyncMock(
+            side_effect=DomainHasUsers("Domain has users")
+        )
 
         action = PurgeDomainAction(name="test-domain", user_info=admin_user)
 
@@ -595,7 +626,9 @@ class TestPurgeDomain:
         admin_user: UserInfo,
     ) -> None:
         """Purge domain with groups should raise DomainHasGroups."""
-        mock_repository.purge_domain = AsyncMock(side_effect=DomainHasGroups("Domain has groups"))
+        mock_repository.purge_domain_validated = AsyncMock(
+            side_effect=DomainHasGroups("Domain has groups")
+        )
 
         action = PurgeDomainAction(name="test-domain", user_info=admin_user)
 
@@ -611,12 +644,18 @@ class TestCreateDomainNode:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     @pytest.fixture
@@ -662,15 +701,15 @@ class TestCreateDomainNode:
         assert result.domain_data.name == sample_domain_node_data.name
         mock_repository.create_domain_node_with_permissions.assert_called_once()
 
-    async def test_create_domain_node_as_superadmin_returns_domain(
+    async def test_create_domain_node_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_node_data: DomainData,
     ) -> None:
-        """Create domain node as superadmin should return domain."""
-        mock_repository.create_domain_node_with_permissions = AsyncMock(
+        """Create domain node as superadmin should use force method."""
+        mock_admin_repository.create_domain_node_with_permissions_force = AsyncMock(
             return_value=sample_domain_node_data
         )
 
@@ -688,7 +727,7 @@ class TestCreateDomainNode:
         result = await service.create_domain_node(action)
 
         assert result.domain_data.name == sample_domain_node_data.name
-        mock_repository.create_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.create_domain_node_with_permissions_force.assert_called_once()
 
     async def test_create_domain_node_with_empty_name_raises_error(
         self,
@@ -742,12 +781,18 @@ class TestModifyDomainNode:
         return MagicMock(spec=DomainRepository)
 
     @pytest.fixture
+    def mock_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=AdminDomainRepository)
+
+    @pytest.fixture
     def service(
         self,
         mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
     ) -> DomainService:
         return DomainService(
             repository=mock_repository,
+            admin_repository=mock_admin_repository,
         )
 
     @pytest.fixture
@@ -808,15 +853,15 @@ class TestModifyDomainNode:
         assert result.domain_data.description == modified_domain_node_data.description
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
 
-    async def test_modify_domain_node_as_superadmin_returns_domain(
+    async def test_modify_domain_node_as_superadmin_uses_force(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         modified_domain_node_data: DomainData,
     ) -> None:
-        """Modify domain node as superadmin should return domain."""
-        mock_repository.modify_domain_node_with_permissions = AsyncMock(
+        """Modify domain node as superadmin should use force method."""
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
             return_value=modified_domain_node_data
         )
         assert modified_domain_node_data.description is not None
@@ -834,7 +879,7 @@ class TestModifyDomainNode:
         result = await service.modify_domain_node(action)
 
         assert result.domain_data.description == modified_domain_node_data.description
-        mock_repository.modify_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
 
     async def test_modify_domain_node_nonexistent_raises_not_found(
         self,
@@ -906,12 +951,12 @@ class TestModifyDomainNode:
     async def test_modify_domain_node_with_scaling_groups_to_add(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_data: DomainData,
     ) -> None:
         """Modify domain node with scaling groups to add should pass them to repository."""
-        mock_repository.modify_domain_node_with_permissions = AsyncMock(
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
             return_value=sample_domain_data
         )
 
@@ -928,17 +973,17 @@ class TestModifyDomainNode:
         result = await service.modify_domain_node(action)
 
         assert result.domain_data is not None
-        mock_repository.modify_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
 
     async def test_modify_domain_node_with_scaling_groups_to_remove(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_data: DomainData,
     ) -> None:
         """Modify domain node with scaling groups to remove should pass them to repository."""
-        mock_repository.modify_domain_node_with_permissions = AsyncMock(
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
             return_value=sample_domain_data
         )
 
@@ -955,17 +1000,17 @@ class TestModifyDomainNode:
         result = await service.modify_domain_node(action)
 
         assert result.domain_data is not None
-        mock_repository.modify_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
 
     async def test_modify_domain_node_with_disjoint_scaling_groups_succeeds(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_data: DomainData,
     ) -> None:
         """Modify domain node with disjoint add/remove scaling groups should succeed."""
-        mock_repository.modify_domain_node_with_permissions = AsyncMock(
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
             return_value=sample_domain_data
         )
 
@@ -982,17 +1027,17 @@ class TestModifyDomainNode:
         result = await service.modify_domain_node(action)
 
         assert result.domain_data is not None
-        mock_repository.modify_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
 
     async def test_modify_domain_node_with_empty_scaling_groups_succeeds(
         self,
         service: DomainService,
-        mock_repository: MagicMock,
+        mock_admin_repository: MagicMock,
         superadmin_user: UserInfo,
         sample_domain_data: DomainData,
     ) -> None:
         """Modify domain node with both empty scaling groups should succeed."""
-        mock_repository.modify_domain_node_with_permissions = AsyncMock(
+        mock_admin_repository.modify_domain_node_with_permissions_force = AsyncMock(
             return_value=sample_domain_data
         )
 
@@ -1009,4 +1054,4 @@ class TestModifyDomainNode:
         result = await service.modify_domain_node(action)
 
         assert result.domain_data is not None
-        mock_repository.modify_domain_node_with_permissions.assert_called_once()
+        mock_admin_repository.modify_domain_node_with_permissions_force.assert_called_once()
