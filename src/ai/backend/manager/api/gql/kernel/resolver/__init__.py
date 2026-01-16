@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 
-from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelFilterGQL,
     KernelOrderByGQL,
+    KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+
+@strawberry.field(description="Added in 26.1.0. Query a single kernel by ID.")
+async def kernel_v2(
+    info: Info[StrawberryGQLContext],
+    id: ID,
+) -> Optional[KernelV2GQL]:
+    return await fetch_kernel(info, UUID(id))
 
 
 @strawberry.field(description="Added in 26.1.0. Query kernels with pagination and filtering.")

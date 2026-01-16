@@ -2604,6 +2604,7 @@ type KernelDeviceModelInfo {
 
 """Added in 26.1.0. Filter criteria for querying kernels."""
 input KernelFilter {
+  id: UUID = null
   status: KernelStatusFilter = null
   sessionId: UUID = null
 }
@@ -4797,6 +4798,9 @@ type Query {
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
+
+  """Added in 26.1.0. Query a single kernel by ID."""
+  kernelV2(id: ID!): KernelV2
 
   """Added in 26.1.0. Query kernels with pagination and filtering."""
   kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!

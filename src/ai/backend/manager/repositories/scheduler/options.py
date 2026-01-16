@@ -174,6 +174,13 @@ class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
+    def by_id(kernel_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id == kernel_id
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.session_id.in_(session_ids)

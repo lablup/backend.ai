@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
@@ -71,3 +72,26 @@ async def fetch_kernels(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_kernel(
+    info: Info[StrawberryGQLContext],
+    kernel_id: UUID,
+) -> KernelV2GQL | None:
+    """Fetch a single kernel by ID."""
+    filter = KernelFilterGQL(id=kernel_id)
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(limit=1),
+        pagination_spec=_get_kernel_pagination_spec(),
+        filter=filter,
+        order_by=None,
+    )
+
+    action_result = await info.context.processors.session.search_kernels.wait_for_complete(
+        SearchKernelsAction(querier=querier)
+    )
+
+    if not action_result.data:
+        return None
+
+    return KernelV2GQL.from_kernel_info(action_result.data[0])
