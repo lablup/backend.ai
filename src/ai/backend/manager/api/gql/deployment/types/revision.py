@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     to_global_id,
 )
+from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image import Image
 from ai.backend.manager.api.gql.resource_group import ResourceGroup
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -164,6 +165,43 @@ class ModelRuntimeConfig:
         )
 
 
+@strawberry.type(
+    name="ResourceOptsEntry",
+    description=(
+        "Added in 26.1.0. A single key-value entry representing a resource option. "
+        "Contains additional resource configuration such as shared memory settings."
+    ),
+)
+class ResourceOptsEntryGQL:
+    """Single resource option entry with key and value."""
+
+    key: str = strawberry.field(
+        description="The key identifier for this resource option. Example: 'shmem'."
+    )
+    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
+
+
+@strawberry.type(
+    name="ResourceOpts",
+    description=(
+        "Added in 26.1.0. A collection of additional resource options for a deployment. "
+        "Contains key-value pairs for resource configuration like shared memory."
+    ),
+)
+class ResourceOptsGQL:
+    """Resource options containing multiple key-value entries."""
+
+    entries: list[ResourceOptsEntryGQL] = strawberry.field(
+        description="List of resource option entries. Each entry contains a key-value pair."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, str]) -> ResourceOptsGQL:
+        """Convert a Mapping to GraphQL type."""
+        entries = [ResourceOptsEntryGQL(key=k, value=v) for k, v in data.items()]
+        return cls(entries=entries)
+
+
 @strawberry.type
 class ResourceConfig:
     """
@@ -174,11 +212,11 @@ class ResourceConfig:
     """
 
     _resource_group_name: strawberry.Private[str]
-    resource_slots: JSON = strawberry.field(
-        description='JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.'
+    resource_slots: ResourceSlotGQL = strawberry.field(
+        description="Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators."
     )
-    resource_opts: Optional[JSON] = strawberry.field(
-        description='Additional resource options such as shared memory. Example: {"shmem": "64m"}.',
+    resource_opts: Optional[ResourceOptsGQL] = strawberry.field(
+        description="Added in 26.1.0. Additional resource options such as shared memory.",
         default=None,
     )
 
@@ -194,8 +232,10 @@ class ResourceConfig:
     def from_dataclass(cls, data: ResourceConfigData) -> ResourceConfig:
         return cls(
             _resource_group_name=data.resource_group_name,
-            resource_slots=data.resource_slot.to_json(),
-            resource_opts=data.resource_opts,
+            resource_slots=ResourceSlotGQL.from_resource_slot(data.resource_slot),
+            resource_opts=ResourceOptsGQL.from_mapping(data.resource_opts)
+            if data.resource_opts
+            else None,
         )
 
 
@@ -391,14 +431,62 @@ class ResourceGroupInput:
     name: str
 
 
+@strawberry.input(
+    description=(
+        "Added in 26.1.0. A single entry representing one resource type and its allocated quantity."
+    )
+)
+class ResourceSlotEntryInput:
+    """Single resource slot entry input with resource type and quantity."""
+
+    resource_type: str = strawberry.field(
+        description="Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."
+    )
+    quantity: str = strawberry.field(description="Quantity of the resource as a decimal string.")
+
+
+@strawberry.input(
+    description=("Added in 26.1.0. A collection of compute resource allocations for input.")
+)
+class ResourceSlotInput:
+    """Resource slot input containing multiple resource type entries."""
+
+    entries: list[ResourceSlotEntryInput] = strawberry.field(
+        description="List of resource allocations."
+    )
+
+
+@strawberry.input(
+    description=("Added in 26.1.0. A single key-value entry representing a resource option.")
+)
+class ResourceOptsEntryInput:
+    """Single resource option entry input with key and value."""
+
+    key: str = strawberry.field(
+        description="The key identifier for this resource option (e.g., 'shmem')."
+    )
+    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
+
+
+@strawberry.input(
+    description=("Added in 26.1.0. A collection of additional resource options for input.")
+)
+class ResourceOptsInput:
+    """Resource options input containing multiple key-value entries."""
+
+    entries: list[ResourceOptsEntryInput] = strawberry.field(
+        description="List of resource option entries."
+    )
+
+
 @strawberry.input(description="Added in 25.19.0")
 class ResourceConfigInput:
     resource_group: ResourceGroupInput
-    resource_slots: JSON = strawberry.field(
-        description='Resources allocated for the deployment. Example: "resourceSlots": "{\\"cpu\\": \\"1\\", \\"mem\\": \\"1073741824\\", \\"cuda.device\\": \\"0\\"}"'
+    resource_slots: ResourceSlotInput = strawberry.field(
+        description="Added in 26.1.0. Resources allocated for the deployment."
     )
-    resource_opts: Optional[JSON] = strawberry.field(
-        description='Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\\"shmem\\": \\"64m\\"}"',
+    resource_opts: Optional[ResourceOptsInput] = strawberry.field(
+        description="Added in 26.1.0. Additional options for the resources such as shared memory.",
         default=None,
     )
 
