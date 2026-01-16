@@ -69,8 +69,8 @@ class KernelRecoveryData(BaseModel):
             resource_spec=kernel.resource_spec,
             service_ports=kernel.service_ports,
             environ=kernel.environ,
-            block_service_ports=kernel.data["block_service_ports"],
-            domain_socket_proxies=kernel.data["domain_socket_proxies"],
+            block_service_ports=kernel.data.get("block_service_ports", False),
+            domain_socket_proxies=kernel.data.get("domain_socket_proxies", []),
             repl_in_port=kernel.data["repl_in_port"],
             repl_out_port=kernel.data["repl_out_port"],
         )
