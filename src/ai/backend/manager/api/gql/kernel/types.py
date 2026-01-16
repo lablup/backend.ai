@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     SchedulerInfoGQL,
     SchedulerPredicateGQL,
+    ServicePortEntryGQL,
     ServicePortsGQL,
     SessionResultGQL,
     SessionTypesGQL,
@@ -869,7 +870,13 @@ class KernelV2GQL(Node):
                 kernel_host=kernel_info.network.kernel_host,
                 repl_in_port=kernel_info.network.repl_in_port,
                 repl_out_port=kernel_info.network.repl_out_port,
-                service_ports=ServicePortsGQL.from_mapping(kernel_info.network.service_ports),
+                service_ports=ServicePortsGQL(
+                    entries=[
+                        ServicePortEntryGQL.from_dict(p) for p in kernel_info.network.service_ports
+                    ]
+                )
+                if kernel_info.network.service_ports
+                else None,
                 preopen_ports=kernel_info.network.preopen_ports,
                 use_host_network=kernel_info.network.use_host_network,
             ),
