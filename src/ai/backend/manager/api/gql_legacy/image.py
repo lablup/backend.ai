@@ -336,6 +336,9 @@ class Image(graphene.ObjectType):
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
 
+        if allowed_docker_registries is None:
+            return []
+
         filtered_items: list[Image] = [
             item for item in items if item.registry in allowed_docker_registries
         ]

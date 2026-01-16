@@ -493,7 +493,7 @@ class Agent(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -782,7 +782,7 @@ class AgentSummary(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -838,7 +838,7 @@ class AgentSummary(graphene.ObjectType):
             result = await db_session.scalars(query)
             rows = result.unique().all()
             for row in rows:
-                agent_ids.append(row.id)
+                agent_ids.append(AgentId(row.id))
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
@@ -888,7 +888,7 @@ class ModifyAgent(graphene.Mutation):
         set_if_set(props, data, "scaling_group")
         # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
         if (scaling_group := data.get("scaling_group")) is not None:
-            await graph_ctx.registry.update_scaling_group(id, scaling_group)
+            await graph_ctx.registry.update_scaling_group(AgentId(id), scaling_group)
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)

@@ -394,7 +394,7 @@ class ComputeContainer(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly_session() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -778,7 +778,7 @@ class LegacyComputeSession(graphene.ObjectType):
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(

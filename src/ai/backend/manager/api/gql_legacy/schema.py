@@ -88,14 +88,14 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api.api.manager import ManagerStatus
-    from ai.backend.manager.api.idle import IdleCheckerHost
-    from ai.backend.manager.api.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.api.registry import AgentRegistry
-    from ai.backend.manager.api.repositories.agent.repository import AgentRepository
-    from ai.backend.manager.api.repositories.scheduler.repository import SchedulerRepository
-    from ai.backend.manager.api.repositories.user.repository import UserRepository
+    from ai.backend.manager.api.manager import ManagerStatus
+    from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.agent.repository import AgentRepository
+    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+    from ai.backend.manager.repositories.user.repository import UserRepository
 
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
