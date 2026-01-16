@@ -130,6 +130,7 @@ from .scheduling_history import (
     route_histories,
     session_scheduling_histories,
 )
+from .session.resolver import session_v2, sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -189,6 +190,8 @@ class Query:
     inference_runtime_config = inference_runtime_config
     kernel_v2 = kernel_v2
     kernels_v2 = kernels_v2
+    session_v2 = session_v2
+    sessions_v2 = sessions_v2
     route = route
     routes = routes
     session_scheduling_histories = session_scheduling_histories
