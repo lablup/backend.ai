@@ -252,13 +252,13 @@ class ComputePluginEntryGQL:
 
 
 @strawberry.type(
-    name="ComputePlugin",
+    name="ComputePlugins",
     description=(
         "Added in 26.1.0. A collection of compute plugins available on an agent. "
         "Each entry specifies a plugin name and its associated metadata."
     ),
 )
-class ComputePluginGQL:
+class ComputePluginsGQL:
     """Compute plugins container with multiple plugin entries."""
 
     entries: list[ComputePluginEntryGQL] = strawberry.field(
@@ -269,7 +269,7 @@ class ComputePluginGQL:
     )
 
     @classmethod
-    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginGQL:
+    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsGQL:
         """Convert a mapping of plugin name to value to GraphQL type."""
         entries = [
             ComputePluginEntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
@@ -304,7 +304,7 @@ class AgentSystemInfoGQL:
         """),
         deprecation_reason="Legacy feature no longer in use.",
     )
-    compute_plugins: ComputePluginGQL = strawberry.field(
+    compute_plugins: ComputePluginsGQL = strawberry.field(
         description=dedent_strip("""
             List of compute plugin metadata supported by this agent.
             Each plugin represents a specific accelerator or resource type (e.g., CUDA).
@@ -398,7 +398,7 @@ class AgentV2GQL(Node):
                 architecture=data.architecture,
                 version=data.version,
                 auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
-                compute_plugins=ComputePluginGQL.from_mapping(data.compute_plugins),
+                compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
             ),
             network_info=AgentNetworkInfoGQL(
                 region=data.region,
