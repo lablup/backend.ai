@@ -21,6 +21,7 @@ from .types import (
     KernelResourceInfoGQL,
     KernelRuntimeInfoGQL,
     KernelSessionInfoGQL,
+    KernelSessionStatusDataGQL,
     KernelStatEntryGQL,
     KernelStatGQL,
     KernelStatusDataContainerGQL,
@@ -32,7 +33,6 @@ from .types import (
     KernelStatusHistoryGQL,
     KernelUserPermissionInfoGQL,
     KernelV2GQL,
-    SessionStatusDataGQL,
 )
 
 __all__ = [
@@ -65,5 +65,5 @@ __all__ = [
     "KernelStatusHistoryGQL",
     "KernelUserPermissionInfoGQL",
     "KernelV2GQL",
-    "SessionStatusDataGQL",
+    "KernelSessionStatusDataGQL",
 ]
