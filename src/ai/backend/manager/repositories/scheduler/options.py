@@ -266,6 +266,18 @@ class KernelOrders:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
 
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.created_at.asc()
+        return KernelRow.created_at.desc()
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.id.asc()
+        return KernelRow.id.desc()
+
 
 class UserConditions:
     """Query conditions for users."""
