@@ -1553,7 +1553,7 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
         assert result.data == [sample_session_data]
         assert result.total_count == 1
@@ -1582,7 +1582,7 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
         assert result.data == []
         assert result.total_count == 0
@@ -1609,7 +1609,7 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
