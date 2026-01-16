@@ -438,10 +438,10 @@ class KernelInternalDataGQL:
                     f"Invalid dotfiles type: expected Sequence, got {type(dotfiles_data).__name__}"
                 )
             dotfiles = []
-            for i, df in enumerate(dotfiles_data):
+            for df in dotfiles_data:
                 if not isinstance(df, dict):
                     raise InvalidKernelData(
-                        f"Invalid dotfile type at index {i}: expected dict, got {type(df).__name__}"
+                        f"Invalid dotfile entry type: expected dict, got {type(df).__name__}"
                     )
                 dotfiles.append(
                     DotfileInfoGQL(
@@ -617,10 +617,10 @@ class KernelAttachedDevicesGQL:
                     f"expected Sequence, got {type(devices).__name__}"
                 )
             device_infos = []
-            for i, device in enumerate(devices):
+            for device in devices:
                 if not isinstance(device, dict):
                     raise InvalidKernelData(
-                        f"Invalid device type at index {i} for device_type '{device_type}': "
+                        f"Invalid device entry type for device_type '{device_type}': "
                         f"expected dict, got {type(device).__name__}"
                     )
                 device_infos.append(
