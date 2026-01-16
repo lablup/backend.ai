@@ -13,49 +13,30 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.types import (
-    MountPermission,
-    ServicePortProtocols,
-    SessionId,
-    SessionResult,
-    SessionTypes,
-    VFolderUsageMode,
-)
-from ai.backend.manager.api.gql.base import (
-    OrderDirection,
+from ai.backend.common.types import SessionId
+from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.common.types import (
+    DotfileInfoGQL,
+    MetricStatGQL,
+    MetricValueGQL,
+    ResourceOptsGQL,
+    SchedulerInfoGQL,
+    SchedulerPredicateGQL,
+    ServicePortsGQL,
+    SessionResultGQL,
+    SessionTypesGQL,
+    SSHKeypairGQL,
+    VFolderMountGQL,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.errors.kernel import InvalidKernelData
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
 KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.1.0")
-
-SessionTypesGQL = strawberry.enum(
-    SessionTypes,
-    name="SessionType",
-    description="Added in 26.1.0. Type of compute session.",
-)
-
-SessionResultGQL = strawberry.enum(
-    SessionResult,
-    name="SessionResult",
-    description="Added in 26.1.0. Result status of a session execution.",
-)
-
-MountPermissionGQL = strawberry.enum(
-    MountPermission,
-    name="MountPermission",
-    description="Added in 26.1.0. Permission level for virtual folder mounts.",
-)
-
-VFolderUsageModeGQL = strawberry.enum(
-    VFolderUsageMode,
-    name="VFolderUsageMode",
-    description="Added in 26.1.0. Usage mode of a virtual folder.",
-)
 
 
 @strawberry.enum(
@@ -118,126 +99,17 @@ class KernelOrderByGQL(GQLOrderBy):
                 return KernelOrders.id(ascending)
 
 
-# ========== Resource Options Types ==========
+# ========== Kernel Status History Types ==========
 
 
 @strawberry.type(
-    name="ResourceOptsEntry",
-    description=(
-        "Added in 26.1.0. A single resource option entry with name and value. "
-        "Resource options provide additional configuration like shared memory settings."
-    ),
-)
-class ResourceOptsEntryGQL:
-    """Single resource option entry with name and value."""
-
-    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
-    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
-
-
-@strawberry.type(
-    name="ResourceOpts",
-    description=(
-        "Added in 26.1.0. A collection of additional resource options. "
-        "Contains configuration like shared memory and other resource-specific settings."
-    ),
-)
-class ResourceOptsGQL:
-    """Resource options containing multiple entries."""
-
-    entries: list[ResourceOptsEntryGQL] = strawberry.field(
-        description="List of resource option entries."
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> ResourceOptsGQL | None:
-        """Convert a Mapping to GraphQL type."""
-        if data is None:
-            return None
-        entries = [ResourceOptsEntryGQL(name=k, value=str(v)) for k, v in data.items()]
-        return cls(entries=entries)
-
-
-# ========== Service Port Types ==========
-
-
-ServicePortProtocolGQL = strawberry.enum(
-    ServicePortProtocols,
-    name="ServicePortProtocol",
-    description="Added in 26.1.0. Protocol types for service ports.",
-)
-
-
-@strawberry.type(
-    name="ServicePortEntry",
-    description=(
-        "Added in 26.1.0. A single service port entry representing an exposed service. "
-        "Contains port mapping and protocol information for accessing kernel services."
-    ),
-)
-class ServicePortEntryGQL:
-    """Single service port entry with name, protocol, and port mappings."""
-
-    name: str = strawberry.field(
-        description="Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."
-    )
-    protocol: ServicePortProtocolGQL = strawberry.field(
-        description="Protocol type for this service port (http, tcp, preopen, internal)."
-    )
-    container_ports: list[int] = strawberry.field(description="Port numbers inside the container.")
-    host_ports: list[int | None] = strawberry.field(
-        description="Mapped port numbers on the host. May be null if not yet assigned."
-    )
-    is_inference: bool = strawberry.field(
-        description="Whether this port is used for inference endpoints."
-    )
-
-
-@strawberry.type(
-    name="ServicePorts",
-    description=(
-        "Added in 26.1.0. A collection of service ports exposed by a kernel. "
-        "Each entry defines a service accessible through the kernel."
-    ),
-)
-class ServicePortsGQL:
-    """Service ports containing multiple port entries."""
-
-    entries: list[ServicePortEntryGQL] = strawberry.field(
-        description="List of service port entries."
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> ServicePortsGQL | None:
-        """Convert a service ports mapping to GraphQL type."""
-        if data is None:
-            return None
-        entries = []
-        for name, port_info in data.items():
-            if isinstance(port_info, dict):
-                entries.append(
-                    ServicePortEntryGQL(
-                        name=name,
-                        protocol=ServicePortProtocolGQL(port_info["protocol"]),
-                        container_ports=list(port_info["container_ports"]),
-                        host_ports=list(port_info["host_ports"]),
-                        is_inference=port_info["is_inference"],
-                    )
-                )
-        return cls(entries=entries)
-
-
-# ========== Status History Types ==========
-
-
-@strawberry.type(
-    name="StatusHistoryEntry",
+    name="KernelStatusHistoryEntry",
     description=(
         "Added in 26.1.0. A single status history entry recording a status transition. "
         "Contains the status name and the timestamp when the kernel entered that status."
     ),
 )
-class StatusHistoryEntryGQL:
+class KernelStatusHistoryEntryGQL:
     """Single status history entry with status and timestamp."""
 
     status: str = strawberry.field(
@@ -249,103 +121,66 @@ class StatusHistoryEntryGQL:
 
 
 @strawberry.type(
-    name="StatusHistory",
+    name="KernelStatusHistory",
     description=(
         "Added in 26.1.0. A collection of status history entries for a kernel. "
         "Records the progression of status changes throughout the kernel's lifecycle."
     ),
 )
-class StatusHistoryGQL:
+class KernelStatusHistoryGQL:
     """Status history containing multiple entries."""
 
-    entries: list[StatusHistoryEntryGQL] = strawberry.field(
+    entries: list[KernelStatusHistoryEntryGQL] = strawberry.field(
         description="List of status history entries in chronological order."
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> StatusHistoryGQL | None:
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatusHistoryGQL | None:
         """Convert a status history mapping to GraphQL type."""
         if data is None:
             return None
         entries = []
         for status, timestamp in data.items():
-            if timestamp is not None:
-                if isinstance(timestamp, datetime):
-                    entries.append(StatusHistoryEntryGQL(status=status, timestamp=timestamp))
-                elif isinstance(timestamp, str):
-                    entries.append(
-                        StatusHistoryEntryGQL(
-                            status=status,
-                            timestamp=datetime.fromisoformat(timestamp),
-                        )
+            if timestamp is None:
+                continue
+            if isinstance(timestamp, datetime):
+                entries.append(KernelStatusHistoryEntryGQL(status=status, timestamp=timestamp))
+            elif isinstance(timestamp, str):
+                entries.append(
+                    KernelStatusHistoryEntryGQL(
+                        status=status,
+                        timestamp=datetime.fromisoformat(timestamp),
                     )
+                )
+            else:
+                raise InvalidKernelData(
+                    f"Invalid timestamp type for status '{status}': "
+                    f"expected datetime or str, got {type(timestamp).__name__}"
+                )
         return cls(entries=entries)
 
 
-# ========== Status Data Types ==========
+# ========== Kernel Status Data Types ==========
 
 
 @strawberry.type(
-    name="StatusErrorInfo",
+    name="KernelStatusErrorInfo",
     description=(
         "Added in 26.1.0. Error information when a kernel enters an error state. "
         "Contains details about the source and nature of the error."
     ),
 )
-class StatusErrorInfoGQL:
-    """Error information in status_data."""
+class KernelStatusErrorInfoGQL:
+    """Error information in kernel status_data."""
 
     src: str = strawberry.field(
         description="Source of the error: 'agent' for agent errors, 'other' for other errors."
     )
     agent_id: str | None = strawberry.field(
-        description="ID of the agent where the error occurred. Only present for agent errors."
+        description="ID of the agent where the error occurred. Only present for agent errors in debug mode."
     )
-    name: str | None = strawberry.field(description="Name of the exception class.")
-    repr: str | None = strawberry.field(description="String representation of the exception.")
-
-
-@strawberry.type(
-    name="SchedulerPredicate",
-    description=(
-        "Added in 26.1.0. A scheduler predicate result from scheduling attempts. "
-        "Predicates are conditions checked during session scheduling."
-    ),
-)
-class SchedulerPredicateGQL:
-    """A scheduler predicate entry."""
-
-    name: str = strawberry.field(
-        description="Name of the predicate (e.g., 'concurrency', 'reserved_time')."
-    )
-    msg: str | None = strawberry.field(
-        description="Message explaining why the predicate failed. Null for passed predicates."
-    )
-
-
-@strawberry.type(
-    name="SchedulerInfo",
-    description=(
-        "Added in 26.1.0. Scheduler information including retry attempts and predicate results. "
-        "Contains details about scheduling attempts when a session is pending."
-    ),
-)
-class SchedulerInfoGQL:
-    """Scheduler information in status_data."""
-
-    retries: int | None = strawberry.field(
-        description="Number of scheduling attempts made for this session."
-    )
-    last_try: str | None = strawberry.field(
-        description="ISO 8601 timestamp of the last scheduling attempt."
-    )
-    msg: str | None = strawberry.field(description="Message from the last scheduling attempt.")
-    failed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
-        description="List of predicates that failed during scheduling."
-    )
-    passed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
-        description="List of predicates that passed during scheduling."
-    )
+    name: str = strawberry.field(description="Name of the exception class.")
+    repr: str = strawberry.field(description="String representation of the exception.")
 
 
 @strawberry.type(
@@ -379,10 +214,10 @@ class SessionStatusDataGQL:
         "The populated fields depend on the kernel's current status and recent state transitions."
     ),
 )
-class StatusDataGQL:
+class KernelStatusDataContainerGQL:
     """Structured status data with optional sections."""
 
-    error: StatusErrorInfoGQL | None = strawberry.field(
+    error: KernelStatusErrorInfoGQL | None = strawberry.field(
         description="Error information when the kernel is in an error state."
     )
     scheduler: SchedulerInfoGQL | None = strawberry.field(
@@ -396,7 +231,7 @@ class StatusDataGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> StatusDataGQL | None:
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatusDataContainerGQL | None:
         """Convert a status_data mapping to GraphQL type."""
         if data is None or not data:
             return None
@@ -409,11 +244,11 @@ class StatusDataGQL:
         # Parse error section
         if "error" in data:
             err = data["error"]
-            error = StatusErrorInfoGQL(
-                src=err.get("src", ""),
+            error = KernelStatusErrorInfoGQL(
+                src=err["src"],
                 agent_id=err.get("agent_id"),
-                name=err.get("name"),
-                repr=err.get("repr"),
+                name=err["name"],
+                repr=err["repr"],
             )
 
         # Parse scheduler section (can be nested under "scheduler" or at top level)
@@ -430,13 +265,13 @@ class StatusDataGQL:
 
             if "failed_predicates" in scheduler_data:
                 failed_predicates = [
-                    SchedulerPredicateGQL(name=p.get("name", ""), msg=p.get("msg"))
+                    SchedulerPredicateGQL(name=p["name"], msg=p["msg"])
                     for p in scheduler_data["failed_predicates"]
                 ]
 
             if "passed_predicates" in scheduler_data:
                 passed_predicates = [
-                    SchedulerPredicateGQL(name=p.get("name", ""), msg=None)
+                    SchedulerPredicateGQL(name=p["name"], msg=None)
                     for p in scheduler_data["passed_predicates"]
                 ]
 
@@ -468,49 +303,6 @@ class StatusDataGQL:
 
 
 # ========== Kernel Statistics Types ==========
-
-
-@strawberry.type(
-    name="MetricStat",
-    description=(
-        "Added in 26.1.0. Statistical aggregation values for a metric over time. "
-        "Contains min, max, sum, average, difference, and rate calculations."
-    ),
-)
-class MetricStatGQL:
-    """Statistical values for a metric."""
-
-    min: str | None = strawberry.field(description="Minimum observed value.")
-    max: str | None = strawberry.field(description="Maximum observed value.")
-    sum: str | None = strawberry.field(description="Sum of all observed values.")
-    avg: str | None = strawberry.field(description="Average of observed values.")
-    diff: str | None = strawberry.field(description="Difference from previous measurement.")
-    rate: str | None = strawberry.field(description="Rate of change per second.")
-
-
-@strawberry.type(
-    name="MetricValue",
-    description=(
-        "Added in 26.1.0. A metric measurement with current value, capacity, and statistics. "
-        "Used for resource utilization metrics like CPU, memory, and I/O."
-    ),
-)
-class MetricValueGQL:
-    """A single metric measurement."""
-
-    current: str = strawberry.field(description="Current measured value.")
-    capacity: str | None = strawberry.field(
-        description="Maximum capacity for this metric. Null for unbounded metrics."
-    )
-    pct: str | None = strawberry.field(
-        description="Percentage utilization (current/capacity * 100)."
-    )
-    unit_hint: str | None = strawberry.field(
-        description="Unit hint for display (e.g., 'bytes', 'msec', 'percent')."
-    )
-    stats: MetricStatGQL | None = strawberry.field(
-        description="Statistical aggregation values over time."
-    )
 
 
 @strawberry.type(
@@ -548,170 +340,142 @@ class KernelStatGQL:
             return None
         entries = []
         for key, metric_value in data.items():
-            if isinstance(metric_value, dict):
-                # Extract stats if present
-                stats = None
-                stat_keys = ["min", "max", "sum", "avg", "diff", "rate"]
-                stat_data = {}
-                for stat_key in stat_keys:
-                    # Stats can be prefixed with "stats." in the serialized format
-                    prefixed_key = f"stats.{stat_key}"
-                    if prefixed_key in metric_value:
-                        stat_data[stat_key] = metric_value[prefixed_key]
-                    elif stat_key in metric_value:
-                        stat_data[stat_key] = metric_value[stat_key]
-
-                if stat_data:
-                    stats = MetricStatGQL(
-                        min=stat_data.get("min"),
-                        max=stat_data.get("max"),
-                        sum=stat_data.get("sum"),
-                        avg=stat_data.get("avg"),
-                        diff=stat_data.get("diff"),
-                        rate=stat_data.get("rate"),
-                    )
-
-                entries.append(
-                    KernelStatEntryGQL(
-                        key=key,
-                        value=MetricValueGQL(
-                            current=str(metric_value.get("current", "0")),
-                            capacity=str(metric_value["capacity"])
-                            if metric_value.get("capacity") is not None
-                            else None,
-                            pct=str(metric_value["pct"])
-                            if metric_value.get("pct") is not None
-                            else None,
-                            unit_hint=metric_value.get("unit_hint"),
-                            stats=stats,
-                        ),
-                    )
+            if not isinstance(metric_value, dict):
+                raise InvalidKernelData(
+                    f"Invalid metric value type for key '{key}': "
+                    f"expected dict, got {type(metric_value).__name__}"
                 )
+            # Extract stats if present
+            stats = None
+            stat_keys = ["min", "max", "sum", "avg", "diff", "rate"]
+            stat_data = {}
+            for stat_key in stat_keys:
+                # Stats can be prefixed with "stats." in the serialized format
+                prefixed_key = f"stats.{stat_key}"
+                if prefixed_key in metric_value:
+                    stat_data[stat_key] = metric_value[prefixed_key]
+                elif stat_key in metric_value:
+                    stat_data[stat_key] = metric_value[stat_key]
+
+            if stat_data:
+                stats = MetricStatGQL(
+                    min=stat_data.get("min"),
+                    max=stat_data.get("max"),
+                    sum=stat_data.get("sum"),
+                    avg=stat_data.get("avg"),
+                    diff=stat_data.get("diff"),
+                    rate=stat_data.get("rate"),
+                )
+
+            entries.append(
+                KernelStatEntryGQL(
+                    key=key,
+                    value=MetricValueGQL(
+                        current=str(metric_value["current"]),
+                        capacity=str(metric_value["capacity"])
+                        if metric_value.get("capacity") is not None
+                        else None,
+                        pct=str(metric_value["pct"])
+                        if metric_value.get("pct") is not None
+                        else None,
+                        unit_hint=metric_value.get("unit_hint"),
+                        stats=stats,
+                    ),
+                )
+            )
         return cls(entries=entries) if entries else None
 
 
-# ========== Attached Device Types ==========
+# ========== Kernel Internal Data Types ==========
 
 
 @strawberry.type(
-    name="DeviceModelInfo",
-    description=(
-        "Added in 26.1.0. Information about a specific device model attached to a kernel. "
-        "Contains device identification and capacity information."
-    ),
+    name="KernelInternalData",
+    description="Added in 26.1.0. Internal data stored with the kernel for system use.",
 )
-class DeviceModelInfoGQL:
-    """Device model information with ID, name, and capacity data."""
-
-    device_id: str = strawberry.field(description="Unique identifier for the device instance.")
-    model_name: str = strawberry.field(
-        description="Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."
+class KernelInternalDataGQL:
+    dotfiles: list[DotfileInfoGQL] | None = strawberry.field(
+        default=None,
+        description="List of dotfiles to be provisioned in the kernel's filesystem.",
     )
-    data: JSON = strawberry.field(
-        description="Device-specific capacity and capability information."
+    ssh_keypair: SSHKeypairGQL | None = strawberry.field(
+        default=None, description="SSH keypair for secure access to the kernel."
     )
-
-
-@strawberry.type(
-    name="AttachedDeviceEntry",
-    description=(
-        "Added in 26.1.0. A collection of devices of a specific type attached to a kernel. "
-        "Groups devices by their device type (e.g., 'cuda', 'rocm')."
-    ),
-)
-class AttachedDeviceEntryGQL:
-    """Entry for a device type with its attached device instances."""
-
-    device_type: str = strawberry.field(
-        description="Type of the device (e.g., 'cuda', 'rocm', 'tpu')."
+    model_definition_path: str | None = strawberry.field(
+        default=None, description="Path to the model definition file for inference services."
     )
-    devices: list[DeviceModelInfoGQL] = strawberry.field(
-        description="List of device instances of this type attached to the kernel."
+    runtime_variant: str | None = strawberry.field(
+        default=None, description="Runtime variant identifier (e.g., 'custom')."
     )
-
-
-@strawberry.type(
-    name="AttachedDevices",
-    description=(
-        "Added in 26.1.0. A collection of all devices attached to a kernel. "
-        "Organized by device type, each containing multiple device instances."
-    ),
-)
-class AttachedDevicesGQL:
-    """Attached devices organized by device type."""
-
-    entries: list[AttachedDeviceEntryGQL] = strawberry.field(
-        description="List of device type entries, each containing attached device instances."
+    sudo_session_enabled: bool | None = strawberry.field(
+        default=None, description="Whether sudo is enabled for this session."
+    )
+    block_service_ports: bool | None = strawberry.field(
+        default=None,
+        description="Whether to block service ports. If true, no services can be started.",
+    )
+    prevent_vfolder_mounts: bool | None = strawberry.field(
+        default=None,
+        description="Whether to prevent vfolder mounts (except .logs directory).",
+    )
+    docker_credentials: JSON | None = strawberry.field(
+        default=None, description="Docker credentials for private registry access."
+    )
+    domain_socket_proxies: list[str] | None = strawberry.field(
+        default=None,
+        description="List of domain socket paths to proxy into the container.",
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> AttachedDevicesGQL | None:
-        """Convert an attached devices mapping to GraphQL type."""
-        if data is None:
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelInternalDataGQL | None:
+        if not data:
             return None
-        entries = []
-        for device_type, devices in data.items():
-            if isinstance(devices, Sequence):
-                device_infos = []
-                for device in devices:
-                    if isinstance(device, dict):
-                        device_infos.append(
-                            DeviceModelInfoGQL(
-                                device_id=str(device.get("device_id", "")),
-                                model_name=device.get("model_name", ""),
-                                data=device.get("data", {}),
-                            )
-                        )
-                entries.append(
-                    AttachedDeviceEntryGQL(
-                        device_type=device_type,
-                        devices=device_infos,
+
+        dotfiles = None
+        if dotfiles_data := data.get("dotfiles"):
+            if not isinstance(dotfiles_data, Sequence):
+                raise InvalidKernelData(
+                    f"Invalid dotfiles type: expected Sequence, got {type(dotfiles_data).__name__}"
+                )
+            dotfiles = []
+            for i, df in enumerate(dotfiles_data):
+                if not isinstance(df, dict):
+                    raise InvalidKernelData(
+                        f"Invalid dotfile type at index {i}: expected dict, got {type(df).__name__}"
+                    )
+                dotfiles.append(
+                    DotfileInfoGQL(
+                        path=df["path"],
+                        data=df["data"],
+                        perm=df["perm"],
                     )
                 )
-        return cls(entries=entries)
 
+        ssh_keypair = None
+        if keypair_data := data.get("ssh_keypair"):
+            if not isinstance(keypair_data, dict):
+                raise InvalidKernelData(
+                    f"Invalid ssh_keypair type: expected dict, got {type(keypair_data).__name__}"
+                )
+            ssh_keypair = SSHKeypairGQL(
+                public_key=keypair_data["public_key"],
+                private_key=keypair_data["private_key"],
+            )
 
-# ========== VFolder Mount Types ==========
-
-
-@strawberry.type(
-    name="VFolderMount",
-    description=(
-        "Added in 26.1.0. Information about a virtual folder mounted to a kernel. "
-        "Contains mount path, permissions, and usage mode details."
-    ),
-)
-class VFolderMountGQL:
-    """Virtual folder mount information."""
-
-    name: str = strawberry.field(description="Name of the virtual folder.")
-    vfid: str = strawberry.field(description="Unique identifier of the virtual folder.")
-    vfsubpath: str = strawberry.field(description="Subpath within the virtual folder to mount.")
-    host_path: str = strawberry.field(
-        description="Path on the host where the virtual folder is stored."
-    )
-    kernel_path: str = strawberry.field(
-        description="Path inside the kernel container where the folder is mounted."
-    )
-    mount_perm: MountPermissionGQL = strawberry.field(
-        description="Permission level for this mount (ro, rw, wd)."
-    )
-    usage_mode: VFolderUsageModeGQL = strawberry.field(
-        description="Usage mode of the virtual folder (general, model, data)."
-    )
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> VFolderMountGQL:
-        """Convert a dict to VFolderMountGQL."""
         return cls(
-            name=data["name"],
-            vfid=str(data["vfid"]),
-            vfsubpath=str(data.get("vfsubpath", ".")),
-            host_path=str(data["host_path"]),
-            kernel_path=str(data["kernel_path"]),
-            mount_perm=MountPermissionGQL(data["mount_perm"]),
-            usage_mode=VFolderUsageModeGQL(data.get("usage_mode", "general")),
+            dotfiles=dotfiles,
+            ssh_keypair=ssh_keypair,
+            model_definition_path=data.get("model_definition_path"),
+            runtime_variant=data.get("runtime_variant"),
+            sudo_session_enabled=data.get("sudo_session_enabled"),
+            block_service_ports=data.get("block_service_ports"),
+            prevent_vfolder_mounts=data.get("prevent_vfolder_mounts"),
+            docker_credentials=data.get("docker_credentials"),
+            domain_socket_proxies=data.get("domain_socket_proxies"),
         )
+
+
+# ========== Kernel Sub-Info Types ==========
 
 
 @strawberry.type(
@@ -779,14 +543,100 @@ class KernelUserPermissionInfoGQL:
     description="Added in 26.1.0. Container image information for a kernel.",
 )
 class KernelImageInfoGQL:
-    reference: str = strawberry.field(
-        description="The canonical reference of the container image (e.g., registry/repo:tag)."
+    reference: str | None = strawberry.field(
+        description="The canonical reference of the container image (e.g., registry/repo:tag). May be null for legacy kernels with missing image data."
     )
     registry: str | None = strawberry.field(description="The container registry hosting the image.")
     tag: str | None = strawberry.field(description="The tag of the container image.")
-    architecture: str = strawberry.field(
-        description="The CPU architecture the image is built for (e.g., x86_64, aarch64)."
+    architecture: str | None = strawberry.field(
+        description="The CPU architecture the image is built for (e.g., x86_64, aarch64). May be null for legacy kernels."
     )
+
+
+@strawberry.type(
+    name="KernelDeviceModelInfo",
+    description=(
+        "Added in 26.1.0. Information about a specific device model attached to a kernel. "
+        "Contains device identification and capacity information."
+    ),
+)
+class KernelDeviceModelInfoGQL:
+    """Device model information with ID, name, and capacity data."""
+
+    device_id: str = strawberry.field(description="Unique identifier for the device instance.")
+    model_name: str = strawberry.field(
+        description="Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."
+    )
+    data: JSON = strawberry.field(
+        description="Device-specific capacity and capability information."
+    )
+
+
+@strawberry.type(
+    name="KernelAttachedDeviceEntry",
+    description=(
+        "Added in 26.1.0. A collection of devices of a specific type attached to a kernel. "
+        "Groups devices by their device type (e.g., 'cuda', 'rocm')."
+    ),
+)
+class KernelAttachedDeviceEntryGQL:
+    """Entry for a device type with its attached device instances."""
+
+    device_type: str = strawberry.field(
+        description="Type of the device (e.g., 'cuda', 'rocm', 'tpu')."
+    )
+    devices: list[KernelDeviceModelInfoGQL] = strawberry.field(
+        description="List of device instances of this type."
+    )
+
+
+@strawberry.type(
+    name="KernelAttachedDevices",
+    description=(
+        "Added in 26.1.0. A collection of all devices attached to a kernel. "
+        "Organized by device type, each containing multiple device instances."
+    ),
+)
+class KernelAttachedDevicesGQL:
+    """Attached devices organized by device type."""
+
+    entries: list[KernelAttachedDeviceEntryGQL] = strawberry.field(
+        description="List of device type entries, each containing attached device instances."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> Self | None:
+        """Convert an attached devices mapping to GraphQL type."""
+        if data is None:
+            return None
+        entries = []
+        for device_type, devices in data.items():
+            if not isinstance(devices, Sequence):
+                raise InvalidKernelData(
+                    f"Invalid devices type for device_type '{device_type}': "
+                    f"expected Sequence, got {type(devices).__name__}"
+                )
+            device_infos = []
+            for i, device in enumerate(devices):
+                if not isinstance(device, dict):
+                    raise InvalidKernelData(
+                        f"Invalid device type at index {i} for device_type '{device_type}': "
+                        f"expected dict, got {type(device).__name__}"
+                    )
+                device_infos.append(
+                    KernelDeviceModelInfoGQL(
+                        device_id=str(device["device_id"]),
+                        model_name=device["model_name"],
+                        data=device.get("data", {}),
+                    )
+                )
+            entries.append(
+                KernelAttachedDeviceEntryGQL(
+                    device_type=device_type,
+                    devices=device_infos,
+                )
+            )
+        return cls(entries=entries)
 
 
 @strawberry.type(
@@ -821,7 +671,7 @@ class KernelResourceInfoGQL:
     occupied_shares: ResourceSlotGQL = strawberry.field(
         description="The fractional resource shares occupied by this kernel."
     )
-    attached_devices: AttachedDevicesGQL | None = strawberry.field(
+    attached_devices: KernelAttachedDevicesGQL | None = strawberry.field(
         description="Information about attached devices (e.g., GPUs) allocated to this kernel."
     )
     resource_opts: ResourceOptsGQL | None = strawberry.field(
@@ -889,10 +739,10 @@ class KernelLifecycleInfoGQL:
     status_info: str | None = strawberry.field(
         description="Human-readable information about the current status."
     )
-    status_data: StatusDataGQL | None = strawberry.field(
+    status_data: KernelStatusDataContainerGQL | None = strawberry.field(
         description="Structured data about the current status including error, scheduler, or lifecycle information."
     )
-    status_history: StatusHistoryGQL | None = strawberry.field(
+    status_history: KernelStatusHistoryGQL | None = strawberry.field(
         description="History of status transitions with timestamps."
     )
     created_at: datetime | None = strawberry.field(
@@ -923,102 +773,6 @@ class KernelMetricsInfoGQL:
 
 
 @strawberry.type(
-    name="DotfileInfo",
-    description="Added in 26.1.0. Information about a dotfile to be provisioned in the kernel.",
-)
-class DotfileInfoGQL:
-    path: str = strawberry.field(
-        description="The file path where the dotfile will be placed (relative or absolute)."
-    )
-    data: str = strawberry.field(description="The content of the dotfile.")
-    perm: str = strawberry.field(
-        description="The file permission in octal string format (e.g., '0644')."
-    )
-
-
-@strawberry.type(
-    name="SSHKeypair",
-    description="Added in 26.1.0. SSH keypair for kernel access.",
-)
-class SSHKeypairGQL:
-    public_key: str = strawberry.field(description="The public key in OpenSSH format.")
-    private_key: str = strawberry.field(description="The private key in PEM format.")
-
-
-@strawberry.type(
-    name="InternalData",
-    description="Added in 26.1.0. Internal data stored with the kernel for system use.",
-)
-class InternalDataGQL:
-    dotfiles: list[DotfileInfoGQL] | None = strawberry.field(
-        default=None,
-        description="List of dotfiles to be provisioned in the kernel's filesystem.",
-    )
-    ssh_keypair: SSHKeypairGQL | None = strawberry.field(
-        default=None, description="SSH keypair for secure access to the kernel."
-    )
-    model_definition_path: str | None = strawberry.field(
-        default=None, description="Path to the model definition file for inference services."
-    )
-    runtime_variant: str | None = strawberry.field(
-        default=None, description="Runtime variant identifier (e.g., 'custom')."
-    )
-    sudo_session_enabled: bool | None = strawberry.field(
-        default=None, description="Whether sudo is enabled for this session."
-    )
-    block_service_ports: bool | None = strawberry.field(
-        default=None,
-        description="Whether to block service ports. If true, no services can be started.",
-    )
-    prevent_vfolder_mounts: bool | None = strawberry.field(
-        default=None,
-        description="Whether to prevent vfolder mounts (except .logs directory).",
-    )
-    docker_credentials: JSON | None = strawberry.field(
-        default=None, description="Docker credentials for private registry access."
-    )
-    domain_socket_proxies: list[str] | None = strawberry.field(
-        default=None,
-        description="List of domain socket paths to proxy into the container.",
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> InternalDataGQL | None:
-        if not data:
-            return None
-
-        dotfiles = None
-        if dotfiles_data := data.get("dotfiles"):
-            dotfiles = [
-                DotfileInfoGQL(
-                    path=df.get("path", ""),
-                    data=df.get("data", ""),
-                    perm=df.get("perm", "0644"),
-                )
-                for df in dotfiles_data
-            ]
-
-        ssh_keypair = None
-        if keypair_data := data.get("ssh_keypair"):
-            ssh_keypair = SSHKeypairGQL(
-                public_key=keypair_data.get("public_key", ""),
-                private_key=keypair_data.get("private_key", ""),
-            )
-
-        return cls(
-            dotfiles=dotfiles,
-            ssh_keypair=ssh_keypair,
-            model_definition_path=data.get("model_definition_path"),
-            runtime_variant=data.get("runtime_variant"),
-            sudo_session_enabled=data.get("sudo_session_enabled"),
-            block_service_ports=data.get("block_service_ports"),
-            prevent_vfolder_mounts=data.get("prevent_vfolder_mounts"),
-            docker_credentials=data.get("docker_credentials"),
-            domain_socket_proxies=data.get("domain_socket_proxies"),
-        )
-
-
-@strawberry.type(
     name="KernelMetadataInfo",
     description="Added in 26.1.0. Additional metadata for a kernel.",
 )
@@ -1026,9 +780,12 @@ class KernelMetadataInfoGQL:
     callback_url: str | None = strawberry.field(
         description="URL to call back when kernel status changes."
     )
-    internal_data: InternalDataGQL | None = strawberry.field(
+    internal_data: KernelInternalDataGQL | None = strawberry.field(
         description="Internal data stored with the kernel for system use."
     )
+
+
+# ========== Main Kernel Type ==========
 
 
 @strawberry.type(
@@ -1072,18 +829,14 @@ class KernelV2GQL(Node):
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
         """Create KernelGQL from KernelInfo dataclass."""
-        # Extract image reference from ImageInfo
-        image_ref = ""
-        architecture = ""
-        registry = None
-        tag = None
+        # Extract image reference from ImageInfo (may be None for legacy kernels)
+        image_canonical: str | None = None
+        architecture: str | None = None
         if kernel_info.image.identifier:
-            image_ref = kernel_info.image.identifier.canonical
+            image_canonical = kernel_info.image.identifier.canonical
             architecture = kernel_info.image.identifier.architecture
-        if kernel_info.image.registry:
-            registry = kernel_info.image.registry
-        if kernel_info.image.tag:
-            tag = kernel_info.image.tag
+        registry = kernel_info.image.registry
+        tag = kernel_info.image.tag
         if kernel_info.image.architecture:
             architecture = kernel_info.image.architecture
 
@@ -1105,7 +858,7 @@ class KernelV2GQL(Node):
                 gids=kernel_info.user_permission.gids,
             ),
             image=KernelImageInfoGQL(
-                reference=image_ref,
+                reference=image_canonical,
                 registry=registry,
                 tag=tag,
                 architecture=architecture,
@@ -1144,7 +897,7 @@ class KernelV2GQL(Node):
                 occupied_shares=ResourceSlotGQL.from_resource_slot(
                     kernel_info.resource.occupied_shares or {}
                 ),
-                attached_devices=AttachedDevicesGQL.from_mapping(
+                attached_devices=KernelAttachedDevicesGQL.from_mapping(
                     kernel_info.resource.attached_devices
                 ),
                 resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
@@ -1164,8 +917,12 @@ class KernelV2GQL(Node):
                 result=SessionResultGQL(kernel_info.lifecycle.result),
                 status_changed=kernel_info.lifecycle.status_changed,
                 status_info=kernel_info.lifecycle.status_info,
-                status_data=StatusDataGQL.from_mapping(kernel_info.lifecycle.status_data),
-                status_history=StatusHistoryGQL.from_mapping(kernel_info.lifecycle.status_history),
+                status_data=KernelStatusDataContainerGQL.from_mapping(
+                    kernel_info.lifecycle.status_data
+                ),
+                status_history=KernelStatusHistoryGQL.from_mapping(
+                    kernel_info.lifecycle.status_history
+                ),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
                 starts_at=kernel_info.lifecycle.starts_at,
@@ -1177,7 +934,9 @@ class KernelV2GQL(Node):
             ),
             metadata=KernelMetadataInfoGQL(
                 callback_url=kernel_info.metadata.callback_url,
-                internal_data=InternalDataGQL.from_mapping(kernel_info.metadata.internal_data),
+                internal_data=KernelInternalDataGQL.from_mapping(
+                    kernel_info.metadata.internal_data
+                ),
             ),
         )
 
