@@ -1155,31 +1155,6 @@ type AssociateScalingGroupWithUserGroup
   msg: String
 }
 
-"""
-Added in 26.1.0. A collection of devices of a specific type attached to a kernel. Groups devices by their device type (e.g., 'cuda', 'rocm').
-"""
-type AttachedDeviceEntry
-  @join__type(graph: STRAWBERRY)
-{
-  """Type of the device (e.g., 'cuda', 'rocm', 'tpu')."""
-  deviceType: String!
-
-  """List of device instances of this type attached to the kernel."""
-  devices: [DeviceModelInfo!]!
-}
-
-"""
-Added in 26.1.0. A collection of all devices attached to a kernel. Organized by device type, each containing multiple device instances.
-"""
-type AttachedDevices
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  List of device type entries, each containing attached device instances.
-  """
-  entries: [AttachedDeviceEntry!]!
-}
-
 """Added in 25.6.0."""
 type AuditLogConnection
   @join__type(graph: GRAPHENE)
@@ -3020,22 +2995,6 @@ enum DeploymentStrategyType
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 26.1.0. Information about a specific device model attached to a kernel. Contains device identification and capacity information.
-"""
-type DeviceModelInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Unique identifier for the device instance."""
-  deviceId: String!
-
-  """Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."""
-  modelName: String!
-
-  """Device-specific capacity and capability information."""
-  data: JSON!
-}
-
 type DisassociateAllScalingGroupsWithDomain
   @join__type(graph: GRAPHENE)
 {
@@ -3404,7 +3363,7 @@ input DomainUsageBucketOrderBy
 }
 
 """
-Added in 26.1.0. Information about a dotfile to be provisioned in the kernel.
+Added in 26.1.0. Information about a dotfile to be provisioned in a container.
 """
 type DotfileInfo
   @join__type(graph: STRAWBERRY)
@@ -4196,38 +4155,6 @@ type InferenceSessionErrorInfo
   repr: String!
 }
 
-"""Added in 26.1.0. Internal data stored with the kernel for system use."""
-type InternalData
-  @join__type(graph: STRAWBERRY)
-{
-  """List of dotfiles to be provisioned in the kernel's filesystem."""
-  dotfiles: [DotfileInfo!]
-
-  """SSH keypair for secure access to the kernel."""
-  sshKeypair: SSHKeypair
-
-  """Path to the model definition file for inference services."""
-  modelDefinitionPath: String
-
-  """Runtime variant identifier (e.g., 'custom')."""
-  runtimeVariant: String
-
-  """Whether sudo is enabled for this session."""
-  sudoSessionEnabled: Boolean
-
-  """Whether to block service ports. If true, no services can be started."""
-  blockServicePorts: Boolean
-
-  """Whether to prevent vfolder mounts (except .logs directory)."""
-  preventVfolderMounts: Boolean
-
-  """Docker credentials for private registry access."""
-  dockerCredentials: JSON
-
-  """List of domain socket paths to proxy into the container."""
-  domainSocketProxies: [String!]
-}
-
 input IntFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -4269,6 +4196,31 @@ schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
   @join__type(graph: GRAPHENE)
+
+"""
+Added in 26.1.0. A collection of devices of a specific type attached to a kernel. Groups devices by their device type (e.g., 'cuda', 'rocm').
+"""
+type KernelAttachedDeviceEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the device (e.g., 'cuda', 'rocm', 'tpu')."""
+  deviceType: String!
+
+  """List of device instances of this type."""
+  devices: [KernelDeviceModelInfo!]!
+}
+
+"""
+Added in 26.1.0. A collection of all devices attached to a kernel. Organized by device type, each containing multiple device instances.
+"""
+type KernelAttachedDevices
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of device type entries, each containing attached device instances.
+  """
+  entries: [KernelAttachedDeviceEntry!]!
+}
 
 """
 Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
@@ -4321,6 +4273,22 @@ type KernelConnectionV2
   count: Int!
 }
 
+"""
+Added in 26.1.0. Information about a specific device model attached to a kernel. Contains device identification and capacity information.
+"""
+type KernelDeviceModelInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique identifier for the device instance."""
+  deviceId: String!
+
+  """Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."""
+  modelName: String!
+
+  """Device-specific capacity and capability information."""
+  data: JSON!
+}
+
 """Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
 type KernelEdge
   @join__type(graph: GRAPHENE)
@@ -4336,6 +4304,7 @@ type KernelEdge
 input KernelFilter
   @join__type(graph: STRAWBERRY)
 {
+  id: UUID = null
   status: KernelStatusFilter = null
   sessionId: UUID = null
 }
@@ -4345,9 +4314,9 @@ type KernelImageInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  The canonical reference of the container image (e.g., registry/repo:tag).
+  The canonical reference of the container image (e.g., registry/repo:tag). May be null for legacy kernels with missing image data.
   """
-  reference: String!
+  reference: String
 
   """The container registry hosting the image."""
   registry: String
@@ -4355,8 +4324,42 @@ type KernelImageInfo
   """The tag of the container image."""
   tag: String
 
-  """The CPU architecture the image is built for (e.g., x86_64, aarch64)."""
-  architecture: String!
+  """
+  The CPU architecture the image is built for (e.g., x86_64, aarch64). May be null for legacy kernels.
+  """
+  architecture: String
+}
+
+"""Added in 26.1.0. Internal data stored with the kernel for system use."""
+type KernelInternalData
+  @join__type(graph: STRAWBERRY)
+{
+  """List of dotfiles to be provisioned in the kernel's filesystem."""
+  dotfiles: [DotfileInfo!]
+
+  """SSH keypair for secure access to the kernel."""
+  sshKeypair: SSHKeypair
+
+  """Path to the model definition file for inference services."""
+  modelDefinitionPath: String
+
+  """Runtime variant identifier (e.g., 'custom')."""
+  runtimeVariant: String
+
+  """Whether sudo is enabled for this session."""
+  sudoSessionEnabled: Boolean
+
+  """Whether to block service ports. If true, no services can be started."""
+  blockServicePorts: Boolean
+
+  """Whether to prevent vfolder mounts (except .logs directory)."""
+  preventVfolderMounts: Boolean
+
+  """Docker credentials for private registry access."""
+  dockerCredentials: JSON
+
+  """List of domain socket paths to proxy into the container."""
+  domainSocketProxies: [String!]
 }
 
 """Added in 26.1.0. Lifecycle and status information for a kernel."""
@@ -4381,10 +4384,10 @@ type KernelLifecycleInfo
   """
   Structured data about the current status including error, scheduler, or lifecycle information.
   """
-  statusData: StatusData
+  statusData: KernelStatusData
 
   """History of status transitions with timestamps."""
-  statusHistory: StatusHistory
+  statusHistory: KernelStatusHistory
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
@@ -4407,7 +4410,7 @@ type KernelMetadataInfo
   callbackUrl: String
 
   """Internal data stored with the kernel for system use."""
-  internalData: InternalData
+  internalData: KernelInternalData
 }
 
 """Added in 26.1.0. Metrics and statistics for a kernel."""
@@ -4542,7 +4545,7 @@ type KernelResourceInfo
   """
   Information about attached devices (e.g., GPUs) allocated to this kernel.
   """
-  attachedDevices: AttachedDevices
+  attachedDevices: KernelAttachedDevices
 
   """Additional resource options and configurations for this kernel."""
   resourceOpts: ResourceOpts
@@ -4580,6 +4583,16 @@ type KernelSessionInfo
 
   """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
   sessionType: SessionType!
+}
+
+"""
+Added in 26.1.0. Session-specific status data during kernel lifecycle transitions.
+"""
+type KernelSessionStatusData
+  @join__type(graph: STRAWBERRY)
+{
+  """Status string of the session (e.g., 'terminating')."""
+  status: String
 }
 
 """
@@ -4627,13 +4640,55 @@ enum KernelStatus
 }
 
 """
-Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
+Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
 """
 type KernelStatusData
   @join__type(graph: STRAWBERRY)
 {
+  """Error information when the kernel is in an error state."""
+  error: KernelStatusErrorInfo
+
+  """Scheduler information during pending/scheduling states."""
+  scheduler: SchedulerInfo
+
+  """Kernel-specific status data during lifecycle transitions."""
+  kernel: KernelStatusDataKernel
+
+  """Session-specific status data during lifecycle transitions."""
+  session: KernelSessionStatusData
+}
+
+"""
+Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
+"""
+type KernelStatusDataKernel
+  @join__type(graph: STRAWBERRY)
+{
   """Exit code of the kernel process. Null if not yet terminated."""
   exitCode: Int
+}
+
+"""
+Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
+"""
+type KernelStatusErrorInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Source of the error: 'agent' for agent errors, 'other' for other errors.
+  """
+  src: String!
+
+  """
+  ID of the agent where the error occurred. Only present for agent errors in debug mode.
+  """
+  agentId: String
+
+  """Name of the exception class."""
+  name: String!
+
+  """String representation of the exception."""
+  repr: String!
 }
 
 """Added in 26.1.0. Filter for kernel status."""
@@ -4642,6 +4697,29 @@ input KernelStatusFilter
 {
   in: [KernelStatus!] = null
   notIn: [KernelStatus!] = null
+}
+
+"""
+Added in 26.1.0. A collection of status history entries for a kernel. Records the progression of status changes throughout the kernel's lifecycle.
+"""
+type KernelStatusHistory
+  @join__type(graph: STRAWBERRY)
+{
+  """List of status history entries in chronological order."""
+  entries: [KernelStatusHistoryEntry!]!
+}
+
+"""
+Added in 26.1.0. A single status history entry recording a status transition. Contains the status name and the timestamp when the kernel entered that status.
+"""
+type KernelStatusHistoryEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."""
+  status: String!
+
+  """Timestamp when the kernel entered this status."""
+  timestamp: DateTime!
 }
 
 """
@@ -8849,7 +8927,7 @@ type ServiceConfigNode implements Node
 }
 
 """
-Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing kernel services.
+Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
 """
 type ServicePortEntry
   @join__type(graph: STRAWBERRY)
@@ -8881,7 +8959,7 @@ enum ServicePortProtocol
 }
 
 """
-Added in 26.1.0. A collection of service ports exposed by a kernel. Each entry defines a service accessible through the kernel.
+Added in 26.1.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
 """
 type ServicePorts
   @join__type(graph: STRAWBERRY)
@@ -9008,16 +9086,6 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 26.1.0. Session-specific status data during lifecycle transitions.
-"""
-type SessionStatusData
-  @join__type(graph: STRAWBERRY)
-{
-  """Status string of the session (e.g., 'terminating')."""
-  status: String
-}
-
 """Added in 26.1.0. Type of compute session."""
 enum SessionType
   @join__type(graph: STRAWBERRY)
@@ -9066,7 +9134,7 @@ type SourceInfo
   url: String
 }
 
-"""Added in 26.1.0. SSH keypair for kernel access."""
+"""Added in 26.1.0. SSH keypair for secure access."""
 type SSHKeypair
   @join__type(graph: STRAWBERRY)
 {
@@ -9075,71 +9143,6 @@ type SSHKeypair
 
   """The private key in PEM format."""
   privateKey: String!
-}
-
-"""
-Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
-"""
-type StatusData
-  @join__type(graph: STRAWBERRY)
-{
-  """Error information when the kernel is in an error state."""
-  error: StatusErrorInfo
-
-  """Scheduler information during pending/scheduling states."""
-  scheduler: SchedulerInfo
-
-  """Kernel-specific status data during lifecycle transitions."""
-  kernel: KernelStatusData
-
-  """Session-specific status data during lifecycle transitions."""
-  session: SessionStatusData
-}
-
-"""
-Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
-"""
-type StatusErrorInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Source of the error: 'agent' for agent errors, 'other' for other errors.
-  """
-  src: String!
-
-  """
-  ID of the agent where the error occurred. Only present for agent errors.
-  """
-  agentId: String
-
-  """Name of the exception class."""
-  name: String
-
-  """String representation of the exception."""
-  repr: String
-}
-
-"""
-Added in 26.1.0. A collection of status history entries for a kernel. Records the progression of status changes throughout the kernel's lifecycle.
-"""
-type StatusHistory
-  @join__type(graph: STRAWBERRY)
-{
-  """List of status history entries in chronological order."""
-  entries: [StatusHistoryEntry!]!
-}
-
-"""
-Added in 26.1.0. A single status history entry recording a status transition. Contains the status name and the timestamp when the kernel entered that status.
-"""
-type StatusHistoryEntry
-  @join__type(graph: STRAWBERRY)
-{
-  """The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."""
-  status: String!
-
-  """Timestamp when the kernel entered this status."""
-  timestamp: DateTime!
 }
 
 """
@@ -10219,7 +10222,7 @@ type ValidateNotificationRulePayload
 }
 
 """
-Added in 26.1.0. Information about a virtual folder mounted to a kernel. Contains mount path, permissions, and usage mode details.
+Added in 26.1.0. Information about a mounted virtual folder. Contains mount path, permissions, and usage mode details.
 """
 type VFolderMount
   @join__type(graph: STRAWBERRY)
@@ -10236,7 +10239,7 @@ type VFolderMount
   """Path on the host where the virtual folder is stored."""
   hostPath: String!
 
-  """Path inside the kernel container where the folder is mounted."""
+  """Path inside the container where the folder is mounted."""
   kernelPath: String!
 
   """Permission level for this mount (ro, rw, wd)."""
