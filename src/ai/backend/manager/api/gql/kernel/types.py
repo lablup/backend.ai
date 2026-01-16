@@ -69,11 +69,14 @@ class KernelStatusFilterGQL:
     name="KernelFilter", description="Added in 26.1.0. Filter criteria for querying kernels."
 )
 class KernelFilterGQL(GQLFilter):
+    id: UUID | None = None
     status: KernelStatusFilterGQL | None = None
     session_id: UUID | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+        if self.id:
+            conditions.append(KernelConditions.by_id(self.id))
         if self.status:
             condition = self.status.build_condition()
             if condition:
