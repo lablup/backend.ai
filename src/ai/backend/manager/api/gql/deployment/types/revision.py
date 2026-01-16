@@ -432,10 +432,6 @@ class EnvironmentVariablesInputGQL:
         description="List of environment variable entries."
     )
 
-    def to_dict(self) -> dict[str, str]:
-        """Convert to dict for internal use."""
-        return {entry.name: entry.value for entry in self.entries}
-
 
 @strawberry.input(description="Added in 25.19.0")
 class ModelRuntimeConfigInput:
@@ -502,7 +498,7 @@ class CreateRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=self.model_runtime_config.environ.to_dict()
+            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
             if self.model_runtime_config.environ
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
@@ -561,7 +557,7 @@ class AddRevisionInput:
         )
 
         execution_spec = ExecutionSpec(
-            environ=self.model_runtime_config.environ.to_dict()
+            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
             if self.model_runtime_config.environ
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
