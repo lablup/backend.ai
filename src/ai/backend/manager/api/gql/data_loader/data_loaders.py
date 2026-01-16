@@ -24,6 +24,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
 
+from .agent.loader import load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
@@ -164,6 +165,4 @@ class DataLoaders:
     def container_count_loader(
         self,
     ) -> DataLoader[AgentId, int]:
-        from .agent.loader import load_container_counts
-
         return DataLoader(load_fn=partial(load_container_counts, self._processors.agent))
