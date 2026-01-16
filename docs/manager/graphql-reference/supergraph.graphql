@@ -1110,6 +1110,31 @@ type AssociateScalingGroupWithUserGroup
   msg: String
 }
 
+"""
+Added in 26.1.0. A collection of devices of a specific type attached to a kernel. Groups devices by their device type (e.g., 'cuda', 'rocm').
+"""
+type AttachedDeviceEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the device (e.g., 'cuda', 'rocm', 'tpu')."""
+  deviceType: String!
+
+  """List of device instances of this type attached to the kernel."""
+  devices: [DeviceModelInfo!]!
+}
+
+"""
+Added in 26.1.0. A collection of all devices attached to a kernel. Organized by device type, each containing multiple device instances.
+"""
+type AttachedDevices
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of device type entries, each containing attached device instances.
+  """
+  entries: [AttachedDeviceEntry!]!
+}
+
 """Added in 25.6.0."""
 type AuditLogConnection
   @join__type(graph: GRAPHENE)
@@ -2912,6 +2937,22 @@ enum DeploymentStrategyType
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.1.0. Information about a specific device model attached to a kernel. Contains device identification and capacity information.
+"""
+type DeviceModelInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique identifier for the device instance."""
+  deviceId: String!
+
+  """Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."""
+  modelName: String!
+
+  """Device-specific capacity and capability information."""
+  data: JSON!
+}
+
 type DisassociateAllScalingGroupsWithDomain
   @join__type(graph: GRAPHENE)
 {
@@ -4118,8 +4159,8 @@ type KernelLifecycleInfo
   """
   status: KernelStatus!
 
-  """The result of the kernel execution (e.g., SUCCESS, FAILURE)."""
-  result: String!
+  """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
+  result: SessionResult!
 
   """Timestamp when the kernel last changed status."""
   statusChanged: DateTime
@@ -4131,7 +4172,7 @@ type KernelLifecycleInfo
   statusData: JSON
 
   """History of status transitions with timestamps."""
-  statusHistory: JSON
+  statusHistory: StatusHistory
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
@@ -4181,8 +4222,8 @@ type KernelNetworkInfo
   """The port for REPL output stream."""
   replOutPort: Int!
 
-  """Mapping of service names to their exposed ports."""
-  servicePorts: JSON
+  """Collection of service ports exposed by this kernel."""
+  servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
   preopenPorts: [Int!]
@@ -4271,26 +4312,26 @@ type KernelResourceInfo
 
   """
   The resource slots currently occupied by this kernel.
-  Expressed as a JSON object with resource types as keys (e.g., cpu, mem, cuda.shares).
+  Contains entries with resource types (e.g., cpu, mem, cuda.shares) and their quantities.
   """
-  occupiedSlots: JSON!
+  occupiedSlots: ResourceSlot!
 
   """
   The resource slots originally requested for this kernel.
   May differ from occupied_slots due to scheduling adjustments.
   """
-  requestedSlots: JSON!
+  requestedSlots: ResourceSlot!
 
   """The fractional resource shares occupied by this kernel."""
-  occupiedShares: JSON!
+  occupiedShares: ResourceSlot!
 
   """
   Information about attached devices (e.g., GPUs) allocated to this kernel.
   """
-  attachedDevices: JSON!
+  attachedDevices: AttachedDevices
 
   """Additional resource options and configurations for this kernel."""
-  resourceOpts: JSON
+  resourceOpts: ResourceOpts
 }
 
 """Added in 26.1.0. Runtime configuration for a kernel."""
@@ -4299,6 +4340,9 @@ type KernelRuntimeInfo
 {
   """Environment variables set for this kernel."""
   environ: [String!]
+
+  """List of virtual folders mounted to this kernel."""
+  vfolderMounts: [VFolderMount!]
 
   """Bootstrap script executed when the kernel starts."""
   bootstrapScript: String
@@ -4320,8 +4364,8 @@ type KernelSessionInfo
   """The name of the session."""
   name: String
 
-  """The type of session (e.g., INTERACTIVE, BATCH)."""
-  sessionType: String!
+  """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
+  sessionType: SessionType!
 }
 
 """Added in 26.1.0"""
@@ -4390,9 +4434,6 @@ type KernelV2 implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-
-  """The internal database row ID of the kernel."""
-  rowId: UUID!
 
   """Information about the session this kernel belongs to."""
   session: KernelSessionInfo!
@@ -5466,6 +5507,15 @@ input ModifyUserResourcePolicyInput
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+}
+
+"""Added in 26.1.0. Permission level for virtual folder mounts."""
+enum MountPermission
+  @join__type(graph: STRAWBERRY)
+{
+  READ_ONLY @join__enumValue(graph: STRAWBERRY)
+  READ_WRITE @join__enumValue(graph: STRAWBERRY)
+  RW_DELETE @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -7574,6 +7624,29 @@ input ResourceLimitInput
   max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
+"""
+Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
+"""
+type ResourceOpts
+  @join__type(graph: STRAWBERRY)
+{
+  """List of resource option entries."""
+  entries: [ResourceOptsEntry!]!
+}
+
+"""
+Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
+"""
+type ResourceOptsEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
+
+  """The value for this resource option (e.g., '64m')."""
+  value: String!
+}
+
 type ResourcePreset
   @join__type(graph: GRAPHENE)
 {
@@ -8396,6 +8469,48 @@ type ServiceConfigNode implements Node
   schema: JSONString!
 }
 
+"""
+Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing kernel services.
+"""
+type ServicePortEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
+  name: String!
+
+  """Protocol type for this service port (http, tcp, preopen, internal)."""
+  protocol: ServicePortProtocol!
+
+  """Port numbers inside the container."""
+  containerPorts: [Int!]!
+
+  """Mapped port numbers on the host. May be null if not yet assigned."""
+  hostPorts: [Int]!
+
+  """Whether this port is used for inference endpoints."""
+  isInference: Boolean!
+}
+
+"""Added in 26.1.0. Protocol types for service ports."""
+enum ServicePortProtocol
+  @join__type(graph: STRAWBERRY)
+{
+  HTTP @join__enumValue(graph: STRAWBERRY)
+  TCP @join__enumValue(graph: STRAWBERRY)
+  PREOPEN @join__enumValue(graph: STRAWBERRY)
+  INTERNAL @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.1.0. A collection of service ports exposed by a kernel. Each entry defines a service accessible through the kernel.
+"""
+type ServicePorts
+  @join__type(graph: STRAWBERRY)
+{
+  """List of service port entries."""
+  entries: [ServicePortEntry!]!
+}
+
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -8428,6 +8543,15 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.1.0. Result status of a session execution."""
+enum SessionResult
+  @join__type(graph: STRAWBERRY)
+{
+  UNDEFINED @join__enumValue(graph: STRAWBERRY)
+  SUCCESS @join__enumValue(graph: STRAWBERRY)
+  FAILURE @join__enumValue(graph: STRAWBERRY)
+}
 
 """Session scheduling history record"""
 type SessionSchedulingHistory implements Node
@@ -8501,6 +8625,16 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.1.0. Type of compute session."""
+enum SessionType
+  @join__type(graph: STRAWBERRY)
+{
+  INTERACTIVE @join__enumValue(graph: STRAWBERRY)
+  BATCH @join__enumValue(graph: STRAWBERRY)
+  INFERENCE @join__enumValue(graph: STRAWBERRY)
+  SYSTEM @join__enumValue(graph: STRAWBERRY)
+}
+
 type SetQuotaScope
   @join__type(graph: GRAPHENE)
 {
@@ -8519,6 +8653,29 @@ type SourceInfo
 {
   name: String
   url: String
+}
+
+"""
+Added in 26.1.0. A collection of status history entries for a kernel. Records the progression of status changes throughout the kernel's lifecycle.
+"""
+type StatusHistory
+  @join__type(graph: STRAWBERRY)
+{
+  """List of status history entries in chronological order."""
+  entries: [StatusHistoryEntry!]!
+}
+
+"""
+Added in 26.1.0. A single status history entry recording a status transition. Contains the status name and the timestamp when the kernel entered that status.
+"""
+type StatusHistoryEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."""
+  status: String!
+
+  """Timestamp when the kernel entered this status."""
+  timestamp: DateTime!
 }
 
 """
@@ -9598,10 +9755,47 @@ type ValidateNotificationRulePayload
 }
 
 """
+Added in 26.1.0. Information about a virtual folder mounted to a kernel. Contains mount path, permissions, and usage mode details.
+"""
+type VFolderMount
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the virtual folder."""
+  name: String!
+
+  """Unique identifier of the virtual folder."""
+  vfid: String!
+
+  """Subpath within the virtual folder to mount."""
+  vfsubpath: String!
+
+  """Path on the host where the virtual folder is stored."""
+  hostPath: String!
+
+  """Path inside the kernel container where the folder is mounted."""
+  kernelPath: String!
+
+  """Permission level for this mount (ro, rw, wd)."""
+  mountPerm: MountPermission!
+
+  """Usage mode of the virtual folder (general, model, data)."""
+  usageMode: VFolderUsageMode!
+}
+
+"""
 Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
 """
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.1.0. Usage mode of a virtual folder."""
+enum VFolderUsageMode
+  @join__type(graph: STRAWBERRY)
+{
+  GENERAL @join__enumValue(graph: STRAWBERRY)
+  MODEL @join__enumValue(graph: STRAWBERRY)
+  DATA @join__enumValue(graph: STRAWBERRY)
+}
 
 """Added in 25.16.0. VFS Storage configuration"""
 type VFSStorage implements Node
