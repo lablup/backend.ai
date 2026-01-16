@@ -158,14 +158,14 @@ def create_channel_cmd(
             channel_spec: WebhookSpec | EmailSpec
             match channel_type_enum:
                 case NotificationChannelType.WEBHOOK:
-                    channel_spec = WebhookSpec(**spec_data)
+                    channel_spec = WebhookSpec.model_validate(spec_data)
                 case NotificationChannelType.EMAIL:
                     # Parse nested structures for EmailSpec
-                    smtp = SMTPConnection(**spec_data["smtp"])
-                    message = EmailMessage(**spec_data["message"])
+                    smtp = SMTPConnection.model_validate(spec_data["smtp"])
+                    message = EmailMessage.model_validate(spec_data["message"])
                     auth = None
                     if spec_data.get("auth"):
-                        auth = SMTPAuth(**spec_data["auth"])
+                        auth = SMTPAuth.model_validate(spec_data["auth"])
                     channel_spec = EmailSpec(smtp=smtp, message=message, auth=auth)
 
             request = CreateNotificationChannelRequest(
