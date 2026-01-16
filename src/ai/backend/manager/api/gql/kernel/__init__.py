@@ -18,8 +18,12 @@ from .types import (
     KernelResourceInfoGQL,
     KernelRuntimeInfoGQL,
     KernelSessionInfoGQL,
+    KernelStatEntryGQL,
+    KernelStatGQL,
     KernelStatusGQL,
     KernelUserPermissionInfoGQL,
+    MetricStatGQL,
+    MetricValueGQL,
 )
 
 __all__ = [
@@ -38,6 +42,10 @@ __all__ = [
     "KernelResourceInfoGQL",
     "KernelRuntimeInfoGQL",
     "KernelSessionInfoGQL",
+    "KernelStatEntryGQL",
+    "KernelStatGQL",
     "KernelStatusGQL",
     "KernelUserPermissionInfoGQL",
+    "MetricStatGQL",
+    "MetricValueGQL",
 ]
