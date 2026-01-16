@@ -3,20 +3,18 @@ from __future__ import annotations
 import uuid
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
-
-if TYPE_CHECKING:
-    from ai.backend.agent.kernel import AbstractKernel
 
 
 @pytest.fixture
@@ -76,7 +74,7 @@ def kernel_registry_data(
 ) -> MutableMapping[KernelId, AbstractKernel]:
     """Registry data with single kernel."""
     return cast(
-        MutableMapping[KernelId, "AbstractKernel"],
+        MutableMapping[KernelId, AbstractKernel],
         {mock_kernel.kernel_id: mock_kernel},
     )
 
