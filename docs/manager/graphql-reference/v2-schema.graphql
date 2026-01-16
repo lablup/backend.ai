@@ -734,6 +734,31 @@ type ArtifactVerificationResult {
 }
 
 """
+Added in 26.1.0.
+
+A collection of metadata from an artifact verifier.
+Contains key-value pairs providing additional information about the verification.
+"""
+type ArtifactVerifierMetadata {
+  """List of metadata entries. Each entry contains a key-value pair."""
+  entries: [ArtifactVerifierMetadataEntry!]!
+}
+
+"""
+Added in 26.1.0.
+
+A single key-value entry representing metadata from an artifact verifier.
+Contains additional information about the verification process.
+"""
+type ArtifactVerifierMetadataEntry {
+  """The key identifier for this metadata entry."""
+  key: String!
+
+  """The value for this metadata entry."""
+  value: String!
+}
+
+"""
 Added in 25.17.0.
 
 Result from a single malware verifier containing scan results and metadata.
@@ -757,8 +782,8 @@ type ArtifactVerifierResult {
   """Total number of files scanned"""
   scannedCount: Int!
 
-  """Additional metadata from the verifier"""
-  metadata: JSON!
+  """Added in 26.1.0. Additional metadata from the verifier."""
+  metadata: ArtifactVerifierMetadata!
 
   """Fatal error message if the verifier failed to complete"""
   error: String
@@ -3253,14 +3278,12 @@ type ReservoirRegistryEdge {
 
 type ResourceConfig {
   """
-  JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
+  Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
   """
-  resourceSlots: JSON!
+  resourceSlots: ResourceSlot!
 
-  """
-  Additional resource options such as shared memory. Example: {"shmem": "64m"}.
-  """
-  resourceOpts: JSON
+  """Added in 26.1.0. Additional resource options such as shared memory."""
+  resourceOpts: ResourceOpts
   resourceGroup: ScalingGroupNode!
 }
 
@@ -3268,20 +3291,56 @@ type ResourceConfig {
 input ResourceConfigInput {
   resourceGroup: ResourceGroupInput!
 
-  """
-  Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
-  """
-  resourceSlots: JSON!
+  """Added in 26.1.0. Resources allocated for the deployment."""
+  resourceSlots: ResourceSlotInput!
 
   """
-  Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  Added in 26.1.0. Additional options for the resources such as shared memory.
   """
-  resourceOpts: JSON = null
+  resourceOpts: ResourceOptsInput = null
 }
 
 """Added in 25.19.0"""
 input ResourceGroupInput {
   name: String!
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
+"""
+type ResourceOpts {
+  """List of resource option entries. Each entry contains a key-value pair."""
+  entries: [ResourceOptsEntry!]!
+}
+
+"""
+Added in 26.1.0. A single key-value entry representing a resource option. Contains additional resource configuration such as shared memory settings.
+"""
+type ResourceOptsEntry {
+  """The key identifier for this resource option. Example: 'shmem'."""
+  key: String!
+
+  """The value for this resource option. Example: '64m'."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A single key-value entry representing a resource option.
+"""
+input ResourceOptsEntryInput {
+  """The key identifier for this resource option (e.g., 'shmem')."""
+  key: String!
+
+  """The value for this resource option (e.g., '64m')."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for input.
+"""
+input ResourceOptsInput {
+  """List of resource option entries."""
+  entries: [ResourceOptsEntryInput!]!
 }
 
 """
@@ -3307,6 +3366,25 @@ type ResourceSlotEntry {
   Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
   """
   quantity: String!
+}
+
+"""
+Added in 26.1.0. A single entry representing one resource type and its allocated quantity.
+"""
+input ResourceSlotEntryInput {
+  """Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  resourceType: String!
+
+  """Quantity of the resource as a decimal string."""
+  quantity: String!
+}
+
+"""
+Added in 26.1.0. A collection of compute resource allocations for input.
+"""
+input ResourceSlotInput {
+  """List of resource allocations."""
+  entries: [ResourceSlotEntryInput!]!
 }
 
 """
