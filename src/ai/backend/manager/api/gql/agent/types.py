@@ -1,9 +1,11 @@
+"""GraphQL types for agent management."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -12,6 +14,12 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels_by_agent
+from ai.backend.manager.api.gql.kernel.types import (
+    KernelConnectionV2GQL,
+    KernelFilterGQL,
+    KernelOrderByGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
@@ -23,6 +31,9 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.enum(
@@ -388,12 +399,44 @@ class AgentV2GQL(Node):
         """
         return await info.context.data_loaders.container_count_loader.load(self._agent_id)
 
+    @strawberry.field(
+        description="Added in 26.1.0. List of kernels running on this agent with pagination support."
+    )
+    async def kernels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: KernelFilterGQL | None = None,
+        order_by: list[KernelOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        resource_occupied_only: bool = False,
+    ) -> KernelConnectionV2GQL:
+        """Fetch kernels associated with this agent."""
+
+        return await fetch_kernels_by_agent(
+            info=info,
+            agent_id=self._agent_id,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            resource_occupied_only=resource_occupied_only,
+        )
+
     @classmethod
     def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
         data = detail_data.agent
 
         return cls(
-            _agent_id=data.id,
+            _agent_id=AgentId(data.id),
             id=ID(data.id),
             resource_info=AgentResourceGQL(
                 capacity=data.available_slots.to_json(),
