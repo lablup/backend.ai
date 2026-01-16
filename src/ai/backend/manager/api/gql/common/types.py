@@ -282,11 +282,11 @@ class VFolderMountGQL:
         return cls(
             name=data["name"],
             vfid=str(data["vfid"]),
-            vfsubpath=str(data.get("vfsubpath", ".")),
+            vfsubpath=str(data["vfsubpath"]),
             host_path=str(data["host_path"]),
             kernel_path=str(data["kernel_path"]),
             mount_perm=MountPermissionGQL(data["mount_perm"]),
-            usage_mode=VFolderUsageModeGQL(data.get("usage_mode", "general")),
+            usage_mode=VFolderUsageModeGQL(data["usage_mode"]),
         )
 
 
