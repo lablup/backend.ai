@@ -178,7 +178,7 @@ class TestRBACFieldCreatorBasic:
             assert entity_field_row is not None
             assert entity_field_row.entity_type == EntityType.VFOLDER.value
             assert entity_field_row.entity_id == parent_entity_id
-            assert entity_field_row.field_type == EntityType.VFOLDER.value
+            assert entity_field_row.field_type == FieldType.KERNEL.value
             assert entity_field_row.field_id == str(result.row.id)
 
     async def test_create_multiple_fields_for_same_parent(
@@ -262,7 +262,7 @@ class TestRBACFieldCreatorIdempotent:
             duplicate_field = EntityFieldRow(
                 entity_type=EntityType.VFOLDER.value,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER.value,
+                field_type=FieldType.KERNEL.value,
                 field_id=str(field_id),  # Same field_id as first
             )
             # Should not raise an error
