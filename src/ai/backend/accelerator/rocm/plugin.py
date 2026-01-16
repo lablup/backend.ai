@@ -183,7 +183,7 @@ class ROCmPlugin(AbstractComputePlugin):
     def get_version(self) -> str:
         return __version__
 
-    async def extra_info(self) -> Mapping[str, Any]:
+    async def extra_info(self) -> Mapping[str, str]:
         if self.enabled:
             try:
                 return {
