@@ -417,8 +417,7 @@ class ValkeyStatClient:
         results = await self._get_multiple_keys(keys)
 
         counts_dict: dict[AgentId, int] = {}
-        for i, result in enumerate(results):
-            agent_id = agent_ids[i]
+        for agent_id, result in zip(agent_ids, results, strict=False):
             if result is None:
                 counts_dict[agent_id] = 0
                 continue
