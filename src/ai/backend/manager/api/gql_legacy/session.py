@@ -670,6 +670,8 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
+        if session_row is None:
+            return None
         return cls.from_row(
             graph_ctx,
             session_row,
@@ -1231,7 +1233,7 @@ class ComputeSession(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(

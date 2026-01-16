@@ -1007,7 +1007,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1158,7 +1158,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_invited(
@@ -1239,7 +1239,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_project(
@@ -1360,7 +1360,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1465,14 +1465,26 @@ class QuotaScope(graphene.ObjectType):
                         .where(UserRow.uuid == qsid.scope_id)
                         .options(selectinload(UserRow.resource_policy_row))
                     )
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"User not found for quota scope id: {self.quota_scope_id}"
+                        )
+                    resource_policy_constraint: int | None = (
+                        result.resource_policy_row.max_quota_scope_size
+                    )
                 else:
                     query = (
                         sa.select(GroupRow)
                         .where(GroupRow.id == qsid.scope_id)
                         .options(selectinload(GroupRow.resource_policy_row))
                     )
-                result = await sess.scalar(query)
-                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"Group not found for quota scope id: {self.quota_scope_id}"
+                        )
+                    resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 
