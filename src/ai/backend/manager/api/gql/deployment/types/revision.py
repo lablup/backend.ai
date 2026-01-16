@@ -173,10 +173,10 @@ class ModelRuntimeConfig:
     ),
 )
 class ResourceOptsEntryGQL:
-    """Single resource option entry with key and value."""
+    """Single resource option entry with name and value."""
 
-    key: str = strawberry.field(
-        description="The key identifier for this resource option. Example: 'shmem'."
+    name: str = strawberry.field(
+        description="The name of this resource option. Example: 'shmem'."
     )
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
@@ -198,7 +198,7 @@ class ResourceOptsGQL:
     @classmethod
     def from_mapping(cls, data: Mapping[str, str]) -> ResourceOptsGQL:
         """Convert a Mapping to GraphQL type."""
-        entries = [ResourceOptsEntryGQL(key=k, value=v) for k, v in data.items()]
+        entries = [ResourceOptsEntryGQL(name=k, value=v) for k, v in data.items()]
         return cls(entries=entries)
 
 
@@ -460,10 +460,10 @@ class ResourceSlotInput:
     description=("Added in 26.1.0. A single key-value entry representing a resource option.")
 )
 class ResourceOptsEntryInput:
-    """Single resource option entry input with key and value."""
+    """Single resource option entry input with name and value."""
 
-    key: str = strawberry.field(
-        description="The key identifier for this resource option (e.g., 'shmem')."
+    name: str = strawberry.field(
+        description="The name of this resource option (e.g., 'shmem')."
     )
     value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
 
