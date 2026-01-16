@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from .types import (
+    DotfileInfoGQL,
+    InternalDataGQL,
     KernelClusterInfoGQL,
     KernelConnectionV2GQL,
     KernelEdgeGQL,
     KernelFilterGQL,
-    KernelGQL,
     KernelImageInfoGQL,
     KernelLifecycleInfoGQL,
     KernelMetadataInfoGQL,
@@ -23,21 +24,24 @@ from .types import (
     KernelStatusDataGQL,
     KernelStatusGQL,
     KernelUserPermissionInfoGQL,
+    KernelV2GQL,
     MetricStatGQL,
     MetricValueGQL,
     SchedulerInfoGQL,
     SchedulerPredicateGQL,
     SessionStatusDataGQL,
+    SSHKeypairGQL,
     StatusDataGQL,
     StatusErrorInfoGQL,
 )
 
 __all__ = [
+    "DotfileInfoGQL",
+    "InternalDataGQL",
     "KernelClusterInfoGQL",
     "KernelConnectionV2GQL",
     "KernelEdgeGQL",
     "KernelFilterGQL",
-    "KernelGQL",
     "KernelImageInfoGQL",
     "KernelLifecycleInfoGQL",
     "KernelMetadataInfoGQL",
@@ -53,11 +57,13 @@ __all__ = [
     "KernelStatusDataGQL",
     "KernelStatusGQL",
     "KernelUserPermissionInfoGQL",
+    "KernelV2GQL",
     "MetricStatGQL",
     "MetricValueGQL",
     "SchedulerInfoGQL",
     "SchedulerPredicateGQL",
     "SessionStatusDataGQL",
+    "SSHKeypairGQL",
     "StatusDataGQL",
     "StatusErrorInfoGQL",
 ]
