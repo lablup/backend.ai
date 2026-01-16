@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
@@ -81,6 +82,32 @@ class ScalingGroupNetworkConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 
 
 @dataclass
+class ScalingGroupDriverConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
+    """UpdaterSpec for scaling group driver configuration updates.
+
+    Maps to ScalingGroupDriverConfigGQL in GraphQL types.
+    """
+
+    driver: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    driver_opts: OptionalState[Mapping[str, Any]] = field(
+        default_factory=OptionalState[Mapping[str, Any]].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.driver.update_dict(to_update, "driver")
+        if (driver_opts := self.driver_opts.optional_value()) is not None:
+            to_update["driver_opts"] = dict(driver_opts)
+        return to_update
+
+
+@dataclass
 class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     """UpdaterSpec for scaling group scheduler configuration updates.
 
@@ -110,13 +137,14 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     """Composite UpdaterSpec for scaling group updates.
 
-    Combines status, metadata, network, and scheduler updates.
+    Combines status, metadata, network, driver, and scheduler updates.
     Maps to ScalingGroupV2GQL structure in GraphQL types.
     """
 
     status: Optional[ScalingGroupStatusUpdaterSpec] = None
     metadata: Optional[ScalingGroupMetadataUpdaterSpec] = None
     network: Optional[ScalingGroupNetworkConfigUpdaterSpec] = None
+    driver: Optional[ScalingGroupDriverConfigUpdaterSpec] = None
     scheduler: Optional[ScalingGroupSchedulerConfigUpdaterSpec] = None
 
     @property
@@ -133,6 +161,8 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update.update(self.metadata.build_values())
         if self.network:
             to_update.update(self.network.build_values())
+        if self.driver:
+            to_update.update(self.driver.build_values())
         if self.scheduler:
             to_update.update(self.scheduler.build_values())
         return to_update
