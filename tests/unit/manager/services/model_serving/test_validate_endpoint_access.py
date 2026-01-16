@@ -18,192 +18,63 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
 
-class ValidateEndpointAccessBaseFixtures:
-    """Base class containing shared fixtures for validate_endpoint_access tests."""
+@pytest.mark.parametrize(
+    "requester_role, owner_role, requester_domain, endpoint_domain, is_owner, expected",
+    [
+        # SUPERADMIN: can access any endpoint regardless of owner or domain
+        (UserRole.SUPERADMIN, UserRole.USER, "other-domain", "test-domain", False, True),
+        (UserRole.SUPERADMIN, UserRole.SUPERADMIN, "other-domain", "test-domain", False, True),
+        # ADMIN: can access same domain endpoints (except SUPERADMIN-owned)
+        (UserRole.ADMIN, UserRole.USER, "test-domain", "test-domain", False, True),
+        (UserRole.ADMIN, UserRole.USER, "other-domain", "test-domain", False, False),
+        (UserRole.ADMIN, UserRole.SUPERADMIN, "test-domain", "test-domain", False, False),
+        (UserRole.ADMIN, UserRole.ADMIN, "test-domain", "test-domain", False, True),
+        # USER: can only access own endpoints
+        (UserRole.USER, UserRole.USER, "test-domain", "test-domain", True, True),
+        (UserRole.USER, UserRole.USER, "test-domain", "test-domain", False, False),
+        # MONITOR: can only access own endpoints
+        (UserRole.MONITOR, UserRole.USER, "test-domain", "test-domain", True, True),
+        (UserRole.MONITOR, UserRole.USER, "test-domain", "test-domain", False, False),
+        # Edge case: None owner role (ADMIN can access in same domain)
+        (UserRole.ADMIN, None, "test-domain", "test-domain", False, True),
+    ],
+    ids=[
+        "superadmin_can_access_any_endpoint",
+        "superadmin_can_access_superadmin_owned",
+        "admin_can_access_same_domain",
+        "admin_cannot_access_different_domain",
+        "admin_cannot_access_superadmin_owned",
+        "admin_can_access_admin_owned_same_domain",
+        "user_can_access_own_endpoint",
+        "user_cannot_access_others_endpoint",
+        "monitor_can_access_own_endpoint",
+        "monitor_cannot_access_others_endpoint",
+        "admin_can_access_none_owner_role",
+    ],
+)
+def test_validate_endpoint_access(
+    requester_role: UserRole,
+    owner_role: UserRole | None,
+    requester_domain: str,
+    endpoint_domain: str,
+    is_owner: bool,
+    expected: bool,
+) -> None:
+    """Test access control logic for validate_endpoint_access function."""
+    user_id = uuid.uuid4()
+    owner_id = user_id if is_owner else uuid.uuid4()
 
-    @pytest.fixture
-    def user_id(self) -> uuid.UUID:
-        """User ID for test fixtures."""
-        return uuid.uuid4()
+    validation_data = EndpointAccessValidationData(
+        session_owner_id=owner_id,
+        session_owner_role=owner_role,
+        domain=endpoint_domain,
+    )
 
-    @pytest.fixture
-    def base_validation_data(self) -> EndpointAccessValidationData:
-        """Create a base EndpointAccessValidationData for testing."""
-        return EndpointAccessValidationData(
-            session_owner_id=uuid.uuid4(),
-            session_owner_role=UserRole.USER,
-            domain="test-domain",
-        )
+    requester_ctx = RequesterCtx(
+        is_authorized=True,
+        user_id=user_id,
+        user_role=requester_role,
+        domain_name=requester_domain,
+    )
 
-    @pytest.fixture
-    def superadmin_requester_ctx(self, user_id: uuid.UUID) -> RequesterCtx:
-        """Create a SUPERADMIN RequesterCtx for testing."""
-        return RequesterCtx(
-            is_authorized=True,
-            user_id=user_id,
-            user_role=UserRole.SUPERADMIN,
-            domain_name="other-domain",
-        )
-
-    @pytest.fixture
-    def admin_requester_ctx(self, user_id: uuid.UUID) -> RequesterCtx:
-        """Create an ADMIN RequesterCtx for testing."""
-        return RequesterCtx(
-            is_authorized=True,
-            user_id=user_id,
-            user_role=UserRole.ADMIN,
-            domain_name="test-domain",
-        )
-
-    @pytest.fixture
-    def user_requester_ctx(self, user_id: uuid.UUID) -> RequesterCtx:
-        """Create a USER RequesterCtx for testing."""
-        return RequesterCtx(
-            is_authorized=True,
-            user_id=user_id,
-            user_role=UserRole.USER,
-            domain_name="test-domain",
-        )
-
-    @pytest.fixture
-    def monitor_requester_ctx(self, user_id: uuid.UUID) -> RequesterCtx:
-        """Create a MONITOR RequesterCtx for testing."""
-        return RequesterCtx(
-            is_authorized=True,
-            user_id=user_id,
-            user_role=UserRole.MONITOR,
-            domain_name="test-domain",
-        )
-
-
-class TestValidateEndpointAccessSuperadmin(ValidateEndpointAccessBaseFixtures):
-    """Tests for SUPERADMIN role access."""
-
-    def test_superadmin_can_access_any_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        superadmin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """SUPERADMIN should have access to any endpoint regardless of owner."""
-        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx)
-
-    def test_superadmin_can_access_superadmin_owned_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        superadmin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """SUPERADMIN should access endpoints owned by other SUPERADMINs."""
-        base_validation_data.session_owner_role = UserRole.SUPERADMIN
-
-        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx)
-
-
-class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
-    """Tests for ADMIN role access."""
-
-    def test_admin_can_access_endpoint_in_same_domain(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        admin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """ADMIN should access endpoints in their domain owned by regular users."""
-        base_validation_data.session_owner_role = UserRole.USER
-
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
-
-    def test_admin_cannot_access_endpoint_in_different_domain(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        admin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """ADMIN should NOT access endpoints in different domains."""
-        base_validation_data.session_owner_role = UserRole.USER
-        admin_requester_ctx.domain_name = "other-domain"
-
-        assert not validate_endpoint_access(base_validation_data, admin_requester_ctx)
-
-    def test_admin_cannot_access_superadmin_owned_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        admin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """ADMIN should NOT access endpoints owned by SUPERADMIN users.
-
-        This is a critical security test - ADMIN users should never be able
-        to access resources owned by SUPERADMIN users, even in the same domain.
-        """
-        base_validation_data.session_owner_role = UserRole.SUPERADMIN
-        base_validation_data.domain = "test-domain"
-
-        assert not validate_endpoint_access(base_validation_data, admin_requester_ctx)
-
-    def test_admin_can_access_admin_owned_endpoint_in_same_domain(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        admin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """ADMIN should access endpoints owned by other ADMINs in same domain."""
-        base_validation_data.session_owner_role = UserRole.ADMIN
-
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
-
-
-class TestValidateEndpointAccessUser(ValidateEndpointAccessBaseFixtures):
-    """Tests for regular USER role access."""
-
-    def test_user_can_access_own_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        user_id: uuid.UUID,
-        user_requester_ctx: RequesterCtx,
-    ) -> None:
-        """USER should access their own endpoints."""
-        base_validation_data.session_owner_id = user_id
-
-        assert validate_endpoint_access(base_validation_data, user_requester_ctx)
-
-    def test_user_cannot_access_other_users_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        user_requester_ctx: RequesterCtx,
-    ) -> None:
-        """USER should NOT access other users' endpoints even in the same domain."""
-        assert not validate_endpoint_access(base_validation_data, user_requester_ctx)
-
-
-class TestValidateEndpointAccessMonitor(ValidateEndpointAccessBaseFixtures):
-    """Tests for MONITOR role access."""
-
-    def test_monitor_can_access_own_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        user_id: uuid.UUID,
-        monitor_requester_ctx: RequesterCtx,
-    ) -> None:
-        """MONITOR should access their own endpoints."""
-        base_validation_data.session_owner_id = user_id
-
-        assert validate_endpoint_access(base_validation_data, monitor_requester_ctx)
-
-    def test_monitor_cannot_access_other_users_endpoint(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        monitor_requester_ctx: RequesterCtx,
-    ) -> None:
-        """MONITOR should NOT access other users' endpoints."""
-        assert not validate_endpoint_access(base_validation_data, monitor_requester_ctx)
-
-
-class TestValidateEndpointAccessEdgeCases(ValidateEndpointAccessBaseFixtures):
-    """Tests for edge cases."""
-
-    def test_endpoint_with_none_session_owner_role(
-        self,
-        base_validation_data: EndpointAccessValidationData,
-        admin_requester_ctx: RequesterCtx,
-    ) -> None:
-        """ADMIN should access endpoints with None session_owner_role in same domain."""
-        base_validation_data.session_owner_role = None
-
-        # None != SUPERADMIN, so domain check applies
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
+    assert validate_endpoint_access(validation_data, requester_ctx) == expected
