@@ -14,7 +14,7 @@ async def load_container_counts(
     """Batch load container counts for agents by their IDs.
 
     Args:
-        info: The Strawberry GraphQL Info object.
+        processor: AgentProcessors instance.
         agent_ids: List of agent IDs to load container counts for.
 
     Returns:
