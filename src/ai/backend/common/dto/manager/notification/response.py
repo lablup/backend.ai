@@ -13,8 +13,11 @@ from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.notification.types import (
+    EmailMessage,
     NotificationChannelType,
     NotificationRuleType,
+    SMTPAuth,
+    SMTPConnection,
 )
 
 __all__ = (
@@ -45,6 +48,14 @@ class WebhookSpecResponse(BaseResponseModel):
     url: str = Field(description="Webhook URL")
 
 
+class EmailSpecResponse(BaseResponseModel):
+    """Response model for email specification."""
+
+    smtp: SMTPConnection = Field(description="SMTP connection settings")
+    message: EmailMessage = Field(description="Email message settings")
+    auth: SMTPAuth | None = Field(default=None, description="SMTP authentication credentials")
+
+
 class NotificationChannelDTO(BaseModel):
     """DTO for notification channel data."""
 
@@ -52,7 +63,7 @@ class NotificationChannelDTO(BaseModel):
     name: str = Field(description="Channel name")
     description: Optional[str] = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: WebhookSpecResponse = Field(description="Channel configuration")
+    spec: WebhookSpecResponse | EmailSpecResponse = Field(description="Channel configuration")
     enabled: bool = Field(description="Whether the channel is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the channel")

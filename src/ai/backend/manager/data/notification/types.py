@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.notification import (
@@ -22,7 +22,7 @@ class NotificationChannelData:
     name: str
     description: str | None
     channel_type: NotificationChannelType
-    config: WebhookSpec | EmailSpec
+    spec: WebhookSpec | EmailSpec
     enabled: bool
     created_by: UUID
     created_at: datetime = field(compare=False)
@@ -35,7 +35,7 @@ class NotificationRuleData:
 
     id: UUID
     name: str
-    description: Optional[str]
+    description: str | None
     rule_type: NotificationRuleType
     channel: NotificationChannelData
     message_template: str
@@ -50,10 +50,8 @@ class NotificationChannelModifier(PartialModifier):
     """Modifier for notification channel."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    description: OptionalState[Optional[str]] = field(
-        default_factory=OptionalState[Optional[str]].nop
-    )
-    config: OptionalState[WebhookSpec | EmailSpec] = field(
+    description: OptionalState[str | None] = field(default_factory=OptionalState[str | None].nop)
+    spec: OptionalState[WebhookSpec | EmailSpec] = field(
         default_factory=OptionalState[WebhookSpec | EmailSpec].nop
     )
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
@@ -63,9 +61,9 @@ class NotificationChannelModifier(PartialModifier):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
-        config_value = self.config.optional_value()
-        if config_value is not None:
-            to_update["config"] = config_value.model_dump()
+        spec_value = self.spec.optional_value()
+        if spec_value is not None:
+            to_update["spec"] = spec_value.model_dump()
         self.enabled.update_dict(to_update, "enabled")
         return to_update
 
@@ -75,9 +73,7 @@ class NotificationRuleModifier(PartialModifier):
     """Modifier for notification rule."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    description: OptionalState[Optional[str]] = field(
-        default_factory=OptionalState[Optional[str]].nop
-    )
+    description: OptionalState[str | None] = field(default_factory=OptionalState[str | None].nop)
     message_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 

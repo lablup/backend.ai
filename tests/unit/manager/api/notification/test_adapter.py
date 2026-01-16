@@ -577,7 +577,7 @@ class TestNotificationChannelAdapterConversion:
             name="Test Channel",
             description="Test description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookSpec(url="https://example.com/webhook"),
+            spec=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,
@@ -592,8 +592,8 @@ class TestNotificationChannelAdapterConversion:
         assert dto.name == "Test Channel"
         assert dto.description == "Test description"
         assert dto.channel_type == NotificationChannelType.WEBHOOK
-        assert isinstance(dto.config, WebhookSpecResponse)
-        assert dto.config.url == "https://example.com/webhook"
+        assert isinstance(dto.spec, WebhookSpecResponse)
+        assert dto.spec.url == "https://example.com/webhook"
         assert dto.enabled is True
         assert dto.created_by == user_id
         assert dto.created_at == now
@@ -605,7 +605,7 @@ class TestNotificationChannelAdapterConversion:
         request = UpdateNotificationChannelRequest(
             name="Updated Name",
             description="Updated description",
-            config=WebhookSpec(url="https://new-url.com"),
+            spec=WebhookSpec(url="https://new-url.com"),
             enabled=False,
         )
 
@@ -615,7 +615,7 @@ class TestNotificationChannelAdapterConversion:
 
         assert spec.name.value() == "Updated Name"
         assert spec.description.value() == "Updated description"
-        config_value = spec.config.value()
+        config_value = spec.spec.value()
         assert isinstance(config_value, WebhookSpec)
         assert config_value.url == "https://new-url.com"
         assert spec.enabled.value() is False
@@ -635,7 +635,7 @@ class TestNotificationChannelAdapterConversion:
 
         assert spec.name.value() == "Updated Name"
         assert spec.description.optional_value() is None
-        assert spec.config.optional_value() is None
+        assert spec.spec.optional_value() is None
         assert spec.enabled.value() is False
         assert updater.pk_value == channel_id
 
@@ -655,7 +655,7 @@ class TestNotificationRuleAdapterConversion:
             name="Test Channel",
             description="Channel description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookSpec(url="https://example.com/webhook"),
+            spec=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,

@@ -388,7 +388,7 @@ class TestNotificationRepository:
             spec=NotificationChannelCreatorSpec(
                 name="Test Webhook",
                 channel_type=NotificationChannelType.WEBHOOK,
-                config=config,
+                spec=config,
                 created_by=test_user,
                 description="Test webhook channel",
                 enabled=True,
@@ -399,10 +399,10 @@ class TestNotificationRepository:
 
         assert channel.name == "Test Webhook"
         assert channel.channel_type == NotificationChannelType.WEBHOOK
-        assert isinstance(channel.config, WebhookSpec)
-        assert channel.config.url == "https://example.com/webhook"
-        assert channel.config.method == "POST"
-        assert channel.config.timeout == 30
+        assert isinstance(channel.spec, WebhookSpec)
+        assert channel.spec.url == "https://example.com/webhook"
+        assert channel.spec.method == "POST"
+        assert channel.spec.timeout == 30
         assert channel.enabled is True
         assert channel.description == "Test webhook channel"
 
@@ -435,7 +435,7 @@ class TestNotificationRepository:
 
         updater_spec = NotificationChannelUpdaterSpec(
             name=OptionalState.update("Updated Name"),
-            config=OptionalState.update(new_config),
+            spec=OptionalState.update(new_config),
             enabled=OptionalState.update(False),
         )
         updater = Updater(spec=updater_spec, pk_value=sample_channel_id)
@@ -444,9 +444,9 @@ class TestNotificationRepository:
 
         assert updated_channel is not None
         assert updated_channel.name == "Updated Name"
-        assert isinstance(updated_channel.config, WebhookSpec)
-        assert updated_channel.config.url == "https://example.com/new-webhook"
-        assert updated_channel.config.method == "GET"
+        assert isinstance(updated_channel.spec, WebhookSpec)
+        assert updated_channel.spec.url == "https://example.com/new-webhook"
+        assert updated_channel.spec.method == "GET"
         assert updated_channel.enabled is False
 
     @pytest.mark.asyncio
@@ -531,7 +531,7 @@ class TestNotificationRepository:
             spec=NotificationChannelCreatorSpec(
                 name="Test Channel",
                 channel_type=NotificationChannelType.WEBHOOK,
-                config=config,
+                spec=config,
                 created_by=test_user,
             )
         )

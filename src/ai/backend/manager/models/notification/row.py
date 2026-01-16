@@ -115,7 +115,7 @@ class NotificationChannelRow(Base):
             name=self.name,
             description=self.description,
             channel_type=channel_type_enum,
-            config=parsed_config,
+            spec=parsed_config,
             enabled=self.enabled,
             created_by=self.created_by,
             created_at=self.created_at,

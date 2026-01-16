@@ -42,7 +42,10 @@ class SMTPAuth(BaseModel):
     """SMTP authentication credentials."""
 
     username: str | None = Field(default=None, description="SMTP username for authentication")
-    password: str | None = Field(default=None, description="SMTP password for authentication")
+    password: str | None = Field(
+        default=None,
+        description="SMTP password for authentication",
+    )
 
 
 class SMTPConnection(BaseModel):

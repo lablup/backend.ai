@@ -9,6 +9,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.data.notification.types import (
+    EmailSpec,
+    NotificationChannelType,
     WebhookSpec,
 )
 from ai.backend.common.dto.manager.notification import (
@@ -27,12 +29,13 @@ from ai.backend.common.dto.manager.notification import (
     UpdateNotificationRuleRequest,
     WebhookSpecResponse,
 )
+from ai.backend.common.dto.manager.notification.response import EmailSpecResponse
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.errors.notification import InvalidNotificationConfig
+from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -64,17 +67,30 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: NotificationChannelData) -> NotificationChannelDTO:
         """Convert NotificationChannelData to DTO."""
-        # TODO: Support EmailSpec when Email channel is implemented
-        if not isinstance(data.config, WebhookSpec):
-            raise InvalidNotificationConfig(
-                f"Expected WebhookSpec, got {type(data.config).__name__}"
-            )
+        response: WebhookSpecResponse | EmailSpecResponse
+        match data.channel_type:
+            case NotificationChannelType.WEBHOOK:
+                if not isinstance(data.spec, WebhookSpec):
+                    raise InvalidNotificationSpec(
+                        f"Expected WebhookSpec for WEBHOOK channel, got {type(data.spec).__name__}"
+                    )
+                response = WebhookSpecResponse(url=data.spec.url)
+            case NotificationChannelType.EMAIL:
+                if not isinstance(data.spec, EmailSpec):
+                    raise InvalidNotificationSpec(
+                        f"Expected EmailSpec for EMAIL channel, got {type(data.spec).__name__}"
+                    )
+                response = EmailSpecResponse(
+                    smtp=data.spec.smtp,
+                    message=data.spec.message,
+                    auth=data.spec.auth,
+                )
         return NotificationChannelDTO(
             id=data.id,
             name=data.name,
             description=data.description,
             channel_type=data.channel_type,
-            config=WebhookSpecResponse(url=data.config.url),
+            spec=response,
             enabled=data.enabled,
             created_at=data.created_at,
             created_by=data.created_by,
@@ -88,30 +104,30 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 
         name = OptionalState[str].nop()
         description = OptionalState[str | None].nop()
-        config = OptionalState[WebhookSpec].nop()
+        spec = OptionalState[WebhookSpec | EmailSpec].nop()
         enabled = OptionalState[bool].nop()
 
         if request.name is not None:
             name = OptionalState.update(request.name)
         if request.description is not None:
             description = OptionalState.update(request.description)
-        if request.config is not None:
-            # config validator ensures this is WebhookSpec
-            if not isinstance(request.config, WebhookSpec):
-                raise InvalidNotificationConfig(
-                    f"Expected WebhookSpec, got {type(request.config).__name__}"
+        if request.spec is not None:
+            # spec validator ensures this is WebhookSpec or EmailSpec
+            if not isinstance(request.spec, WebhookSpec | EmailSpec):
+                raise InvalidNotificationSpec(
+                    f"Expected WebhookSpec or EmailSpec, got {type(request.spec).__name__}"
                 )
-            config = OptionalState.update(request.config)
+            spec = OptionalState.update(request.spec)
         if request.enabled is not None:
             enabled = OptionalState.update(request.enabled)
 
-        spec = NotificationChannelUpdaterSpec(
+        updater_spec = NotificationChannelUpdaterSpec(
             name=name,
             description=description,
-            config=config,
+            spec=spec,
             enabled=enabled,
         )
-        return Updater(spec=spec, pk_value=channel_id)
+        return Updater(spec=updater_spec, pk_value=channel_id)
 
     def build_querier(self, request: SearchNotificationChannelsRequest) -> BatchQuerier:
         """

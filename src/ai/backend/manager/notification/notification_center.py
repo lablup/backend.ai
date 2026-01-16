@@ -74,21 +74,21 @@ class NotificationCenter:
         # Create handler based on channel type (no caching due to dynamic config changes)
         match channel_data.channel_type:
             case NotificationChannelType.WEBHOOK:
-                if not isinstance(channel_data.config, WebhookSpec):
+                if not isinstance(channel_data.spec, WebhookSpec):
                     raise InvalidNotificationChannelType(
-                        f"Invalid config type for WEBHOOK channel: {type(channel_data.config)}"
+                        f"Invalid config type for WEBHOOK channel: {type(channel_data.spec)}"
                     )
                 return WebhookChannel(
                     http_client_pool=self._http_client_pool,
-                    webhook_spec=channel_data.config,
+                    webhook_spec=channel_data.spec,
                 )
 
             case NotificationChannelType.EMAIL:
-                if not isinstance(channel_data.config, EmailSpec):
+                if not isinstance(channel_data.spec, EmailSpec):
                     raise InvalidNotificationChannelType(
-                        f"Invalid config type for EMAIL channel: {type(channel_data.config)}"
+                        f"Invalid config type for EMAIL channel: {type(channel_data.spec)}"
                     )
-                return EmailChannel(email_spec=channel_data.config)
+                return EmailChannel(email_spec=channel_data.spec)
 
         # Explicitly handle unregistered channel types
         raise InvalidNotificationChannelType(
