@@ -55,7 +55,6 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
     ScalingGroupsForProjectPurgerSpec,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
-    ScalingGroupDriverConfigUpdaterSpec,
     ScalingGroupMetadataUpdaterSpec,
     ScalingGroupNetworkConfigUpdaterSpec,
     ScalingGroupSchedulerConfigUpdaterSpec,
@@ -665,10 +664,6 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
             wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
             use_host_network=OptionalState.from_graphql(self.use_host_network),
         )
-        driver_spec = ScalingGroupDriverConfigUpdaterSpec(
-            driver=OptionalState.from_graphql(self.driver),
-            driver_opts=OptionalState.from_graphql(self.driver_opts),
-        )
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
             scheduler_opts=OptionalState.from_graphql(
@@ -681,7 +676,6 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
             status=status_spec,
             metadata=metadata_spec,
             network=network_spec,
-            driver=driver_spec,
             scheduler=scheduler_spec,
         )
         return Updater(spec=spec, pk_value=name)
