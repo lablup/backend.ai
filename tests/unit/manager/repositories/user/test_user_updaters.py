@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -180,8 +178,6 @@ class TestUserUpdaterSpecRowClass:
 
     def test_row_class_returns_user_row(self) -> None:
         """row_class should return UserRow."""
-        from ai.backend.manager.models.user import UserRow
-
         spec = UserUpdaterSpec()
 
         assert spec.row_class is UserRow
