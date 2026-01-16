@@ -282,6 +282,127 @@ class StatusHistoryGQL:
         return cls(entries=entries)
 
 
+# ========== Kernel Statistics Types ==========
+
+
+@strawberry.type(
+    name="MetricStat",
+    description=(
+        "Added in 26.1.0. Statistical aggregation values for a metric over time. "
+        "Contains min, max, sum, average, difference, and rate calculations."
+    ),
+)
+class MetricStatGQL:
+    """Statistical values for a metric."""
+
+    min: str | None = strawberry.field(description="Minimum observed value.")
+    max: str | None = strawberry.field(description="Maximum observed value.")
+    sum: str | None = strawberry.field(description="Sum of all observed values.")
+    avg: str | None = strawberry.field(description="Average of observed values.")
+    diff: str | None = strawberry.field(description="Difference from previous measurement.")
+    rate: str | None = strawberry.field(description="Rate of change per second.")
+
+
+@strawberry.type(
+    name="MetricValue",
+    description=(
+        "Added in 26.1.0. A metric measurement with current value, capacity, and statistics. "
+        "Used for resource utilization metrics like CPU, memory, and I/O."
+    ),
+)
+class MetricValueGQL:
+    """A single metric measurement."""
+
+    current: str = strawberry.field(description="Current measured value.")
+    capacity: str | None = strawberry.field(
+        description="Maximum capacity for this metric. Null for unbounded metrics."
+    )
+    pct: str | None = strawberry.field(
+        description="Percentage utilization (current/capacity * 100)."
+    )
+    unit_hint: str | None = strawberry.field(
+        description="Unit hint for display (e.g., 'bytes', 'msec', 'percent')."
+    )
+    stats: MetricStatGQL | None = strawberry.field(
+        description="Statistical aggregation values over time."
+    )
+
+
+@strawberry.type(
+    name="KernelStatEntry",
+    description=(
+        "Added in 26.1.0. A single kernel statistic entry with metric key and value. "
+        "Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx."
+    ),
+)
+class KernelStatEntryGQL:
+    """Single kernel statistic entry."""
+
+    key: str = strawberry.field(description="Metric key name (e.g., 'cpu_util', 'mem', 'io_read').")
+    value: MetricValueGQL = strawberry.field(description="The metric measurement value.")
+
+
+@strawberry.type(
+    name="KernelStat",
+    description=(
+        "Added in 26.1.0. Collection of kernel resource statistics. "
+        "Contains utilization metrics for CPU, memory, I/O, network, and accelerators."
+    ),
+)
+class KernelStatGQL:
+    """Kernel statistics containing multiple metric entries."""
+
+    entries: list[KernelStatEntryGQL] = strawberry.field(
+        description="List of metric entries for this kernel."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatGQL | None:
+        """Convert a stat mapping to GraphQL type."""
+        if data is None:
+            return None
+        entries = []
+        for key, metric_value in data.items():
+            if isinstance(metric_value, dict):
+                # Extract stats if present
+                stats = None
+                stat_keys = ["min", "max", "sum", "avg", "diff", "rate"]
+                stat_data = {}
+                for stat_key in stat_keys:
+                    # Stats can be prefixed with "stats." in the serialized format
+                    prefixed_key = f"stats.{stat_key}"
+                    if prefixed_key in metric_value:
+                        stat_data[stat_key] = metric_value[prefixed_key]
+                    elif stat_key in metric_value:
+                        stat_data[stat_key] = metric_value[stat_key]
+
+                if stat_data:
+                    stats = MetricStatGQL(
+                        min=stat_data.get("min"),
+                        max=stat_data.get("max"),
+                        sum=stat_data.get("sum"),
+                        avg=stat_data.get("avg"),
+                        diff=stat_data.get("diff"),
+                        rate=stat_data.get("rate"),
+                    )
+
+                entries.append(
+                    KernelStatEntryGQL(
+                        key=key,
+                        value=MetricValueGQL(
+                            current=str(metric_value.get("current", "0")),
+                            capacity=str(metric_value["capacity"])
+                            if metric_value.get("capacity") is not None
+                            else None,
+                            pct=str(metric_value.get("pct")),
+                            unit_hint=metric_value.get("unit_hint"),
+                            stats=stats,
+                        ),
+                    )
+                )
+        return cls(entries=entries) if entries else None
+
+
 # ========== Attached Device Types ==========
 
 
@@ -609,8 +730,8 @@ class KernelMetricsInfoGQL:
     num_queries: int = strawberry.field(
         description="The number of queries/executions performed by this kernel."
     )
-    last_stat: JSON | None = strawberry.field(
-        description="The last collected statistics for this kernel."
+    last_stat: KernelStatGQL | None = strawberry.field(
+        description="The last collected statistics for this kernel including CPU, memory, I/O, and network metrics."
     )
 
 
@@ -769,7 +890,7 @@ class KernelGQL(Node):
             ),
             metrics=KernelMetricsInfoGQL(
                 num_queries=kernel_info.metrics.num_queries,
-                last_stat=kernel_info.metrics.last_stat,
+                last_stat=KernelStatGQL.from_mapping(kernel_info.metrics.last_stat),
             ),
             metadata=KernelMetadataInfoGQL(
                 callback_url=kernel_info.metadata.callback_url,
