@@ -40,7 +40,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -206,6 +206,199 @@ class TestDomainRepository:
     def user_info(self) -> UserInfo:
         """Create user info for testing"""
         return UserInfo(id=uuid.uuid4(), role=UserRole.SUPERADMIN, domain_name="default")
+
+    @pytest.fixture
+    async def inactive_domain(
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+    ) -> str:
+        """Create an inactive domain for purge testing."""
+        domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_default_resource_policies.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain for purging",
+                is_active=False,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=["registry.example.com"],
+                dotfiles=b"test dotfiles",
+                integration_id="test-integration",
+            )
+            session.add(domain)
+            await session.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def domain_with_user(
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+    ) -> str:
+        """Create an inactive domain with a user for purge testing."""
+        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+        from ai.backend.manager.models.hasher.types import PasswordInfo
+
+        domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
+        async with db_with_default_resource_policies.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain with users",
+                is_active=False,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=["registry.example.com"],
+                dotfiles=b"test dotfiles",
+                integration_id="test-integration",
+            )
+            session.add(domain)
+
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            )
+            user = UserRow(
+                uuid=uuid.uuid4(),
+                username=f"testuser-{uuid.uuid4().hex[:8]}",
+                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                full_name="Test User",
+                description="Test user",
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=domain_name,
+                role=UserRole.USER,
+                resource_policy="default",
+            )
+            session.add(user)
+            await session.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def domain_with_group(
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+    ) -> str:
+        """Create an inactive domain with a group for purge testing."""
+        domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
+        async with db_with_default_resource_policies.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain with groups",
+                is_active=False,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=["registry.example.com"],
+                dotfiles=b"test dotfiles",
+                integration_id="test-integration",
+            )
+            session.add(domain)
+
+            group = GroupRow(
+                id=uuid.uuid4(),
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                description="Test group",
+                is_active=True,
+                domain_name=domain_name,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                integration_id=None,
+                resource_policy="default",
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+            await session.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def domain_with_active_kernel(
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+    ) -> str:
+        """Create an inactive domain with an active kernel for purge testing."""
+        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+        from ai.backend.manager.models.hasher.types import PasswordInfo
+
+        domain_name = f"domain-with-kernel-{uuid.uuid4().hex[:8]}"
+        user_uuid = uuid.uuid4()
+        group_id = uuid.uuid4()
+        session_id = uuid.uuid4()
+
+        async with db_with_default_resource_policies.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain with active kernels",
+                is_active=False,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "8", "mem": "16g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=["registry.example.com"],
+                dotfiles=b"test dotfiles",
+                integration_id="test-integration",
+            )
+            session.add(domain)
+
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                description="Test group",
+                is_active=True,
+                domain_name=domain_name,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                integration_id=None,
+                resource_policy="default",
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            )
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{uuid.uuid4().hex[:8]}",
+                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                full_name="Test User",
+                description="Test user",
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=domain_name,
+                role=UserRole.USER,
+                resource_policy="default",
+            )
+            session.add(user)
+
+            sess = SessionRow(
+                id=session_id,
+                creation_id=str(uuid.uuid4()).replace("-", ""),
+                cluster_size=1,
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                vfolder_mounts={},
+            )
+            session.add(sess)
+
+            kernel = KernelRow(
+                session_id=session_id,
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                cluster_role="main",
+                status=KernelStatus.RUNNING,
+                occupied_slots={},
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
+                vfolder_mounts={},
+            )
+            session.add(kernel)
+            await session.commit()
+        return domain_name
 
     @pytest.mark.asyncio
     async def test_create_domain_success(
@@ -383,106 +576,28 @@ class TestDomainRepository:
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        inactive_domain: str,
     ) -> None:
         """Test successful domain purging"""
-        domain_name = "purge-test"
-
-        # Create domain manually for purge test (inactive domain)
-        async with db_with_default_resource_policies.begin() as conn:
-            domain_data = {
-                "name": domain_name,
-                "description": "Test domain for purging",
-                "is_active": False,
-                "total_resource_slots": ResourceSlot.from_user_input(
-                    {"cpu": "8", "mem": "16g"}, None
-                ),
-                "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": ["modify-vfolder", "upload-file", "download-file"]
-                }),
-                "allowed_docker_registries": ["registry.example.com"],
-                "dotfiles": b"test dotfiles",
-                "integration_id": "test-integration",
-            }
-
-            await conn.execute(sa.insert(domains).values(domain_data))
-            await conn.commit()
-
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain(domain_name)
+        await domain_repository.purge_domain(inactive_domain)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
-            result = await conn.execute(sa.select(domains).where(domains.c.name == domain_name))
+            result = await conn.execute(sa.select(domains).where(domains.c.name == inactive_domain))
             domain_row = result.first()
             assert domain_row is None
 
     @pytest.mark.asyncio
     async def test_purge_domain_with_users(
         self,
-        db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        domain_with_user: str,
     ) -> None:
         """Test domain purging when domain has users"""
-        domain_name = "purge-with-users-test"
-
-        # Create domain and user
-        async with db_with_default_resource_policies.begin() as conn:
-            domain_data = {
-                "name": domain_name,
-                "description": "Test domain with users",
-                "is_active": False,
-                "total_resource_slots": ResourceSlot.from_user_input(
-                    {"cpu": "8", "mem": "16g"}, None
-                ),
-                "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": ["modify-vfolder", "upload-file", "download-file"]
-                }),
-                "allowed_docker_registries": ["registry.example.com"],
-                "dotfiles": b"test dotfiles",
-                "integration_id": "test-integration",
-            }
-
-            await conn.execute(sa.insert(domains).values(domain_data))
-
-            # Create user in domain
-            from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-            from ai.backend.manager.models.hasher.types import PasswordInfo
-
-            password_info = PasswordInfo(
-                password="test_password",
-                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                rounds=600_000,
-                salt_size=32,
-            )
-
-            user_data = {
-                "uuid": uuid.uuid4(),
-                "username": "testuser",
-                "email": "test@example.com",
-                "password": password_info,
-                "need_password_change": False,
-                "full_name": "Test User",
-                "description": "Test user",
-                "status": UserStatus.ACTIVE,
-                "domain_name": domain_name,
-                "role": UserRole.USER,
-                "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
-                "allowed_client_ip": None,
-                "resource_policy": "default",
-                "totp_activated": False,
-                "sudo_session_enabled": False,
-                "container_uid": None,
-                "container_main_gid": None,
-                "container_gids": None,
-            }
-
-            await conn.execute(sa.insert(users).values(user_data))
-            await conn.commit()
-
         # Try to purge domain (should fail due to users)
         with pytest.raises(DomainHasUsers) as exc_info:
-            await domain_repository.purge_domain(domain_name)
+            await domain_repository.purge_domain(domain_with_user)
 
         assert "There are users bound to the domain" in str(exc_info.value)
 
@@ -550,159 +665,25 @@ class TestDomainRepository:
     @pytest.mark.asyncio
     async def test_purge_domain_with_groups(
         self,
-        db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        domain_with_group: str,
     ) -> None:
         """Test domain purging when domain has groups"""
-        domain_name = "purge-with-groups-test"
-
-        # Create domain and group
-        async with db_with_default_resource_policies.begin() as conn:
-            domain_data = {
-                "name": domain_name,
-                "description": "Test domain with groups",
-                "is_active": False,
-                "total_resource_slots": ResourceSlot.from_user_input(
-                    {"cpu": "8", "mem": "16g"}, None
-                ),
-                "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": ["modify-vfolder", "upload-file", "download-file"]
-                }),
-                "allowed_docker_registries": ["registry.example.com"],
-                "dotfiles": b"test dotfiles",
-                "integration_id": "test-integration",
-            }
-
-            await conn.execute(sa.insert(domains).values(domain_data))
-
-            # Create group in domain
-            group_data = {
-                "id": uuid.uuid4(),
-                "name": "test-group",
-                "description": "Test group",
-                "is_active": True,
-                "domain_name": domain_name,
-                "total_resource_slots": {},
-                "allowed_vfolder_hosts": {},
-                "integration_id": None,
-                "resource_policy": "default",
-                "type": ProjectType.GENERAL,
-                "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
-            }
-
-            await conn.execute(sa.insert(groups).values(group_data))
-            await conn.commit()
-
         # Try to purge domain (should fail due to groups)
         with pytest.raises(DomainHasGroups) as exc_info:
-            await domain_repository.purge_domain(domain_name)
+            await domain_repository.purge_domain(domain_with_group)
 
         assert "There are groups bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_purge_domain_with_active_kernels(
         self,
-        db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        domain_with_active_kernel: str,
     ) -> None:
         """Test domain purging when domain has active kernels"""
-        domain_name = "purge-with-kernels-test"
-        session_id = uuid.uuid4()
-        user_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
-
-        # Create domain, group, user with Core API
-        async with db_with_default_resource_policies.begin() as conn:
-            domain_data = {
-                "name": domain_name,
-                "description": "Test domain with active kernels",
-                "is_active": False,
-                "total_resource_slots": ResourceSlot.from_user_input(
-                    {"cpu": "8", "mem": "16g"}, None
-                ),
-                "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": ["modify-vfolder", "upload-file", "download-file"]
-                }),
-                "allowed_docker_registries": ["registry.example.com"],
-                "dotfiles": b"test dotfiles",
-                "integration_id": "test-integration",
-            }
-
-            await conn.execute(sa.insert(domains).values(domain_data))
-
-            # Create group
-            group_data = {
-                "id": group_id,
-                "name": f"test-group-{uuid.uuid4().hex[:8]}",
-                "domain_name": domain_name,
-                "total_resource_slots": {},
-                "resource_policy": "default",
-                "type": ProjectType.GENERAL,
-                "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
-            }
-            await conn.execute(sa.insert(groups).values(group_data))
-
-            # Create user
-            from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-            from ai.backend.manager.models.hasher.types import PasswordInfo
-
-            password_info = PasswordInfo(
-                password="test_password",
-                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                rounds=600_000,
-                salt_size=32,
-            )
-
-            user_data = {
-                "uuid": user_uuid,
-                "username": f"test-user-{uuid.uuid4().hex[:8]}",
-                "email": f"test-{uuid.uuid4().hex[:8]}@example.com",
-                "password": password_info,
-                "need_password_change": False,
-                "domain_name": domain_name,
-                "role": UserRole.USER,
-                "status": UserStatus.ACTIVE,
-                "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
-                "resource_policy": "default",
-            }
-            await conn.execute(sa.insert(users).values(user_data))
-            await conn.commit()
-
-        # Create session and kernel with ORM API
-        async with db_with_default_resource_policies.begin_session() as db_session:
-            sess = SessionRow(
-                id=session_id,
-                creation_id=str(uuid.uuid4()).replace("-", ""),
-                cluster_size=1,
-                domain_name=domain_name,
-                group_id=group_id,
-                user_uuid=user_uuid,
-                vfolder_mounts={},
-            )
-            db_session.add(sess)
-
-            kernel = KernelRow(
-                session_id=session_id,
-                domain_name=domain_name,
-                group_id=group_id,
-                user_uuid=user_uuid,
-                cluster_role="main",
-                status=KernelStatus.RUNNING,
-                occupied_slots={},
-                repl_in_port=0,
-                repl_out_port=0,
-                stdin_port=0,
-                stdout_port=0,
-                vfolder_mounts={},
-            )
-            db_session.add(kernel)
-            await db_session.commit()
-
         # Try to purge domain (should fail due to active kernels)
         with pytest.raises(DomainHasActiveKernels) as exc_info:
-            await domain_repository.purge_domain(domain_name)
+            await domain_repository.purge_domain(domain_with_active_kernel)
 
         assert "Domain has some active kernels" in str(exc_info.value)
