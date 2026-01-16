@@ -175,9 +175,7 @@ class ModelRuntimeConfig:
 class ResourceOptsEntryGQL:
     """Single resource option entry with name and value."""
 
-    name: str = strawberry.field(
-        description="The name of this resource option. Example: 'shmem'."
-    )
+    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
@@ -462,9 +460,7 @@ class ResourceSlotInput:
 class ResourceOptsEntryInput:
     """Single resource option entry input with name and value."""
 
-    name: str = strawberry.field(
-        description="The name of this resource option (e.g., 'shmem')."
-    )
+    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
     value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
 
 
