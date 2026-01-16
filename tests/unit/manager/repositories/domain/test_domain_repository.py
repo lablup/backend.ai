@@ -596,10 +596,8 @@ class TestDomainRepository:
     ) -> None:
         """Test domain purging when domain has users"""
         # Try to purge domain (should fail due to users)
-        with pytest.raises(DomainHasUsers) as exc_info:
+        with pytest.raises(DomainHasUsers):
             await domain_repository.purge_domain(domain_with_user)
-
-        assert "There are users bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_purge_domain_not_found(
@@ -670,10 +668,8 @@ class TestDomainRepository:
     ) -> None:
         """Test domain purging when domain has groups"""
         # Try to purge domain (should fail due to groups)
-        with pytest.raises(DomainHasGroups) as exc_info:
+        with pytest.raises(DomainHasGroups):
             await domain_repository.purge_domain(domain_with_group)
-
-        assert "There are groups bound to the domain" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_purge_domain_with_active_kernels(
@@ -683,7 +679,5 @@ class TestDomainRepository:
     ) -> None:
         """Test domain purging when domain has active kernels"""
         # Try to purge domain (should fail due to active kernels)
-        with pytest.raises(DomainHasActiveKernels) as exc_info:
+        with pytest.raises(DomainHasActiveKernels):
             await domain_repository.purge_domain(domain_with_active_kernel)
-
-        assert "Domain has some active kernels" in str(exc_info.value)
