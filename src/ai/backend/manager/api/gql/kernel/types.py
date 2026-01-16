@@ -218,10 +218,10 @@ class ServicePortsGQL:
                 entries.append(
                     ServicePortEntryGQL(
                         name=name,
-                        protocol=ServicePortProtocolGQL(port_info.get("protocol", "tcp")),
-                        container_ports=list(port_info.get("container_ports", [])),
-                        host_ports=list(port_info.get("host_ports", [])),
-                        is_inference=port_info.get("is_inference", False),
+                        protocol=ServicePortProtocolGQL(port_info["protocol"]),
+                        container_ports=list(port_info["container_ports"]),
+                        host_ports=list(port_info["host_ports"]),
+                        is_inference=port_info["is_inference"],
                     )
                 )
         return cls(entries=entries)
@@ -579,7 +579,9 @@ class KernelStatGQL:
                             capacity=str(metric_value["capacity"])
                             if metric_value.get("capacity") is not None
                             else None,
-                            pct=str(metric_value.get("pct")),
+                            pct=str(metric_value["pct"])
+                            if metric_value.get("pct") is not None
+                            else None,
                             unit_hint=metric_value.get("unit_hint"),
                             stats=stats,
                         ),
@@ -702,12 +704,12 @@ class VFolderMountGQL:
     def from_dict(cls, data: Mapping[str, Any]) -> VFolderMountGQL:
         """Convert a dict to VFolderMountGQL."""
         return cls(
-            name=data.get("name", ""),
-            vfid=str(data.get("vfid", "")),
+            name=data["name"],
+            vfid=str(data["vfid"]),
             vfsubpath=str(data.get("vfsubpath", ".")),
-            host_path=str(data.get("host_path", "")),
-            kernel_path=str(data.get("kernel_path", "")),
-            mount_perm=MountPermissionGQL(data.get("mount_perm", "ro")),
+            host_path=str(data["host_path"]),
+            kernel_path=str(data["kernel_path"]),
+            mount_perm=MountPermissionGQL(data["mount_perm"]),
             usage_mode=VFolderUsageModeGQL(data.get("usage_mode", "general")),
         )
 
