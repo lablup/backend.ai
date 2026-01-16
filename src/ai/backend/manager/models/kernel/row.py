@@ -500,7 +500,7 @@ class KernelRow(Base):
     stdout_port: Mapped[int] = mapped_column(
         "stdout_port", sa.Integer(), nullable=False
     )  # legacy for stream_pty
-    service_ports: Mapped[dict[str, Any] | None] = mapped_column(
+    service_ports: Mapped[list[dict[str, Any]] | None] = mapped_column(
         "service_ports", pgsql.JSONB(), nullable=True
     )
     preopen_ports: Mapped[list[int] | None] = mapped_column(

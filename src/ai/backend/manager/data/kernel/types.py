@@ -198,7 +198,7 @@ class NetworkConfig:
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
-    service_ports: Optional[dict[str, Any]]
+    service_ports: Optional[list[dict[str, Any]]]
     preopen_ports: Optional[list[int]]
     use_host_network: bool
 
