@@ -829,7 +829,6 @@ class KernelV2GQL(Node):
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
         """Create KernelGQL from KernelInfo dataclass."""
-        # Extract image reference from ImageInfo (may be None for legacy kernels)
         image_canonical: str | None = None
         architecture: str | None = None
         if kernel_info.image.identifier:
