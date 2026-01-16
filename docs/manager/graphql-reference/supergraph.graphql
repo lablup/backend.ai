@@ -343,8 +343,13 @@ type AgentSelectorConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  Maximum number of kernels that can be scheduled on the same endpoint.
-  Used by concentrated strategy to control endpoint spreading behavior.
+  Number of existing kernels already running on the same endpoint.
+  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
+  
+  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
+  across different agents for improved fault tolerance. This count helps the scheduler
+  avoid placing new replicas on agents that already host replicas for the same endpoint,
+  ensuring better distribution of model serving workloads.
   """
   kernelCountsAtSameEndpoint: Int!
 }
@@ -468,10 +473,10 @@ type AgentSystemInfo
   """
   List of compute plugin metadata supported by this agent.
   Each plugin represents a specific accelerator or resource type (e.g., CUDA).
-  Expressed as a JSON object where keys are plugin names and values contain
+  Entries contain plugin names and their associated metadata with
   plugin-specific configuration and capabilities.
   """
-  computePlugins: JSON!
+  computePlugins: ComputePlugin!
 }
 
 """Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
@@ -1551,6 +1556,35 @@ type ComputeContainerList implements PaginatedList
 {
   items: [ComputeContainer]!
   total_count: Int!
+}
+
+"""
+Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
+"""
+type ComputePlugin
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  """
+  entries: [ComputePluginEntry!]!
+}
+
+"""
+Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
+"""
+type ComputePluginEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Name of the compute plugin (e.g., 'cuda', 'rocm', 'tpu'). This identifier corresponds to the accelerator or resource type supported by the agent.
+  """
+  pluginName: String!
+
+  """
+  Plugin value string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
+  """
+  value: String!
 }
 
 type ComputeSession implements Item
