@@ -116,6 +116,17 @@ class ServicePortEntryGQL:
         description="Whether this port is used for inference endpoints."
     )
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ServicePortEntryGQL:
+        """Convert a dict to ServicePortEntryGQL."""
+        return cls(
+            name=data["name"],
+            protocol=ServicePortProtocolGQL(data["protocol"]),
+            container_ports=list(data["container_ports"]),
+            host_ports=list(data["host_ports"]),
+            is_inference=data["is_inference"],
+        )
+
 
 @strawberry.type(
     name="ServicePorts",
@@ -130,29 +141,6 @@ class ServicePortsGQL:
     entries: list[ServicePortEntryGQL] = strawberry.field(
         description="List of service port entries."
     )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> ServicePortsGQL | None:
-        """Convert a service ports mapping to GraphQL type."""
-        if data is None:
-            return None
-        entries = []
-        for name, port_info in data.items():
-            if not isinstance(port_info, dict):
-                raise ValueError(
-                    f"Invalid port_info type for service '{name}': "
-                    f"expected dict, got {type(port_info).__name__}"
-                )
-            entries.append(
-                ServicePortEntryGQL(
-                    name=name,
-                    protocol=ServicePortProtocolGQL(port_info["protocol"]),
-                    container_ports=list(port_info["container_ports"]),
-                    host_ports=list(port_info["host_ports"]),
-                    is_inference=port_info["is_inference"],
-                )
-            )
-        return cls(entries=entries)
 
 
 # ========== Status Error and Scheduler Types ==========
