@@ -7399,8 +7399,8 @@ Added in 26.1.0. A single key-value entry representing a resource option. Contai
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The key identifier for this resource option. Example: 'shmem'."""
-  key: String!
+  """The name of this resource option. Example: 'shmem'."""
+  name: String!
 
   """The value for this resource option. Example: '64m'."""
   value: String!
@@ -7412,8 +7412,8 @@ Added in 26.1.0. A single key-value entry representing a resource option.
 input ResourceOptsEntryInput
   @join__type(graph: STRAWBERRY)
 {
-  """The key identifier for this resource option (e.g., 'shmem')."""
-  key: String!
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
 
   """The value for this resource option (e.g., '64m')."""
   value: String!

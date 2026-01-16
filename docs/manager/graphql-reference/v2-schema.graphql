@@ -3317,8 +3317,8 @@ type ResourceOpts {
 Added in 26.1.0. A single key-value entry representing a resource option. Contains additional resource configuration such as shared memory settings.
 """
 type ResourceOptsEntry {
-  """The key identifier for this resource option. Example: 'shmem'."""
-  key: String!
+  """The name of this resource option. Example: 'shmem'."""
+  name: String!
 
   """The value for this resource option. Example: '64m'."""
   value: String!
@@ -3328,8 +3328,8 @@ type ResourceOptsEntry {
 Added in 26.1.0. A single key-value entry representing a resource option.
 """
 input ResourceOptsEntryInput {
-  """The key identifier for this resource option (e.g., 'shmem')."""
-  key: String!
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
 
   """The value for this resource option (e.g., '64m')."""
   value: String!
