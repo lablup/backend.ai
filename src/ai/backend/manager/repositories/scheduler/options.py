@@ -41,6 +41,59 @@ class SessionConditions:
 
         return inner
 
+    @staticmethod
+    def by_id(session_id: SessionId) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.id == session_id
+
+        return inner
+
+    @staticmethod
+    def by_name(name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.name == name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_group_id(group_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.group_id == group_id
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid(user_uuid: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.user_uuid == user_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_value: str) -> QueryCondition:
+        """Condition for forward pagination (created_at < cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.created_at < cursor_value
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_value: str) -> QueryCondition:
+        """Condition for backward pagination (created_at > cursor)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.created_at > cursor_value
+
+        return inner
+
 
 class SessionOrders:
     """Query orders for sessions."""
@@ -56,6 +109,12 @@ class SessionOrders:
         if ascending:
             return SessionRow.id.asc()
         return SessionRow.id.desc()
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.name.asc()
+        return SessionRow.name.desc()
 
 
 class KernelConditions:
