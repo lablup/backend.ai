@@ -30,6 +30,10 @@ class TestGroupConfigRepository:
             yield database_connection
 
     @pytest.fixture
+    def repo(self, db_with_cleanup: ExtendedAsyncSAEngine) -> GroupConfigRepository:
+        return GroupConfigRepository(db_with_cleanup)
+
+    @pytest.fixture
     async def sample_group(
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> tuple[uuid.UUID, str, str]:
@@ -77,10 +81,9 @@ class TestGroupConfigRepository:
 
     @pytest.mark.asyncio
     async def test_resolve_group_id_by_uuid(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
         group_id, _, domain_name = sample_group
-        repo = GroupConfigRepository(db_with_cleanup)
 
         result_id, result_domain = await repo.resolve_group_id_and_domain(group_id, None)
 
@@ -89,10 +92,9 @@ class TestGroupConfigRepository:
 
     @pytest.mark.asyncio
     async def test_resolve_group_id_by_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
         group_id, group_name, domain_name = sample_group
-        repo = GroupConfigRepository(db_with_cleanup)
 
         result_id, result_domain = await repo.resolve_group_id_and_domain(group_name, domain_name)
 
@@ -101,28 +103,25 @@ class TestGroupConfigRepository:
 
     @pytest.mark.asyncio
     async def test_resolve_group_id_by_name_missing_domain(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
         _, group_name, _ = sample_group
-        repo = GroupConfigRepository(db_with_cleanup)
 
         with pytest.raises(InvalidAPIParameters):
             await repo.resolve_group_id_and_domain(group_name, None)
 
     @pytest.mark.asyncio
     async def test_resolve_group_not_found(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
-        repo = GroupConfigRepository(db_with_cleanup)
         with pytest.raises(ProjectNotFound):
             await repo.resolve_group_id_and_domain(uuid.uuid4(), None)
 
     @pytest.mark.asyncio
     async def test_get_dotfiles(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
         group_id, _, _ = sample_group
-        repo = GroupConfigRepository(db_with_cleanup)
 
         dotfiles, leftover = await repo.get_dotfiles(group_id)
 
@@ -132,10 +131,9 @@ class TestGroupConfigRepository:
 
     @pytest.mark.asyncio
     async def test_update_dotfiles(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: GroupConfigRepository, sample_group: tuple[uuid.UUID, str, str]
     ) -> None:
         group_id, _, _ = sample_group
-        repo = GroupConfigRepository(db_with_cleanup)
         new_dotfiles = [{"path": ".zshrc", "perm": "644", "data": "# zsh"}]
 
         await repo.update_dotfiles(group_id, msgpack.packb(new_dotfiles))
