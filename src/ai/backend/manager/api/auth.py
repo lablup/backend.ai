@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -16,6 +16,7 @@ import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
@@ -760,11 +761,11 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
 
 
-def auth_required(handler):
+def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request) -> web.StreamResponse:
         if request.get("is_authorized", False):
-            return await handler(request, *args, **kwargs)
+            return await handler(request)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
@@ -772,9 +773,13 @@ def auth_required(handler):
     return wrapped
 
 
-def auth_required_for_method(method):
+def auth_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
     @functools.wraps(method)
-    async def wrapped(self, request, *args, **kwargs):
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -784,9 +789,9 @@ def auth_required_for_method(method):
     return wrapped
 
 
-def admin_required(handler):
+def admin_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_admin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -796,11 +801,47 @@ def admin_required(handler):
     return wrapped
 
 
-def superadmin_required(handler):
+def admin_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
+    """Decorator for class methods that require admin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_admin", False):
+            return await method(self, request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "admin")
+    return wrapped
+
+
+def superadmin_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_superadmin", False):
             return await handler(request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "superadmin")
+    return wrapped
+
+
+def superadmin_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
+    """Decorator for class methods that require superadmin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_superadmin", False):
+            return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)

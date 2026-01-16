@@ -340,7 +340,7 @@ class TestGetRole:
 
         mock_root_ctx.processors.auth.get_role.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
+        response_body = json.loads(cast(bytes, cast(web.Response, response).body))
         assert response_body["global_role"] == global_role
         assert response_body["domain_role"] == domain_role
         assert response_body["group_role"] is None
@@ -555,7 +555,7 @@ class TestGetSSHKeypair:
 
         mock_root_ctx.processors.auth.get_ssh_keypair.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
+        response_body = json.loads(cast(bytes, cast(web.Response, response).body))
         assert response_body["ssh_public_key"] == public_key
 
     @pytest.mark.asyncio
@@ -596,7 +596,7 @@ class TestGenerateSSHKeypair:
 
         mock_root_ctx.processors.auth.generate_ssh_keypair.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
+        response_body = json.loads(cast(bytes, cast(web.Response, response).body))
         assert response_body["ssh_public_key"] == ssh_public_key
         assert response_body["ssh_private_key"] == ssh_private_key
 
@@ -642,7 +642,7 @@ class TestUploadSSHKeypair:
 
         mock_root_ctx.processors.auth.upload_ssh_keypair.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
+        response_body = json.loads(cast(bytes, cast(web.Response, response).body))
         assert "ssh_public_key" in response_body
         assert "ssh_private_key" in response_body
 

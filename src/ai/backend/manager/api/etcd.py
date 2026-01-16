@@ -284,7 +284,7 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
 
 
 @superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
+async def get_docker_registries(request: web.Request) -> web.StreamResponse:
     """
     Returns the list of all registered docker registries.
     """
