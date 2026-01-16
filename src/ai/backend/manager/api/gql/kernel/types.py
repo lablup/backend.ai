@@ -196,11 +196,11 @@ class KernelStatusDataGQL:
 
 
 @strawberry.type(
-    name="SessionStatusData",
-    description="Added in 26.1.0. Session-specific status data during lifecycle transitions.",
+    name="KernelSessionStatusData",
+    description="Added in 26.1.0. Session-specific status data during kernel lifecycle transitions.",
 )
-class SessionStatusDataGQL:
-    """Session status data."""
+class KernelSessionStatusDataGQL:
+    """Session status data within kernel context."""
 
     status: str | None = strawberry.field(
         description="Status string of the session (e.g., 'terminating')."
@@ -208,7 +208,7 @@ class SessionStatusDataGQL:
 
 
 @strawberry.type(
-    name="StatusData",
+    name="KernelStatusData",
     description=(
         "Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. "
         "The populated fields depend on the kernel's current status and recent state transitions."
@@ -226,7 +226,7 @@ class KernelStatusDataContainerGQL:
     kernel: KernelStatusDataGQL | None = strawberry.field(
         description="Kernel-specific status data during lifecycle transitions."
     )
-    session: SessionStatusDataGQL | None = strawberry.field(
+    session: KernelSessionStatusDataGQL | None = strawberry.field(
         description="Session-specific status data during lifecycle transitions."
     )
 
@@ -293,7 +293,7 @@ class KernelStatusDataContainerGQL:
 
         # Parse session section
         if "session" in data:
-            session = SessionStatusDataGQL(status=data["session"].get("status"))
+            session = KernelSessionStatusDataGQL(status=data["session"].get("status"))
 
         # Return None if all sections are empty
         if error is None and scheduler is None and kernel is None and session is None:
