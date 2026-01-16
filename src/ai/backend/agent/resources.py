@@ -375,7 +375,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def extra_info(self) -> Mapping[str, str]:
+    async def extra_info(self) -> Mapping[str, str | bool]:
         """
         Return extra information related to this plugin,
         such as the underlying driver version and feature flags.

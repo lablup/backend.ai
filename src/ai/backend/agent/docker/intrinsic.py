@@ -204,7 +204,7 @@ class CPUPlugin(AbstractComputePlugin):
     def get_version(self) -> str:
         return __version__
 
-    async def extra_info(self) -> Mapping[str, str]:
+    async def extra_info(self) -> Mapping[str, str | bool]:
         return {
             "agent_version": __version__,
             "machine": platform.machine(),
@@ -519,7 +519,7 @@ class MemoryPlugin(AbstractComputePlugin):
     def get_version(self) -> str:
         return __version__
 
-    async def extra_info(self) -> Mapping[str, str]:
+    async def extra_info(self) -> Mapping[str, str | bool]:
         return {}
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
