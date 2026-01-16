@@ -181,8 +181,13 @@ class SchedulerConfigGQL:
 class AgentSelectorConfigGQL:
     kernel_counts_at_same_endpoint: int = strawberry.field(
         description=dedent_strip("""
-            Maximum number of kernels that can be scheduled on the same endpoint.
-            Used by concentrated strategy to control endpoint spreading behavior.
+            Number of existing kernels already running on the same endpoint.
+            Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
+
+            When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
+            across different agents for improved fault tolerance. This count helps the scheduler
+            avoid placing new replicas on agents that already host replicas for the same endpoint,
+            ensuring better distribution of model serving workloads.
         """)
     )
 
