@@ -107,7 +107,6 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
     CreatorSpec,
-    execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
     Purger,
