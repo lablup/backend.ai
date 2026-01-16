@@ -85,7 +85,7 @@ class TestValidateEndpointAccessSuperadmin(ValidateEndpointAccessBaseFixtures):
         superadmin_requester_ctx: RequesterCtx,
     ) -> None:
         """SUPERADMIN should have access to any endpoint regardless of owner."""
-        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx)
 
     def test_superadmin_can_access_superadmin_owned_endpoint(
         self,
@@ -95,7 +95,7 @@ class TestValidateEndpointAccessSuperadmin(ValidateEndpointAccessBaseFixtures):
         """SUPERADMIN should access endpoints owned by other SUPERADMINs."""
         base_validation_data.session_owner_role = UserRole.SUPERADMIN
 
-        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, superadmin_requester_ctx)
 
 
 class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
@@ -109,7 +109,7 @@ class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
         """ADMIN should access endpoints in their domain owned by regular users."""
         base_validation_data.session_owner_role = UserRole.USER
 
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
 
     def test_admin_cannot_access_endpoint_in_different_domain(
         self,
@@ -120,7 +120,7 @@ class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
         base_validation_data.session_owner_role = UserRole.USER
         admin_requester_ctx.domain_name = "other-domain"
 
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx) is False
+        assert not validate_endpoint_access(base_validation_data, admin_requester_ctx)
 
     def test_admin_cannot_access_superadmin_owned_endpoint(
         self,
@@ -135,7 +135,7 @@ class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
         base_validation_data.session_owner_role = UserRole.SUPERADMIN
         base_validation_data.domain = "test-domain"
 
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx) is False
+        assert not validate_endpoint_access(base_validation_data, admin_requester_ctx)
 
     def test_admin_can_access_admin_owned_endpoint_in_same_domain(
         self,
@@ -145,7 +145,7 @@ class TestValidateEndpointAccessAdmin(ValidateEndpointAccessBaseFixtures):
         """ADMIN should access endpoints owned by other ADMINs in same domain."""
         base_validation_data.session_owner_role = UserRole.ADMIN
 
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
 
 
 class TestValidateEndpointAccessUser(ValidateEndpointAccessBaseFixtures):
@@ -160,7 +160,7 @@ class TestValidateEndpointAccessUser(ValidateEndpointAccessBaseFixtures):
         """USER should access their own endpoints."""
         base_validation_data.session_owner_id = user_id
 
-        assert validate_endpoint_access(base_validation_data, user_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, user_requester_ctx)
 
     def test_user_cannot_access_other_users_endpoint(
         self,
@@ -168,7 +168,7 @@ class TestValidateEndpointAccessUser(ValidateEndpointAccessBaseFixtures):
         user_requester_ctx: RequesterCtx,
     ) -> None:
         """USER should NOT access other users' endpoints even in the same domain."""
-        assert validate_endpoint_access(base_validation_data, user_requester_ctx) is False
+        assert not validate_endpoint_access(base_validation_data, user_requester_ctx)
 
 
 class TestValidateEndpointAccessMonitor(ValidateEndpointAccessBaseFixtures):
@@ -183,7 +183,7 @@ class TestValidateEndpointAccessMonitor(ValidateEndpointAccessBaseFixtures):
         """MONITOR should access their own endpoints."""
         base_validation_data.session_owner_id = user_id
 
-        assert validate_endpoint_access(base_validation_data, monitor_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, monitor_requester_ctx)
 
     def test_monitor_cannot_access_other_users_endpoint(
         self,
@@ -191,7 +191,7 @@ class TestValidateEndpointAccessMonitor(ValidateEndpointAccessBaseFixtures):
         monitor_requester_ctx: RequesterCtx,
     ) -> None:
         """MONITOR should NOT access other users' endpoints."""
-        assert validate_endpoint_access(base_validation_data, monitor_requester_ctx) is False
+        assert not validate_endpoint_access(base_validation_data, monitor_requester_ctx)
 
 
 class TestValidateEndpointAccessEdgeCases(ValidateEndpointAccessBaseFixtures):
@@ -206,4 +206,4 @@ class TestValidateEndpointAccessEdgeCases(ValidateEndpointAccessBaseFixtures):
         base_validation_data.session_owner_role = None
 
         # None != SUPERADMIN, so domain check applies
-        assert validate_endpoint_access(base_validation_data, admin_requester_ctx) is True
+        assert validate_endpoint_access(base_validation_data, admin_requester_ctx)
