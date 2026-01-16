@@ -1,7 +1,8 @@
-"""GraphQL types for kernel management."""
+"""GraphQL types and resolvers for kernel management."""
 
 from __future__ import annotations
 
+from .fetcher import fetch_kernels_by_agent
 from .types import (
     KernelAttachedDeviceEntryGQL,
     KernelAttachedDevicesGQL,
@@ -36,6 +37,7 @@ from .types import (
 )
 
 __all__ = [
+    # Types
     "KernelAttachedDeviceEntryGQL",
     "KernelAttachedDevicesGQL",
     "KernelClusterInfoGQL",
@@ -54,6 +56,7 @@ __all__ = [
     "KernelResourceInfoGQL",
     "KernelRuntimeInfoGQL",
     "KernelSessionInfoGQL",
+    "KernelSessionStatusDataGQL",
     "KernelStatEntryGQL",
     "KernelStatGQL",
     "KernelStatusDataContainerGQL",
@@ -65,5 +68,6 @@ __all__ = [
     "KernelStatusHistoryGQL",
     "KernelUserPermissionInfoGQL",
     "KernelV2GQL",
-    "KernelSessionStatusDataGQL",
+    # Fetchers
+    "fetch_kernels_by_agent",
 ]
