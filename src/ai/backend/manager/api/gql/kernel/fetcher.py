@@ -20,8 +20,8 @@ from .types import (
     KernelConnectionV2GQL,
     KernelEdgeGQL,
     KernelFilterGQL,
-    KernelGQL,
     KernelOrderByGQL,
+    KernelV2GQL,
 )
 
 if TYPE_CHECKING:
@@ -104,7 +104,7 @@ async def fetch_kernels_by_agent(
     )
 
     # Convert to GraphQL types
-    nodes = [KernelGQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
+    nodes = [KernelV2GQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
     edges = [KernelEdgeGQL(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return KernelConnectionV2GQL(
