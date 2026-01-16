@@ -921,6 +921,102 @@ class KernelMetricsInfoGQL:
 
 
 @strawberry.type(
+    name="DotfileInfo",
+    description="Added in 26.1.0. Information about a dotfile to be provisioned in the kernel.",
+)
+class DotfileInfoGQL:
+    path: str = strawberry.field(
+        description="The file path where the dotfile will be placed (relative or absolute)."
+    )
+    data: str = strawberry.field(description="The content of the dotfile.")
+    perm: str = strawberry.field(
+        description="The file permission in octal string format (e.g., '0644')."
+    )
+
+
+@strawberry.type(
+    name="SSHKeypair",
+    description="Added in 26.1.0. SSH keypair for kernel access.",
+)
+class SSHKeypairGQL:
+    public_key: str = strawberry.field(description="The public key in OpenSSH format.")
+    private_key: str = strawberry.field(description="The private key in PEM format.")
+
+
+@strawberry.type(
+    name="InternalData",
+    description="Added in 26.1.0. Internal data stored with the kernel for system use.",
+)
+class InternalDataGQL:
+    dotfiles: list[DotfileInfoGQL] | None = strawberry.field(
+        default=None,
+        description="List of dotfiles to be provisioned in the kernel's filesystem.",
+    )
+    ssh_keypair: SSHKeypairGQL | None = strawberry.field(
+        default=None, description="SSH keypair for secure access to the kernel."
+    )
+    model_definition_path: str | None = strawberry.field(
+        default=None, description="Path to the model definition file for inference services."
+    )
+    runtime_variant: str | None = strawberry.field(
+        default=None, description="Runtime variant identifier (e.g., 'custom')."
+    )
+    sudo_session_enabled: bool | None = strawberry.field(
+        default=None, description="Whether sudo is enabled for this session."
+    )
+    block_service_ports: bool | None = strawberry.field(
+        default=None,
+        description="Whether to block service ports. If true, no services can be started.",
+    )
+    prevent_vfolder_mounts: bool | None = strawberry.field(
+        default=None,
+        description="Whether to prevent vfolder mounts (except .logs directory).",
+    )
+    docker_credentials: JSON | None = strawberry.field(
+        default=None, description="Docker credentials for private registry access."
+    )
+    domain_socket_proxies: list[str] | None = strawberry.field(
+        default=None,
+        description="List of domain socket paths to proxy into the container.",
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> InternalDataGQL | None:
+        if not data:
+            return None
+
+        dotfiles = None
+        if dotfiles_data := data.get("dotfiles"):
+            dotfiles = [
+                DotfileInfoGQL(
+                    path=df.get("path", ""),
+                    data=df.get("data", ""),
+                    perm=df.get("perm", "0644"),
+                )
+                for df in dotfiles_data
+            ]
+
+        ssh_keypair = None
+        if keypair_data := data.get("ssh_keypair"):
+            ssh_keypair = SSHKeypairGQL(
+                public_key=keypair_data.get("public_key", ""),
+                private_key=keypair_data.get("private_key", ""),
+            )
+
+        return cls(
+            dotfiles=dotfiles,
+            ssh_keypair=ssh_keypair,
+            model_definition_path=data.get("model_definition_path"),
+            runtime_variant=data.get("runtime_variant"),
+            sudo_session_enabled=data.get("sudo_session_enabled"),
+            block_service_ports=data.get("block_service_ports"),
+            prevent_vfolder_mounts=data.get("prevent_vfolder_mounts"),
+            docker_credentials=data.get("docker_credentials"),
+            domain_socket_proxies=data.get("domain_socket_proxies"),
+        )
+
+
+@strawberry.type(
     name="KernelMetadataInfo",
     description="Added in 26.1.0. Additional metadata for a kernel.",
 )
@@ -928,7 +1024,7 @@ class KernelMetadataInfoGQL:
     callback_url: str | None = strawberry.field(
         description="URL to call back when kernel status changes."
     )
-    internal_data: JSON | None = strawberry.field(
+    internal_data: InternalDataGQL | None = strawberry.field(
         description="Internal data stored with the kernel for system use."
     )
 
@@ -937,7 +1033,7 @@ class KernelMetadataInfoGQL:
     name="KernelV2",
     description="Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.",
 )
-class KernelGQL(Node):
+class KernelV2GQL(Node):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
@@ -1079,19 +1175,19 @@ class KernelGQL(Node):
             ),
             metadata=KernelMetadataInfoGQL(
                 callback_url=kernel_info.metadata.callback_url,
-                internal_data=kernel_info.metadata.internal_data,
+                internal_data=InternalDataGQL.from_mapping(kernel_info.metadata.internal_data),
             ),
         )
 
 
-KernelEdgeGQL = Edge[KernelGQL]
+KernelEdgeGQL = Edge[KernelV2GQL]
 
 
 @strawberry.type(
     name="KernelConnectionV2",
     description="Added in 26.1.0. Connection type for paginated kernel results.",
 )
-class KernelConnectionV2GQL(Connection[KernelGQL]):
+class KernelConnectionV2GQL(Connection[KernelV2GQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:
