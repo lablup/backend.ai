@@ -303,6 +303,18 @@ class InvalidSessionData(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class InvalidKernelData(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-kernel-data"
+    error_title = "Kernel data has an invalid type or format."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class InvalidKernelConfig(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-kernel-config"
     error_title = "Invalid kernel configuration."
