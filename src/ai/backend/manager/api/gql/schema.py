@@ -121,6 +121,7 @@ from .image import (
     container_registry_images_v2,
     image_v2,
 )
+from .kernel.resolver import kernels_v2
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -313,6 +314,7 @@ class Query:
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
+    kernels_v2 = kernels_v2
     route = route
     routes = routes
     session_scheduling_histories = session_scheduling_histories

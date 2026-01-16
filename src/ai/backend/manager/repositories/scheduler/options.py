@@ -197,62 +197,32 @@ class KernelConditions:
         return inner
 
     @staticmethod
-    def for_fair_share_observation(
-        scaling_group: str,
-    ) -> QueryCondition:
-        """Filter kernels that need fair share observation.
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
 
-        Includes:
-        1. Running kernels (terminated_at IS NULL) with starts_at set
-        2. Recently terminated kernels with unobserved periods
-           (terminated_at > last_observed_at, within lookback window)
-
-        The lookback_days is fetched from scaling_groups.fair_share_spec via subquery.
-
-        Args:
-            scaling_group: The scaling group to filter
-
-        Returns:
-            QueryCondition for fair share observation targets
+        Uses subquery to get created_at of the cursor row and compare.
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            # Subquery to get lookback_days from scaling_group's fair_share_spec
-            # Falls back to DEFAULT_LOOKBACK_DAYS if not set
-            lookback_days_subquery = (
-                sa.select(
-                    sa.func.coalesce(
-                        sa.cast(
-                            ScalingGroupRow.fair_share_spec["lookback_days"].as_string(),
-                            sa.Integer,
-                        ),
-                        DEFAULT_LOOKBACK_DAYS,
-                    )
-                )
-                .where(ScalingGroupRow.name == scaling_group)
-                .scalar_subquery()
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
             )
+            return KernelRow.created_at < subquery
 
-            # Calculate lookback cutoff using the subquery
-            lookback_cutoff = sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days_subquery)
+        return inner
 
-            return sa.and_(
-                KernelRow.scaling_group == scaling_group,
-                KernelRow.starts_at.isnot(None),  # Must have started
-                sa.or_(
-                    # Running kernels (not yet terminated)
-                    KernelRow.terminated_at.is_(None),
-                    # Terminated kernels with unobserved period, within lookback
-                    sa.and_(
-                        KernelRow.terminated_at
-                        > sa.func.coalesce(
-                            KernelRow.last_observed_at,
-                            KernelRow.starts_at,
-                        ),
-                        KernelRow.terminated_at >= lookback_cutoff,
-                    ),
-                ),
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
             )
+            return KernelRow.created_at > subquery
 
         return inner
 
