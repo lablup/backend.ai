@@ -20,10 +20,16 @@ from .types import (
     KernelSessionInfoGQL,
     KernelStatEntryGQL,
     KernelStatGQL,
+    KernelStatusDataGQL,
     KernelStatusGQL,
     KernelUserPermissionInfoGQL,
     MetricStatGQL,
     MetricValueGQL,
+    SchedulerInfoGQL,
+    SchedulerPredicateGQL,
+    SessionStatusDataGQL,
+    StatusDataGQL,
+    StatusErrorInfoGQL,
 )
 
 __all__ = [
@@ -44,8 +50,14 @@ __all__ = [
     "KernelSessionInfoGQL",
     "KernelStatEntryGQL",
     "KernelStatGQL",
+    "KernelStatusDataGQL",
     "KernelStatusGQL",
     "KernelUserPermissionInfoGQL",
     "MetricStatGQL",
     "MetricValueGQL",
+    "SchedulerInfoGQL",
+    "SchedulerPredicateGQL",
+    "SessionStatusDataGQL",
+    "StatusDataGQL",
+    "StatusErrorInfoGQL",
 ]
