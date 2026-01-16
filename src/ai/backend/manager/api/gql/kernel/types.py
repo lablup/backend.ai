@@ -184,7 +184,7 @@ class KernelStatusErrorInfoGQL:
 
 
 @strawberry.type(
-    name="KernelStatusData",
+    name="KernelStatusDataKernel",
     description="Added in 26.1.0. Kernel-specific status data during lifecycle transitions.",
 )
 class KernelStatusDataGQL:
