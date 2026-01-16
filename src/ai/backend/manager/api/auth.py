@@ -5,11 +5,11 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 from urllib.parse import urlparse
 
 import aiohttp_cors
@@ -66,6 +66,8 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+_HandlerT = TypeVar("_HandlerT", bound=Callable[..., Awaitable[web.StreamResponse]])
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -760,52 +762,86 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
 
 
-def auth_required(handler):
+def auth_required(handler: _HandlerT) -> _HandlerT:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "user")
-    return wrapped
+    return wrapped  # type: ignore[return-value]
 
 
-def auth_required_for_method(method):
+def auth_required_for_method(method: _HandlerT) -> _HandlerT:
     @functools.wraps(method)
-    async def wrapped(self, request, *args, **kwargs):
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "user")
-    return wrapped
+    return wrapped  # type: ignore[return-value]
 
 
-def admin_required(handler):
+def admin_required(handler: _HandlerT) -> _HandlerT:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_admin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "admin")
-    return wrapped
+    return wrapped  # type: ignore[return-value]
 
 
-def superadmin_required(handler):
+def admin_required_for_method(method: _HandlerT) -> _HandlerT:
+    """Decorator for class methods that require admin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_admin", False):
+            return await method(self, request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "admin")
+    return wrapped  # type: ignore[return-value]
+
+
+def superadmin_required(handler: _HandlerT) -> _HandlerT:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_superadmin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "superadmin")
-    return wrapped
+    return wrapped  # type: ignore[return-value]
+
+
+def superadmin_required_for_method(method: _HandlerT) -> _HandlerT:
+    """Decorator for class methods that require superadmin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_superadmin", False):
+            return await method(self, request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "superadmin")
+    return wrapped  # type: ignore[return-value]
 
 
 @auth_required
