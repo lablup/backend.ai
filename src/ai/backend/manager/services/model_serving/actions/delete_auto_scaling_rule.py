@@ -1,15 +1,15 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class DeleteEndpointAutoScalingRuleAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
+    user_data: UserData
     id: RuleId
 
     @override

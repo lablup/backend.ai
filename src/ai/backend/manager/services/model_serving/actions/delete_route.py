@@ -2,14 +2,14 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class DeleteRouteAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
+    user_data: UserData
     service_id: uuid.UUID
     route_id: uuid.UUID
 
