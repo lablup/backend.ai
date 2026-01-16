@@ -30,19 +30,19 @@ def mock_check_requester_access_get_info(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_get_info(mocker, mock_repositories):
+def mock_get_endpoint_by_id_get_info(mocker, mock_repositories):
     return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
+        mock_repositories.repository,
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_validated_get_info(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_get_info(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -123,11 +123,20 @@ class TestGetModelServiceInfo:
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_get_info,
-        mock_get_endpoint_by_id_force_get_info,
-        mock_get_endpoint_by_id_validated_get_info,
+        mock_get_endpoint_by_id_get_info,
+        mock_get_endpoint_access_validation_data_get_info,
     ):
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
+        action = scenario.input
+
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_get_info.return_value = mock_validation_data
+
         mock_endpoint = MagicMock(
             id=expected.data.endpoint_id,
             model=expected.data.model_id,
@@ -153,11 +162,8 @@ class TestGetModelServiceInfo:
         )
         mock_endpoint.name = expected.data.name
 
-        # Mock repository based on user role
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_get_info.return_value = mock_endpoint
-        else:
-            mock_get_endpoint_by_id_validated_get_info.return_value = mock_endpoint
+        # Now uses single repository for all roles
+        mock_get_endpoint_by_id_get_info.return_value = mock_endpoint
 
         async def get_model_service_info(action: GetModelServiceInfoAction):
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)

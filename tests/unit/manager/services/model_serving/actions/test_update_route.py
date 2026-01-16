@@ -29,19 +29,19 @@ def mock_check_requester_access_update_route(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_update_route_traffic_force(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_update_route(mocker, mock_repositories):
     return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "update_route_traffic_force",
+        mock_repositories.repository,
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_update_route_traffic_validated(mocker, mock_repositories):
+def mock_update_route_traffic(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "update_route_traffic_validated",
+        "update_route_traffic",
         new_callable=AsyncMock,
     )
 
@@ -123,38 +123,43 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_update_route_traffic_force,
-        mock_update_route_traffic_validated,
+        mock_get_endpoint_access_validation_data_update_route,
+        mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
     ):
-        # Mock endpoint data for route update
-        mock_endpoint_data = MagicMock(
-            id=scenario.input.service_id,
-            route_id=scenario.input.route_id,
-            traffic_ratio=scenario.input.traffic_ratio,
+        action = scenario.input
+
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+
+        # Mock route data
+        mock_route_data = MagicMock(
+            id=action.service_id,
+            route_id=action.route_id,
+            traffic_ratio=action.traffic_ratio,
         )
 
         # Mock endpoint row for AppProxy update
         mock_endpoint_row = MagicMock(
-            id=scenario.input.service_id,
+            id=action.service_id,
             url="https://api.example.com/v1/models/test-model",
             routings=[
                 MagicMock(
-                    id=scenario.input.route_id,
-                    traffic_ratio=scenario.input.traffic_ratio,
+                    id=action.route_id,
+                    traffic_ratio=action.traffic_ratio,
                     session=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                 )
             ],
         )
 
-        # Mock repository based on user role
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_update_route_traffic_force.return_value = mock_endpoint_data
-        else:
-            mock_update_route_traffic_validated.return_value = mock_endpoint_data
-
-        # Mock AppProxy related methods
+        # Setup mocks - now uses single repository for all roles
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
+        mock_update_route_traffic.return_value = mock_route_data
         mock_get_endpoint_for_appproxy_update.return_value = mock_endpoint_row
 
         async def update_route(action: UpdateRouteAction):
@@ -188,10 +193,21 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, Exception],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_update_route_traffic_validated,
+        mock_get_endpoint_access_validation_data_update_route,
+        mock_update_route_traffic,
     ):
+        action = scenario.input
+
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
+
         # Mock repository to return None (route not found)
-        mock_update_route_traffic_validated.return_value = None
+        mock_update_route_traffic.return_value = None
 
         async def update_route(action: UpdateRouteAction):
             return await model_serving_processors.update_route.wait_for_complete(action)
@@ -203,7 +219,8 @@ class TestUpdateRoute:
         self,
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
-        mock_update_route_traffic_validated,
+        mock_get_endpoint_access_validation_data_update_route,
+        mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
     ):
@@ -219,8 +236,16 @@ class TestUpdateRoute:
             traffic_ratio=0.7,
         )
 
+        # Mock validation data for access validation
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
+
         # Mock successful route update
-        mock_update_route_traffic_validated.return_value = MagicMock(id=action.service_id)
+        mock_update_route_traffic.return_value = MagicMock(id=action.service_id)
         mock_get_endpoint_for_appproxy_update.return_value = MagicMock(id=action.service_id)
 
         # Mock AppProxy communication failure

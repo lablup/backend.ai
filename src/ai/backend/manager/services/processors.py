@@ -282,14 +282,12 @@ class Services:
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
-            admin_repository=repositories.model_serving.admin_repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
         )
 
         model_serving_auto_scaling = AutoScalingService(
             repository=repositories.model_serving.repository,
-            admin_repository=repositories.model_serving.admin_repository,
         )
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,
