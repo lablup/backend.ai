@@ -150,12 +150,15 @@ class SessionLauncher:
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            # Note: shared_phase should be provided by the caller (e.g., handler)
-            with RecorderContext[SessionId].shared_step(
-                "check_and_pull_images",
-                success_detail="Image pull triggered",
+            with RecorderContext[SessionId].shared_phase(
+                "prepare_images",
+                success_detail="Image pull requested",
             ):
-                await asyncio.gather(*pull_tasks, return_exceptions=True)
+                with RecorderContext[SessionId].shared_step(
+                    "check_and_pull_images",
+                    success_detail="Image pull triggered",
+                ):
+                    await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions_for_handler(
         self,
@@ -174,7 +177,15 @@ class SessionLauncher:
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image name
         """
-        await self._start_sessions_concurrently(sessions, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "trigger_kernel_creation",
+            success_detail="Kernel creation triggered",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "create_kernels",
+                success_detail="Kernel creation requested",
+            ):
+                await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
@@ -842,7 +853,15 @@ class SessionLauncher:
         ]
 
         # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "prepare_images",
+            success_detail="Image pull retried",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "retry_image_pulling",
+                success_detail="Image pull retried",
+            ):
+                await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
 
         return RetryResult(
             retried_ids=list(retry_update_result.sessions_to_retry),

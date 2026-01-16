@@ -412,13 +412,13 @@ async def unified_config(
     app, bootstrap_config: BootstrapConfig, etcd_fixture
 ) -> AsyncIterator[ManagerUnifiedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
-    root_ctx.etcd = etcd
-    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    raw_config = await etcd_loader.load()
-    merged_config = {**bootstrap_config.model_dump(), **raw_config}
-    unified_config = ManagerUnifiedConfig(**merged_config)
-    yield unified_config
+    async with AsyncEtcd.create_from_config(bootstrap_config.etcd.to_dataclass()) as etcd:
+        root_ctx.etcd = etcd
+        etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+        raw_config = await etcd_loader.load()
+        merged_config = {**bootstrap_config.model_dump(), **raw_config}
+        unified_config = ManagerUnifiedConfig(**merged_config)
+        yield unified_config
 
 
 @pytest.fixture(scope="session")

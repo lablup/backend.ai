@@ -131,8 +131,6 @@ class VFolderInviteService:
 
         # Get target vfolder
         vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
-        if not vfolder_data:
-            raise VFolderNotFound
 
         # Prevent accepting vfolder with duplicated name
         count = await self._vfolder_repository.count_vfolder_with_name_for_user(

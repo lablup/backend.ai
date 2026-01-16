@@ -1,11 +1,13 @@
 import logging
+from uuid import UUID
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageRow,
@@ -13,7 +15,6 @@ from ai.backend.manager.models.image import (
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.image.admin_repository import AdminImageRepository
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -94,17 +95,25 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class ImageService:
     _agent_registry: AgentRegistry
     _image_repository: ImageRepository
-    _admin_image_repository: AdminImageRepository
 
     def __init__(
         self,
         agent_registry: AgentRegistry,
         image_repository: ImageRepository,
-        admin_image_repository: AdminImageRepository,
     ) -> None:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
-        self._admin_image_repository = admin_image_repository
+
+    async def _validate_image_ownership(self, image_id: UUID, user_id: UUID) -> None:
+        """
+        Validates that user owns the image.
+        Raises ImageAccessForbiddenError if user doesn't own the image.
+
+        Note: Non-customized images are not owned by anyone,
+        so ownership validation fails for them.
+        """
+        if not await self._image_repository.validate_image_ownership(image_id, user_id):
+            raise ImageAccessForbiddenError()
 
     async def get_images_by_canonicals(
         self, action: GetImagesByCanonicalsAction
@@ -159,35 +168,24 @@ class ImageService:
         )
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
-        if action.client_role == UserRole.SUPERADMIN:
-            # Superadmin can forget any image without checking ownership
-            data = await self._admin_image_repository.soft_delete_image_force(
-                [
-                    ImageIdentifier(action.reference, action.architecture),
-                    ImageAlias(action.reference),
-                ],
-            )
-            return ForgetImageActionResult(image=data)
-        # Regular users can only forget images they own
-        data = await self._image_repository.soft_delete_user_image(
-            [
-                ImageIdentifier(action.reference, action.architecture),
-                ImageAlias(action.reference),
-            ],
-            action.user_id,
-        )
+        identifiers: list[ImageAlias | ImageRef | ImageIdentifier] = [
+            ImageIdentifier(action.reference, action.architecture),
+            ImageAlias(action.reference),
+        ]
+        # Regular users need ownership validation
+        if action.client_role != UserRole.SUPERADMIN:
+            image_data = await self._image_repository.resolve_image(identifiers)
+            await self._validate_image_ownership(image_data.id, action.user_id)
+        data = await self._image_repository.soft_delete_image(identifiers)
         return ForgetImageActionResult(image=data)
 
     async def forget_image_by_id(
         self, action: ForgetImageByIdAction
     ) -> ForgetImageByIdActionResult:
-        if action.client_role == UserRole.SUPERADMIN:
-            # Superadmin can forget any image without checking ownership
-            data = await self._admin_image_repository.soft_delete_image_by_id_force(action.image_id)
-            return ForgetImageByIdActionResult(image=data)
-
         # Regular users need ownership validation
-        data = await self._image_repository.soft_delete_image_by_id(action.image_id, action.user_id)
+        if action.client_role != UserRole.SUPERADMIN:
+            await self._validate_image_ownership(action.image_id, action.user_id)
+        data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
@@ -233,33 +231,19 @@ class ImageService:
         raise NotImplementedError
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
-        if action.client_role == UserRole.SUPERADMIN:
-            # Superadmin can delete any image without checking ownership
-            image_data = await self._admin_image_repository.delete_image_with_aliases_force(
-                action.image_id
-            )
-            return PurgeImageByIdActionResult(image=image_data)
-
         # Regular users need ownership validation
-        image_data = await self._image_repository.delete_image_with_aliases_validated(
-            action.image_id, action.user_id
-        )
+        if action.client_role != UserRole.SUPERADMIN:
+            await self._validate_image_ownership(action.image_id, action.user_id)
+        image_data = await self._image_repository.delete_image_with_aliases(action.image_id)
         return PurgeImageByIdActionResult(image=image_data)
 
     async def untag_image_from_registry(
         self, action: UntagImageFromRegistryAction
     ) -> UntagImageFromRegistryActionResult:
-        if action.client_role == UserRole.SUPERADMIN:
-            # Superadmin can untag without ownership check
-            image_data = await self._admin_image_repository.untag_image_from_registry_force(
-                action.image_id
-            )
-            return UntagImageFromRegistryActionResult(image=image_data)
-
         # Regular users need ownership validation
-        image_data = await self._image_repository.untag_image_from_registry_validated(
-            action.image_id, action.user_id
-        )
+        if action.client_role != UserRole.SUPERADMIN:
+            await self._validate_image_ownership(action.image_id, action.user_id)
+        image_data = await self._image_repository.untag_image_from_registry(action.image_id)
         return UntagImageFromRegistryActionResult(image=image_data)
 
     async def purge_image(self, action: PurgeImageAction) -> PurgeImageActionResult:

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
+    from .object_permission import ObjectPermissionRow
     from .permission import PermissionRow
 
 
@@ -48,6 +49,14 @@ def _get_permission_join_condition():
     from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
     return PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)
+
+
+def _get_object_permission_join_condition():
+    from ai.backend.manager.models.rbac_models.permission.object_permission import (
+        ObjectPermissionRow,
+    )
+
+    return PermissionGroupRow.id == foreign(ObjectPermissionRow.permission_group_id)
 
 
 class PermissionGroupRow(Base):
@@ -77,6 +86,7 @@ class PermissionGroupRow(Base):
         "RoleRow",
         back_populates="permission_group_rows",
         primaryjoin=_get_role_join_condition,
+        viewonly=True,
     )
     mapped_entities: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
         "AssociationScopesEntitiesRow",
@@ -87,6 +97,13 @@ class PermissionGroupRow(Base):
         "PermissionRow",
         back_populates="permission_group_row",
         primaryjoin=_get_permission_join_condition,
+        passive_deletes=True,
+    )
+    object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
+        "ObjectPermissionRow",
+        back_populates="permission_group_row",
+        primaryjoin=_get_object_permission_join_condition,
+        passive_deletes=True,
     )
 
     def parsed_scope_id(self) -> ScopeId:

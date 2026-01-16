@@ -169,3 +169,10 @@ class VolumePool:
             yield self._volumes_by_name[name]
         except KeyError:
             raise InvalidVolumeError(name)
+
+    def get_volume_by_name_direct(self, name: str) -> AbstractVolume:
+        """Get volume by name without context manager."""
+        try:
+            return self._volumes_by_name[name]
+        except KeyError:
+            raise InvalidVolumeError(name)

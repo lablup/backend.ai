@@ -40,14 +40,15 @@ def local_volume(vfroot) -> Iterator[Path]:
 
 
 @pytest.fixture
-def mock_etcd() -> Iterator[AsyncEtcd]:
-    yield AsyncEtcd(
+async def mock_etcd() -> AsyncIterator[AsyncEtcd]:
+    async with AsyncEtcd(
         addrs=[HostPortPair("", 0)],
         namespace="",
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
         },
-    )
+    ) as etcd:
+        yield etcd
 
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:

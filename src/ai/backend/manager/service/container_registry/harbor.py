@@ -7,7 +7,7 @@ from typing import TypedDict, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.client.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.harbor import (
     AbstractPerProjectRegistryQuotaClient,
     PerProjectHarborQuotaClient,
 )

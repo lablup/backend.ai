@@ -46,7 +46,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=44.0.2",
 //     "dataclasses-json~=0.5.7",
-//     "etcd-client-py~=0.4.1",
+//     "etcd-client-py~=0.5.1",
 //     "faker~=24.7.1",
 //     "graphene-federation~=3.2.0",
 //     "graphene~=3.3.0",
@@ -103,7 +103,7 @@
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
-//     "testcontainers[minio,postgres,redis]~=4.8.1",
+//     "testcontainers[minio,postgres,redis]~=4.13.3",
 //     "textual~=0.79.1",
 //     "tomli-w~=1.2.0",
 //     "tomli~=2.0.1",
@@ -2063,29 +2063,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e10e972639606206892aef94953fb023e4bb1a4fa68143396e49f4d0da31a13a",
-              "url": "https://files.pythonhosted.org/packages/46/32/6b0a21ddd58c6da6dd1c2fedd9c23fa717cc0ca204a6ca5329c8123374b9/etcd_client_py-0.4.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "63d245dcecdf845aa76b4da4f73d00919f07eb35788e683ee4f809e188c53375",
+              "url": "https://files.pythonhosted.org/packages/3f/6c/e6b2cf73127561e9c9bae8a41c017be346deeb54d0f8128109c2581beae6/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "26845fbf2bbdee9283df60f58938e8f8ea111e3cce4bb9737154ccd526a01813",
-              "url": "https://files.pythonhosted.org/packages/25/3c/ec281bc41637d163471f491dc04367799cf6e75e86526ff486b8a997d44c/etcd_client_py-0.4.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+              "hash": "c8bc311f225147e3260c6416d4c66146dd291e5af5c6b8120d0b410cce89a8d1",
+              "url": "https://files.pythonhosted.org/packages/a2/d1/6aad26b2f0581db64650f640c0d7968bbe25cc6a2fc35f7d66d4c0347f6b/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3909bd4857274e2ffa37aabc6d4a7e49dc2f903ef657dbf141555887b707129e",
-              "url": "https://files.pythonhosted.org/packages/c7/75/4034fbbdcb9b670e7add878a208484b9aceafea7dc55c4964fd5e0eb67a1/etcd_client_py-0.4.1.tar.gz"
+              "hash": "dee52d29cd2d441ecebbc84b80c3c08370b0b5859dc5b165bf9133bd209e2565",
+              "url": "https://files.pythonhosted.org/packages/ab/92/2f21e778b884729d412613713d33eda98c644fbfb03bca4bb0ded94298ec/etcd_client_py-0.5.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "cdbf59cc758692595ae2f4a592bf75108ddb5d61fa7a5440ba089bbbe766dbe9",
-              "url": "https://files.pythonhosted.org/packages/fa/91/c67993ae03b54db1f4f308a7cabdf765371a2cbdc2b7e94fa3ea28065c37/etcd_client_py-0.4.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "7809b1adfa58c0e84cbaac166c7e76ce5987558426acaa8651075dd2315a9212",
+              "url": "https://files.pythonhosted.org/packages/bb/d2/c79d349cd668a24a3647b17db2396c59393ba6b368279abbe1169ba39bc7/etcd_client_py-0.5.1.tar.gz"
             }
           ],
           "project_name": "etcd-client-py",
-          "requires_dists": [],
+          "requires_dists": [
+            "maturin<2.0,>=1.11; extra == \"dev\"",
+            "mypy>=1.19.1; extra == \"dev\"",
+            "pytest-asyncio<2,>=1.3.0; extra == \"test\"",
+            "pytest<10,>=9.0.2; extra == \"test\"",
+            "ruff>=0.14.10; extra == \"dev\"",
+            "testcontainers<5,>=4.13.3; extra == \"test\"",
+            "trafaret<3,>=2.1; extra == \"test\""
+          ],
           "requires_python": ">=3.10",
-          "version": "0.4.1"
+          "version": "0.5.1"
         },
         {
           "artifacts": [
@@ -6435,13 +6443,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9e19af077cd96e1957c13ee466f1f32905bc6c5bc1bc98643eb18be1a989bfb0",
-              "url": "https://files.pythonhosted.org/packages/80/77/5ac0dff2903a033d83d971fd85957356abdb66a327f3589df2b3d1a586b4/testcontainers-4.8.2-py3-none-any.whl"
+              "hash": "063278c4805ffa6dd85e56648a9da3036939e6c0ac1001e851c9276b19b05970",
+              "url": "https://files.pythonhosted.org/packages/73/27/c2f24b19dafa197c514abe70eda69bc031c5152c6b1f1e5b20099e2ceedd/testcontainers-4.13.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dd4a6a2ea09e3c3ecd39e180b6548105929d0bb78d665ce9919cb3f8c98f9853",
-              "url": "https://files.pythonhosted.org/packages/1f/72/c58d84f5704c6caadd9f803a3adad5ab54ac65328c02d13295f40860cf33/testcontainers-4.8.2.tar.gz"
+              "hash": "9d82a7052c9a53c58b69e1dc31da8e7a715e8b3ec1c4df5027561b47e2efe646",
+              "url": "https://files.pythonhosted.org/packages/fc/b3/c272537f3ea2f312555efeb86398cc382cd07b740d5f3c730918c36e64e1/testcontainers-4.13.3.tar.gz"
             }
           ],
           "project_name": "testcontainers",
@@ -6451,29 +6459,30 @@
             "bcrypt; extra == \"registry\"",
             "boto3; extra == \"aws\" or extra == \"localstack\"",
             "cassandra-driver==3.29.1; extra == \"scylla\"",
-            "chromadb-client; extra == \"chroma\"",
-            "clickhouse-driver; extra == \"clickhouse\"",
+            "chromadb-client<2.0.0,>=1.0.0; extra == \"chroma\"",
             "cryptography; extra == \"mailpit\" or extra == \"sftp\"",
             "docker",
             "google-cloud-datastore>=2; extra == \"google\"",
             "google-cloud-pubsub>=2; extra == \"google\"",
             "httpx; extra == \"aws\" or extra == \"generic\" or extra == \"test-module-import\"",
-            "ibm_db_sa; extra == \"db2\"",
+            "ibm_db_sa; (platform_machine != \"aarch64\" and platform_machine != \"arm64\") and extra == \"db2\"",
             "influxdb-client; extra == \"influxdb\"",
             "influxdb; extra == \"influxdb\"",
             "kubernetes; extra == \"k3s\"",
             "minio; extra == \"minio\"",
             "nats-py; extra == \"nats\"",
             "neo4j; extra == \"neo4j\"",
-            "opensearch-py; extra == \"opensearch\"",
-            "oracledb; extra == \"oracle\" or extra == \"oracle-free\"",
+            "openfga-sdk; python_version >= \"3.10\" and extra == \"openfga\"",
+            "opensearch-py; python_version < \"4.0\" and extra == \"opensearch\"",
+            "oracledb>=3.4.1; extra == \"oracle\" or extra == \"oracle-free\"",
             "pika; extra == \"rabbitmq\"",
             "pymongo; extra == \"mongodb\"",
-            "pymssql; extra == \"mssql\"",
+            "pymssql>=2.3.9; (platform_machine != \"arm64\" or python_version >= \"3.10\") and extra == \"mssql\"",
             "pymysql[rsa]; extra == \"mysql\"",
             "python-arango<8.0,>=7.8; extra == \"arangodb\"",
+            "python-dotenv",
             "python-keycloak; extra == \"keycloak\"",
-            "pyyaml; extra == \"k3s\"",
+            "pyyaml>=6.0.3; extra == \"k3s\"",
             "qdrant-client; extra == \"qdrant\"",
             "redis; extra == \"generic\" or extra == \"redis\"",
             "selenium; extra == \"selenium\"",
@@ -6484,8 +6493,8 @@
             "weaviate-client<5.0.0,>=4.5.4; extra == \"weaviate\"",
             "wrapt"
           ],
-          "requires_python": "<4.0,>=3.9",
-          "version": "4.8.2"
+          "requires_python": ">=3.9.2",
+          "version": "4.13.3"
         },
         {
           "artifacts": [
@@ -7717,7 +7726,7 @@
     "coloredlogs~=15.0",
     "cryptography>=44.0.2",
     "dataclasses-json~=0.5.7",
-    "etcd-client-py~=0.4.1",
+    "etcd-client-py~=0.5.1",
     "faker~=24.7.1",
     "graphene-federation~=3.2.0",
     "graphene~=3.3.0",
@@ -7774,7 +7783,7 @@
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",
-    "testcontainers[minio,postgres,redis]~=4.8.1",
+    "testcontainers[minio,postgres,redis]~=4.13.3",
     "textual~=0.79.1",
     "tomli-w~=1.2.0",
     "tomli~=2.0.1",

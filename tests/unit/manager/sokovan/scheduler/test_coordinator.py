@@ -518,10 +518,8 @@ class TestStatusTransitions:
             steps=[step_record],
         )
         execution_record = ExecutionRecord(
-            operation="schedule",
             started_at=exec_started,
             ended_at=exec_ended,
-            status=StepStatus.SUCCESS,
             phases=[phase_record],
         )
         records: dict[SessionId, ExecutionRecord] = {session_id: execution_record}
@@ -592,10 +590,8 @@ class TestStatusTransitions:
             steps=[step_record],
         )
         execution_record = ExecutionRecord(
-            operation="schedule",
             started_at=step_started,
             ended_at=step_ended,
-            status=StepStatus.FAILED,
             phases=[phase_record],
         )
         records: dict[SessionId, ExecutionRecord] = {session_id: execution_record}

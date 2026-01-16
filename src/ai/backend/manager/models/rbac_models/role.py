@@ -94,11 +94,13 @@ class RoleRow(Base):
         "ObjectPermissionRow",
         back_populates="role_row",
         primaryjoin=_get_object_permission_rows_join_condition,
+        viewonly=True,
     )
     permission_group_rows: Mapped[list[PermissionGroupRow]] = relationship(
         "PermissionGroupRow",
         back_populates="role_row",
         primaryjoin=_get_permission_group_rows_join_condition,
+        viewonly=True,
     )
 
     def to_data(self) -> RoleData:

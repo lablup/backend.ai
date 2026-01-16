@@ -63,7 +63,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
@@ -2748,34 +2748,21 @@ class ScheduleDBSource:
 
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state with occupying_slots.
+        Update sessions with occupying_slots.
+
+        Note: Status transition is handled by the Coordinator via SessionStatusBatchUpdaterSpec.
+        This method only updates the occupying_slots field.
         """
         if not sessions_data:
             return
 
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-
             # Update each session individually with its calculated occupying_slots
             for session_data in sessions_data:
                 stmt = (
                     sa.update(SessionRow)
-                    .where(
-                        sa.and_(
-                            SessionRow.id == session_data.session_id,
-                            SessionRow.status == SessionStatus.CREATING,
-                        )
-                    )
-                    .values(
-                        status=SessionStatus.RUNNING,
-                        status_info=None,  # Clear any previous error status
-                        occupying_slots=session_data.occupying_slots,
-                        status_history=sql_json_merge(
-                            SessionRow.__table__.c.status_history,
-                            (),
-                            {SessionStatus.RUNNING.name: now.isoformat()},
-                        ),
-                    )
+                    .where(SessionRow.id == session_data.session_id)
+                    .values(occupying_slots=session_data.occupying_slots)
                 )
                 await db_sess.execute(stmt)
 
@@ -2804,37 +2791,6 @@ class ScheduleDBSource:
                     ready_session_ids.append(session.id)
 
             return ready_session_ids
-
-    async def update_sessions_to_terminated(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from TERMINATING to TERMINATED state.
-        """
-        if not session_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-            # Update session status to TERMINATED
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.TERMINATING,
-                    )
-                )
-                .values(
-                    status=SessionStatus.TERMINATED,
-                    terminated_at=now,
-                    # Keep status_info if it contains termination reason, otherwise clear
-                    status_history=sql_json_merge(
-                        SessionRow.__table__.c.status_history,
-                        (),
-                        {SessionStatus.TERMINATED.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
@@ -3441,7 +3397,7 @@ class ScheduleDBSource:
         async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
 
-            # Update session status
+            # Update session status with status_history
             stmt = (
                 sa.update(SessionRow)
                 .where(SessionRow.id == session_id)
@@ -3449,11 +3405,16 @@ class ScheduleDBSource:
                     status=SessionStatus.CANCELLED,
                     status_info=reason,
                     status_data=error_info,  # Store ErrorStatusInfo as status_data in DB
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.CANCELLED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(stmt)
 
-            # Update kernel statuses
+            # Update kernel statuses with status_history
             kernel_stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.session_id == session_id)
@@ -3461,6 +3422,11 @@ class ScheduleDBSource:
                     status=KernelStatus.CANCELLED,
                     status_changed=now,
                     status_info=reason,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.CANCELLED.name: now.isoformat()},
+                    ),
                 )
             )
             await db_sess.execute(kernel_stmt)
@@ -3812,6 +3778,8 @@ class ScheduleDBSource:
 
         This method combines batch status update with history recording,
         ensuring both operations are atomic within a single transaction.
+        Uses merge logic to prevent duplicate history records when status
+        doesn't change.
 
         Args:
             updater: BatchUpdater containing spec and conditions for session update
@@ -3824,10 +3792,65 @@ class ScheduleDBSource:
             # 1. Execute batch update
             update_result = await execute_batch_updater(db_sess, updater)
 
-            # 2. Create history records
-            await execute_bulk_creator(db_sess, bulk_creator)
+            if not bulk_creator.specs:
+                return update_result.updated_count
+
+            # 2. Build rows from specs (respects abstraction)
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            session_ids = [SessionId(row.session_id) for row in new_rows]
+
+            # 3. Get last history records for all sessions
+            last_records = await self._get_last_session_histories_bulk(db_sess, session_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[UUID] = []
+            create_rows: list[SessionSchedulingHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(SessionId(new_row.session_id))
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(SessionSchedulingHistoryRow)
+                    .where(SessionSchedulingHistoryRow.id.in_(merge_ids))
+                    .values(attempts=SessionSchedulingHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
 
             return update_result.updated_count
+
+    async def _get_last_session_histories_bulk(
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, SessionSchedulingHistoryRow]:
+        """Get last history records for multiple sessions efficiently."""
+        if not session_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per session
+        query = (
+            sa.select(SessionSchedulingHistoryRow)
+            .where(SessionSchedulingHistoryRow.session_id.in_(session_ids))
+            .distinct(SessionSchedulingHistoryRow.session_id)
+            .order_by(
+                SessionSchedulingHistoryRow.session_id,
+                SessionSchedulingHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {SessionId(row.session_id): row for row in rows}
 
     async def update_kernels_status_bulk(
         self,
