@@ -17,7 +17,6 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentImagesRemoveEvent,
     AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
-    AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
@@ -46,7 +45,6 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -285,13 +283,6 @@ class Dispatchers:
         event_dispatcher.consume(
             AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
-        event_dispatcher.consume(
-            AgentStatusHeartbeat,
-            None,
-            self._agent_event_handler.handle_agent_container_heartbeat,
-            name="agent.status_heartbeat",
-        )
-
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
@@ -382,12 +373,6 @@ class Dispatchers:
             None,
             self._kernel_event_handler.handle_kernel_terminated,
             name="api.session.kterm",
-        )
-        evd.consume(
-            KernelHeartbeatEvent,
-            None,
-            self._kernel_event_handler.handle_kernel_heartbeat,
-            name="api.session.kheartbeat",
         )
 
     def _dispatch_model_serving_events(self, event_dispatcher: EventDispatcher) -> None:

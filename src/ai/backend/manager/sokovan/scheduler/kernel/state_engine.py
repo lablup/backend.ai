@@ -150,20 +150,6 @@ class KernelStateEngine:
 
         return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
-    async def update_kernel_heartbeat(
-        self,
-        kernel_id: KernelId,
-    ) -> bool:
-        """
-        Update the heartbeat timestamp for a running kernel.
-
-        :param kernel_id: The kernel ID
-        :return: True if the update was successful
-        """
-        log.trace("Updating heartbeat for kernel {}", kernel_id)
-
-        return await self._repository.update_kernel_heartbeat(kernel_id)
-
     async def update_kernels_to_pulling_for_image(
         self,
         agent_id: AgentId,

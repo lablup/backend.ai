@@ -5,7 +5,7 @@ from typing import Any, Optional, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import ContainerId, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 
 from .types import KernelLifecycleEventReason
 
@@ -189,32 +189,3 @@ class DoSyncKernelLogsEvent(BaseKernelEvent):
     @classmethod
     def event_name(cls) -> str:
         return "do_sync_kernel_logs"
-
-
-@dataclass
-class KernelHeartbeatEvent(BaseKernelEvent):
-    container_id: ContainerId
-
-    @override
-    def serialize(self) -> tuple:
-        return (
-            str(self.kernel_id),
-            str(self.container_id),
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_id=KernelId(uuid.UUID(value[0])),
-            container_id=ContainerId(str(value[1])),
-        )
-
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "kernel_heartbeat"
-
-    @override
-    def user_event(self) -> Optional[UserEvent]:
-        return None

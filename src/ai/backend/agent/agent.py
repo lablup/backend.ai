@@ -195,7 +195,6 @@ from ai.backend.common.types import (
     ClusterSSHPortMapping,
     CommitStatus,
     ContainerId,
-    ContainerKernelId,
     DeviceId,
     DeviceName,
     HardwareMetadata,
@@ -260,7 +259,6 @@ from .kernel import (
     match_distro_data,
 )
 from .kernel_registry.writer.types import KernelRegistrySaveMetadata
-from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
 from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
@@ -1059,11 +1057,9 @@ class AbstractAgent(
             )
 
         self._agent_runner = Runner(resources=[])
-        container_observer = HeartbeatObserver(self, self.event_producer)
         host_port_observer = HostPortObserver(self)
         kernel_presence_observer = KernelPresenceObserver(self, self.valkey_schedule_client)
         orphan_cleanup_observer = OrphanKernelCleanupObserver(self, self.valkey_schedule_client)
-        await self._agent_runner.register_observer(container_observer)
         await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.register_observer(kernel_presence_observer)
         await self._agent_runner.register_observer(orphan_cleanup_observer)
@@ -1610,46 +1606,6 @@ class AbstractAgent(
 
     def update_scaling_group(self, scaling_group: str) -> None:
         self.local_config.update(agent_update={"scaling_group": scaling_group})
-
-    async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
-        tasks = [self._purge_container(container) for container in containers]
-        await asyncio.gather(*tasks, return_exceptions=True)
-        try:
-            await self.reconstruct_resource_usage()
-        except Exception as e:
-            log.exception("failed to reconstruct resource usage: {0}", repr(e))
-
-    async def _purge_container(self, container: ContainerKernelId) -> None:
-        """
-        Destroy and clean up container.
-        """
-        kernel_id = container.kernel_id
-        container_id = container.container_id
-        log.info("purging container (kernel:{}, container:{})", kernel_id, container_id)
-        try:
-            await self.destroy_kernel(kernel_id, container_id)
-        except Exception as e:
-            log.exception(
-                "failed to destroy kernel (kernel:{}, container:{}): {}",
-                kernel_id,
-                container.human_readable_container_id,
-                repr(e),
-            )
-            raise
-
-        await self.stat_ctx.remove_kernel_metric(kernel_id)
-        try:
-            await self.clean_kernel(kernel_id, container_id, restarting=False)
-        except Exception as e:
-            log.exception(
-                "failed to clean kernel (kernel:{}, container:{}): {}",
-                kernel_id,
-                container.human_readable_container_id,
-                repr(e),
-            )
-            raise
-
-        log.info("purged container (kernel:{}, container:{})", kernel_id, container_id)
 
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated

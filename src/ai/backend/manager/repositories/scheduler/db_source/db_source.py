@@ -2451,32 +2451,6 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return cast(CursorResult, result).rowcount
 
-    async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
-        """
-        Update kernel last_heartbeat timestamp.
-        Uses UPDATE WHERE to ensure kernel exists and is running.
-
-        :param kernel_id: Kernel ID to update
-        :return: True if update was successful, False otherwise
-        """
-        now = datetime.now(tzutc())
-
-        async with self._begin_session_read_committed() as db_sess:
-            stmt = (
-                sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.id == kernel_id,
-                        KernelRow.status == KernelStatus.RUNNING,
-                    )
-                )
-                .values(
-                    last_heartbeat=now,
-                )
-            )
-            result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
-
     async def update_kernels_to_pulling_for_image(
         self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
     ) -> int:

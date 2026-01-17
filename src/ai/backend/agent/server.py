@@ -65,8 +65,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
     AbstractAgentResp,
     CodeCompletionResp,
-    DropKernelRegistryResp,
-    PurgeContainersResp,
     PurgeImagesResp,
 )
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
@@ -110,7 +108,6 @@ from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
     ContainerId,
-    ContainerKernelId,
     HardwareMetadata,
     HostPortPair,
     ImageConfig,
@@ -873,40 +870,6 @@ class AgentRPCServer(aobject):
             suppress_events=suppress_events,
         )
         return await done
-
-    @rpc_function_v2
-    @collect_error
-    async def purge_containers(
-        self,
-        container_kernel_ids: list[tuple[str, str]],
-        agent_id: AgentId | None = None,
-    ) -> PurgeContainersResp:
-        str_kernel_ids = [str(kid) for _, kid in container_kernel_ids]
-        log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
-        kernel_container_pairs = [
-            ContainerKernelId(
-                ContainerId(cid),
-                KernelId(UUID(kid)),
-            )
-            for cid, kid in container_kernel_ids
-        ]
-        agent = self.runtime.get_agent(agent_id)
-        asyncio.create_task(agent.purge_containers(kernel_container_pairs))
-        return PurgeContainersResp()
-
-    @rpc_function_v2
-    @collect_error
-    async def drop_kernel_registry(
-        self,
-        kernel_ids: list[UUID],
-        agent_id: AgentId | None = None,
-    ) -> DropKernelRegistryResp:
-        str_kernel_ids = [str(kid) for kid in kernel_ids]
-        log.info("rpc::drop_kernel_registry(kernel_ids:{0})", str_kernel_ids)
-        kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
-        agent = self.runtime.get_agent(agent_id)
-        asyncio.create_task(agent.clean_kernel_objects(kernel_ids_to_purge))
-        return DropKernelRegistryResp()
 
     @rpc_function
     @collect_error

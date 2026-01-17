@@ -74,7 +74,6 @@ from ai.backend.common.events.event_types.image.anycast import (
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -125,7 +124,6 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
     CommitStatus,
-    ContainerKernelId,
     DeviceId,
     HardwareMetadata,
     ImageAlias,
@@ -3421,12 +3419,6 @@ class AgentRegistry:
             return
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
-    async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
-        last_seen = datetime.now(UTC)
-        async with self.db.begin_session() as db_session:
-            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
-            kernel_row.last_seen = last_seen
-
     async def _get_user_email(
         self,
         kernel: KernelRow,
@@ -3746,28 +3738,6 @@ class AgentRegistry:
 
         await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
 
-    async def purge_containers(
-        self,
-        agent_id: AgentId,
-        container_kernel_ids: Iterable[ContainerKernelId],
-    ) -> None:
-        serialized = [entry.serialize() for entry in container_kernel_ids]
-        if not serialized:
-            return
-        async with self._agent_client_pool.acquire(agent_id) as client:
-            await client.purge_containers(serialized)
-
-    async def drop_kernel_registry(
-        self,
-        agent_id: AgentId,
-        kernel_ids: Iterable[KernelId],
-    ) -> None:
-        kernel_id_list = list(kernel_ids)  # Parse the iterable to a list for serialization
-        if not kernel_id_list:
-            return
-        async with self._agent_client_pool.acquire(agent_id) as client:
-            await client.drop_kernel_registry(kernel_id_list)
-
 
 async def handle_image_pull_started(
     context: AgentRegistry,
@@ -3859,14 +3829,6 @@ async def handle_kernel_termination_lifecycle(
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
                 )
-
-
-async def handle_kernel_heartbeat(
-    context: AgentRegistry,
-    source: AgentId,
-    event: KernelHeartbeatEvent,
-) -> None:
-    await context.mark_kernel_heartbeat(event.kernel_id)
 
 
 async def handle_session_creation_lifecycle(
