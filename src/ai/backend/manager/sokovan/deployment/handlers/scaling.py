@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -55,6 +55,18 @@ class ScalingDeploymentHandler(DeploymentHandler):
     @classmethod
     def failure_status(cls) -> Optional[EndpointLifecycle]:
         return None
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for scaling deployment handler (BEP-1030).
+
+        - success: Deployment → READY
+        - failure: None (stays in current state)
+        """
+        return DeploymentStatusTransitions(
+            success=EndpointLifecycle.READY,
+            failure=None,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check and execute deployment scaling operations."""

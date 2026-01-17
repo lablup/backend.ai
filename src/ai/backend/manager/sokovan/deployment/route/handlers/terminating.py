@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -58,6 +58,20 @@ class TerminatingRouteHandler(RouteHandler):
     def stale_status(cls) -> Optional[RouteStatus]:
         """Get the stale route status if applicable."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for terminating route handler (BEP-1030).
+
+        - success: Route → TERMINATED
+        - failure: None (even if termination fails, route proceeds to terminated)
+        - stale: None
+        """
+        return RouteStatusTransitions(
+            success=RouteStatus.TERMINATED,
+            failure=None,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute termination for routes."""

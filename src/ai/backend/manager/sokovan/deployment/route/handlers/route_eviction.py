@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -62,6 +62,20 @@ class RouteEvictionHandler(RouteHandler):
     def stale_status(cls) -> Optional[RouteStatus]:
         """No stale status for eviction handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for route eviction handler (BEP-1030).
+
+        - success: Route → TERMINATING (evicted)
+        - failure: None (routes are either evicted or left as is)
+        - stale: None
+        """
+        return RouteStatusTransitions(
+            success=RouteStatus.TERMINATING,
+            failure=None,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """

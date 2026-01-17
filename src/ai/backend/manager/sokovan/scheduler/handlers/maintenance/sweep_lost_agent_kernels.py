@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -49,7 +49,7 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.TERMINATING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Kernels in TERMINATING status that need sweep."""
         return [KernelStatus.TERMINATING]
 
@@ -67,6 +67,20 @@ class SweepLostAgentKernelsLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status - this handler updates kernel status only."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for sweep lost agent kernels handler (BEP-1030).
+
+        All transitions are None because this handler only updates kernel status,
+        not session status. Kernel status is updated directly in the terminator.
+        """
+        return StatusTransitions(
+            success=None,
+            need_retry=None,
+            expired=None,
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

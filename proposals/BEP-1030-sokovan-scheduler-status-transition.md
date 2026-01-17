@@ -103,7 +103,17 @@ class LifecycleHandler(ABC):
 
     @property
     @abstractmethod
-    def target_kernel_statuses(self) -> frozenset[KernelStatus]: ...
+    def target_kernel_statuses(self) -> Optional[list[KernelStatus]]:
+        """Kernel statuses to filter sessions.
+
+        Returns:
+            None: No kernel filtering (include sessions regardless of kernel status)
+            list[KernelStatus]: Include sessions that have kernels in these statuses
+
+        Note: This is simple filtering, not condition checking.
+        For condition checking (ALL/ANY/NOT_ANY), use SessionPromotionHandler.
+        """
+        ...
 
     @classmethod
     @abstractmethod
@@ -115,6 +125,10 @@ class LifecycleHandler(ABC):
     async def execute(self, targets: Sequence[SessionWithKernels]) -> HandlerResult:
         ...
 ```
+
+**LifecycleHandler vs SessionPromotionHandler - Kernel Status Handling**:
+- **LifecycleHandler**: Simple filtering - fetch sessions that have kernels in specified statuses
+- **SessionPromotionHandler**: Condition checking - check if ALL/ANY/NOT_ANY kernels meet the condition to promote session
 
 ### 4. HandlerResult
 

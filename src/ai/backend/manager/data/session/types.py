@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.kernel.types import KernelStatus
     from ai.backend.manager.models.network import NetworkType
 
 
@@ -259,8 +260,46 @@ class SessionInfo:
 
 class SchedulingResult(StrEnum):
     SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-    STALE = "STALE"
+    FAILURE = "FAILURE"  # Deprecated: use NEED_RETRY or GIVE_UP
+    STALE = "STALE"  # Deprecated: use EXPIRED
+    NEED_RETRY = "NEED_RETRY"  # Failed but will retry
+    EXPIRED = "EXPIRED"  # Gave up due to time elapsed
+    GIVE_UP = "GIVE_UP"  # Gave up due to retry count exceeded
+    SKIPPED = "SKIPPED"  # Not attempted (e.g., resource shortage)
+
+
+@dataclass(frozen=True)
+class TransitionStatus:
+    """Status transition for session and kernel.
+
+    Attributes:
+        session: Target session status, None means no change
+        kernel: Target kernel status, None means no change
+    """
+
+    session: SessionStatus | None = None
+    kernel: KernelStatus | None = None
+
+
+@dataclass(frozen=True)
+class StatusTransitions:
+    """Defines state transitions for different handler outcomes.
+
+    Attributes:
+        success: Transition when handler succeeds
+        need_retry: Transition when handler fails but will retry (None = no change)
+        expired: Transition when time elapsed in current state
+        give_up: Transition when retry count exceeded
+
+    Note:
+        - None in TransitionStatus field: Don't change that entity's status
+        - None in StatusTransitions field: No status change at all, only record history
+    """
+
+    success: TransitionStatus | None = None
+    need_retry: TransitionStatus | None = None
+    expired: TransitionStatus | None = None
+    give_up: TransitionStatus | None = None
 
 
 class SubStepResult(BaseModel):

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Optional
 
+from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
@@ -44,11 +45,11 @@ class SessionLifecycleHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Get the target kernel statuses for session filtering.
 
         Sessions are included only if ALL their kernels match these statuses.
-        Return empty list [] to include sessions regardless of kernel status.
+        Return None to include sessions regardless of kernel status.
         """
         raise NotImplementedError("Subclasses must implement target_kernel_statuses()")
 
@@ -81,6 +82,21 @@ class SessionLifecycleHandler(ABC):
             SessionStatus to set for stales, or None if coordinator should not update status
         """
         raise NotImplementedError("Subclasses must implement stale_status()")
+
+    @classmethod
+    @abstractmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for different handler outcomes (BEP-1030).
+
+        Returns:
+            StatusTransitions defining what session/kernel status to transition to for
+            success, need_retry, expired, and give_up outcomes.
+
+        Note:
+            - None in TransitionStatus: Don't change that entity's status
+            - None in StatusTransitions field: No status change, only record history
+        """
+        raise NotImplementedError("Subclasses must implement status_transitions()")
 
     @property
     @abstractmethod

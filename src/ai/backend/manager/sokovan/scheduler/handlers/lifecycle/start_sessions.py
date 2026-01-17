@@ -14,7 +14,7 @@ from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
@@ -64,7 +64,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PREPARED]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Include sessions where kernels are in PREPARED status."""
         return [KernelStatus.PREPARED]
 
@@ -82,6 +82,31 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status for this handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for start sessions handler (BEP-1030).
+
+        - success: Session/kernel → CREATING
+        - need_retry: None (stays PREPARED)
+        - expired: Session/kernel → PENDING (re-scheduling)
+        - give_up: Session/kernel → PENDING (re-scheduling)
+        """
+        return StatusTransitions(
+            success=TransitionStatus(
+                session=SessionStatus.CREATING,
+                kernel=KernelStatus.CREATING,
+            ),
+            need_retry=None,
+            expired=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+            give_up=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

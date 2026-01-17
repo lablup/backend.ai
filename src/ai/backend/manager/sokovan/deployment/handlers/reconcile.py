@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -57,6 +57,18 @@ class ReconcileDeploymentHandler(DeploymentHandler):
     @classmethod
     def failure_status(cls) -> Optional[EndpointLifecycle]:
         return EndpointLifecycle.SCALING
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for reconcile deployment handler (BEP-1030).
+
+        - success: None (stays READY)
+        - failure: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        """
+        return DeploymentStatusTransitions(
+            success=None,
+            failure=EndpointLifecycle.SCALING,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check ready deployments."""

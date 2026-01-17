@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
@@ -68,6 +68,20 @@ class RouteHandler(ABC):
             The stale route status, or None if not applicable
         """
         raise NotImplementedError("Subclasses must implement stale_status()")
+
+    @classmethod
+    @abstractmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for different handler outcomes (BEP-1030).
+
+        Returns:
+            RouteStatusTransitions defining what status to transition to for
+            success, failure, and stale outcomes.
+
+        Note:
+            - None value: Don't change the route status
+        """
+        raise NotImplementedError("Subclasses must implement status_transitions()")
 
     @abstractmethod
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:

@@ -144,6 +144,41 @@ class RouteTrafficStatus(enum.StrEnum):
     INACTIVE = "inactive"
 
 
+# ========== Status Transition Types (BEP-1030) ==========
+
+
+@dataclass(frozen=True)
+class DeploymentStatusTransitions:
+    """Status transitions for deployment handlers.
+
+    Deployment handlers only have success/failure outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target lifecycle when handler succeeds, None means no change
+        failure: Target lifecycle when handler fails, None means no change
+    """
+
+    success: EndpointLifecycle | None = None
+    failure: EndpointLifecycle | None = None
+
+
+@dataclass(frozen=True)
+class RouteStatusTransitions:
+    """Status transitions for route handlers.
+
+    Route handlers have success/failure/stale outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target status when handler succeeds, None means no change
+        failure: Target status when handler fails, None means no change
+        stale: Target status when route becomes stale, None means no change
+    """
+
+    success: RouteStatus | None = None
+    failure: RouteStatus | None = None
+    stale: RouteStatus | None = None
+
+
 @dataclass
 class ScalingGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""

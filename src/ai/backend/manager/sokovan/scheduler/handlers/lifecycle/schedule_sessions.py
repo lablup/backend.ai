@@ -14,7 +14,7 @@ from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -66,9 +66,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PENDING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
-        """Any kernel status for scheduling."""
-        return []
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+        """No kernel filtering for scheduling."""
+        return None
 
     @classmethod
     def success_status(cls) -> Optional[SessionStatus]:
@@ -84,6 +84,31 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status for scheduling handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for scheduling handler (BEP-1030).
+
+        - success: Session/kernel → SCHEDULED
+        - need_retry: None (stays PENDING, will retry on next schedule)
+        - expired: Session/kernel → TERMINATING (some kernels may be in higher states)
+        - give_up: Session/kernel → TERMINATING (some kernels may be in higher states)
+        """
+        return StatusTransitions(
+            success=TransitionStatus(
+                session=SessionStatus.SCHEDULED,
+                kernel=KernelStatus.SCHEDULED,
+            ),
+            need_retry=None,
+            expired=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=KernelStatus.TERMINATING,
+            ),
+            give_up=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=KernelStatus.TERMINATING,
+            ),
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:
