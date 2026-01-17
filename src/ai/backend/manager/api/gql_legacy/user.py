@@ -1074,6 +1074,8 @@ class CreateUser(graphene.Mutation):
     ) -> CreateUser:
         from .keypair import KeyPair
 
+        validate_user_mutation_props(props)
+
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email, graph_ctx)
 
@@ -1108,6 +1110,8 @@ class ModifyUser(graphene.Mutation):
         props: ModifyUserInput,
     ) -> ModifyUser:
         graph_ctx: GraphQueryContext = info.context
+
+        validate_user_mutation_props(props)
 
         action: ModifyUserAction = props.to_action(email, graph_ctx)
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
@@ -1199,3 +1203,15 @@ class PurgeUser(graphene.Mutation):
             ok=True,
             msg="success",
         )
+
+
+def _validate_container_uid_gid(value: Any) -> None:
+    if value is not Undefined and value < 0:
+        raise ValueError("UID and GID must be non-negative integers.")
+
+
+def validate_user_mutation_props(props: UserInput | ModifyUserInput) -> None:
+    for value in [props.container_uid, props.container_main_gid]:
+        _validate_container_uid_gid(value)
+    for value in props.container_gids:
+        _validate_container_uid_gid(value)
