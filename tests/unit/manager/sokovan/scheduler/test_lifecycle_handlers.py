@@ -234,6 +234,7 @@ class TestCheckPullingProgressLifecycleHandler:
     def test_target_kernel_statuses(self, handler: CheckPullingProgressLifecycleHandler) -> None:
         """Test target kernel statuses."""
         kernel_statuses = handler.target_kernel_statuses()
+        assert kernel_statuses is not None
         assert KernelStatus.PREPARED in kernel_statuses
         assert KernelStatus.RUNNING in kernel_statuses
 
