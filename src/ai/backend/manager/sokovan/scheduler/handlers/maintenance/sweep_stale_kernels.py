@@ -10,7 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -58,7 +58,7 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.RUNNING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Running kernels that may be stale."""
         return [KernelStatus.RUNNING]
 
@@ -76,6 +76,20 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status - this handler updates kernel status only."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for sweep stale kernels handler (BEP-1030).
+
+        All transitions are None because this handler only updates kernel status,
+        not session status. Kernel status is updated directly in the terminator.
+        """
+        return StatusTransitions(
+            success=None,
+            need_retry=None,
+            expired=None,
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

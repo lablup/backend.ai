@@ -9,7 +9,7 @@ from typing import Optional
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -49,9 +49,9 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PENDING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
-        """Any kernel status for sweep check."""
-        return []
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+        """No kernel filtering for sweep check."""
+        return None
 
     @classmethod
     def success_status(cls) -> Optional[SessionStatus]:
@@ -67,6 +67,25 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """Stale sessions transition to TERMINATING."""
         return SessionStatus.TERMINATING
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for sweep sessions handler (BEP-1030).
+
+        - success: None (sweep operation doesn't have success transition)
+        - need_retry: None
+        - expired: Session/kernel → TERMINATING (pending timeout exceeded)
+        - give_up: None
+        """
+        return StatusTransitions(
+            success=None,
+            need_retry=None,
+            expired=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=KernelStatus.TERMINATING,
+            ),
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

@@ -774,7 +774,7 @@ class SchedulerRepository:
         self,
         scaling_group: str,
         session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
+        kernel_statuses: Optional[list[KernelStatus]],
     ) -> list[SessionWithKernels]:
         """Get sessions for handler execution based on status filters.
 
@@ -786,8 +786,8 @@ class SchedulerRepository:
         Args:
             scaling_group: The scaling group to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
-            kernel_statuses: Kernel statuses to filter by. If non-empty, only includes
-                           sessions where ALL kernels match. If empty, includes all
+            kernel_statuses: Kernel statuses to filter by. If non-None, only includes
+                           sessions where ALL kernels match. If None, includes all
                            sessions regardless of kernel status.
 
         Returns:

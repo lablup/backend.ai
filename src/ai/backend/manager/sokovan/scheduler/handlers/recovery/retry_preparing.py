@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -55,9 +55,9 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PREPARING, SessionStatus.PULLING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
-        """Any kernel status - we check stuck sessions regardless."""
-        return []
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+        """No kernel filtering - we check stuck sessions regardless."""
+        return None
 
     @classmethod
     def success_status(cls) -> Optional[SessionStatus]:
@@ -73,6 +73,28 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """Sessions exceeding max retries transition to PENDING for re-scheduling."""
         return SessionStatus.PENDING
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for retry preparing handler (BEP-1030).
+
+        - success: None (stays PREPARING/PULLING, retry was successful)
+        - need_retry: None (will retry on next check)
+        - expired: Session/kernel → PENDING (exceeded time, re-schedule)
+        - give_up: Session/kernel → PENDING (exceeded max retries, re-schedule)
+        """
+        return StatusTransitions(
+            success=None,
+            need_retry=None,
+            expired=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+            give_up=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

@@ -14,7 +14,7 @@ from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -54,7 +54,7 @@ class CheckPullingProgressLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PREPARING, SessionStatus.PULLING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Only include sessions where ALL kernels are PREPARED or RUNNING."""
         return [KernelStatus.PREPARED, KernelStatus.RUNNING]
 
@@ -72,6 +72,25 @@ class CheckPullingProgressLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status for this handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for check pulling progress handler (BEP-1030).
+
+        - success: Session/kernel → PREPARED
+        - need_retry: None
+        - expired: None
+        - give_up: None
+        """
+        return StatusTransitions(
+            success=TransitionStatus(
+                session=SessionStatus.PREPARED,
+                kernel=KernelStatus.PREPARED,
+            ),
+            need_retry=None,
+            expired=None,
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

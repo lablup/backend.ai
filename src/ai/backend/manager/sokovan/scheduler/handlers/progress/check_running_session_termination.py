@@ -10,7 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -56,7 +56,7 @@ class CheckRunningSessionTerminationLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.RUNNING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Only include sessions where ALL kernels are TERMINATED."""
         return [KernelStatus.TERMINATED]
 
@@ -74,6 +74,25 @@ class CheckRunningSessionTerminationLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status for this handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for check running session termination handler (BEP-1030).
+
+        - success: Session → TERMINATING, kernel already TERMINATED
+        - need_retry: None
+        - expired: None
+        - give_up: None
+        """
+        return StatusTransitions(
+            success=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=None,  # Kernels already TERMINATED
+            ),
+            need_retry=None,
+            expired=None,
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

@@ -3657,7 +3657,7 @@ class ScheduleDBSource:
         self,
         scaling_group: str,
         session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
+        kernel_statuses: Optional[list[KernelStatus]],
     ) -> list[SessionWithKernels]:
         """Fetch sessions for handler execution based on status filters.
 
@@ -3667,8 +3667,8 @@ class ScheduleDBSource:
         Args:
             scaling_group: The scaling group to filter by
             session_statuses: Session statuses to include
-            kernel_statuses: If non-empty, only include sessions where ALL kernels
-                           match these statuses. If empty, include sessions regardless
+            kernel_statuses: If non-None, only include sessions where ALL kernels
+                           match these statuses. If None, include sessions regardless
                            of kernel status.
 
         Returns:
@@ -3688,8 +3688,8 @@ class ScheduleDBSource:
 
             handler_sessions: list[SessionWithKernels] = []
             for session in sessions:
-                # If kernel_statuses is specified, check if all kernels match
-                if kernel_statuses:
+                # If kernel_statuses is specified (not None), check if all kernels match
+                if kernel_statuses is not None:
                     if not session.kernels:
                         continue
                     all_match = all(kernel.status in kernel_statuses for kernel in session.kernels)

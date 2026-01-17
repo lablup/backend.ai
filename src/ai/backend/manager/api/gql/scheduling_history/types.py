@@ -73,6 +73,8 @@ class SchedulingResultGQL(StrEnum):
                 return cls.FAILURE
             case SchedulingResult.STALE:
                 return cls.STALE
+            case _:
+                raise ValueError(f"Unknown SchedulingResult: {value}")
 
     def to_internal(self) -> SchedulingResult:
         match self:

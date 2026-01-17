@@ -15,7 +15,7 @@ from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -67,7 +67,7 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.TERMINATING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Only include sessions where ALL kernels are TERMINATED."""
         return [KernelStatus.TERMINATED]
 
@@ -85,6 +85,25 @@ class CheckTerminatingProgressLifecycleHandler(SessionLifecycleHandler):
     def stale_status(cls) -> Optional[SessionStatus]:
         """No stale status for this handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for check terminating progress handler (BEP-1030).
+
+        - success: Session/kernel → TERMINATED
+        - need_retry: None
+        - expired: None
+        - give_up: None
+        """
+        return StatusTransitions(
+            success=TransitionStatus(
+                session=SessionStatus.TERMINATED,
+                kernel=KernelStatus.TERMINATED,
+            ),
+            need_retry=None,
+            expired=None,
+            give_up=None,
+        )
 
     @property
     def lock_id(self) -> Optional[LockID]:

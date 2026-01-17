@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
@@ -56,6 +56,20 @@ class DeploymentHandler:
             The failure deployment status, or None if not applicable
         """
         raise NotImplementedError("Subclasses must implement failure_status()")
+
+    @classmethod
+    @abstractmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for different handler outcomes (BEP-1030).
+
+        Returns:
+            DeploymentStatusTransitions defining what lifecycle to transition to for
+            success and failure outcomes.
+
+        Note:
+            - None value: Don't change the deployment lifecycle
+        """
+        raise NotImplementedError("Subclasses must implement status_transitions()")
 
     @abstractmethod
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
