@@ -161,6 +161,7 @@ class UserResourcePolicyRow(Base):
     def to_dataclass(self) -> UserResourcePolicyData:
         return UserResourcePolicyData(
             name=self.name,
+            created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
             max_quota_scope_size=self.max_quota_scope_size,
             max_session_count_per_model_session=self.max_session_count_per_model_session,
