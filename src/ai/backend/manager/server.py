@@ -1454,9 +1454,6 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
-    from .sweeper.kernel import stale_kernel_sweeper_ctx
-    from .sweeper.session import stale_session_sweeper_ctx
-
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1540,8 +1537,6 @@ def build_root_app(
             leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
-            stale_session_sweeper_ctx,
-            stale_kernel_sweeper_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
             gql_adapters_ctx,
