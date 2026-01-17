@@ -16,7 +16,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -1109,26 +1108,6 @@ class TestKernelEventHandlers:
         calls = mock_scheduling_controller.mark_scheduling_needed.call_args_list
         assert calls[0] == call(ScheduleType.CHECK_RUNNING_SESSION_TERMINATION)
         assert calls[1] == call(ScheduleType.CHECK_TERMINATING_PROGRESS)
-
-    async def test_handle_kernel_heartbeat(
-        self,
-        schedule_coordinator: ScheduleCoordinator,
-        mock_kernel_state_engine: MagicMock,
-    ) -> None:
-        """Test handle_kernel_heartbeat updates heartbeat."""
-        # Setup
-        schedule_coordinator._kernel_state_engine = mock_kernel_state_engine
-
-        kernel_id = KernelId(uuid4())
-        event = MagicMock(spec=KernelHeartbeatEvent)
-        event.kernel_id = kernel_id
-
-        # Execute
-        result = await schedule_coordinator.handle_kernel_heartbeat(event)
-
-        # Verify
-        assert result is True
-        mock_kernel_state_engine.update_kernel_heartbeat.assert_called_once_with(kernel_id)
 
 
 class TestImageUpdateMethods:

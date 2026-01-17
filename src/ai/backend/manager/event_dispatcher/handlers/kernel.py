@@ -12,7 +12,6 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -289,16 +288,3 @@ class KernelEventHandler:
                 await self._registry.mark_kernel_terminated(
                     db_conn, event.kernel_id, event.session_id, event.reason, event.exit_code
                 )
-
-    async def handle_kernel_heartbeat(
-        self,
-        context: None,
-        source: AgentId,
-        event: KernelHeartbeatEvent,
-    ) -> None:
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_heartbeat(event)
-        else:
-            # Use legacy registry method
-            await self._registry.mark_kernel_heartbeat(event.kernel_id)

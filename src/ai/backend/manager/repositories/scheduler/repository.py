@@ -544,11 +544,6 @@ class SchedulerRepository:
         return await self._db_source.update_kernels_to_terminated(kernel_ids, reason)
 
     @scheduler_repository_resilience.apply()
-    async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
-        """Update kernel heartbeat timestamp."""
-        return await self._db_source.update_kernel_heartbeat(kernel_id)
-
-    @scheduler_repository_resilience.apply()
     async def get_sessions_for_pull(
         self,
         statuses: list[SessionStatus],

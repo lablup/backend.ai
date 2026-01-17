@@ -10,7 +10,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
@@ -631,10 +630,6 @@ class ScheduleCoordinator:
                 ScheduleType.CHECK_TERMINATING_PROGRESS
             )
         return result
-
-    async def handle_kernel_heartbeat(self, event: KernelHeartbeatEvent) -> bool:
-        """Handle kernel heartbeat event through the kernel state engine."""
-        return await self._kernel_state_engine.update_kernel_heartbeat(event.kernel_id)
 
     # Image-related kernel state update methods
 
