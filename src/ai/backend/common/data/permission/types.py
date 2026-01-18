@@ -145,6 +145,17 @@ class EntityType(enum.StrEnum):
         return {*cls._resource_types(), cls.USER}
 
 
+class FieldType(enum.StrEnum):
+    """Field types for RBAC field-scoped entities.
+
+    Fields are sub-resources that belong to a parent entity.
+    Unlike EntityType which represents scope-scoped entities,
+    FieldType represents entity-scoped sub-entities.
+    """
+
+    KERNEL = "kernel"
+
+
 class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"

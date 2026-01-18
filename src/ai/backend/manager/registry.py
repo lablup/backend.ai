@@ -58,6 +58,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
@@ -156,7 +157,19 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.rbac.field_creator import (
+    RBACBulkFieldCreator,
+    execute_rbac_bulk_field_creator,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.repositories.session.creators import (
+    KernelRowCreatorSpec,
+    SessionRowCreatorSpec,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.utils import query_userinfo
 
@@ -1509,8 +1522,24 @@ class AgentRegistry:
                     session_data["requested_slots"] = session_requested_slots
                     session = SessionRow(**session_data)
                     kernels = [KernelRow(**kernel) for kernel in kernel_data]
-                    db_sess.add(session)
-                    db_sess.add_all(kernels)
+
+                    # Use RBACEntityCreator to create session with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=SessionRowCreatorSpec(row=session),
+                        scope_type=ScopeType.USER,
+                        scope_id=str(session_data["user_uuid"]),
+                        entity_type=EntityType.SESSION,
+                    )
+                    await execute_rbac_entity_creator(db_sess, rbac_creator)
+
+                    # Use RBACBulkFieldCreator to create kernels with RBAC field association
+                    kernel_field_creator = RBACBulkFieldCreator(
+                        specs=[KernelRowCreatorSpec(row=k) for k in kernels],
+                        entity_type=EntityType.SESSION,
+                        entity_id=str(session_id),
+                        field_type=FieldType.KERNEL,
+                    )
+                    await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
                     await db_sess.flush()
 
                     if matched_dependency_session_ids:
