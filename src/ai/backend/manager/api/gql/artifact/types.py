@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Optional, Self
 
@@ -55,6 +56,45 @@ from ai.backend.manager.services.artifact_revision.actions.get import GetArtifac
 
 
 @strawberry.type(
+    name="ArtifactVerifierMetadataEntry",
+    description=dedent_strip("""
+    Added in 26.1.0.
+
+    A single key-value entry representing metadata from an artifact verifier.
+    Contains additional information about the verification process.
+    """),
+)
+class ArtifactVerifierMetadataEntryGQL:
+    """Single metadata entry with key and value."""
+
+    key: str = strawberry.field(description="The key identifier for this metadata entry.")
+    value: str = strawberry.field(description="The value for this metadata entry.")
+
+
+@strawberry.type(
+    name="ArtifactVerifierMetadata",
+    description=dedent_strip("""
+    Added in 26.1.0.
+
+    A collection of metadata from an artifact verifier.
+    Contains key-value pairs providing additional information about the verification.
+    """),
+)
+class ArtifactVerifierMetadataGQL:
+    """Metadata containing multiple key-value entries."""
+
+    entries: list[ArtifactVerifierMetadataEntryGQL] = strawberry.field(
+        description="List of metadata entries. Each entry contains a key-value pair."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
+        """Convert a Mapping to GraphQL type."""
+        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
+        return cls(entries=entries)
+
+
+@strawberry.type(
     name="ArtifactVerifierResult",
     description=dedent_strip("""
     Added in 25.17.0.
@@ -75,7 +115,9 @@ class ArtifactVerifierGQLResult:
         description="Time taken to complete verification in seconds"
     )
     scanned_count: int = strawberry.field(description="Total number of files scanned")
-    metadata: JSON = strawberry.field(description="Additional metadata from the verifier")
+    metadata: ArtifactVerifierMetadataGQL = strawberry.field(
+        description="Added in 26.1.0. Additional metadata from the verifier."
+    )
     error: Optional[str] = strawberry.field(
         description="Fatal error message if the verifier failed to complete"
     )
@@ -88,7 +130,7 @@ class ArtifactVerifierGQLResult:
             scanned_at=data.scanned_at,
             scan_time=data.scan_time,
             scanned_count=data.scanned_count,
-            metadata=data.metadata,
+            metadata=ArtifactVerifierMetadataGQL.from_mapping(data.metadata),
             error=data.error,
         )
 
