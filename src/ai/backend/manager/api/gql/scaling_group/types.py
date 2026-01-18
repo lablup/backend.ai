@@ -15,7 +15,6 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
-    ScalingGroupDriverConfig,
     ScalingGroupMetadata,
     ScalingGroupNetworkConfig,
     ScalingGroupSchedulerConfig,
@@ -34,7 +33,6 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
-    "ScalingGroupDriverConfigGQL",
     "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
     "ScalingGroupNetworkConfigGQL",
@@ -126,29 +124,6 @@ class ScalingGroupNetworkConfigGQL:
             wsproxy_addr=data.wsproxy_addr,
             wsproxy_api_token=data.wsproxy_api_token,
             use_host_network=data.use_host_network,
-        )
-
-
-@strawberry.type(
-    name="ScalingGroupDriverConfig",
-    description="Added in 25.18.0. Driver configuration for resource allocation",
-)
-class ScalingGroupDriverConfigGQL:
-    name: str = strawberry.field(
-        description=dedent_strip("""
-            Agent resource driver implementation name.
-            'static' uses a predefined set of agents registered to this scaling group.
-        """)
-    )
-    options: JSON = strawberry.field(
-        description="Driver-specific configuration options. Contents vary by driver type."
-    )
-
-    @classmethod
-    def from_dataclass(cls, data: ScalingGroupDriverConfig) -> Self:
-        return cls(
-            name=data.name,
-            options=data.options,
         )
 
 
@@ -308,12 +283,6 @@ class ScalingGroupV2GQL(Node):
             (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
         """)
     )
-    driver: ScalingGroupDriverConfigGQL = strawberry.field(
-        description=dedent_strip("""
-            Agent resource management driver determining how compute agents are provisioned
-            and registered to this scaling group (static registration vs dynamic provisioning).
-        """)
-    )
     scheduler: ScalingGroupSchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Session scheduling configuration controlling queue management,
@@ -330,7 +299,6 @@ class ScalingGroupV2GQL(Node):
             status=ScalingGroupStatusGQL.from_dataclass(data.status),
             metadata=ScalingGroupMetadataGQL.from_dataclass(data.metadata),
             network=ScalingGroupNetworkConfigGQL.from_dataclass(data.network),
-            driver=ScalingGroupDriverConfigGQL.from_dataclass(data.driver),
             scheduler=ScalingGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
         )
 
@@ -355,7 +323,6 @@ class ScalingGroupFilterGQL(GQLFilter):
     description: Optional[StringFilter] = None
     is_active: Optional[bool] = None
     is_public: Optional[bool] = None
-    driver: Optional[str] = None
     scheduler: Optional[str] = None
     use_host_network: Optional[bool] = None
 
@@ -402,10 +369,6 @@ class ScalingGroupFilterGQL(GQLFilter):
         # Apply is_public filter
         if self.is_public is not None:
             field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
-
-        # Apply driver filter
-        if self.driver:
-            field_conditions.append(ScalingGroupConditions.by_driver(self.driver))
 
         # Apply scheduler filter
         if self.scheduler:
