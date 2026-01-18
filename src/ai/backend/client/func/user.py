@@ -14,7 +14,7 @@ from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 from ai.backend.client.types import set_if_set
 from ai.backend.client.utils import dedent as _d
-from ai.backend.common.dto.manager.auth.field import AuthResponse, parse_auth_response
+from ai.backend.common.dto.manager.auth.types import AuthResponse, parse_auth_response
 
 from .base import BaseFunction, api_function, resolve_fields
 
