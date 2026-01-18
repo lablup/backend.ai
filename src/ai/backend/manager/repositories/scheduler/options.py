@@ -170,6 +170,13 @@ class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
+    def by_id(kernel_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id == kernel_id
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.session_id.in_(session_ids)
@@ -183,6 +190,36 @@ class KernelConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at > subquery
+
+        return inner
+
 
 class KernelOrders:
     """Query orders for kernels."""
@@ -192,6 +229,18 @@ class KernelOrders:
         if ascending:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.created_at.asc()
+        return KernelRow.created_at.desc()
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.id.asc()
+        return KernelRow.id.desc()
 
 
 class UserConditions:
