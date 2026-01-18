@@ -145,6 +145,17 @@ class EntityType(enum.StrEnum):
         return {*cls._resource_types(), cls.USER}
 
 
+class FieldType(enum.StrEnum):
+    """Field types for RBAC entity-field relationships.
+
+    Field types are objects that do not have their own permission checks.
+    Instead, permission checks are delegated to the parent entity.
+    See BEP-1012 entity-types.md for the complete list.
+    """
+
+    MODEL_REVISION = "model_revision"
+
+
 class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
