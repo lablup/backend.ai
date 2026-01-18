@@ -23,9 +23,14 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SchedulingResult,
+    SessionStatus,
+)
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -41,15 +46,16 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.types import DistributedLockFactory
 
 from .handlers import (
-    CheckCreatingProgressLifecycleHandler,
     CheckPreconditionLifecycleHandler,
-    CheckPullingProgressLifecycleHandler,
-    CheckRunningSessionTerminationLifecycleHandler,
-    CheckTerminatingProgressLifecycleHandler,
+    DetectTerminationPromotionHandler,
+    PromoteToPreparedPromotionHandler,
+    PromoteToRunningPromotionHandler,
+    PromoteToTerminatedPromotionHandler,
     RetryCreatingLifecycleHandler,
     RetryPreparingLifecycleHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
+    SessionPromotionHandler,
     StartSessionsLifecycleHandler,
     SweepLostAgentKernelsLifecycleHandler,
     SweepSessionsLifecycleHandler,
@@ -103,6 +109,7 @@ class ScheduleCoordinator:
     _scheduling_controller: SchedulingController
     _repository: SchedulerRepository
     _lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
+    _promotion_handlers: Mapping[ScheduleType, SessionPromotionHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
     _lock_factory: DistributedLockFactory
@@ -132,6 +139,9 @@ class ScheduleCoordinator:
         # Initialize lifecycle handlers
         self._lifecycle_handlers = self._init_lifecycle_handlers()
 
+        # Initialize promotion handlers
+        self._promotion_handlers = self._init_promotion_handlers()
+
     def _init_lifecycle_handlers(self) -> Mapping[ScheduleType, SessionLifecycleHandler]:
         """Initialize and return the mapping of schedule types to their lifecycle handlers.
 
@@ -140,9 +150,12 @@ class ScheduleCoordinator:
         - Coordinator iterates over scaling groups
         - Handler executes business logic and returns successes/failures/stales
         - Coordinator applies status transitions based on handler's declared statuses
+
+        Note: Promotion handlers (CHECK_*_PROGRESS, CHECK_RUNNING_SESSION_TERMINATION)
+        are now in _init_promotion_handlers() using SessionPromotionHandler interface.
+        Legacy progress handlers are kept here for backward compatibility during migration.
         """
         # Get components for handlers that need them
-        hook_registry = self._components.hook_registry
         launcher = self._components.launcher
         terminator = self._components.terminator
         provisioner = self._components.provisioner
@@ -161,35 +174,14 @@ class ScheduleCoordinator:
                 self._scheduling_controller,
                 self._event_producer,
             ),
-            ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressLifecycleHandler(
-                self._event_producer,
-            ),
             ScheduleType.START: StartSessionsLifecycleHandler(
                 launcher,
                 self._repository,
                 self._event_producer,
             ),
-            ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressLifecycleHandler(
-                self._scheduling_controller,
-                self._event_producer,
-                self._repository,
-                hook_registry,
-            ),
             ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
                 terminator,
                 self._repository,
-            ),
-            ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressLifecycleHandler(
-                self._scheduling_controller,
-                self._event_producer,
-                self._repository,
-                hook_registry,
-            ),
-            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: (
-                CheckRunningSessionTerminationLifecycleHandler(
-                    self._valkey_schedule,
-                    self._repository,
-                )
             ),
             # Recovery handlers
             ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
@@ -210,6 +202,37 @@ class ScheduleCoordinator:
             ),
             ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
                 terminator,
+                self._valkey_schedule,
+                self._repository,
+            ),
+        }
+
+    def _init_promotion_handlers(self) -> Mapping[ScheduleType, SessionPromotionHandler]:
+        """Initialize and return the mapping of schedule types to their promotion handlers.
+
+        Promotion handlers check kernel status conditions (ALL/ANY/NOT_ANY) to
+        determine if sessions should be promoted to a new status.
+        """
+        # Get components for handlers that need them
+        hook_registry = self._components.hook_registry
+
+        return {
+            ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(
+                self._event_producer,
+            ),
+            ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+                hook_registry,
+            ),
+            ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
+                self._scheduling_controller,
+                self._event_producer,
+                self._repository,
+                hook_registry,
+            ),
+            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
                 self._valkey_schedule,
                 self._repository,
             ),
@@ -240,11 +263,24 @@ class ScheduleCoordinator:
         Returns:
             True if operation was performed, False otherwise
         """
-        handler = self._lifecycle_handlers.get(schedule_type)
-        if not handler:
-            log.warning("No lifecycle handler for schedule type: {}", schedule_type.value)
-            return False
+        # Check promotion handlers first, then lifecycle handlers
+        promotion_handler = self._promotion_handlers.get(schedule_type)
+        if promotion_handler:
+            return await self._process_promotion_schedule(schedule_type, promotion_handler)
 
+        lifecycle_handler = self._lifecycle_handlers.get(schedule_type)
+        if lifecycle_handler:
+            return await self._process_lifecycle_handler_schedule(schedule_type, lifecycle_handler)
+
+        log.warning("No handler for schedule type: {}", schedule_type.value)
+        return False
+
+    async def _process_lifecycle_handler_schedule(
+        self,
+        schedule_type: ScheduleType,
+        handler: SessionLifecycleHandler,
+    ) -> bool:
+        """Process a lifecycle handler schedule type."""
         try:
             log.debug("Processing lifecycle schedule type: {}", schedule_type.value)
 
@@ -286,6 +322,62 @@ class ScheduleCoordinator:
         except Exception as e:
             log.exception(
                 "Error processing lifecycle schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_promotion_schedule(
+        self,
+        schedule_type: ScheduleType,
+        handler: SessionPromotionHandler,
+    ) -> bool:
+        """Process a promotion handler schedule type.
+
+        Promotion handlers use ALL/ANY/NOT_ANY kernel status conditions,
+        so they use get_sessions_for_promotion() instead of get_sessions_for_handler().
+        """
+        try:
+            log.debug("Processing promotion schedule type: {}", schedule_type.value)
+
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+
+                # Acquire lock if needed
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
+
+                # Process each scaling group in parallel
+                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+
+                results = await asyncio.gather(
+                    *[
+                        self._process_promotion_scaling_group(handler, schedule_type, scaling_group)
+                        for scaling_group in scaling_groups
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Log any exceptions that occurred during parallel processing
+                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error(
+                            "Error processing scaling group {} for {}: {}",
+                            scaling_group,
+                            schedule_type.value,
+                            result,
+                        )
+
+            return True
+
+        except Exception as e:
+            log.exception(
+                "Error processing promotion schedule type {}: {}",
                 schedule_type.value,
                 e,
             )
@@ -361,6 +453,134 @@ class ScheduleCoordinator:
                     schedule_type.value,
                     scaling_group,
                 )
+
+    async def _process_promotion_scaling_group(
+        self,
+        handler: SessionPromotionHandler,
+        schedule_type: ScheduleType,
+        scaling_group: str,
+    ) -> None:
+        """Process a single scaling group for the given promotion handler.
+
+        This method handles all processing for one scaling group using
+        promotion handler semantics (ALL/ANY/NOT_ANY kernel matching).
+
+        Args:
+            handler: The promotion handler to execute
+            schedule_type: Type of scheduling operation
+            scaling_group: The scaling group to process
+        """
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                SessionConditions.by_scaling_group(scaling_group),
+                SessionConditions.by_statuses(handler.target_statuses()),
+                SessionConditions.by_kernel_match(
+                    handler.target_kernel_statuses(),
+                    handler.kernel_match_type(),
+                ),
+            ],
+        )
+
+        # Query sessions (only session data, no kernels)
+        session_infos = await self._repository.search_sessions_for_handler(querier)
+
+        if not session_infos:
+            return
+
+        session_ids = [info.identity.id for info in session_infos]
+
+        # Create recorder scoped to this scaling group
+        recorder_scope = f"{schedule_type.value}:{scaling_group}"
+        with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
+            # Execute handler logic (handlers receive SessionInfo directly)
+            result = await handler.execute(scaling_group, session_infos)
+
+            # Get recorded steps for history
+            all_records = pool.build_all_records()
+
+            # Apply status transitions immediately for this scaling group
+            await self._handle_promotion_status_transitions(handler, result, all_records)
+
+            # Emit metrics per scaling group
+            self._operation_metrics.observe_success(
+                operation=handler.name(),
+                count=result.success_count(),
+            )
+
+            # Post-process if needed (per scaling group)
+            if result.needs_post_processing():
+                try:
+                    await handler.post_process(result)
+                except Exception as e:
+                    log.error(
+                        "Error during post-processing for scaling group {}: {}",
+                        scaling_group,
+                        e,
+                    )
+
+            # Log recorded steps for this scaling group
+            if all_records:
+                log.debug(
+                    "Recorded {} sessions with execution records for {} in scaling group {}",
+                    len(all_records),
+                    schedule_type.value,
+                    scaling_group,
+                )
+
+    async def _handle_promotion_status_transitions(
+        self,
+        handler: SessionPromotionHandler,
+        result: SessionExecutionResult,
+        records: Mapping[SessionId, ExecutionRecord],
+    ) -> None:
+        """Apply status transitions for promotion handler execution results.
+
+        Promotion handlers only have success outcomes (no failure/stale).
+
+        Args:
+            handler: The promotion handler that produced the result
+            result: Execution result containing successes
+            records: Mapping of session IDs to their execution records for sub_steps
+        """
+        target_statuses = handler.target_statuses()
+        handler_name = handler.name()
+
+        # Update successful sessions
+        success_status = handler.success_status()
+        if result.successes:
+            updater = BatchUpdater(
+                spec=SessionStatusBatchUpdaterSpec(to_status=success_status),
+                conditions=[
+                    SessionConditions.by_ids(result.success_ids()),
+                    SessionConditions.by_statuses(target_statuses),
+                ],
+            )
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=s.session_id,
+                    phase=handler_name,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{handler_name} completed successfully",
+                    from_status=s.from_status,
+                    to_status=success_status,
+                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
+                )
+                for s in result.successes
+            ]
+            updated = await self._repository.update_with_history(
+                updater, BulkCreator(specs=history_specs)
+            )
+            log.debug(
+                "{}: Updated {} sessions to {} (success)",
+                handler_name,
+                updated,
+                success_status,
+            )
+
+        # Apply kernel terminations (processed together with session status changes)
+        if result.kernel_terminations:
+            await self._apply_kernel_terminations(handler_name, result.kernel_terminations)
 
     async def _handle_status_transitions(
         self,
