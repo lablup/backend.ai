@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData, RequesterCtx
+from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
 from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
@@ -11,7 +12,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
+    user_data: UserData
     id: RuleId
     updater: Updater[EndpointAutoScalingRuleRow]
 

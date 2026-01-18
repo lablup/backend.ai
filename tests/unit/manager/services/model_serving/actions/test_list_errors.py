@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import ErrorInfo, RequesterCtx
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import ErrorInfo
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.list_errors import (
@@ -19,10 +20,10 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_check_requester_access_list_errors(mocker, model_serving_service):
+def mock_check_user_access_list_errors(mocker, model_serving_service):
     mock = mocker.patch.object(
         model_serving_service,
-        "check_requester_access",
+        "check_user_access",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -54,10 +55,12 @@ class TestListErrors:
             ScenarioBase.success(
                 "recent errors lookup",
                 ListErrorsAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role=UserRole.USER.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
@@ -87,10 +90,12 @@ class TestListErrors:
             ScenarioBase.success(
                 "error type filtered",
                 ListErrorsAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role=UserRole.USER.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
@@ -116,7 +121,7 @@ class TestListErrors:
         self,
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_list_errors,
+        mock_check_user_access_list_errors,
         mock_get_endpoint_by_id_list_errors,
         mock_get_endpoint_access_validation_data_list_errors,
     ):
@@ -125,9 +130,9 @@ class TestListErrors:
         action = scenario.input
 
         mock_validation_data = MagicMock(
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole(action.user_data.role),
+            domain=action.user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_list_errors.return_value = mock_validation_data
 

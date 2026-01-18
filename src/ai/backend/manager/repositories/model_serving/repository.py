@@ -731,15 +731,16 @@ class ModelServingRepository:
                         load_routes=True,
                         load_image=True,
                     )
-                    match action.requester_ctx.user_role:
+                    user_role = UserRole(action.user_data.role)
+                    match user_role:
                         case UserRole.SUPERADMIN:
                             pass
                         case UserRole.ADMIN:
-                            domain_name = action.requester_ctx.domain_name
+                            domain_name = action.user_data.domain_name
                             if endpoint_row.domain != domain_name:
                                 raise EndpointNotFound
                         case _:
-                            user_id = action.requester_ctx.user_id
+                            user_id = action.user_data.user_id
                             if endpoint_row.session_owner != user_id:
                                 raise EndpointNotFound
                 except NoResultFound:

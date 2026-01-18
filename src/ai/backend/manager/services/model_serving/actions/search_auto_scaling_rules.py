@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
-    RequesterCtx,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -18,7 +18,7 @@ class SearchAutoScalingRulesAction(ModelServiceAction):
     """Action to search endpoint auto scaling rules."""
 
     querier: BatchQuerier
-    requester_ctx: RequesterCtx
+    user_data: UserData
 
     @override
     @classmethod

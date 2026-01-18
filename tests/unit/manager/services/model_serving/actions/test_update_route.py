@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.update_route import (
@@ -18,10 +18,10 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_check_requester_access_update_route(mocker, model_serving_service):
+def mock_check_user_access_update_route(mocker, model_serving_service):
     mock = mocker.patch.object(
         model_serving_service,
-        "check_requester_access",
+        "check_user_access",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -73,10 +73,12 @@ class TestUpdateRoute:
             ScenarioBase.success(
                 "weighted routing",
                 UpdateRouteAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role=UserRole.USER.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
@@ -88,10 +90,12 @@ class TestUpdateRoute:
             ScenarioBase.success(
                 "canary deployment",
                 UpdateRouteAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role=UserRole.USER.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("66666666-7777-8888-9999-aaaaaaaaaaaa"),
@@ -103,10 +107,12 @@ class TestUpdateRoute:
             ScenarioBase.success(
                 "SUPERADMIN blue-green deployment",
                 UpdateRouteAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=True,
+                        role=UserRole.SUPERADMIN.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("77777777-8888-9999-aaaa-bbbbbbbbbbbb"),
@@ -122,7 +128,7 @@ class TestUpdateRoute:
         self,
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_update_route,
+        mock_check_user_access_update_route,
         mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
@@ -132,9 +138,9 @@ class TestUpdateRoute:
 
         # Mock validation data for access validation
         mock_validation_data = MagicMock(
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole(action.user_data.role),
+            domain=action.user_data.domain_name,
         )
 
         # Mock route data
@@ -173,10 +179,12 @@ class TestUpdateRoute:
             ScenarioBase.failure(
                 "non-existent route",
                 UpdateRouteAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
+                    user_data=UserData(
                         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
+                        is_authorized=True,
+                        is_admin=False,
+                        is_superadmin=False,
+                        role=UserRole.USER.value,
                         domain_name="default",
                     ),
                     service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
@@ -192,7 +200,7 @@ class TestUpdateRoute:
         self,
         scenario: ScenarioBase[UpdateRouteAction, Exception],
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_update_route,
+        mock_check_user_access_update_route,
         mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
     ):
@@ -200,9 +208,9 @@ class TestUpdateRoute:
 
         # Mock validation data for access validation
         mock_validation_data = MagicMock(
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole(action.user_data.role),
+            domain=action.user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
 
@@ -218,17 +226,19 @@ class TestUpdateRoute:
     async def test_update_route_appproxy_failure(
         self,
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_update_route,
+        mock_check_user_access_update_route,
         mock_get_endpoint_access_validation_data_update_route,
         mock_update_route_traffic,
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
     ):
         action = UpdateRouteAction(
-            requester_ctx=RequesterCtx(
-                is_authorized=True,
+            user_data=UserData(
                 user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                user_role=UserRole.USER,
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role=UserRole.USER.value,
                 domain_name="default",
             ),
             service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
@@ -238,9 +248,9 @@ class TestUpdateRoute:
 
         # Mock validation data for access validation
         mock_validation_data = MagicMock(
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
+            session_owner_id=action.user_data.user_id,
+            session_owner_role=UserRole(action.user_data.role),
+            domain=action.user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
 

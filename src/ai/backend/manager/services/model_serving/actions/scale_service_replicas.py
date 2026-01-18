@@ -4,9 +4,9 @@ from typing import Optional, Self, override
 from pydantic import model_validator
 from pydantic.dataclasses import dataclass
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
 )
@@ -14,7 +14,7 @@ from ai.backend.manager.services.model_serving.actions.base import (
 
 @dataclass
 class ScaleServiceReplicasAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
+    user_data: UserData
     max_session_count_per_model_session: int
     service_id: uuid.UUID
     to: int

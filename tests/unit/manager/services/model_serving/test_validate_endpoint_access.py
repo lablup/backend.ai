@@ -11,9 +11,9 @@ from typing import NamedTuple
 
 import pytest
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
-    RequesterCtx,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
@@ -151,11 +151,13 @@ def test_validate_endpoint_access(case: EndpointAccessCase) -> None:
         domain=case.endpoint_domain,
     )
 
-    requester_ctx = RequesterCtx(
-        is_authorized=True,
+    user_data = UserData(
         user_id=user_id,
-        user_role=case.requester_role,
+        is_authorized=True,
+        is_admin=case.requester_role == UserRole.ADMIN,
+        is_superadmin=case.requester_role == UserRole.SUPERADMIN,
+        role=case.requester_role.value,
         domain_name=case.requester_domain,
     )
 
-    assert validate_endpoint_access(validation_data, requester_ctx) == case.expected
+    assert validate_endpoint_access(validation_data, user_data) == case.expected
