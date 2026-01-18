@@ -7,18 +7,13 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
-    SessionExecutionResult,
-)
+from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
 from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo, SessionWithKernels
 
 if TYPE_CHECKING:
@@ -41,11 +36,9 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         self,
         terminator: SessionTerminator,
         valkey_schedule_client: ValkeyScheduleClient,
-        repository: SchedulerRepository,
     ) -> None:
         self._terminator = terminator
         self._valkey_schedule_client = valkey_schedule_client
-        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -105,6 +98,7 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         sweep_result = await self._terminator.sweep_stale_kernels_for_handler(list(sessions))
 
         # Add kernel terminations for Coordinator to process
+        # Note: This handler will be refactored in Phase 3 when KernelLifecycleHandler is introduced
         for kernel_id in sweep_result.dead_kernel_ids:
             result.kernel_terminations.append(
                 KernelTerminationInfo(
@@ -113,33 +107,14 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
                 )
             )
 
-        # Build scheduled data for affected sessions
-        for session in sweep_result.affected_sessions:
-            result.scheduled_data.append(
-                ScheduledSessionData(
-                    session_id=session.session_info.identity.id,
-                    creation_id=session.session_info.identity.creation_id,
-                    access_key=AccessKey(session.session_info.metadata.access_key),
-                    reason="STALE_KERNEL",
-                )
-            )
-
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
-        """Trigger CHECK_RUNNING_SESSION_TERMINATION and invalidate cache."""
-        log.info("Swept kernels affecting {} sessions", len(result.scheduled_data))
-
-        if result.scheduled_data:
+        """Trigger CHECK_RUNNING_SESSION_TERMINATION for swept kernels."""
+        if result.kernel_terminations:
+            log.info("Swept {} stale kernels", len(result.kernel_terminations))
             # Trigger CHECK_RUNNING_SESSION_TERMINATION to check if sessions need termination
             await self._valkey_schedule_client.mark_schedule_needed(
                 ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
             )
-
-            # Invalidate cache for affected access keys
-            affected_keys: set[AccessKey] = {
-                event_data.access_key for event_data in result.scheduled_data
-            }
-            if affected_keys:
-                await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-                log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
+            # Note: Cache invalidation will be handled in Phase 3 with KernelLifecycleHandler

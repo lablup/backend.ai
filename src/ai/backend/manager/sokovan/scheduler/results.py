@@ -47,14 +47,19 @@ class ScheduleResult:
 
 @dataclass
 class SessionTransitionInfo:
-    """Session transition information for history recording.
+    """Session transition information for history recording and event broadcasting.
 
     Contains session_id with its actual from_status at the time of processing.
+    Also includes creation_id and access_key for:
+    - Event broadcasting (session_id, creation_id, reason)
+    - Cache invalidation (access_key)
     """
 
     session_id: SessionId
     from_status: SessionStatus
     reason: Optional[str] = None
+    creation_id: Optional[str] = None
+    access_key: Optional[AccessKey] = None
 
 
 @dataclass
@@ -108,16 +113,12 @@ class SessionExecutionResult:
     failures: list[SessionTransitionInfo] = field(default_factory=list)
     skipped: list[SessionTransitionInfo] = field(default_factory=list)
 
-    # For post-processing (event broadcasting, cache invalidation)
-    scheduled_data: list[ScheduledSessionData] = field(default_factory=list)
     # Kernel terminations to be processed together with session status changes
+    # Note: Will be moved to KernelExecutionResult in Phase 3
     kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
     # Sessions transitioning to RUNNING with their occupied_slots
+    # Note: Will be removed in Phase 2 with batch hook processing
     sessions_running_data: list[SessionRunningData] = field(default_factory=list)
-
-    def needs_post_processing(self) -> bool:
-        """Check if post-processing is needed based on the result."""
-        return len(self.scheduled_data) > 0
 
     def success_count(self) -> int:
         """Get the count of successfully processed sessions."""
@@ -140,6 +141,5 @@ class SessionExecutionResult:
         self.successes.extend(other.successes)
         self.failures.extend(other.failures)
         self.skipped.extend(other.skipped)
-        self.scheduled_data.extend(other.scheduled_data)
         self.kernel_terminations.extend(other.kernel_terminations)
         self.sessions_running_data.extend(other.sessions_running_data)

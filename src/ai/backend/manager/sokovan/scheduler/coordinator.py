@@ -15,6 +15,10 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.session.broadcast import (
+    SchedulingBroadcastEvent,
+)
+from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
@@ -200,19 +204,16 @@ class ScheduleCoordinator:
             ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
                 provisioner,
                 self._scheduling_controller,
-                self._event_producer,
                 self._repository,
             ),
             ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
                 launcher,
                 self._repository,
                 self._scheduling_controller,
-                self._event_producer,
             ),
             ScheduleType.START: StartSessionsLifecycleHandler(
                 launcher,
                 self._repository,
-                self._event_producer,
             ),
             ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
                 terminator,
@@ -238,7 +239,6 @@ class ScheduleCoordinator:
             ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
                 terminator,
                 self._valkey_schedule,
-                self._repository,
             ),
         }
 
@@ -249,17 +249,13 @@ class ScheduleCoordinator:
         determine if sessions should be promoted to a new status.
         """
         return {
-            ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(
-                self._event_producer,
-            ),
+            ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
             ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
                 self._scheduling_controller,
-                self._event_producer,
                 self._repository,
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
                 self._scheduling_controller,
-                self._event_producer,
                 self._repository,
             ),
             ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
@@ -464,8 +460,8 @@ class ScheduleCoordinator:
                 count=result.success_count(),
             )
 
-            # Post-process if needed (per scaling group)
-            if result.needs_post_processing():
+            # Post-process if there are any results
+            if result.successes or result.failures or result.kernel_terminations:
                 try:
                     await handler.post_process(result)
                 except Exception as e:
@@ -538,8 +534,8 @@ class ScheduleCoordinator:
                 count=result.success_count(),
             )
 
-            # Post-process if needed (per scaling group)
-            if result.needs_post_processing():
+            # Post-process if there are any results
+            if result.successes or result.failures:
                 try:
                     await handler.post_process(result)
                 except Exception as e:
@@ -621,6 +617,9 @@ class ScheduleCoordinator:
                 SchedulingResult.SUCCESS,
                 records,
             )
+
+            # Broadcast events for successful transitions
+            await self._broadcast_transition_events(sessions_to_transition, to_status)
 
     async def _execute_transition_hooks(
         self,
@@ -718,6 +717,49 @@ class ScheduleCoordinator:
         hook = self._hook_registry.get_hook(session_type)
         await hook.on_transition(session, status)
 
+    async def _broadcast_transition_events(
+        self,
+        sessions: list[SessionTransitionInfo],
+        to_status: SessionStatus,
+    ) -> None:
+        """Broadcast scheduling events for session status transitions.
+
+        Creates SchedulingBroadcastEvent for each session and broadcasts them in batch.
+        Uses session data from SessionTransitionInfo (session_id, creation_id, reason).
+
+        Args:
+            sessions: Sessions that transitioned successfully
+            to_status: The target status sessions transitioned to
+        """
+        if not sessions:
+            return
+
+        events: list[AbstractBroadcastEvent] = []
+        for session_info in sessions:
+            if session_info.creation_id is None:
+                log.warning(
+                    "Skipping event broadcast for session {} - missing creation_id",
+                    session_info.session_id,
+                )
+                continue
+
+            events.append(
+                SchedulingBroadcastEvent(
+                    session_id=session_info.session_id,
+                    creation_id=session_info.creation_id,
+                    status_transition=str(to_status),
+                    reason=session_info.reason or "triggered-by-scheduler",
+                )
+            )
+
+        if events:
+            await self._event_producer.broadcast_events_batch(events)
+            log.debug(
+                "Broadcast {} transition events for status {}",
+                len(events),
+                to_status,
+            )
+
     async def _handle_result(
         self,
         handler: SessionLifecycleHandler,
@@ -751,6 +793,11 @@ class ScheduleCoordinator:
                 SchedulingResult.SUCCESS,
                 records,
             )
+            # Broadcast events for successful transitions
+            if transitions.success.session:
+                await self._broadcast_transition_events(
+                    result.successes, transitions.success.session
+                )
 
         # FAILURE transitions - Coordinator classifies failures into need_retry/expired/give_up
         # TODO: Implement policy-based classification in Phase 4:

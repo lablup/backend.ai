@@ -6,11 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.session.broadcast import (
-    SchedulingBroadcastEvent,
-)
-from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -28,7 +23,6 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
@@ -47,20 +41,18 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
     - Coordinator queries sessions with CREATING status and ALL kernels RUNNING
     - Handler calculates occupied_slots from all kernels
     - Handler returns sessions_running_data for Coordinator to update
-    - Coordinator executes hooks and applies status transition to RUNNING
+    - Coordinator executes hooks, applies status transition, and broadcasts events
 
-    Note: Hook execution and occupied_slots update are handled by Coordinator
-    after handler returns, ensuring hook failures don't affect sessions.
+    Note: Hook execution, occupied_slots update, and event broadcasting are handled
+    by Coordinator after handler returns, ensuring hook failures don't affect sessions.
     """
 
     def __init__(
         self,
         scheduling_controller: SchedulingController,
-        event_producer: EventProducer,
         repository: SchedulerRepository,
     ) -> None:
         self._scheduling_controller = scheduling_controller
-        self._event_producer = event_producer
         self._repository = repository
 
     @classmethod
@@ -146,31 +138,15 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                )
-            )
-            result.scheduled_data.append(
-                ScheduledSessionData(
-                    session_id=session_info.identity.id,
+                    reason="triggered-by-scheduler",
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
-                    reason="triggered-by-scheduler",
                 )
             )
 
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
-        """Broadcast events for sessions that transitioned to RUNNING."""
+        """Request next scheduling phase. Events are broadcast by Coordinator."""
         await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
-        log.info("{} sessions transitioned to RUNNING state", len(result.scheduled_data))
-
-        events: list[AbstractBroadcastEvent] = [
-            SchedulingBroadcastEvent(
-                session_id=event_data.session_id,
-                creation_id=event_data.creation_id,
-                status_transition=str(SessionStatus.RUNNING),
-                reason=event_data.reason,
-            )
-            for event_data in result.scheduled_data
-        ]
-        await self._event_producer.broadcast_events_batch(events)
+        log.info("{} sessions transitioned to RUNNING state", len(result.successes))
