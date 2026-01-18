@@ -70,20 +70,30 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
+    # Scope types
     USER = "user"
     PROJECT = "project"
     DOMAIN = "domain"
 
+    # Resource types
     VFOLDER = "vfolder"
     IMAGE = "image"
     SESSION = "session"
-
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
     APP_CONFIG = "app_config"
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"
+
+    # Infrastructure types
+    AGENT = "agent"
+    RESOURCE_GROUP = "resource_group"
+    STORAGE_HOST = "storage_host"
+
+    # RBAC types
+    ROLE = "role"
+    ROLE_ASSIGNMENT = "role_assignment"
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:

@@ -1,0 +1,232 @@
+"""GraphQL role types for RBAC system."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional, Self, override
+
+import strawberry
+from strawberry import ID
+from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
+from ai.backend.manager.data.permission.role import RoleDetailData
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.repositories.permission_controller.options import RoleConditions, RoleOrders
+
+from .enums import EntityTypeGQL, RoleOrderField, RoleSourceGQL, ScopeTypeGQL
+from .helper import paginate_in_memory
+from .permission import (
+    ObjectPermission,
+    ObjectPermissionConnection,
+    ObjectPermissionEdge,
+)
+from .scope import Scope
+
+# ==============================================================================
+# Filter Types
+# ==============================================================================
+
+
+@strawberry.input(description="Added in 26.1.0. Filter for scope type")
+class ScopeTypeFilter:
+    in_: Optional[list[ScopeTypeGQL]] = strawberry.field(default=None, name="in")
+    equals: Optional[ScopeTypeGQL] = None
+
+
+@strawberry.input(description="Added in 26.1.0. Filter for role source")
+class RoleSourceFilter:
+    in_: Optional[list[RoleSourceGQL]] = strawberry.field(default=None, name="in")
+    equals: Optional[RoleSourceGQL] = None
+
+
+@strawberry.input(description="Added in 26.1.0. Filter options for role queries")
+class RoleFilter(GQLFilter):
+    scope_type: Optional[ScopeTypeFilter] = None
+    scope_id: Optional[ID] = None
+    source: Optional[RoleSourceFilter] = None
+    name: Optional[StringFilter] = None
+    has_permission_for: Optional[EntityTypeGQL] = None
+
+    AND: Optional[list[RoleFilter]] = None
+    OR: Optional[list[RoleFilter]] = None
+    NOT: Optional[list[RoleFilter]] = None
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter."""
+        field_conditions: list[QueryCondition] = []
+
+        # Apply name filter
+        if self.name:
+            name_condition = self.name.build_query_condition(
+                contains_factory=RoleConditions.by_name_contains,
+                equals_factory=RoleConditions.by_name_equals,
+                starts_with_factory=RoleConditions.by_name_starts_with,
+                ends_with_factory=RoleConditions.by_name_ends_with,
+            )
+            if name_condition:
+                field_conditions.append(name_condition)
+
+        # Apply scope_type filter
+        if self.scope_type:
+            if self.scope_type.equals:
+                field_conditions.append(RoleConditions.by_scope_type(self.scope_type.equals))
+            elif self.scope_type.in_:
+                type_conditions = [RoleConditions.by_scope_type(st) for st in self.scope_type.in_]
+                field_conditions.append(combine_conditions_or(type_conditions))
+
+        # Apply scope_id filter
+        if self.scope_id:
+            field_conditions.append(RoleConditions.by_scope_id(str(self.scope_id)))
+
+        # Apply source filter
+        if self.source:
+            if self.source.equals:
+                field_conditions.append(RoleConditions.by_sources([self.source.equals]))
+            elif self.source.in_:
+                field_conditions.append(RoleConditions.by_sources(list(self.source.in_)))
+
+        # Apply has_permission_for filter
+        if self.has_permission_for:
+            field_conditions.append(RoleConditions.by_has_permission_for(self.has_permission_for))
+
+        # Handle logical operators
+        if self.AND:
+            and_conditions = [cond for f in self.AND for cond in f.build_conditions()]
+            if and_conditions:
+                field_conditions.extend(and_conditions)
+
+        if self.OR:
+            or_conditions = [cond for f in self.OR for cond in f.build_conditions()]
+            if or_conditions:
+                field_conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions = [cond for f in self.NOT for cond in f.build_conditions()]
+            if not_conditions:
+                field_conditions.append(negate_conditions(not_conditions))
+
+        return field_conditions if field_conditions else []
+
+
+# ==============================================================================
+# OrderBy Types
+# ==============================================================================
+
+
+@strawberry.input(description="Added in 26.1.0. Ordering options for role queries")
+class RoleOrderBy(GQLOrderBy):
+    field: RoleOrderField
+    direction: OrderDirection = OrderDirection.ASC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case RoleOrderField.NAME:
+                return RoleOrders.name(ascending)
+            case RoleOrderField.CREATED_AT:
+                return RoleOrders.created_at(ascending)
+            case RoleOrderField.UPDATED_AT:
+                return RoleOrders.updated_at(ascending)
+
+
+# ==============================================================================
+# Object Types
+# ==============================================================================
+
+
+@strawberry.type(
+    description="Added in 26.1.0. Role: defines a collection of permissions bound to specific scopes"
+)
+class Role(Node):
+    id: NodeID[str]
+    name: str
+    description: Optional[str]
+    scopes: list[Scope]
+    source: RoleSourceGQL
+    created_at: datetime
+    updated_at: Optional[datetime]
+    deleted_at: Optional[datetime]
+
+    # Private fields for lazy loading
+    # TODO: Refactor to fetch permissions via separate DB queries instead of in-memory pagination.
+    #       Currently, all permissions are loaded upfront and paginated in memory.
+    #       For better performance, implement DB-level pagination.
+    _object_permissions_data: strawberry.Private[list[ObjectPermissionData]]
+
+    @strawberry.field(description="Added in 26.1.0. Object permissions for this role")
+    def object_permissions(
+        self,
+        first: Optional[int] = None,
+        after: Optional[str] = None,
+        last: Optional[int] = None,
+        before: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> ObjectPermissionConnection:
+        """Fetch object permissions with optional pagination."""
+        all_perms = [ObjectPermission.from_dataclass(op) for op in self._object_permissions_data]
+
+        result = paginate_in_memory(all_perms, first, after, last, before, limit, offset)
+
+        edges = [
+            ObjectPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id)))
+            for perm in result.items
+        ]
+
+        return ObjectPermissionConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
+
+    @classmethod
+    def from_dataclass(cls, data: RoleDetailData) -> Self:
+        scopes = [
+            Scope.from_permission_group(permission_group)
+            for permission_group in data.permission_groups
+        ]
+
+        return cls(
+            id=ID(str(data.id)),
+            name=data.name,
+            description=data.description,
+            scopes=scopes,
+            source=data.source,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+            deleted_at=data.deleted_at,
+            _object_permissions_data=data.object_permissions,
+        )
+
+
+# ==============================================================================
+# Connection Types (Relay Specification)
+# ==============================================================================
+
+
+RoleEdge = Edge[Role]
+
+
+@strawberry.type(description="Added in 26.1.0. Connection type for paginated roles")
+class RoleConnection(Connection[Role]):
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
