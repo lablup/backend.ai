@@ -6,11 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.session.broadcast import (
-    SchedulingBroadcastEvent,
-)
-from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -41,18 +36,17 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
     - Coordinator queries sessions with PENDING status per scaling group
     - Handler delegates to Provisioner for session scheduling
     - Successfully scheduled sessions are moved to SCHEDULED status
+    - Coordinator broadcasts events after status transition
     """
 
     def __init__(
         self,
         provisioner: SessionProvisioner,
         scheduling_controller: SchedulingController,
-        event_producer: EventProducer,
         repository: SchedulerRepository,
     ) -> None:
         self._provisioner = provisioner
         self._scheduling_controller = scheduling_controller
-        self._event_producer = event_producer
         self._repository = repository
 
     @classmethod
@@ -143,35 +137,24 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=event_data.session_id,
                     from_status=from_status,
+                    reason=event_data.reason,
+                    creation_id=event_data.creation_id,
+                    access_key=event_data.access_key,
                 )
             )
-            result.scheduled_data.append(event_data)
 
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
-        """Request precondition check and invalidate cache."""
+        """Request precondition check and invalidate cache. Events are broadcast by Coordinator."""
         # Request next phase first
         await self._scheduling_controller.mark_scheduling_needed(ScheduleType.CHECK_PRECONDITION)
         log.info("Scheduled {} sessions, requesting precondition check", len(result.successes))
 
         # Invalidate cache for affected access keys
         affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_data
+            s.access_key for s in result.successes if s.access_key
         }
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
             log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
-
-        # Broadcast batch event for scheduled sessions
-        events: list[AbstractBroadcastEvent] = [
-            SchedulingBroadcastEvent(
-                session_id=event_data.session_id,
-                creation_id=event_data.creation_id,
-                status_transition=str(SessionStatus.SCHEDULED),
-                reason=event_data.reason,
-            )
-            for event_data in result.scheduled_data
-        ]
-        if events:
-            await self._event_producer.broadcast_events_batch(events)

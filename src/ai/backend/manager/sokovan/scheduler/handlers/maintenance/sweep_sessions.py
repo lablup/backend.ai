@@ -14,7 +14,6 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
@@ -120,14 +119,8 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
                         session_id=timed_out.session_id,
                         from_status=session_data.session_info.lifecycle.status,
                         reason="PENDING_TIMEOUT_EXCEEDED",
-                    )
-                )
-                result.scheduled_data.append(
-                    ScheduledSessionData(
-                        session_id=timed_out.session_id,
                         creation_id=timed_out.creation_id,
                         access_key=timed_out.access_key,
-                        reason="sweeped-as-stale",
                     )
                 )
 
@@ -138,7 +131,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         log.info("Swept {} failed sessions", len(result.failures))
         # Invalidate cache for affected access keys
         affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_data
+            s.access_key for s in result.failures if s.access_key
         }
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))

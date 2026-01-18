@@ -21,7 +21,6 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
@@ -101,14 +100,9 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                )
-            )
-            result.scheduled_data.append(
-                ScheduledSessionData(
-                    session_id=session_info.identity.id,
+                    reason="ABNORMAL_TERMINATION",
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
-                    reason="ABNORMAL_TERMINATION",
                 )
             )
 
@@ -121,10 +115,13 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
         return result
 
     async def post_process(self, result: SessionExecutionResult) -> None:
-        """Trigger CHECK_TERMINATING_PROGRESS and invalidate cache."""
+        """Trigger CHECK_TERMINATING_PROGRESS and invalidate cache.
+
+        Events are broadcast by Coordinator.
+        """
         log.info(
             "{} RUNNING sessions marked as TERMINATING",
-            len(result.scheduled_data),
+            len(result.successes),
         )
 
         # Trigger CHECK_TERMINATING_PROGRESS to finalize session termination
@@ -134,7 +131,7 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
 
         # Invalidate cache for affected access keys
         affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_data
+            s.access_key for s in result.successes if s.access_key
         }
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
