@@ -331,9 +331,11 @@ class TestProcessLifecycleSchedule:
         schedule_coordinator: ScheduleCoordinator,
     ) -> None:
         """Test process_lifecycle_schedule returns False when no handler exists."""
-        # Clear lifecycle handlers
+        # Clear both lifecycle and promotion handlers
         schedule_coordinator._lifecycle_handlers = {}
+        schedule_coordinator._promotion_handlers = {}
 
+        # Use a schedule type that has no handler
         result = await schedule_coordinator.process_lifecycle_schedule(
             ScheduleType.CHECK_PULLING_PROGRESS
         )
@@ -350,10 +352,9 @@ class TestProcessLifecycleSchedule:
         """Test process_lifecycle_schedule iterates over scaling groups."""
         session_sg1, session_sg2, session_sg3 = sessions_for_multi_scaling_group_iteration
 
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler, not a promotion handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         # Multiple scaling groups
@@ -375,9 +376,7 @@ class TestProcessLifecycleSchedule:
             ]
         )
 
-        result = await schedule_coordinator.process_lifecycle_schedule(
-            ScheduleType.CHECK_PULLING_PROGRESS
-        )
+        result = await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         assert result is True
         assert mock_repository.get_schedulable_scaling_groups.call_count == 1
@@ -392,10 +391,9 @@ class TestProcessLifecycleSchedule:
         session_for_empty_scaling_group_skip: MagicMock,
     ) -> None:
         """Test process_lifecycle_schedule skips scaling groups with no sessions."""
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
@@ -406,7 +404,7 @@ class TestProcessLifecycleSchedule:
 
         mock_lifecycle_handler.execute.return_value = SessionExecutionResult()
 
-        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         # Handler execute should only be called once (for sg2)
         assert mock_lifecycle_handler.execute.call_count == 1
@@ -419,10 +417,9 @@ class TestProcessLifecycleSchedule:
         session_for_post_process_verification: MagicMock,
     ) -> None:
         """Test process_lifecycle_schedule calls post_process when needed."""
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_sessions_for_handler.return_value = [
@@ -447,7 +444,7 @@ class TestProcessLifecycleSchedule:
             ],
         )
 
-        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         # Verify post_process was called
         mock_lifecycle_handler.post_process.assert_called_once()
@@ -744,10 +741,9 @@ class TestScalingGroupProcessing:
         """Test process_lifecycle_schedule processes each scaling group independently."""
         session1, session2 = sessions_for_independent_scaling_group_processing
 
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
@@ -775,7 +771,7 @@ class TestScalingGroupProcessing:
             ),
         ]
 
-        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         # Verify status updates were called per scaling group (2 separate calls)
         calls = mock_repository.update_with_history.call_args_list
@@ -801,10 +797,9 @@ class TestScalingGroupProcessing:
         """Test post_process is called per scaling group, not merged."""
         session1, session2 = sessions_for_independent_scaling_group_processing
 
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2"]
@@ -848,7 +843,7 @@ class TestScalingGroupProcessing:
             ),
         ]
 
-        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         # Verify post_process was called twice (once per scaling group)
         assert mock_lifecycle_handler.post_process.call_count == 2
@@ -863,10 +858,9 @@ class TestScalingGroupProcessing:
         """Test parallel processing continues even when one scaling group fails."""
         session1, session2, session3 = sessions_for_parallel_processing_with_error
 
-        # Setup
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_lifecycle_handler
-        }
+        # Setup - use SWEEP which is a lifecycle handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_lifecycle_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository
 
         mock_repository.get_schedulable_scaling_groups.return_value = ["sg1", "sg2", "sg3"]
@@ -897,9 +891,7 @@ class TestScalingGroupProcessing:
         ]
 
         # Execute - should not raise despite one scaling group failing
-        result = await schedule_coordinator.process_lifecycle_schedule(
-            ScheduleType.CHECK_PULLING_PROGRESS
-        )
+        result = await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         assert result is True
         # Handler was called 3 times (once per scaling group)
@@ -1399,7 +1391,7 @@ class TestLockAcquisition:
         """Test that no lock is acquired when handler has no lock_id."""
         # Setup handler without lock_id
         mock_handler = MagicMock(spec=SessionLifecycleHandler)
-        mock_handler.name = MagicMock(return_value="check-progress")
+        mock_handler.name = MagicMock(return_value="sweep-sessions")
         mock_handler.lock_id = None
         mock_handler.target_statuses = MagicMock(return_value=[SessionStatus.PREPARING])
         mock_handler.target_kernel_statuses = MagicMock(return_value=[])
@@ -1409,13 +1401,13 @@ class TestLockAcquisition:
         mock_handler.execute = AsyncMock(return_value=SessionExecutionResult())
         mock_handler.post_process = AsyncMock()
 
-        schedule_coordinator._lifecycle_handlers = {
-            ScheduleType.CHECK_PULLING_PROGRESS: mock_handler
-        }
+        # Use SWEEP which is a lifecycle handler, not a promotion handler
+        schedule_coordinator._lifecycle_handlers = {ScheduleType.SWEEP: mock_handler}
+        schedule_coordinator._promotion_handlers = {}
         schedule_coordinator._repository = mock_repository_for_lock
 
         # Execute
-        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.CHECK_PULLING_PROGRESS)
+        await schedule_coordinator.process_lifecycle_schedule(ScheduleType.SWEEP)
 
         # Verify lock was NOT acquired
         mock_lock_factory.assert_not_called()
