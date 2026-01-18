@@ -71,21 +71,6 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         return None
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """Successfully scheduled sessions move to SCHEDULED."""
-        return SessionStatus.SCHEDULED
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status - failed scheduling stays PENDING."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """No stale status for scheduling handler."""
-        return None
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for scheduling handler (BEP-1030).
 

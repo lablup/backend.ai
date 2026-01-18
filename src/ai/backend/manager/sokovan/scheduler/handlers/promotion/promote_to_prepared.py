@@ -16,10 +16,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     KernelMatchType,
+    PromotionStatusTransitions,
     SessionInfo,
     SessionStatus,
-    StatusTransitions,
-    TransitionStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
@@ -71,28 +70,12 @@ class PromoteToPreparedPromotionHandler(SessionPromotionHandler):
         return KernelMatchType.ALL
 
     @classmethod
-    def success_status(cls) -> SessionStatus:
-        """Sessions transition to PREPARED on success."""
-        return SessionStatus.PREPARED
-
-    @classmethod
-    def status_transitions(cls) -> StatusTransitions:
+    def status_transitions(cls) -> PromotionStatusTransitions:
         """Define state transitions for promote to prepared handler (BEP-1030).
 
-        - success: Session/kernel → PREPARED
-        - need_retry: None
-        - expired: None
-        - give_up: None
+        Session → PREPARED (kernel status unchanged, driven by agent events)
         """
-        return StatusTransitions(
-            success=TransitionStatus(
-                session=SessionStatus.PREPARED,
-                kernel=KernelStatus.PREPARED,
-            ),
-            need_retry=None,
-            expired=None,
-            give_up=None,
-        )
+        return PromotionStatusTransitions(success=SessionStatus.PREPARED)
 
     @property
     def lock_id(self) -> Optional[LockID]:

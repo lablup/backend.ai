@@ -847,6 +847,24 @@ class SchedulerRepository:
         return await self._db_source.update_with_history(updater, bulk_creator)
 
     @scheduler_repository_resilience.apply()
+    async def create_scheduling_history(
+        self,
+        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+    ) -> int:
+        """Create scheduling history records without status update.
+
+        Used for recording skipped sessions where no status change occurs
+        but the scheduling attempt should be recorded in history.
+
+        Args:
+            bulk_creator: BulkCreator containing specs for history records
+
+        Returns:
+            Number of history records created
+        """
+        return await self._db_source.create_scheduling_history(bulk_creator)
+
+    @scheduler_repository_resilience.apply()
     async def update_kernels_status_bulk(
         self,
         session_ids: list[SessionId],

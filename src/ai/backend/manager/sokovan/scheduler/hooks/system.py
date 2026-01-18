@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 from .base import AbstractSessionHook
@@ -16,14 +17,13 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class SystemSessionHook(AbstractSessionHook):
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
         log.debug(
-            "System session {} transitioning to RUNNING",
+            "System session {} transitioning to {}",
             session.session_info.identity.id,
-        )
-
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
-        log.debug(
-            "System session {} transitioning to TERMINATED",
-            session.session_info.identity.id,
+            status,
         )

@@ -69,21 +69,6 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         return [KernelStatus.PREPARED]
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """Sessions transition to CREATING on success."""
-        return SessionStatus.CREATING
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status - sessions stay in PREPARED state."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """No stale status for this handler."""
-        return None
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for start sessions handler (BEP-1030).
 

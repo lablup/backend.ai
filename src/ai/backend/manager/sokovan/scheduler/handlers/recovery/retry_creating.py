@@ -60,21 +60,6 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
         return None
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """No status change on retry - sessions stay in CREATING."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status for retry handler."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """Sessions exceeding max retries transition to PENDING for re-scheduling."""
-        return SessionStatus.PENDING
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for retry creating handler (BEP-1030).
 
@@ -153,7 +138,7 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
                 )
             )
 
-        # Sessions that exceeded max retries go to stales (Coordinator applies PENDING)
+        # Sessions that exceeded max retries are failures (Coordinator applies policy-based transition)
         for session_id in retry_result.exceeded_ids:
             original_session = session_map.get(session_id)
             from_status = (
@@ -161,7 +146,7 @@ class RetryCreatingLifecycleHandler(SessionLifecycleHandler):
                 if original_session
                 else SessionStatus.CREATING  # fallback to expected status
             )
-            result.stales.append(
+            result.failures.append(
                 SessionTransitionInfo(
                     session_id=session_id,
                     from_status=from_status,

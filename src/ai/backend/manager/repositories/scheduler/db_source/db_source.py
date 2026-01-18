@@ -3790,42 +3790,82 @@ class ScheduleDBSource:
             # 1. Execute batch update
             update_result = await execute_batch_updater(db_sess, updater)
 
-            if not bulk_creator.specs:
-                return update_result.updated_count
-
-            # 2. Build rows from specs (respects abstraction)
-            new_rows = [spec.build_row() for spec in bulk_creator.specs]
-            session_ids = [SessionId(row.session_id) for row in new_rows]
-
-            # 3. Get last history records for all sessions
-            last_records = await self._get_last_session_histories_bulk(db_sess, session_ids)
-
-            # 4. Separate rows into merge and create groups
-            merge_ids: list[UUID] = []
-            create_rows: list[SessionSchedulingHistoryRow] = []
-
-            for new_row in new_rows:
-                last_row = last_records.get(SessionId(new_row.session_id))
-
-                if last_row is not None and last_row.should_merge_with(new_row):
-                    merge_ids.append(last_row.id)
-                else:
-                    create_rows.append(new_row)
-
-            # 5. Batch update attempts for merge group
-            if merge_ids:
-                await db_sess.execute(
-                    sa.update(SessionSchedulingHistoryRow)
-                    .where(SessionSchedulingHistoryRow.id.in_(merge_ids))
-                    .values(attempts=SessionSchedulingHistoryRow.attempts + 1)
-                )
-
-            # 6. Batch insert for create group
-            if create_rows:
-                db_sess.add_all(create_rows)
-                await db_sess.flush()
+            # 2. Record history
+            await self._record_scheduling_history(db_sess, bulk_creator)
 
             return update_result.updated_count
+
+    async def create_scheduling_history(
+        self,
+        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+    ) -> int:
+        """Create scheduling history records without status update.
+
+        Used for recording skipped sessions where no status change occurs
+        but the scheduling attempt should be recorded in history.
+
+        Args:
+            bulk_creator: BulkCreator containing specs for history records
+
+        Returns:
+            Number of history records created
+        """
+        if not bulk_creator.specs:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            return await self._record_scheduling_history(db_sess, bulk_creator)
+
+    async def _record_scheduling_history(
+        self,
+        db_sess: SASession,
+        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+    ) -> int:
+        """Record scheduling history with merge logic.
+
+        Uses merge logic to prevent duplicate history records when status
+        doesn't change - increments attempts count instead of creating new records.
+
+        Args:
+            db_sess: Database session
+            bulk_creator: BulkCreator containing specs for history records
+
+        Returns:
+            Number of history records affected (merged + created)
+        """
+        # Build rows from specs
+        new_rows = [spec.build_row() for spec in bulk_creator.specs]
+        session_ids = [SessionId(row.session_id) for row in new_rows]
+
+        # Get last history records for all sessions
+        last_records = await self._get_last_session_histories_bulk(db_sess, session_ids)
+
+        # Separate rows into merge and create groups
+        merge_ids: list[UUID] = []
+        create_rows: list[SessionSchedulingHistoryRow] = []
+
+        for new_row in new_rows:
+            last_row = last_records.get(SessionId(new_row.session_id))
+
+            if last_row is not None and last_row.should_merge_with(new_row):
+                merge_ids.append(last_row.id)
+            else:
+                create_rows.append(new_row)
+
+        # Batch update attempts for merge group
+        if merge_ids:
+            await db_sess.execute(
+                sa.update(SessionSchedulingHistoryRow)
+                .where(SessionSchedulingHistoryRow.id.in_(merge_ids))
+                .values(attempts=SessionSchedulingHistoryRow.attempts + 1)
+            )
+
+        # Batch insert for create group
+        if create_rows:
+            db_sess.add_all(create_rows)
+            await db_sess.flush()
+
+        return len(merge_ids) + len(create_rows)
 
     async def _get_last_session_histories_bulk(
         self,
