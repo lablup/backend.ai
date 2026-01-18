@@ -26,7 +26,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
@@ -781,14 +781,17 @@ class SchedulerRepository:
         This method is used by SessionLifecycleHandler implementations.
         The coordinator calls this to query sessions before passing to handlers.
 
+        For SessionPromotionHandler (ALL/ANY/NOT_ANY conditions), use
+        get_sessions_for_promotion() instead.
+
         Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
             scaling_group: The scaling group to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
-            kernel_statuses: Kernel statuses to filter by. If non-None, only includes
-                           sessions where ALL kernels match. If None, includes all
-                           sessions regardless of kernel status.
+            kernel_statuses: Kernel statuses to filter by. If non-None, includes sessions
+                           that have at least one kernel in these statuses (simple filtering).
+                           If None, includes all sessions regardless of kernel status.
 
         Returns:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
@@ -929,3 +932,24 @@ class SchedulerRepository:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
         return await self._db_source.search_sessions_with_kernels_for_handler(querier)
+
+    @scheduler_repository_resilience.apply()
+    async def search_sessions_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> list[SessionInfo]:
+        """Search sessions without kernel data for handlers.
+
+        This method returns only session data without loading kernels,
+        optimized for handlers that don't need kernel information.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Conditions should target SessionRow columns.
+                     Use kernel EXISTS subquery conditions for filtering
+                     (e.g., SessionConditions.all_kernels_in_statuses).
+
+        Returns:
+            List of SessionInfo objects.
+        """
+        return await self._db_source.search_sessions_for_handler(querier)

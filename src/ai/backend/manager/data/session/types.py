@@ -116,6 +116,18 @@ class SessionStatus(CIStrEnum):
         return self in self.terminal_statuses()
 
 
+class KernelMatchType(StrEnum):
+    """Kernel status matching type for promotion handlers.
+
+    Used by SessionPromotionHandler to define how kernel statuses
+    should be evaluated when determining session promotion eligibility.
+    """
+
+    ALL = "ALL"  # All kernels must match target statuses
+    ANY = "ANY"  # At least one kernel must match target statuses
+    NOT_ANY = "NOT_ANY"  # No kernel should match target statuses
+
+
 # TODO: Add proper types
 @dataclass
 class SessionData:

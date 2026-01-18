@@ -35,7 +35,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -3661,15 +3661,18 @@ class ScheduleDBSource:
     ) -> list[SessionWithKernels]:
         """Fetch sessions for handler execution based on status filters.
 
+        This method is for SessionLifecycleHandler. For SessionPromotionHandler,
+        use fetch_sessions_for_promotion() which supports ALL/ANY/NOT_ANY conditions.
+
         Uses SessionRow.to_session_info() and KernelRow.to_kernel_info() for
         unified data representation across all handlers.
 
         Args:
             scaling_group: The scaling group to filter by
             session_statuses: Session statuses to include
-            kernel_statuses: If non-None, only include sessions where ALL kernels
-                           match these statuses. If None, include sessions regardless
-                           of kernel status.
+            kernel_statuses: If non-None, include sessions that have at least one
+                           kernel in these statuses (simple filtering).
+                           If None, include sessions regardless of kernel status.
 
         Returns:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
@@ -3688,12 +3691,13 @@ class ScheduleDBSource:
 
             handler_sessions: list[SessionWithKernels] = []
             for session in sessions:
-                # If kernel_statuses is specified (not None), check if all kernels match
+                # If kernel_statuses is specified (not None), check if any kernel matches
+                # For ALL/ANY/NOT_ANY conditions, use fetch_sessions_for_promotion() instead
                 if kernel_statuses is not None:
-                    if not session.kernels:
-                        continue
-                    all_match = all(kernel.status in kernel_statuses for kernel in session.kernels)
-                    if not all_match:
+                    has_matching_kernel = any(
+                        kernel.status in kernel_statuses for kernel in session.kernels
+                    )
+                    if not has_matching_kernel:
                         continue
 
                 # Convert using Row converters
@@ -3705,6 +3709,26 @@ class ScheduleDBSource:
                 )
 
             return handler_sessions
+
+    async def search_sessions_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> list[SessionInfo]:
+        """Search sessions without kernel data for handlers.
+
+        This method uses EXISTS subqueries for optimized kernel condition checking
+        without loading kernel data.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            List of SessionInfo matching all conditions.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            stmt = sa.select(SessionRow)
+            result = await execute_batch_querier(db_sess, stmt, querier)
+            return [row.to_session_info() for row in result.rows]
 
     async def update_sessions_status_bulk(
         self,
