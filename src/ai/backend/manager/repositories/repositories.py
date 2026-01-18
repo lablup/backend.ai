@@ -18,6 +18,7 @@ from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepos
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
+from ai.backend.manager.repositories.group_config.repositories import GroupConfigRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
@@ -73,6 +74,7 @@ class Repositories:
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
+    group_config: GroupConfigRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     metric: MetricRepositories
@@ -111,6 +113,7 @@ class Repositories:
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
+        group_config_repositories = GroupConfigRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
@@ -148,6 +151,7 @@ class Repositories:
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
+            group_config=group_config_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             metric=metric_repositories,
