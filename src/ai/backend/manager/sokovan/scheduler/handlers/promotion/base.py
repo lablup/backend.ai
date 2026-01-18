@@ -9,9 +9,9 @@ from typing import Optional
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     KernelMatchType,
+    PromotionStatusTransitions,
     SessionInfo,
     SessionStatus,
-    StatusTransitions,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
@@ -26,13 +26,13 @@ class SessionPromotionHandler(ABC):
     Key differences from SessionLifecycleHandler:
     - target_kernel_statuses() is required (non-optional)
     - kernel_match_type() defines ALL/ANY/NOT_ANY condition
-    - No failure_status() or stale_status() (promotion is success or wait)
+    - Typically only success transition in status_transitions() (BEP-1030)
 
     The coordinator will:
     1. Query sessions based on target_statuses()
     2. Filter sessions based on target_kernel_statuses() and kernel_match_type()
     3. Execute handler logic with filtered sessions
-    4. Apply status transition from success_status() for successes
+    4. Apply status transitions from status_transitions() for successes
     """
 
     @classmethod
@@ -74,24 +74,14 @@ class SessionPromotionHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def success_status(cls) -> SessionStatus:
-        """Get the status to set on successful execution.
+    def status_transitions(cls) -> PromotionStatusTransitions:
+        """Define state transitions for promotion handler (BEP-1030).
 
-        Unlike SessionLifecycleHandler, this is required for promotion handlers
-        as every successful promotion must result in a status change.
-        """
-        raise NotImplementedError("Subclasses must implement success_status()")
-
-    @classmethod
-    @abstractmethod
-    def status_transitions(cls) -> StatusTransitions:
-        """Define state transitions for different handler outcomes (BEP-1030).
-
-        For promotion handlers, typically only success transition is defined.
-        need_retry, expired, give_up are usually None for promotion handlers.
+        Promotion handlers only change session status, not kernel status.
+        Kernel status changes are driven by agent events, not coordinator.
 
         Returns:
-            StatusTransitions defining what session/kernel status to transition to.
+            PromotionStatusTransitions with target session status for success.
         """
         raise NotImplementedError("Subclasses must implement status_transitions()")
 

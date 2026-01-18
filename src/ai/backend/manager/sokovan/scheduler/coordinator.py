@@ -20,12 +20,14 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessScheduleEvent,
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, SessionId, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionStatus,
+    TransitionStatus,
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -62,10 +64,12 @@ from .handlers import (
     SweepStaleKernelsLifecycleHandler,
     TerminateSessionsLifecycleHandler,
 )
+from .hooks.base import AbstractSessionHook
+from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
 from .recorder import SessionRecorderContext
-from .results import SessionExecutionResult
-from .types import KernelCreationInfo, KernelTerminationInfo
+from .results import SessionExecutionResult, SessionTransitionInfo
+from .types import KernelCreationInfo, KernelTerminationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -98,6 +102,19 @@ class SchedulerTaskSpec:
         return f"sokovan_process_schedule_{self.schedule_type.value}"
 
 
+@dataclass(frozen=True)
+class TransitionHookConfig:
+    """Configuration for hooks triggered on session status transitions.
+
+    Used by Coordinator to execute hooks when sessions transition to specific statuses.
+    Hooks are executed after handler logic but before status transition is applied.
+    """
+
+    blocking: bool
+    """If True, hook failure prevents the session from transitioning.
+    If False, hook is best-effort - failures are logged but transition proceeds."""
+
+
 class ScheduleCoordinator:
     """
     Coordinate scheduling operations based on scheduling needs.
@@ -115,6 +132,8 @@ class ScheduleCoordinator:
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
+    _hook_registry: HookRegistry
+    _transition_hooks: Mapping[SessionStatus, TransitionHookConfig]
 
     def __init__(
         self,
@@ -136,11 +155,27 @@ class ScheduleCoordinator:
         # Initialize kernel state engine with the component's repository
         self._kernel_state_engine = KernelStateEngine(components.repository)
 
+        # Initialize hook registry and transition hooks
+        self._hook_registry = components.hook_registry
+        self._transition_hooks = self._init_transition_hooks()
+
         # Initialize lifecycle handlers
         self._lifecycle_handlers = self._init_lifecycle_handlers()
 
         # Initialize promotion handlers
         self._promotion_handlers = self._init_promotion_handlers()
+
+    def _init_transition_hooks(self) -> Mapping[SessionStatus, TransitionHookConfig]:
+        """Initialize mapping of target statuses to their hook configurations.
+
+        Hooks are executed when sessions transition to specific statuses:
+        - RUNNING: blocking hook (failure prevents transition)
+        - TERMINATED: best-effort hook (failure logged but transition proceeds)
+        """
+        return {
+            SessionStatus.RUNNING: TransitionHookConfig(blocking=True),
+            SessionStatus.TERMINATED: TransitionHookConfig(blocking=False),
+        }
 
     def _init_lifecycle_handlers(self) -> Mapping[ScheduleType, SessionLifecycleHandler]:
         """Initialize and return the mapping of schedule types to their lifecycle handlers.
@@ -213,9 +248,6 @@ class ScheduleCoordinator:
         Promotion handlers check kernel status conditions (ALL/ANY/NOT_ANY) to
         determine if sessions should be promoted to a new status.
         """
-        # Get components for handlers that need them
-        hook_registry = self._components.hook_registry
-
         return {
             ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(
                 self._event_producer,
@@ -224,13 +256,11 @@ class ScheduleCoordinator:
                 self._scheduling_controller,
                 self._event_producer,
                 self._repository,
-                hook_registry,
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
                 self._scheduling_controller,
                 self._event_producer,
                 self._repository,
-                hook_registry,
             ),
             ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
                 self._valkey_schedule,
@@ -425,8 +455,8 @@ class ScheduleCoordinator:
             # Get recorded steps for history
             all_records = pool.build_all_records()
 
-            # Apply status transitions immediately for this scaling group
-            await self._handle_status_transitions(handler, result, all_records)
+            # Apply status transitions immediately for this scaling group (BEP-1030)
+            await self._handle_result(handler, result, all_records)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -534,175 +564,290 @@ class ScheduleCoordinator:
         result: SessionExecutionResult,
         records: Mapping[SessionId, ExecutionRecord],
     ) -> None:
-        """Apply status transitions for promotion handler execution results.
+        """Apply status transitions for promotion handler execution results (BEP-1030).
 
-        Promotion handlers only have success outcomes (no failure/stale).
+        Promotion handlers only change session status (not kernel status).
+        Kernel status changes are driven by agent events, not coordinator.
+
+        Hook execution is centralized here:
+        1. Check if target status has hooks configured
+        2. If hooks exist, fetch full session data and execute hooks
+        3. For blocking hooks, filter out sessions where hooks failed
+        4. Apply sessions_running_data update for hook-success sessions (if present)
+        5. Apply status transition for remaining sessions
 
         Args:
             handler: The promotion handler that produced the result
-            result: Execution result containing successes
+            result: Execution result containing successes and sessions_running_data
             records: Mapping of session IDs to their execution records for sub_steps
         """
-        target_statuses = handler.target_statuses()
+        transitions = handler.status_transitions()
         handler_name = handler.name()
 
-        # Update successful sessions
-        success_status = handler.success_status()
-        if result.successes:
-            updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(to_status=success_status),
-                conditions=[
-                    SessionConditions.by_ids(result.success_ids()),
-                    SessionConditions.by_statuses(target_statuses),
-                ],
+        if not transitions.success or not result.successes:
+            return
+
+        to_status = transitions.success
+        sessions_to_transition = result.successes
+
+        # Execute hooks if configured for this status
+        hook_config = self._transition_hooks.get(to_status)
+        if hook_config:
+            sessions_to_transition = await self._execute_transition_hooks(
+                sessions_to_transition,
+                to_status,
+                hook_config,
             )
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=s.session_id,
-                    phase=handler_name,
-                    result=SchedulingResult.SUCCESS,
-                    message=f"{handler_name} completed successfully",
-                    from_status=s.from_status,
-                    to_status=success_status,
-                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
-                )
-                for s in result.successes
-            ]
-            updated = await self._repository.update_with_history(
-                updater, BulkCreator(specs=history_specs)
-            )
-            log.debug(
-                "{}: Updated {} sessions to {} (success)",
+
+        # Apply status transition for sessions that passed hooks
+        if sessions_to_transition:
+            # Filter sessions_running_data to only include sessions that passed hooks
+            successful_session_ids = {s.session_id for s in sessions_to_transition}
+            if result.sessions_running_data:
+                filtered_running_data = [
+                    data
+                    for data in result.sessions_running_data
+                    if data.session_id in successful_session_ids
+                ]
+                if filtered_running_data:
+                    await self._repository.update_sessions_to_running(filtered_running_data)
+
+            # Create TransitionStatus with kernel=None (promotion doesn't change kernel status)
+            transition = TransitionStatus(session=to_status, kernel=None)
+            await self._apply_transition(
                 handler_name,
-                updated,
-                success_status,
+                sessions_to_transition,
+                transition,
+                SchedulingResult.SUCCESS,
+                records,
             )
 
-        # Apply kernel terminations (processed together with session status changes)
-        if result.kernel_terminations:
-            await self._apply_kernel_terminations(handler_name, result.kernel_terminations)
+    async def _execute_transition_hooks(
+        self,
+        session_infos: list[SessionTransitionInfo],
+        target_status: SessionStatus,
+        hook_config: TransitionHookConfig,
+    ) -> list[SessionTransitionInfo]:
+        """Execute transition hooks for sessions moving to target_status.
 
-    async def _handle_status_transitions(
+        Fetches full session+kernel data, executes hooks per session type,
+        and returns sessions that should proceed with the transition.
+
+        Args:
+            session_infos: Sessions to execute hooks for
+            target_status: The status sessions are transitioning to
+            hook_config: Hook configuration (blocking behavior)
+
+        Returns:
+            For blocking hooks: Only sessions where hook succeeded
+            For best-effort hooks: All sessions (failures are logged)
+        """
+        if not session_infos:
+            return []
+
+        # Fetch full session+kernel data for hook execution
+        session_ids = [s.session_id for s in session_infos]
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[SessionConditions.by_ids(session_ids)],
+        )
+        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
+
+        if not full_sessions:
+            log.warning(
+                "No full session data found for {} sessions transitioning to {}",
+                len(session_ids),
+                target_status,
+            )
+            return []
+
+        # Build session_id -> SessionTransitionInfo mapping for results
+        info_map = {s.session_id: s for s in session_infos}
+
+        # Execute hooks concurrently
+        hook_coroutines = [
+            self._execute_single_hook(session, target_status)
+            for session in full_sessions
+        ]
+        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+
+        # Process results based on blocking behavior
+        successful_sessions: list[SessionTransitionInfo] = []
+        for session, hook_result in zip(full_sessions, hook_results, strict=True):
+            session_id = session.session_info.identity.id
+            original_info = info_map.get(session_id)
+
+            if original_info is None:
+                continue
+
+            if isinstance(hook_result, BaseException):
+                log.error(
+                    "Hook on_transition to {} failed for session {}: {}",
+                    target_status,
+                    session_id,
+                    hook_result,
+                )
+                if hook_config.blocking:
+                    # Blocking hook failed - don't include in successful sessions
+                    continue
+                # Best-effort hook failed - still include in successful sessions
+
+            successful_sessions.append(original_info)
+
+        log.info(
+            "Executed on_transition hooks for {} sessions transitioning to {} ({} succeeded)",
+            len(full_sessions),
+            target_status,
+            len(successful_sessions),
+        )
+
+        return successful_sessions
+
+    async def _execute_single_hook(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
+        """Execute a single hook for a session.
+
+        Args:
+            session: Full session+kernel data
+            status: The status the session is transitioning to
+        """
+        session_type = session.session_info.metadata.session_type
+        hook = self._hook_registry.get_hook(session_type)
+        await hook.on_transition(session, status)
+
+    async def _handle_result(
         self,
         handler: SessionLifecycleHandler,
         result: SessionExecutionResult,
         records: Mapping[SessionId, ExecutionRecord],
     ) -> None:
-        """Apply status transitions based on handler execution results.
+        """Apply status transitions using handler.status_transitions() (BEP-1030).
+
+        Handler reports what happened (successes/failures/skipped), and Coordinator applies
+        policy-based classification for failures to determine the outcome:
+        - need_retry: Can retry (default for failures)
+        - expired: Timeout exceeded
+        - give_up: Max retries exceeded
+
+        Skipped sessions are recorded in history without status change.
 
         Args:
             handler: The lifecycle handler that produced the result
-            result: Execution result containing successes, failures, and stales
+            result: Execution result containing successes, failures, and skipped
             records: Mapping of session IDs to their execution records for sub_steps
         """
-        target_statuses = handler.target_statuses()
+        transitions = handler.status_transitions()
         handler_name = handler.name()
 
-        # Update successful sessions
-        success_status = handler.success_status()
-        if success_status is not None and result.successes:
-            updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(to_status=success_status),
-                conditions=[
-                    SessionConditions.by_ids(result.success_ids()),
-                    SessionConditions.by_statuses(target_statuses),
-                ],
-            )
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=s.session_id,
-                    phase=handler_name,
-                    result=SchedulingResult.SUCCESS,
-                    message=f"{handler_name} completed successfully",
-                    from_status=s.from_status,
-                    to_status=success_status,
-                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
-                )
-                for s in result.successes
-            ]
-            updated = await self._repository.update_with_history(
-                updater, BulkCreator(specs=history_specs)
-            )
-            log.debug(
-                "{}: Updated {} sessions to {} (success)",
+        # SUCCESS transitions
+        if transitions.success and result.successes:
+            await self._apply_transition(
                 handler_name,
-                updated,
-                success_status,
+                result.successes,
+                transitions.success,
+                SchedulingResult.SUCCESS,
+                records,
             )
 
-        # Update failed sessions
-        failure_status = handler.failure_status()
-        if failure_status is not None and result.failures:
-            updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(to_status=failure_status),
-                conditions=[
-                    SessionConditions.by_ids(result.failure_ids()),
-                    SessionConditions.by_statuses(target_statuses),
-                ],
-            )
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=f.session_id,
-                    phase=handler_name,
-                    result=SchedulingResult.FAILURE,
-                    message=f.reason,
-                    from_status=f.from_status,
-                    to_status=failure_status,
-                    error_code=f.error_detail,
-                    sub_steps=extract_sub_steps_for_entity(f.session_id, records),
+        # FAILURE transitions - Coordinator classifies failures into need_retry/expired/give_up
+        # TODO: Implement policy-based classification in Phase 4:
+        #   - Check timeout threshold → expired
+        #   - Check retry count vs max retries → give_up
+        #   - Otherwise → need_retry
+        # For now, use the first defined transition in handler's status_transitions()
+        if result.failures:
+            if transitions.need_retry:
+                await self._apply_transition(
+                    handler_name,
+                    result.failures,
+                    transitions.need_retry,
+                    SchedulingResult.NEED_RETRY,
+                    records,
                 )
-                for f in result.failures
-            ]
-            updated = await self._repository.update_with_history(
-                updater, BulkCreator(specs=history_specs)
-            )
-            log.debug(
-                "{}: Updated {} sessions to {} (failure)",
-                handler_name,
-                updated,
-                failure_status,
-            )
-
-        # Update stale sessions
-        stale_status = handler.stale_status()
-        if stale_status is not None and result.stales:
-            updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(to_status=stale_status),
-                conditions=[
-                    SessionConditions.by_ids(result.stale_ids()),
-                    SessionConditions.by_statuses(target_statuses),
-                ],
-            )
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=s.session_id,
-                    phase=handler_name,
-                    result=SchedulingResult.STALE,
-                    message=f"{handler_name} marked as stale",
-                    from_status=s.from_status,
-                    to_status=stale_status,
-                    sub_steps=extract_sub_steps_for_entity(s.session_id, records),
+            elif transitions.expired:
+                # Use expired if need_retry is not defined (e.g., sweep handlers)
+                await self._apply_transition(
+                    handler_name,
+                    result.failures,
+                    transitions.expired,
+                    SchedulingResult.EXPIRED,
+                    records,
                 )
-                for s in result.stales
-            ]
-            updated = await self._repository.update_with_history(
-                updater, BulkCreator(specs=history_specs)
-            )
-            log.debug(
-                "{}: Updated {} sessions to {} (stale)",
-                handler_name,
-                updated,
-                stale_status,
-            )
+            elif transitions.give_up:
+                # Fallback to give_up
+                await self._apply_transition(
+                    handler_name,
+                    result.failures,
+                    transitions.give_up,
+                    SchedulingResult.GIVE_UP,
+                    records,
+                )
 
-            # When sessions go to PENDING, also reset their kernels
-            if stale_status == SessionStatus.PENDING:
-                stale_session_ids = result.stale_ids()
-                await self._apply_kernel_pending_resets(handler_name, stale_session_ids)
+        # SKIPPED - Record history without status change
+        if result.skipped:
+            await self._record_skipped_history(handler_name, result.skipped, records)
 
         # Apply kernel terminations (processed together with session status changes)
         if result.kernel_terminations:
             await self._apply_kernel_terminations(handler_name, result.kernel_terminations)
+
+    async def _apply_transition(
+        self,
+        handler_name: str,
+        session_infos: list,
+        transition: TransitionStatus,
+        scheduling_result: SchedulingResult,
+        records: Mapping[SessionId, ExecutionRecord],
+    ) -> None:
+        """Apply a single transition type to sessions (BEP-1030).
+
+        Args:
+            handler_name: Name of the handler for logging and history
+            session_infos: List of SessionTransitionInfo for the sessions to update
+            transition: Target status transition to apply
+            scheduling_result: Result type for history recording
+            records: Mapping of session IDs to their execution records
+        """
+        if not session_infos:
+            return
+
+        session_ids = [s.session_id for s in session_infos]
+
+        # Session status update
+        if transition.session:
+            updater = BatchUpdater(
+                spec=SessionStatusBatchUpdaterSpec(to_status=transition.session),
+                conditions=[SessionConditions.by_ids(session_ids)],
+            )
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=info.session_id,
+                    phase=handler_name,
+                    result=scheduling_result,
+                    message=f"{handler_name} {scheduling_result.value.lower()}",
+                    from_status=info.from_status,
+                    to_status=transition.session,
+                    sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+                )
+                for info in session_infos
+            ]
+            updated = await self._repository.update_with_history(
+                updater, BulkCreator(specs=history_specs)
+            )
+            log.debug(
+                "{}: Updated {} sessions to {} ({})",
+                handler_name,
+                updated,
+                transition.session,
+                scheduling_result.value,
+            )
+
+        # Kernel status reset if transitioning to PENDING
+        if transition.kernel == KernelStatus.PENDING:
+            await self._apply_kernel_pending_resets(handler_name, session_ids)
 
     async def _apply_kernel_terminations(
         self,
@@ -756,6 +901,44 @@ class ScheduleCoordinator:
             handler_name,
             reset_count,
             len(session_ids),
+        )
+
+    async def _record_skipped_history(
+        self,
+        handler_name: str,
+        session_infos: list[SessionTransitionInfo],
+        records: Mapping[SessionId, ExecutionRecord],
+    ) -> None:
+        """Record history for skipped sessions without status change.
+
+        Skipped sessions are those that were not processed due to being blocked
+        by other sessions (e.g., scheduling attempt blocked by higher priority sessions).
+
+        Args:
+            handler_name: Name of the handler for history recording
+            session_infos: List of skipped session information
+            records: Mapping of session IDs to their execution records for sub_steps
+        """
+        if not session_infos:
+            return
+
+        history_specs = [
+            SessionSchedulingHistoryCreatorSpec(
+                session_id=info.session_id,
+                phase=handler_name,
+                result=SchedulingResult.SKIPPED,
+                message=info.reason or f"{handler_name} skipped",
+                from_status=info.from_status,
+                to_status=info.from_status,  # No status change
+                sub_steps=extract_sub_steps_for_entity(info.session_id, records),
+            )
+            for info in session_infos
+        ]
+        await self._repository.create_scheduling_history(BulkCreator(specs=history_specs))
+        log.debug(
+            "{}: Recorded {} skipped sessions in history",
+            handler_name,
+            len(session_infos),
         )
 
     async def process_schedule(

@@ -20,7 +20,7 @@ class SessionLifecycleHandler(ABC):
     This interface enables the coordinator to:
     1. Query sessions based on target_statuses() and target_kernel_statuses()
     2. Execute handler logic with the queried sessions
-    3. Apply status transitions based on success_status(), failure_status(), stale_status()
+    3. Apply status transitions based on status_transitions() (BEP-1030)
 
     Handlers can:
     - Perform additional data queries if needed (Option B-1)
@@ -52,36 +52,6 @@ class SessionLifecycleHandler(ABC):
         Return None to include sessions regardless of kernel status.
         """
         raise NotImplementedError("Subclasses must implement target_kernel_statuses()")
-
-    @classmethod
-    @abstractmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set on successful execution.
-
-        Returns:
-            SessionStatus to set for successes, or None if coordinator should not update status
-        """
-        raise NotImplementedError("Subclasses must implement success_status()")
-
-    @classmethod
-    @abstractmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set on failed execution.
-
-        Returns:
-            SessionStatus to set for failures, or None if coordinator should not update status
-        """
-        raise NotImplementedError("Subclasses must implement failure_status()")
-
-    @classmethod
-    @abstractmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set for stale/timeout sessions.
-
-        Returns:
-            SessionStatus to set for stales, or None if coordinator should not update status
-        """
-        raise NotImplementedError("Subclasses must implement stale_status()")
 
     @classmethod
     @abstractmethod
@@ -121,7 +91,7 @@ class SessionLifecycleHandler(ABC):
             sessions: Sessions with full SessionInfo and KernelInfo data
 
         Returns:
-            Result containing successes, failures, and stales for status transitions
+            Result containing successes, need_retries, expired, and give_ups for status transitions
         """
         raise NotImplementedError("Subclasses must implement execute()")
 

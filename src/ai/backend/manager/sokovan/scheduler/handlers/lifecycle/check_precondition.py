@@ -71,21 +71,6 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         return [KernelStatus.SCHEDULED]
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """Sessions transition to PREPARING on success."""
-        return SessionStatus.PREPARING
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status - sessions stay in SCHEDULED state."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """No stale status for this handler."""
-        return None
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for check precondition handler (BEP-1030).
 

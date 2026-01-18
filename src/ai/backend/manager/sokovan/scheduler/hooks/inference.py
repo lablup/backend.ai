@@ -15,6 +15,7 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
@@ -35,6 +36,23 @@ class InferenceSessionHook(AbstractSessionHook):
     ) -> None:
         self._repository = repository
         self._event_producer = event_producer
+
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
+        match status:
+            case SessionStatus.RUNNING:
+                await self._on_transition_to_running(session)
+            case SessionStatus.TERMINATED:
+                await self._on_transition_to_terminated(session)
+            case _:
+                log.debug(
+                    "Inference session {} transitioning to {}",
+                    session.session_info.identity.id,
+                    status,
+                )
 
     async def _get_endpoint_id_from_session(self, session_id: SessionId) -> Optional[uuid.UUID]:
         """
@@ -62,7 +80,7 @@ class InferenceSessionHook(AbstractSessionHook):
             )
             return None
 
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def _on_transition_to_running(self, session: SessionWithKernels) -> None:
         """Handle route creation when inference session starts running."""
         session_id = session.session_info.identity.id
         log.info(
@@ -112,7 +130,7 @@ class InferenceSessionHook(AbstractSessionHook):
                     )
                     # Don't fail the session transition, just log the error
 
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
+    async def _on_transition_to_terminated(self, session: SessionWithKernels) -> None:
         """Handle route deletion when inference session terminates."""
         session_id = session.session_info.identity.id
         log.info(

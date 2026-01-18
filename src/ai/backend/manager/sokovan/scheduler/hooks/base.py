@@ -10,6 +10,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
@@ -23,24 +24,17 @@ class AbstractSessionHook(ABC):
     """
 
     @abstractmethod
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
         """
-        Called when a session is about to transition from CREATING to RUNNING.
-        Raises exception if the transition should not proceed.
+        Called when a session is about to transition to a new status.
 
         :param session: SessionWithKernels with session and kernel information
-        :raises Exception: If the hook fails and transition should not proceed
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
-        """
-        Called when a session is about to transition from TERMINATING to TERMINATED.
-        Best-effort cleanup - exceptions are logged but don't prevent termination.
-
-        :param session: SessionWithKernels with session and kernel information
-        :raises Exception: If cleanup fails (will be logged but ignored)
+        :param status: The target status the session is transitioning to
+        :raises Exception: If the hook fails (behavior depends on blocking config)
         """
         raise NotImplementedError
 
@@ -69,36 +63,21 @@ class SessionHook(AbstractSessionHook):
         self._agent_client_pool = args.agent_client_pool
         self._event_producer = args.event_producer
 
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
         """Execute session hook with SessionWithKernels data.
 
         Note: Notifications are not yet supported.
         This will be implemented when SessionWithKernels has all required fields.
         """
-        await self._session_hook.on_transition_to_running(session)
+        await self._session_hook.on_transition(session, status)
         # TODO: Add notification support when SessionWithKernels has required fields
         log.debug(
-            "Executed on_transition_to_running for session {}",
-            session.session_info.identity.id,
-        )
-
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
-        """Execute session hook with SessionWithKernels data.
-
-        Note: Network cleanup and notifications are not yet supported.
-        This will be implemented when SessionWithKernels has all required fields.
-        """
-        try:
-            await self._session_hook.on_transition_to_terminated(session)
-        except Exception as e:
-            log.error(
-                "Error during cleanup for session {}: {}",
-                session.session_info.identity.id,
-                str(e),
-            )
-        # TODO: Add notification and network cleanup when SessionWithKernels has required fields
-        log.debug(
-            "Executed on_transition_to_terminated for session {}",
+            "Executed on_transition to {} for session {}",
+            status,
             session.session_info.identity.id,
         )
 
@@ -106,16 +85,14 @@ class SessionHook(AbstractSessionHook):
 class NoOpSessionHook(AbstractSessionHook):
     """Default no-op hook for session types that don't need special handling."""
 
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
         log.debug(
-            "No-op hook for session {} (type: {})",
+            "No-op hook for session {} (type: {}) transitioning to {}",
             session.session_info.identity.id,
             session.session_info.identity.session_type,
-        )
-
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
-        log.debug(
-            "No-op cleanup for session {} (type: {})",
-            session.session_info.identity.id,
-            session.session_info.identity.session_type,
+            status,
         )

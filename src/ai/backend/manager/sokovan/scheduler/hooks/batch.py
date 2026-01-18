@@ -10,6 +10,7 @@ import logging
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
@@ -24,7 +25,27 @@ class BatchSessionHook(AbstractSessionHook):
     def __init__(self, agent_client_pool: AgentClientPool) -> None:
         self._agent_client_pool = agent_client_pool
 
-    async def on_transition_to_running(self, session: SessionWithKernels) -> None:
+    async def on_transition(
+        self,
+        session: SessionWithKernels,
+        status: SessionStatus,
+    ) -> None:
+        match status:
+            case SessionStatus.RUNNING:
+                await self._on_transition_to_running(session)
+            case SessionStatus.TERMINATED:
+                log.debug(
+                    "Batch session {} transitioning to TERMINATED",
+                    session.session_info.identity.id,
+                )
+            case _:
+                log.debug(
+                    "Batch session {} transitioning to {}",
+                    session.session_info.identity.id,
+                    status,
+                )
+
+    async def _on_transition_to_running(self, session: SessionWithKernels) -> None:
         """Handle batch execution trigger using SessionWithKernels."""
         main_kernel = session.main_kernel
         agent_id = AgentId(main_kernel.resource.agent) if main_kernel.resource.agent else None
@@ -54,11 +75,4 @@ class BatchSessionHook(AbstractSessionHook):
             "Successfully triggered batch execution for session {} on agent {}",
             session.session_info.identity.id,
             agent_id,
-        )
-
-    async def on_transition_to_terminated(self, session: SessionWithKernels) -> None:
-        """Handle batch session termination using SessionWithKernels."""
-        log.debug(
-            "Batch session {} transitioning to TERMINATED",
-            session.session_info.identity.id,
         )

@@ -63,21 +63,6 @@ class SweepStaleKernelsLifecycleHandler(SessionLifecycleHandler):
         return [KernelStatus.RUNNING]
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """No success status - kernel status updated, not session status."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status for sweep handler."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """No stale status - this handler updates kernel status only."""
-        return None
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for sweep stale kernels handler (BEP-1030).
 

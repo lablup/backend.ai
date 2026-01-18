@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Optional
@@ -17,10 +16,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     KernelMatchType,
+    PromotionStatusTransitions,
     SessionInfo,
     SessionStatus,
-    StatusTransitions,
-    TransitionStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -29,7 +27,6 @@ from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
-from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     SessionExecutionResult,
@@ -48,12 +45,12 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
 
     Following the DeploymentCoordinator pattern:
     - Coordinator queries sessions with CREATING status and ALL kernels RUNNING
-    - Handler executes on_transition_to_running hooks
-    - Handler calculates occupied_slots and updates sessions
-    - Coordinator applies status transition to RUNNING
+    - Handler calculates occupied_slots from all kernels
+    - Handler returns sessions_running_data for Coordinator to update
+    - Coordinator executes hooks and applies status transition to RUNNING
 
-    Note: This handler requires additional data (for hooks) beyond what
-    HandlerSessionData provides, so it fetches full session data from repository.
+    Note: Hook execution and occupied_slots update are handled by Coordinator
+    after handler returns, ensuring hook failures don't affect sessions.
     """
 
     def __init__(
@@ -61,12 +58,10 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         repository: SchedulerRepository,
-        hook_registry: HookRegistry,
     ) -> None:
         self._scheduling_controller = scheduling_controller
         self._event_producer = event_producer
         self._repository = repository
-        self._hook_registry = hook_registry
 
     @classmethod
     def name(cls) -> str:
@@ -89,28 +84,12 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
         return KernelMatchType.ALL
 
     @classmethod
-    def success_status(cls) -> SessionStatus:
-        """Sessions transition to RUNNING on success."""
-        return SessionStatus.RUNNING
-
-    @classmethod
-    def status_transitions(cls) -> StatusTransitions:
+    def status_transitions(cls) -> PromotionStatusTransitions:
         """Define state transitions for promote to running handler (BEP-1030).
 
-        - success: Session/kernel → RUNNING
-        - need_retry: None
-        - expired: None
-        - give_up: None
+        Session → RUNNING (kernel status unchanged, driven by agent events)
         """
-        return StatusTransitions(
-            success=TransitionStatus(
-                session=SessionStatus.RUNNING,
-                kernel=KernelStatus.RUNNING,
-            ),
-            need_retry=None,
-            expired=None,
-            give_up=None,
-        )
+        return PromotionStatusTransitions(success=SessionStatus.RUNNING)
 
     @property
     def lock_id(self) -> Optional[LockID]:
@@ -122,17 +101,14 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
         scaling_group: str,
         sessions: Sequence[SessionInfo],
     ) -> SessionExecutionResult:
-        """Execute on_transition_to_running hooks and prepare for RUNNING transition.
+        """Prepare sessions for RUNNING transition.
 
-        This handler needs to:
-        1. Fetch full session+kernel data (coordinator passes session-only data)
-        2. Execute hooks (on_transition_to_running)
-        3. Calculate occupied_slots from all kernels
-        4. Update sessions with occupying_slots (via repository)
-        5. Return successes for status transition
+        This handler:
+        1. Fetches full session+kernel data (coordinator passes session-only data)
+        2. Calculates occupied_slots from all kernels
+        3. Returns sessions_running_data for Coordinator to update after hook execution
 
-        Note: The coordinator passes session-only data. This handler fetches
-        full session+kernel data for hooks and occupied_slots calculation.
+        Hook execution and occupied_slots update are handled by Coordinator.
         """
         result = SessionExecutionResult()
 
@@ -150,29 +126,9 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
         if not full_sessions:
             return result
 
-        # Execute hooks concurrently
-        sessions_running_data: list[SessionRunningData] = []
-
-        hook_coroutines = [
-            self._hook_registry.get_hook(
-                session.session_info.metadata.session_type
-            ).on_transition_to_running(session)
-            for session in full_sessions
-        ]
-
-        # Execute hooks concurrently (hooks have their own recording per session type)
-        hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
-
-        for session, hook_result in zip(full_sessions, hook_results, strict=True):
+        # Calculate occupied_slots for all sessions
+        for session in full_sessions:
             session_info = session.session_info
-            if isinstance(hook_result, BaseException):
-                log.error(
-                    "Hook failed with exception for session {}: {}",
-                    session_info.identity.id,
-                    hook_result,
-                )
-                # Don't include in successes - session stays in CREATING
-                continue
 
             # Calculate total occupying_slots from all kernels
             total_occupying_slots = ResourceSlot()
@@ -180,37 +136,26 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
                 if kernel_info.resource.occupied_slots:
                     total_occupying_slots += kernel_info.resource.occupied_slots
 
-            sessions_running_data.append(
+            result.sessions_running_data.append(
                 SessionRunningData(
                     session_id=session_info.identity.id,
                     occupying_slots=total_occupying_slots,
                 )
             )
-
-        # Update sessions with occupying_slots via repository
-        if sessions_running_data:
-            await self._repository.update_sessions_to_running(sessions_running_data)
-
-            # Build success result - find matching SessionWithKernels for ScheduledSessionData
-            session_map = {s.session_info.identity.id: s for s in full_sessions}
-            for running_data in sessions_running_data:
-                original_session = session_map.get(running_data.session_id)
-                if original_session:
-                    original_info = original_session.session_info
-                    result.successes.append(
-                        SessionTransitionInfo(
-                            session_id=running_data.session_id,
-                            from_status=original_info.lifecycle.status,
-                        )
-                    )
-                    result.scheduled_data.append(
-                        ScheduledSessionData(
-                            session_id=original_info.identity.id,
-                            creation_id=original_info.identity.creation_id,
-                            access_key=AccessKey(original_info.metadata.access_key),
-                            reason="triggered-by-scheduler",
-                        )
-                    )
+            result.successes.append(
+                SessionTransitionInfo(
+                    session_id=session_info.identity.id,
+                    from_status=session_info.lifecycle.status,
+                )
+            )
+            result.scheduled_data.append(
+                ScheduledSessionData(
+                    session_id=session_info.identity.id,
+                    creation_id=session_info.identity.creation_id,
+                    access_key=AccessKey(session_info.metadata.access_key),
+                    reason="triggered-by-scheduler",
+                )
+            )
 
         return result
 

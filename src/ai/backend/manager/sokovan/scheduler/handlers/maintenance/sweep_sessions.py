@@ -54,21 +54,6 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         return None
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """No success status - sweep operation moves to TERMINATING."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status for sweep handler."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """Stale sessions transition to TERMINATING."""
-        return SessionStatus.TERMINATING
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for sweep sessions handler (BEP-1030).
 
@@ -126,14 +111,15 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         # Build session map for getting current status
         session_map = {s.session_info.identity.id: s for s in sessions}
 
-        # Add timed out sessions to stales - Coordinator will handle status transition
+        # Add timed out sessions to failures - Coordinator will apply policy-based transition
         for timed_out in timed_out_sessions:
             session_data = session_map.get(timed_out.session_id)
             if session_data:
-                result.stales.append(
+                result.failures.append(
                     SessionTransitionInfo(
                         session_id=timed_out.session_id,
                         from_status=session_data.session_info.lifecycle.status,
+                        reason="PENDING_TIMEOUT_EXCEEDED",
                     )
                 )
                 result.scheduled_data.append(
@@ -149,7 +135,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def post_process(self, result: SessionExecutionResult) -> None:
         """Log the number of swept sessions and invalidate cache."""
-        log.info("Swept {} stale sessions", len(result.stales))
+        log.info("Swept {} failed sessions", len(result.failures))
         # Invalidate cache for affected access keys
         affected_keys: set[AccessKey] = {
             event_data.access_key for event_data in result.scheduled_data

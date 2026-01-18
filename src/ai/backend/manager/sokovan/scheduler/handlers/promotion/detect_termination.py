@@ -12,10 +12,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     KernelMatchType,
+    PromotionStatusTransitions,
     SessionInfo,
     SessionStatus,
-    StatusTransitions,
-    TransitionStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -73,28 +72,12 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
         return KernelMatchType.ALL
 
     @classmethod
-    def success_status(cls) -> SessionStatus:
-        """Sessions transition to TERMINATING on success."""
-        return SessionStatus.TERMINATING
-
-    @classmethod
-    def status_transitions(cls) -> StatusTransitions:
+    def status_transitions(cls) -> PromotionStatusTransitions:
         """Define state transitions for detect termination handler (BEP-1030).
 
-        - success: Session → TERMINATING, kernel already TERMINATED
-        - need_retry: None
-        - expired: None
-        - give_up: None
+        Session → TERMINATING (kernels already TERMINATED by agent events)
         """
-        return StatusTransitions(
-            success=TransitionStatus(
-                session=SessionStatus.TERMINATING,
-                kernel=None,  # Kernels already TERMINATED
-            ),
-            need_retry=None,
-            expired=None,
-            give_up=None,
-        )
+        return PromotionStatusTransitions(success=SessionStatus.TERMINATING)
 
     @property
     def lock_id(self) -> Optional[LockID]:

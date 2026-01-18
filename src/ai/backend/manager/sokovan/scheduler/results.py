@@ -11,7 +11,7 @@ from uuid import UUID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo
+from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo, SessionRunningData
 
 
 @dataclass
@@ -58,16 +58,6 @@ class SessionTransitionInfo:
 
 
 @dataclass
-class SessionExecutionError:
-    """Error information for a failed session operation."""
-
-    session_id: SessionId
-    from_status: SessionStatus
-    reason: str
-    error_detail: str
-
-
-@dataclass
 class HandlerKernelData:
     """Kernel data for handler execution.
 
@@ -101,19 +91,29 @@ class HandlerSessionData:
 
 @dataclass
 class SessionExecutionResult:
-    """Result of a session lifecycle handler execution.
+    """Result of a session lifecycle handler execution (BEP-1030).
 
-    Follows the DeploymentCoordinator pattern with successes, failures, and stales.
-    Coordinator uses this result to apply status transitions.
+    Follows the DeploymentCoordinator pattern with successes, failures, and skipped.
+    Handler reports what happened, Coordinator applies policy (retry count, timeout)
+    to determine the outcome (need_retry/expired/give_up) for failures.
+
+    Fields:
+    - successes: Sessions that completed successfully
+    - failures: Sessions that failed (Coordinator determines retry/expired/give_up)
+    - skipped: Sessions that were skipped (no action needed, no status change)
     """
 
+    # Handler outcome fields
     successes: list[SessionTransitionInfo] = field(default_factory=list)
-    failures: list[SessionExecutionError] = field(default_factory=list)
-    stales: list[SessionTransitionInfo] = field(default_factory=list)
+    failures: list[SessionTransitionInfo] = field(default_factory=list)
+    skipped: list[SessionTransitionInfo] = field(default_factory=list)
+
     # For post-processing (event broadcasting, cache invalidation)
     scheduled_data: list[ScheduledSessionData] = field(default_factory=list)
     # Kernel terminations to be processed together with session status changes
     kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
+    # Sessions transitioning to RUNNING with their occupied_slots
+    sessions_running_data: list[SessionRunningData] = field(default_factory=list)
 
     def needs_post_processing(self) -> bool:
         """Check if post-processing is needed based on the result."""
@@ -129,16 +129,17 @@ class SessionExecutionResult:
 
     def failure_ids(self) -> list[SessionId]:
         """Get list of failed session IDs."""
-        return [f.session_id for f in self.failures]
+        return [s.session_id for s in self.failures]
 
-    def stale_ids(self) -> list[SessionId]:
-        """Get list of stale session IDs."""
-        return [s.session_id for s in self.stales]
+    def skipped_ids(self) -> list[SessionId]:
+        """Get list of skipped session IDs."""
+        return [s.session_id for s in self.skipped]
 
     def merge(self, other: SessionExecutionResult) -> None:
         """Merge another result into this one."""
         self.successes.extend(other.successes)
         self.failures.extend(other.failures)
-        self.stales.extend(other.stales)
+        self.skipped.extend(other.skipped)
         self.scheduled_data.extend(other.scheduled_data)
         self.kernel_terminations.extend(other.kernel_terminations)
+        self.sessions_running_data.extend(other.sessions_running_data)
