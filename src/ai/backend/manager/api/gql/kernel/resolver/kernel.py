@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.types import KernelId
 from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 @strawberry.field(description="Added in 26.1.0. Query a single kernel by ID.")
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
-    id: KernelId,
+    id: UUID,
 ) -> Optional[KernelV2GQL]:
     result = await fetch_kernels(info, filter=KernelFilterGQL(id=id), limit=1)
     if result.edges:
