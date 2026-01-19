@@ -17,7 +17,6 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.scheduler.options import KernelConditions
@@ -88,7 +87,6 @@ async def fetch_kernels_by_agent(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-    resource_occupied_only: bool = False,
 ) -> KernelConnectionV2GQL:
     """Fetch kernels associated with a specific agent.
 
@@ -99,7 +97,6 @@ async def fetch_kernels_by_agent(
         order_by: Optional ordering specification
         before/after/first/last: Cursor-based pagination parameters
         limit/offset: Offset-based pagination parameters
-        resource_occupied_only: If True, only return kernels that are occupying resources
 
     Returns:
         KernelConnectionV2GQL with paginated kernel results
@@ -108,12 +105,6 @@ async def fetch_kernels_by_agent(
 
     # Build base conditions - filter by agent_id
     base_conditions: list[QueryCondition] = [KernelConditions.by_agent_ids([str(agent_id)])]
-
-    # Add resource_occupied filter if requested
-    if resource_occupied_only:
-        base_conditions.append(
-            KernelConditions.by_statuses(list(KernelStatus.resource_occupied_statuses()))
-        )
 
     # Build querier using gql_adapter
     querier = info.context.gql_adapter.build_querier(
