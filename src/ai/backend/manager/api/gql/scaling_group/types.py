@@ -134,7 +134,7 @@ class ScalingGroupNetworkConfigGQL:
 
 @strawberry.type(
     name="ScalingGroupDriverConfig",
-    description="Added in 25.18.0. Driver configuration for resource allocation",
+    description="Added in 26.1.0. Driver configuration for resource allocation",
 )
 class ScalingGroupDriverConfigGQL:
     name: str = strawberry.field(
