@@ -47,6 +47,7 @@ def create_scheduler_components(
     hook_registry = HookRegistry(
         HookRegistryArgs(
             repository=deployment_repository,
+            scheduler_repository=repository,
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,

@@ -11,7 +11,7 @@ from uuid import UUID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo, SessionRunningData
+from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo
 
 
 @dataclass
@@ -116,9 +116,6 @@ class SessionExecutionResult:
     # Kernel terminations to be processed together with session status changes
     # Note: Will be moved to KernelExecutionResult in Phase 3
     kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
-    # Sessions transitioning to RUNNING with their occupied_slots
-    # Note: Will be removed in Phase 2 with batch hook processing
-    sessions_running_data: list[SessionRunningData] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get the count of successfully processed sessions."""
@@ -142,4 +139,3 @@ class SessionExecutionResult:
         self.failures.extend(other.failures)
         self.skipped.extend(other.skipped)
         self.kernel_terminations.extend(other.kernel_terminations)
-        self.sessions_running_data.extend(other.sessions_running_data)

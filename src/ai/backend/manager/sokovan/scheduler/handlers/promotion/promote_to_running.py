@@ -6,7 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
@@ -16,17 +16,12 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.pagination import NoPagination
-from ai.backend.manager.repositories.scheduler.options import SessionConditions
-from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from ai.backend.manager.sokovan.scheduler.types import SessionRunningData
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -39,21 +34,19 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
 
     Following the DeploymentCoordinator pattern:
     - Coordinator queries sessions with CREATING status and ALL kernels RUNNING
-    - Handler calculates occupied_slots from all kernels
-    - Handler returns sessions_running_data for Coordinator to update
-    - Coordinator executes hooks, applies status transition, and broadcasts events
+    - Handler returns session transition info for Coordinator to process
+    - Coordinator executes hooks, calculates occupied_slots, applies status transition,
+      and broadcasts events
 
-    Note: Hook execution, occupied_slots update, and event broadcasting are handled
+    Note: Hook execution, occupied_slots calculation, and event broadcasting are handled
     by Coordinator after handler returns, ensuring hook failures don't affect sessions.
     """
 
     def __init__(
         self,
         scheduling_controller: SchedulingController,
-        repository: SchedulerRepository,
     ) -> None:
         self._scheduling_controller = scheduling_controller
-        self._repository = repository
 
     @classmethod
     def name(cls) -> str:
@@ -95,45 +88,18 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
     ) -> SessionExecutionResult:
         """Prepare sessions for RUNNING transition.
 
-        This handler:
-        1. Fetches full session+kernel data (coordinator passes session-only data)
-        2. Calculates occupied_slots from all kernels
-        3. Returns sessions_running_data for Coordinator to update after hook execution
-
-        Hook execution and occupied_slots update are handled by Coordinator.
+        Simply marks sessions for promotion. Coordinator handles:
+        - Hook execution
+        - occupied_slots calculation from kernel data
+        - Status transition and event broadcasting
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
 
-        # Fetch full session+kernel data for occupied_slots calculation
-        session_ids = [s.identity.id for s in sessions]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids(session_ids)],
-        )
-        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
-
-        if not full_sessions:
-            return result
-
-        # Calculate occupied_slots for all sessions
-        for session in full_sessions:
-            session_info = session.session_info
-
-            # Calculate total occupying_slots from all kernels
-            total_occupying_slots = ResourceSlot()
-            for kernel_info in session.kernel_infos:
-                if kernel_info.resource.occupied_slots:
-                    total_occupying_slots += kernel_info.resource.occupied_slots
-
-            result.sessions_running_data.append(
-                SessionRunningData(
-                    session_id=session_info.identity.id,
-                    occupying_slots=total_occupying_slots,
-                )
-            )
+        # Simply mark sessions for promotion - Coordinator handles the rest
+        for session_info in sessions:
             result.successes.append(
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,

@@ -119,6 +119,21 @@ class TransitionHookConfig:
     If False, hook is best-effort - failures are logged but transition proceeds."""
 
 
+@dataclass
+class HookExecutionResult:
+    """Result of hook execution for sessions transitioning to a new status.
+
+    Contains both the session transition info and full session data
+    for sessions that successfully passed hooks.
+    """
+
+    successful_sessions: list[SessionTransitionInfo]
+    """Sessions that passed hooks and should proceed with transition."""
+
+    full_session_data: list[SessionWithKernels]
+    """Full session+kernel data for successful sessions (for occupied_slots calculation)."""
+
+
 class ScheduleCoordinator:
     """
     Coordinate scheduling operations based on scheduling needs.
@@ -252,7 +267,6 @@ class ScheduleCoordinator:
             ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
             ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
                 self._scheduling_controller,
-                self._repository,
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
                 self._scheduling_controller,
@@ -569,12 +583,14 @@ class ScheduleCoordinator:
         1. Check if target status has hooks configured
         2. If hooks exist, fetch full session data and execute hooks
         3. For blocking hooks, filter out sessions where hooks failed
-        4. Apply sessions_running_data update for hook-success sessions (if present)
-        5. Apply status transition for remaining sessions
+        4. Apply status transition for remaining sessions
+
+        Note: Status-specific logic (e.g., occupied_slots for RUNNING) is handled
+        by SessionHook in the hook registry, not here in the Coordinator.
 
         Args:
             handler: The promotion handler that produced the result
-            result: Execution result containing successes and sessions_running_data
+            result: Execution result containing successes
             records: Mapping of session IDs to their execution records for sub_steps
         """
         transitions = handler.status_transitions()
@@ -589,25 +605,15 @@ class ScheduleCoordinator:
         # Execute hooks if configured for this status
         hook_config = self._transition_hooks.get(to_status)
         if hook_config:
-            sessions_to_transition = await self._execute_transition_hooks(
+            hook_result = await self._execute_transition_hooks(
                 sessions_to_transition,
                 to_status,
                 hook_config,
             )
+            sessions_to_transition = hook_result.successful_sessions
 
         # Apply status transition for sessions that passed hooks
         if sessions_to_transition:
-            # Filter sessions_running_data to only include sessions that passed hooks
-            successful_session_ids = {s.session_id for s in sessions_to_transition}
-            if result.sessions_running_data:
-                filtered_running_data = [
-                    data
-                    for data in result.sessions_running_data
-                    if data.session_id in successful_session_ids
-                ]
-                if filtered_running_data:
-                    await self._repository.update_sessions_to_running(filtered_running_data)
-
             # Create TransitionStatus with kernel=None (promotion doesn't change kernel status)
             transition = TransitionStatus(session=to_status, kernel=None)
             await self._apply_transition(
@@ -626,11 +632,12 @@ class ScheduleCoordinator:
         session_infos: list[SessionTransitionInfo],
         target_status: SessionStatus,
         hook_config: TransitionHookConfig,
-    ) -> list[SessionTransitionInfo]:
+    ) -> HookExecutionResult:
         """Execute transition hooks for sessions moving to target_status.
 
         Fetches full session+kernel data, executes hooks per session type,
-        and returns sessions that should proceed with the transition.
+        and returns sessions that should proceed with the transition along with
+        their full session data (for occupied_slots calculation on RUNNING transition).
 
         Args:
             session_infos: Sessions to execute hooks for
@@ -638,11 +645,12 @@ class ScheduleCoordinator:
             hook_config: Hook configuration (blocking behavior)
 
         Returns:
-            For blocking hooks: Only sessions where hook succeeded
-            For best-effort hooks: All sessions (failures are logged)
+            HookExecutionResult containing:
+            - successful_sessions: SessionTransitionInfo for sessions that passed hooks
+            - full_session_data: SessionWithKernels for successful sessions
         """
         if not session_infos:
-            return []
+            return HookExecutionResult(successful_sessions=[], full_session_data=[])
 
         # Fetch full session+kernel data for hook execution
         session_ids = [s.session_id for s in session_infos]
@@ -658,7 +666,7 @@ class ScheduleCoordinator:
                 len(session_ids),
                 target_status,
             )
-            return []
+            return HookExecutionResult(successful_sessions=[], full_session_data=[])
 
         # Build session_id -> SessionTransitionInfo mapping for results
         info_map = {s.session_id: s for s in session_infos}
@@ -672,6 +680,7 @@ class ScheduleCoordinator:
 
         # Process results based on blocking behavior
         successful_sessions: list[SessionTransitionInfo] = []
+        successful_full_sessions: list[SessionWithKernels] = []
         for session, hook_result in zip(full_sessions, hook_results, strict=True):
             session_id = session.session_info.identity.id
             original_info = info_map.get(session_id)
@@ -692,6 +701,7 @@ class ScheduleCoordinator:
                 # Best-effort hook failed - still include in successful sessions
 
             successful_sessions.append(original_info)
+            successful_full_sessions.append(session)
 
         log.info(
             "Executed on_transition hooks for {} sessions transitioning to {} ({} succeeded)",
@@ -700,7 +710,10 @@ class ScheduleCoordinator:
             len(successful_sessions),
         )
 
-        return successful_sessions
+        return HookExecutionResult(
+            successful_sessions=successful_sessions,
+            full_session_data=successful_full_sessions,
+        )
 
     async def _execute_single_hook(
         self,

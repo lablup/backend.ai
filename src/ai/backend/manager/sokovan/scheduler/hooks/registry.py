@@ -14,6 +14,7 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 from .base import AbstractSessionHook, NoOpSessionHook, SessionHook, SessionHookArgs
 from .batch import BatchSessionHook
@@ -27,6 +28,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @dataclass
 class HookRegistryArgs:
     repository: DeploymentRepository
+    scheduler_repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
@@ -35,6 +37,7 @@ class HookRegistryArgs:
 
 class HookRegistry:
     _repository: DeploymentRepository
+    _scheduler_repository: SchedulerRepository
     _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
@@ -43,6 +46,7 @@ class HookRegistry:
 
     def __init__(self, args: HookRegistryArgs) -> None:
         self._repository = args.repository
+        self._scheduler_repository = args.scheduler_repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
@@ -56,6 +60,7 @@ class HookRegistry:
             config_provider=self._config_provider,
             agent_client_pool=self._agent_client_pool,
             event_producer=self._event_producer,
+            scheduler_repository=self._scheduler_repository,
         )
         self._hooks[SessionTypes.INTERACTIVE] = SessionHook(InteractiveSessionHook(), args)
         self._hooks[SessionTypes.BATCH] = SessionHook(
