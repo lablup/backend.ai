@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
@@ -56,71 +57,79 @@ def mock_check_user_access(mocker, model_serving_service):
 
 class TestDeleteModelService:
     @pytest.mark.parametrize(
-        "scenario",
+        ("scenario", "user_data"),
         [
-            ScenarioBase.success(
-                "successful model deletion (user request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "successful model deletion (user request)",
+                    DeleteModelServiceAction(
+                        service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
+                    ),
+                    DeleteModelServiceActionResult(
+                        success=True,
                     ),
                 ),
-                DeleteModelServiceActionResult(
-                    success=True,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.failure(
-                "non-existent model (user request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.failure(
+                    "non-existent model (user request)",
+                    DeleteModelServiceAction(
+                        service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
                     ),
+                    ModelServiceNotFound,
                 ),
-                ModelServiceNotFound,
-            ),
-            ScenarioBase.success(
-                "successful model deletion (superadmin request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role=UserRole.SUPERADMIN.value,
-                        domain_name="default",
-                    ),
-                ),
-                DeleteModelServiceActionResult(
-                    success=True,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.failure(
-                "non-existent model (superadmin request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role=UserRole.SUPERADMIN.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "successful model deletion (superadmin request)",
+                    DeleteModelServiceAction(
+                        service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
+                    ),
+                    DeleteModelServiceActionResult(
+                        success=True,
                     ),
                 ),
-                ModelServiceNotFound,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=True,
+                    role=UserRole.SUPERADMIN.value,
+                    domain_name="default",
+                ),
+            ),
+            (
+                ScenarioBase.failure(
+                    "non-existent model (superadmin request)",
+                    DeleteModelServiceAction(
+                        service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
+                    ),
+                    ModelServiceNotFound,
+                ),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=True,
+                    role=UserRole.SUPERADMIN.value,
+                    domain_name="default",
+                ),
             ),
         ],
     )
@@ -128,17 +137,17 @@ class TestDeleteModelService:
     async def test_delete_model_service(
         self,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_get_endpoint_by_id,
         mock_get_endpoint_access_validation_data,
         mock_update_endpoint_lifecycle,
         mock_check_user_access,
-    ):
-        action = scenario.input
+    ) -> None:
         mock_validation_data = MagicMock(
-            session_owner_id=action.user_data.user_id,
-            session_owner_role=UserRole(action.user_data.role),
-            domain=action.user_data.domain_name,
+            session_owner_id=user_data.user_id,
+            session_owner_role=UserRole(user_data.role),
+            domain=user_data.domain_name,
         )
         mock_endpoint = MagicMock(
             routings=[],
@@ -156,4 +165,5 @@ class TestDeleteModelService:
         async def delete_model_service(action: DeleteModelServiceAction):
             return await model_serving_processors.delete_model_service.wait_for_complete(action)
 
-        await scenario.test(delete_model_service)
+        with with_user(user_data):
+            await scenario.test(delete_model_service)

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import HttpUrl
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.model_serving.types import RouteInfo, ServiceInfo
@@ -50,74 +51,78 @@ def mock_get_endpoint_access_validation_data_get_info(mocker, mock_repositories)
 
 class TestGetModelServiceInfo:
     @pytest.mark.parametrize(
-        "scenario",
+        ("scenario", "user_data"),
         [
-            ScenarioBase.success(
-                "full info lookup",
-                GetModelServiceInfoAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "full info lookup",
+                    GetModelServiceInfoAction(
+                        service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
                     ),
-                    service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
-                ),
-                GetModelServiceInfoActionResult(
-                    data=ServiceInfo(
-                        endpoint_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
-                        model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                        extra_mounts=[],
-                        name="test-model-v1.0",
-                        model_definition_path=None,
-                        replicas=3,
-                        desired_session_count=3,
-                        active_routes=[],
-                        service_endpoint=HttpUrl(
-                            "https://api.example.com/v1/models/test-model/v1.0"
+                    GetModelServiceInfoActionResult(
+                        data=ServiceInfo(
+                            endpoint_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
+                            model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                            extra_mounts=[],
+                            name="test-model-v1.0",
+                            model_definition_path=None,
+                            replicas=3,
+                            desired_session_count=3,
+                            active_routes=[],
+                            service_endpoint=HttpUrl(
+                                "https://api.example.com/v1/models/test-model/v1.0"
+                            ),
+                            is_public=False,
+                            runtime_variant=RuntimeVariant.CUSTOM,
                         ),
-                        is_public=False,
-                        runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                ),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.success(
-                "SUPERADMIN permission lookup",
-                GetModelServiceInfoAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role=UserRole.SUPERADMIN.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "SUPERADMIN permission lookup",
+                    GetModelServiceInfoAction(
+                        service_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
                     ),
-                    service_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                ),
-                GetModelServiceInfoActionResult(
-                    data=ServiceInfo(
-                        endpoint_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                        model_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
-                        extra_mounts=[],
-                        name="admin-model-v2.0",
-                        model_definition_path="/path/to/model",
-                        replicas=2,
-                        desired_session_count=2,
-                        active_routes=[
-                            RouteInfo(
-                                route_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                                session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-                                traffic_ratio=100.0,
-                            )
-                        ],
-                        service_endpoint=HttpUrl(
-                            "https://api.example.com/v1/models/admin-model/v2.0"
+                    GetModelServiceInfoActionResult(
+                        data=ServiceInfo(
+                            endpoint_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
+                            model_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
+                            extra_mounts=[],
+                            name="admin-model-v2.0",
+                            model_definition_path="/path/to/model",
+                            replicas=2,
+                            desired_session_count=2,
+                            active_routes=[
+                                RouteInfo(
+                                    route_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                                    session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                                    traffic_ratio=100.0,
+                                )
+                            ],
+                            service_endpoint=HttpUrl(
+                                "https://api.example.com/v1/models/admin-model/v2.0"
+                            ),
+                            is_public=True,
+                            runtime_variant=RuntimeVariant.CUSTOM,
                         ),
-                        is_public=True,
-                        runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                ),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=True,
+                    role=UserRole.SUPERADMIN.value,
+                    domain_name="default",
                 ),
             ),
         ],
@@ -126,19 +131,19 @@ class TestGetModelServiceInfo:
     async def test_get_model_service_info(
         self,
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_check_user_access_get_info,
         mock_get_endpoint_by_id_get_info,
         mock_get_endpoint_access_validation_data_get_info,
-    ):
+    ) -> None:
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
-        action = scenario.input
 
         mock_validation_data = MagicMock(
-            session_owner_id=action.user_data.user_id,
-            session_owner_role=UserRole(action.user_data.role),
-            domain=action.user_data.domain_name,
+            session_owner_id=user_data.user_id,
+            session_owner_role=UserRole(user_data.role),
+            domain=user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_get_info.return_value = mock_validation_data
 
@@ -173,4 +178,5 @@ class TestGetModelServiceInfo:
         async def get_model_service_info(action: GetModelServiceInfoAction):
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)
 
-        await scenario.test(get_model_service_info)
+        with with_user(user_data):
+            await scenario.test(get_model_service_info)

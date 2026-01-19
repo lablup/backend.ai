@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aioresponses import aioresponses
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import EndpointTokenData
@@ -69,90 +70,96 @@ def mock_get_scaling_group_info_token(mocker, mock_repositories):
 
 class TestGenerateToken:
     @pytest.mark.parametrize(
-        "scenario",
+        ("scenario", "user_data"),
         [
-            ScenarioBase.success(
-                "regular token generation",
-                GenerateTokenAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "regular token generation",
+                    GenerateTokenAction(
+                        service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                        duration=None,
+                        valid_until=None,
+                        expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
                     ),
-                    service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                    duration=None,
-                    valid_until=None,
-                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
-                ),
-                GenerateTokenActionResult(
-                    data=EndpointTokenData(
-                        id=uuid.UUID("12345678-1234-1234-1234-123456789012"),
-                        token="jwt_token_example",
-                        endpoint=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        domain="default",
-                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.now(tz=UTC),
+                    GenerateTokenActionResult(
+                        data=EndpointTokenData(
+                            id=uuid.UUID("12345678-1234-1234-1234-123456789012"),
+                            token="jwt_token_example",
+                            endpoint=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                            domain="default",
+                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                            created_at=datetime.now(tz=UTC),
+                        ),
                     ),
                 ),
-            ),
-            ScenarioBase.success(
-                "unlimited token",
-                GenerateTokenAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
-                    ),
-                    service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
-                    duration=None,
-                    valid_until=None,
-                    expires_at=0,  # No expiry
-                ),
-                GenerateTokenActionResult(
-                    data=EndpointTokenData(
-                        id=uuid.UUID("12345678-1234-1234-1234-123456789013"),
-                        token="jwt_token_unlimited",
-                        endpoint=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
-                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        domain="default",
-                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.now(tz=UTC),
-                    ),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.success(
-                "limited scope token",
-                GenerateTokenAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "unlimited token",
+                    GenerateTokenAction(
+                        service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                        duration=None,
+                        valid_until=None,
+                        expires_at=0,  # No expiry
                     ),
-                    service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
-                    duration=None,
-                    valid_until=None,
-                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
+                    GenerateTokenActionResult(
+                        data=EndpointTokenData(
+                            id=uuid.UUID("12345678-1234-1234-1234-123456789013"),
+                            token="jwt_token_unlimited",
+                            endpoint=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                            domain="default",
+                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                            created_at=datetime.now(tz=UTC),
+                        ),
+                    ),
                 ),
-                GenerateTokenActionResult(
-                    data=EndpointTokenData(
-                        id=uuid.UUID("12345678-1234-1234-1234-123456789014"),
-                        token="jwt_token_restricted",
-                        endpoint=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
-                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        domain="default",
-                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        created_at=datetime.now(tz=UTC),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
+                ),
+            ),
+            (
+                ScenarioBase.success(
+                    "limited scope token",
+                    GenerateTokenAction(
+                        service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                        duration=None,
+                        valid_until=None,
+                        expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
                     ),
+                    GenerateTokenActionResult(
+                        data=EndpointTokenData(
+                            id=uuid.UUID("12345678-1234-1234-1234-123456789014"),
+                            token="jwt_token_restricted",
+                            endpoint=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                            domain="default",
+                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                            created_at=datetime.now(tz=UTC),
+                        ),
+                    ),
+                ),
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
         ],
@@ -161,13 +168,14 @@ class TestGenerateToken:
     async def test_generate_token(
         self,
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_check_user_access_token,
         mock_get_endpoint_by_id_token,
         mock_get_endpoint_access_validation_data_token,
         mock_create_endpoint_token,
         mock_get_scaling_group_info_token,
-    ):
+    ) -> None:
         action = scenario.input
         expected = scenario.expected
 
@@ -176,7 +184,7 @@ class TestGenerateToken:
 
         mock_validation_data = MagicMock(
             session_owner_id=expected.data.session_owner,
-            session_owner_role=UserRole(action.user_data.role),
+            session_owner_role=UserRole(user_data.role),
             domain=expected.data.domain,
         )
         mock_get_endpoint_access_validation_data_token.return_value = mock_validation_data
@@ -222,4 +230,5 @@ class TestGenerateToken:
                 async def generate_token(action: GenerateTokenAction):
                     return await model_serving_processors.generate_token.wait_for_complete(action)
 
-                await scenario.test(generate_token)
+                with with_user(user_data):
+                    await scenario.test(generate_token)

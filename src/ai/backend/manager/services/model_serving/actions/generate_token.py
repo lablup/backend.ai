@@ -5,7 +5,6 @@ from typing import Optional, override
 
 from dateutil.relativedelta import relativedelta
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.types import EndpointTokenData
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
@@ -13,8 +12,6 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class GenerateTokenAction(ModelServiceAction):
-    user_data: UserData
-
     service_id: uuid.UUID
 
     duration: Optional[timedelta | relativedelta]

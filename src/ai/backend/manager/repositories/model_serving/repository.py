@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -69,7 +70,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
-from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
+from ai.backend.manager.services.model_serving.exceptions import (
+    GenericForbidden,
+    InvalidAPIParameters,
+)
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 model_serving_repository_resilience = Resilience(
@@ -731,16 +735,19 @@ class ModelServingRepository:
                         load_routes=True,
                         load_image=True,
                     )
-                    user_role = UserRole(action.user_data.role)
+                    user_data = current_user()
+                    if user_data is None:
+                        raise GenericForbidden("User context not available.")
+                    user_role = UserRole(user_data.role)
                     match user_role:
                         case UserRole.SUPERADMIN:
                             pass
                         case UserRole.ADMIN:
-                            domain_name = action.user_data.domain_name
+                            domain_name = user_data.domain_name
                             if endpoint_row.domain != domain_name:
                                 raise EndpointNotFound
                         case _:
-                            user_id = action.user_data.user_id
+                            user_id = user_data.user_id
                             if endpoint_row.session_owner != user_id:
                                 raise EndpointNotFound
                 except NoResultFound:

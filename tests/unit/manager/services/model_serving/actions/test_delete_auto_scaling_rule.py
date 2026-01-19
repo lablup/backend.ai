@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
 from ai.backend.manager.models.user import UserRole
@@ -59,55 +60,61 @@ def mock_delete_auto_scaling_rule(mocker, mock_repositories):
 
 class TestDeleteAutoScalingRule:
     @pytest.mark.parametrize(
-        "scenario",
+        ("scenario", "user_data"),
         [
-            ScenarioBase.success(
-                "Normal delete",
-                DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "Normal delete",
+                    DeleteEndpointAutoScalingRuleAction(
+                        id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
                     ),
-                    id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
+                    DeleteEndpointAutoScalingRuleActionResult(
+                        success=True,
+                    ),
                 ),
-                DeleteEndpointAutoScalingRuleActionResult(
-                    success=True,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.failure(
-                "Rule not found",
-                DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000010"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.failure(
+                    "Rule not found",
+                    DeleteEndpointAutoScalingRuleAction(
+                        id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
                     ),
-                    id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
+                    EndpointAutoScalingRuleNotFound,
                 ),
-                EndpointAutoScalingRuleNotFound,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000010"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
+                ),
             ),
-            ScenarioBase.success(
-                "SUPERADMIN delete",
-                DeleteEndpointAutoScalingRuleAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000013"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=True,
-                        role=UserRole.SUPERADMIN.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "SUPERADMIN delete",
+                    DeleteEndpointAutoScalingRuleAction(
+                        id=RuleId(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
                     ),
-                    id=RuleId(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
+                    DeleteEndpointAutoScalingRuleActionResult(
+                        success=True,
+                    ),
                 ),
-                DeleteEndpointAutoScalingRuleActionResult(
-                    success=True,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000013"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=True,
+                    role=UserRole.SUPERADMIN.value,
+                    domain_name="default",
                 ),
             ),
         ],
@@ -118,12 +125,13 @@ class TestDeleteAutoScalingRule:
         scenario: ScenarioBase[
             DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
         ],
+        user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_user_access_delete_rule,
         mock_get_auto_scaling_rule_by_id_delete_rule,
         mock_get_endpoint_access_validation_data_delete_rule,
         mock_delete_auto_scaling_rule,
-    ):
+    ) -> None:
         action = scenario.input
 
         # Mock repository responses based on scenario
@@ -136,9 +144,9 @@ class TestDeleteAutoScalingRule:
             mock_get_auto_scaling_rule_by_id_delete_rule.return_value = mock_rule
 
             mock_validation_data = MagicMock(
-                session_owner_id=action.user_data.user_id,
-                session_owner_role=UserRole(action.user_data.role),
-                domain=action.user_data.domain_name,
+                session_owner_id=user_data.user_id,
+                session_owner_role=UserRole(user_data.role),
+                domain=user_data.domain_name,
             )
             mock_get_endpoint_access_validation_data_delete_rule.return_value = mock_validation_data
             mock_delete_auto_scaling_rule.return_value = True
@@ -154,4 +162,5 @@ class TestDeleteAutoScalingRule:
                 )
             )
 
-        await scenario.test(delete_auto_scaling_rule)
+        with with_user(user_data):
+            await scenario.test(delete_auto_scaling_rule)

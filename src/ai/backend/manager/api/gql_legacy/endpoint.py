@@ -19,7 +19,6 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -327,11 +326,8 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(
-        self, user_data: UserData, endpoint_id: EndpointId
-    ) -> CreateEndpointAutoScalingRuleAction:
+    def to_action(self, endpoint_id: EndpointId) -> CreateEndpointAutoScalingRuleAction:
         return CreateEndpointAutoScalingRuleAction(
-            user_data=user_data,
             endpoint_id=endpoint_id,
             creator=EndpointAutoScalingRuleCreator(
                 metric_source=AutoScalingMetricSource(self.metric_source),
@@ -365,7 +361,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(self, user_data: UserData, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
+    def to_action(self, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
         def convert_to_decimal(
             value: Optional[str] | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
@@ -410,7 +406,6 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAutoScalingRuleAction(
-            user_data=user_data,
             id=id,
             updater=Updater(spec=spec, pk_value=id),
         )
@@ -448,14 +443,6 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raise ObjectNotFound(object_name="Endpoint")
 
         action = props.to_action(
-            user_data=UserData(
-                user_id=info.context.user["uuid"],
-                is_authorized=True,
-                is_admin=info.context.user["role"] == UserRole.ADMIN,
-                is_superadmin=info.context.user["role"] == UserRole.SUPERADMIN,
-                role=info.context.user["role"].value,
-                domain_name=info.context.user["domain_name"],
-            ),
             endpoint_id=_endpoint_id,
         )
 
@@ -504,14 +491,6 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
-            user_data=UserData(
-                user_id=graph_ctx.user["uuid"],
-                is_authorized=True,
-                is_admin=graph_ctx.user["role"] == UserRole.ADMIN,
-                is_superadmin=graph_ctx.user["role"] == UserRole.SUPERADMIN,
-                role=graph_ctx.user["role"].value,
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             id=_rule_id,
         )
 
@@ -556,14 +535,6 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         action = DeleteEndpointAutoScalingRuleAction(
-            user_data=UserData(
-                user_id=graph_ctx.user["uuid"],
-                is_authorized=True,
-                is_admin=graph_ctx.user["role"] == UserRole.ADMIN,
-                is_superadmin=graph_ctx.user["role"] == UserRole.SUPERADMIN,
-                role=graph_ctx.user["role"].value,
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             id=_rule_id,
         )
 
@@ -1054,9 +1025,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     environ = graphene.JSONString(description="Added in 24.03.5.")
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
-    def to_action(
-        self, user_data: UserData, endpoint_id: uuid.UUID, info: graphene.ResolveInfo
-    ) -> ModifyEndpointAction:
+    def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
             registry: OptionalState = OptionalState.nop()
             if (
@@ -1139,7 +1108,6 @@ class ModifyEndpointInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAction(
-            user_data=user_data,
             endpoint_id=endpoint_id,
             updater=Updater(spec=spec, pk_value=endpoint_id),
         )
@@ -1167,14 +1135,6 @@ class ModifyEndpoint(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
-            user_data=UserData(
-                user_id=graph_ctx.user["uuid"],
-                is_authorized=True,
-                is_admin=graph_ctx.user["role"] == UserRole.ADMIN,
-                is_superadmin=graph_ctx.user["role"] == UserRole.SUPERADMIN,
-                role=graph_ctx.user["role"].value,
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             endpoint_id=endpoint_id,
             info=info,
         )

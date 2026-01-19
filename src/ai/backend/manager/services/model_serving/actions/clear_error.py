@@ -2,14 +2,12 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class ClearErrorAction(ModelServiceAction):
-    user_data: UserData
     service_id: uuid.UUID
 
     @override

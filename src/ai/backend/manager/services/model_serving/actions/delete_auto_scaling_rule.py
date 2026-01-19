@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
@@ -9,7 +8,6 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class DeleteEndpointAutoScalingRuleAction(ModelServiceAction):
-    user_data: UserData
     id: RuleId
 
     @override

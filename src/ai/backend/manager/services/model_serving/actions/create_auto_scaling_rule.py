@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import EndpointId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
@@ -11,7 +10,6 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 @dataclass
 class CreateEndpointAutoScalingRuleAction(ModelServiceAction):
-    user_data: UserData
     endpoint_id: EndpointId
     creator: EndpointAutoScalingRuleCreator
 

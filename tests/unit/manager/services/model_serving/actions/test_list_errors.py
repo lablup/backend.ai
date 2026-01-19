@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import ErrorInfo
 from ai.backend.manager.models.routing import RouteStatus
@@ -50,68 +51,72 @@ def mock_get_endpoint_access_validation_data_list_errors(mocker, mock_repositori
 
 class TestListErrors:
     @pytest.mark.parametrize(
-        "scenario",
+        ("scenario", "user_data"),
         [
-            ScenarioBase.success(
-                "recent errors lookup",
-                ListErrorsAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "recent errors lookup",
+                    ListErrorsAction(
+                        service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
                     ),
-                    service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
+                    ListErrorsActionResult(
+                        error_info=[
+                            ErrorInfo(
+                                session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                                error={
+                                    "timestamp": datetime.now(tz=UTC).isoformat(),
+                                    "error_type": "OOMKilled",
+                                    "message": "Container killed due to out of memory",
+                                },
+                            ),
+                            ErrorInfo(
+                                session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                                error={
+                                    "timestamp": datetime.now(tz=UTC).isoformat(),
+                                    "error_type": "ImagePullError",
+                                    "message": "Failed to pull image",
+                                },
+                            ),
+                        ],
+                        retries=0,
+                    ),
                 ),
-                ListErrorsActionResult(
-                    error_info=[
-                        ErrorInfo(
-                            session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                            error={
-                                "timestamp": datetime.now(tz=UTC).isoformat(),
-                                "error_type": "OOMKilled",
-                                "message": "Container killed due to out of memory",
-                            },
-                        ),
-                        ErrorInfo(
-                            session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-                            error={
-                                "timestamp": datetime.now(tz=UTC).isoformat(),
-                                "error_type": "ImagePullError",
-                                "message": "Failed to pull image",
-                            },
-                        ),
-                    ],
-                    retries=0,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
-            ScenarioBase.success(
-                "error type filtered",
-                ListErrorsAction(
-                    user_data=UserData(
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        is_authorized=True,
-                        is_admin=False,
-                        is_superadmin=False,
-                        role=UserRole.USER.value,
-                        domain_name="default",
+            (
+                ScenarioBase.success(
+                    "error type filtered",
+                    ListErrorsAction(
+                        service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
                     ),
-                    service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
+                    ListErrorsActionResult(
+                        error_info=[
+                            ErrorInfo(
+                                session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
+                                error={
+                                    "timestamp": datetime.now(tz=UTC).isoformat(),
+                                    "error_type": "OOMKilled",
+                                    "message": "Container killed due to out of memory",
+                                },
+                            ),
+                        ],
+                        retries=0,
+                    ),
                 ),
-                ListErrorsActionResult(
-                    error_info=[
-                        ErrorInfo(
-                            session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                            error={
-                                "timestamp": datetime.now(tz=UTC).isoformat(),
-                                "error_type": "OOMKilled",
-                                "message": "Container killed due to out of memory",
-                            },
-                        ),
-                    ],
-                    retries=0,
+                UserData(
+                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER.value,
+                    domain_name="default",
                 ),
             ),
         ],
@@ -120,19 +125,19 @@ class TestListErrors:
     async def test_list_errors(
         self,
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_check_user_access_list_errors,
         mock_get_endpoint_by_id_list_errors,
         mock_get_endpoint_access_validation_data_list_errors,
-    ):
+    ) -> None:
         # Mock repository responses
         expected = cast(ListErrorsActionResult, scenario.expected)
-        action = scenario.input
 
         mock_validation_data = MagicMock(
-            session_owner_id=action.user_data.user_id,
-            session_owner_role=UserRole(action.user_data.role),
-            domain=action.user_data.domain_name,
+            session_owner_id=user_data.user_id,
+            session_owner_role=UserRole(user_data.role),
+            domain=user_data.domain_name,
         )
         mock_get_endpoint_access_validation_data_list_errors.return_value = mock_validation_data
 
@@ -162,4 +167,5 @@ class TestListErrors:
         async def list_errors(action: ListErrorsAction):
             return await model_serving_processors.list_errors.wait_for_complete(action)
 
-        await scenario.test(list_errors)
+        with with_user(user_data):
+            await scenario.test(list_errors)
