@@ -139,10 +139,8 @@ class KernelStatusHistoryGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatusHistoryGQL | None:
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatusHistoryGQL:
         """Convert a status history mapping to GraphQL type."""
-        if data is None:
-            return None
         entries = []
         for status, timestamp in data.items():
             if timestamp is None:
@@ -235,15 +233,15 @@ class KernelStatusDataContainerGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatusDataContainerGQL | None:
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatusDataContainerGQL:
         """Convert a status_data mapping to GraphQL type."""
-        if data is None or not data:
-            return None
-
         error = None
         scheduler = None
         kernel = None
         session = None
+
+        if not data:
+            return cls(error=error, scheduler=scheduler, kernel=kernel, session=session)
 
         # Parse error section
         if "error" in data:
@@ -299,10 +297,6 @@ class KernelStatusDataContainerGQL:
         if "session" in data:
             session = KernelSessionStatusDataGQL(status=data["session"].get("status"))
 
-        # Return None if all sections are empty
-        if error is None and scheduler is None and kernel is None and session is None:
-            return None
-
         return cls(error=error, scheduler=scheduler, kernel=kernel, session=session)
 
 
@@ -338,10 +332,8 @@ class KernelStatGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelStatGQL | None:
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatGQL:
         """Convert a stat mapping to GraphQL type."""
-        if data is None:
-            return None
         entries = []
         for key, metric_value in data.items():
             if not isinstance(metric_value, dict):
@@ -387,7 +379,7 @@ class KernelStatGQL:
                     ),
                 )
             )
-        return cls(entries=entries) if entries else None
+        return cls(entries=entries)
 
 
 # ========== Kernel Internal Data Types ==========
@@ -431,10 +423,7 @@ class KernelInternalDataGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> KernelInternalDataGQL | None:
-        if not data:
-            return None
-
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelInternalDataGQL:
         dotfiles = None
         if dotfiles_data := data.get("dotfiles"):
             if not isinstance(dotfiles_data, Sequence):
@@ -609,10 +598,8 @@ class KernelAttachedDevicesGQL:
     )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> Self | None:
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
         """Convert an attached devices mapping to GraphQL type."""
-        if data is None:
-            return None
         entries = []
         for device_type, devices in data.items():
             if not isinstance(devices, Sequence):
@@ -843,6 +830,49 @@ class KernelV2GQL(Node):
         if kernel_info.image.architecture:
             architecture = kernel_info.image.architecture
 
+        service_ports = (
+            ServicePortsGQL(
+                entries=[
+                    ServicePortEntryGQL.from_dict(p) for p in kernel_info.network.service_ports
+                ]
+            )
+            if kernel_info.network.service_ports
+            else None
+        )
+
+        occupied_slots = (
+            ResourceSlotGQL.from_resource_slot(kernel_info.resource.occupied_slots)
+            if kernel_info.resource.occupied_slots
+            else ResourceSlotGQL(entries=[])
+        )
+
+        requested_slots = (
+            ResourceSlotGQL.from_resource_slot(kernel_info.resource.requested_slots)
+            if kernel_info.resource.requested_slots
+            else ResourceSlotGQL(entries=[])
+        )
+
+        attached_devices = (
+            KernelAttachedDevicesGQL.from_mapping(kernel_info.resource.attached_devices)
+            if kernel_info.resource.attached_devices is not None
+            else KernelAttachedDevicesGQL(entries=[])
+        )
+
+        vfolder_mounts = (
+            [VFolderMountGQL.from_dict(m) for m in kernel_info.runtime.vfolder_mounts]
+            if kernel_info.runtime.vfolder_mounts
+            else None
+        )
+
+        status_data = KernelStatusDataContainerGQL.from_mapping(
+            kernel_info.lifecycle.status_data or {}
+        )
+        status_history = KernelStatusHistoryGQL.from_mapping(
+            kernel_info.lifecycle.status_history or {}
+        )
+        last_stat = KernelStatGQL.from_mapping(kernel_info.metrics.last_stat or {})
+        internal_data = KernelInternalDataGQL.from_mapping(kernel_info.metadata.internal_data or {})
+
         return cls(
             id=ID(str(kernel_info.id)),
             session=KernelSessionInfoGQL(
@@ -870,13 +900,7 @@ class KernelV2GQL(Node):
                 kernel_host=kernel_info.network.kernel_host,
                 repl_in_port=kernel_info.network.repl_in_port,
                 repl_out_port=kernel_info.network.repl_out_port,
-                service_ports=ServicePortsGQL(
-                    entries=[
-                        ServicePortEntryGQL.from_dict(p) for p in kernel_info.network.service_ports
-                    ]
-                )
-                if kernel_info.network.service_ports
-                else None,
+                service_ports=service_ports,
                 preopen_ports=kernel_info.network.preopen_ports,
                 use_host_network=kernel_info.network.use_host_network,
             ),
@@ -893,31 +917,17 @@ class KernelV2GQL(Node):
                 agent_id=kernel_info.resource.agent if not hide_agents else None,
                 agent_addr=kernel_info.resource.agent_addr if not hide_agents else None,
                 container_id=kernel_info.resource.container_id if not hide_agents else None,
-                occupied_slots=ResourceSlotGQL.from_resource_slot(
-                    kernel_info.resource.occupied_slots
-                )
-                if kernel_info.resource.occupied_slots
-                else ResourceSlotGQL(entries=[]),
-                requested_slots=ResourceSlotGQL.from_resource_slot(
-                    kernel_info.resource.requested_slots
-                )
-                if kernel_info.resource.requested_slots
-                else ResourceSlotGQL(entries=[]),
+                occupied_slots=occupied_slots,
+                requested_slots=requested_slots,
                 occupied_shares=ResourceSlotGQL.from_resource_slot(
                     kernel_info.resource.occupied_shares or {}
                 ),
-                attached_devices=KernelAttachedDevicesGQL.from_mapping(
-                    kernel_info.resource.attached_devices
-                ),
+                attached_devices=attached_devices,
                 resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
             ),
             runtime=KernelRuntimeInfoGQL(
                 environ=kernel_info.runtime.environ,
-                vfolder_mounts=[
-                    VFolderMountGQL.from_dict(m) for m in kernel_info.runtime.vfolder_mounts
-                ]
-                if kernel_info.runtime.vfolder_mounts
-                else None,
+                vfolder_mounts=vfolder_mounts,
                 bootstrap_script=kernel_info.runtime.bootstrap_script,
                 startup_command=kernel_info.runtime.startup_command,
             ),
@@ -926,12 +936,8 @@ class KernelV2GQL(Node):
                 result=SessionResultGQL(kernel_info.lifecycle.result),
                 status_changed=kernel_info.lifecycle.status_changed,
                 status_info=kernel_info.lifecycle.status_info,
-                status_data=KernelStatusDataContainerGQL.from_mapping(
-                    kernel_info.lifecycle.status_data
-                ),
-                status_history=KernelStatusHistoryGQL.from_mapping(
-                    kernel_info.lifecycle.status_history
-                ),
+                status_data=status_data,
+                status_history=status_history,
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
                 starts_at=kernel_info.lifecycle.starts_at,
@@ -939,13 +945,11 @@ class KernelV2GQL(Node):
             ),
             metrics=KernelMetricsInfoGQL(
                 num_queries=kernel_info.metrics.num_queries,
-                last_stat=KernelStatGQL.from_mapping(kernel_info.metrics.last_stat),
+                last_stat=last_stat,
             ),
             metadata=KernelMetadataInfoGQL(
                 callback_url=kernel_info.metadata.callback_url,
-                internal_data=KernelInternalDataGQL.from_mapping(
-                    kernel_info.metadata.internal_data
-                ),
+                internal_data=internal_data,
             ),
         )
 
