@@ -9,7 +9,7 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
 **Key Responsibilities:**
 - **Session Scheduling**: Allocates waiting sessions to available agents
 - **Resource Constraint Validation**: Verifies that requested resources satisfy system constraints
-- **Lifecycle Management**: Handles session start, termination, retry on failure, etc.
+- **Lifecycle Management**: Handles session start, termination, and timeout detection
 - **State Transition Management**: Tracks kernel state transitions (SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED)
 
 ## Architecture
@@ -33,7 +33,6 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
      │           │
      │           ├─── lifecycle/    (Session lifecycle)
      │           ├─── promotion/    (Status promotion)
-     │           ├─── recovery/     (Retry and recovery)
      │           ├─── maintenance/  (Cleanup and sweep)
      │           └─── kernel/       (Kernel-level handlers)
      │
@@ -65,7 +64,6 @@ scheduler/
 ├── handlers/               # State-specific handlers
 │   ├── lifecycle/          # Session lifecycle (schedule, start, terminate)
 │   ├── promotion/          # Session status promotion (pulling, creating, terminating progress)
-│   ├── recovery/           # Retry and recovery (preparing, creating failures)
 │   ├── maintenance/        # Cleanup and sweep operations
 │   └── kernel/             # Kernel-level handlers (stale kernel sweep)
 │
@@ -139,7 +137,7 @@ Process kernel lifecycle events.
 
 ### Scheduler
 
-Scheduler is the engine that executes actual scheduling algorithms, responsible for querying pending sessions and allocating them to available agents. It provides an extensible scheduling mechanism through a plugin system, designed to flexibly change scheduling policies or algorithms. It performs session start and termination processing, confirms progress during image pulling or kernel creation, and handles retry logic on failure.
+Scheduler is the engine that executes actual scheduling algorithms, responsible for querying pending sessions and allocating them to available agents. It provides an extensible scheduling mechanism through a plugin system, designed to flexibly change scheduling policies or algorithms. It performs session start and termination processing, confirms progress during image pulling or kernel creation, and handles timeout detection via Coordinator's failure classification.
 
 **Key Plugins and Dependencies:**
 - **SessionValidator**: Validates whether resources satisfy system constraints (user/group/domain quotas, concurrent execution limits, etc.)
@@ -298,7 +296,7 @@ sequenceDiagram
             alt Image check/pull started
                 Agent-->>Sched: Image pulling triggered
             else RPC failure
-                Note over Sched: Mark session for retry
+                Note over Sched: Record error, timeout will detect
             end
         end
     end
@@ -346,8 +344,7 @@ sequenceDiagram
             alt RPC success
                 Agent-->>Sched: Creation start confirmation
             else RPC failure
-                Note over Sched: Retry up to 3 times
-                Note over Sched: Return to PENDING for rescheduling after 3 failures
+                Note over Sched: Record error, timeout detection will terminate
             end
         end
     end
@@ -668,16 +665,6 @@ Promotes sessions from TERMINATING to TERMINATED status when all kernels have be
 #### DetectTerminationPromotionHandler
 Detects running sessions that need to be terminated and promotes them to TERMINATING status.
 
-### Recovery Handlers (`handlers/recovery/`)
-
-Handlers for retry and recovery operations.
-
-#### RetryPreparingHandler
-Retries sessions that failed during preparation stage. Analyzes failure causes to determine if errors are retryable, returns sessions to PENDING state for scheduling retry if retryable, and cancels sessions if not retryable.
-
-#### RetryCreatingHandler
-Retries sessions that failed during creation stage. Analyzes kernel creation failure causes to determine if errors are temporary or permanent, attempts retry for temporary errors, and cancels sessions for permanent errors.
-
 ### Maintenance Handlers (`handlers/maintenance/`)
 
 Handlers for cleanup and maintenance operations.
@@ -794,38 +781,34 @@ CANCELLED
 
 **Transition Condition Details:**
 
-| Current State | Next State | Transition Trigger | Responsible Component | Failure Handling | Retry Policy |
-|----------|----------|------------|--------------|------------|------------|
-| SCHEDULED | PREPARING | Session scheduled, kernel allocated | Scheduler | - | - |
-| PREPARING | PULLING | Image pull RPC triggered | Scheduler | CANCELLED | 3 retries |
-| PULLING | PREPARED | Image pulling complete | Agent → Event | CANCELLED | Reschedule |
-| PREPARED | CREATING | Kernel creation RPC started | Scheduler | CANCELLED | 3 retries |
-| CREATING | RUNNING | Container created and started | Agent → Event | CANCELLED | Reschedule |
-| SCHEDULED | CANCELLED | Cancellation request before image pull | KernelStateEngine | - | - |
-| PREPARING | CANCELLED | Cancellation request during image pull trigger | KernelStateEngine | - | - |
-| PULLING | CANCELLED | Cancellation request during image pulling | KernelStateEngine | - | - |
-| PREPARED | CANCELLED | Cancellation request before kernel creation | KernelStateEngine | - | - |
-| CREATING | CANCELLED | Cancellation request during kernel creation | KernelStateEngine | - | - |
-| RUNNING | TERMINATING | Termination RPC called | Scheduler | - | - |
-| TERMINATING | TERMINATED | Container cleanup complete | Agent → Event | - | Force terminate |
+| Current State | Next State | Transition Trigger | Responsible Component | Failure Handling |
+|----------|----------|------------|--------------|------------|
+| SCHEDULED | PREPARING | Session scheduled, kernel allocated | Scheduler | - |
+| PREPARING | PULLING | Image pull RPC triggered | Scheduler | TERMINATING on timeout |
+| PULLING | PREPARED | Image pulling complete | Agent → Event | TERMINATING on timeout |
+| PREPARED | CREATING | Kernel creation RPC started | Scheduler | TERMINATING on timeout |
+| CREATING | RUNNING | Container created and started | Agent → Event | TERMINATING on timeout |
+| SCHEDULED | CANCELLED | Cancellation request before image pull | KernelStateEngine | - |
+| PREPARING | CANCELLED | Cancellation request during image pull trigger | KernelStateEngine | - |
+| PULLING | CANCELLED | Cancellation request during image pulling | KernelStateEngine | - |
+| PREPARED | CANCELLED | Cancellation request before kernel creation | KernelStateEngine | - |
+| CREATING | CANCELLED | Cancellation request during kernel creation | KernelStateEngine | - |
+| RUNNING | TERMINATING | Termination RPC called | Scheduler | - |
+| TERMINATING | TERMINATED | Container cleanup complete | Agent → Event | Force terminate |
 
-**Retry Policies:**
+**Timeout Policies:**
 
-**PREPARING stage failure** (image pull trigger RPC failure):
-- Up to 3 retries in same stage
-- After 3 failures: Return session to PENDING state for rescheduling (attempt assignment to different agent)
+Coordinator's `_classify_failures` detects stuck sessions based on timeout thresholds:
 
-**PULLING stage failure** (image pulling failure):
-- Up to 3 retries in same stage
-- After 3 failures: Return session to PENDING state for rescheduling
+| Status | Timeout | Action on Timeout |
+|--------|---------|-------------------|
+| PREPARING | 15 minutes | Transition to TERMINATING |
+| PULLING | 15 minutes | Transition to TERMINATING |
+| CREATING | 10 minutes | Transition to TERMINATING |
 
-**CREATING stage failure** (kernel creation RPC failure):
-- Up to 3 retries in same stage
-- After 3 failures: Return session to PENDING state for rescheduling (attempt assignment to different agent)
-
-**PENDING timeout**:
-- Automatically transition to CANCELLED state if not scheduled within configured time
-- Timeout duration can be configured per scaling group
+**PENDING scheduling failure** (max retries exceeded):
+- Sessions exceeding max scheduling retries (SERVICE_MAX_RETRIES) are deprioritized
+- Priority is lowered and session returns to PENDING for re-scheduling with lower priority
 
 **Termination failure** (TERMINATING stage):
 - Force terminate (SIGKILL) after timeout
@@ -869,13 +852,13 @@ CANCELLED
 **Resolution**:
 1. Verify image registry connection
 2. Free agent disk space
-3. Wait for automatic retry on timeout
+3. Session will be terminated after timeout (15 minutes) - user can retry
 
-### 3. Kernel Repeatedly Fails in PREPARING
+### 3. Kernel Fails in PREPARING/CREATING
 
 **Symptoms**:
-- Kernel creation repeatedly fails
-- Returns to PENDING after exceeding retry count
+- Kernel creation fails
+- Session transitions to TERMINATING after timeout
 
 **Causes**:
 - Container image errors
@@ -883,7 +866,7 @@ CANCELLED
 - Session configuration errors
 
 **Diagnosis**:
-- **Check Session History**: Review kernel creation failure reasons and retry history
+- **Check Session History**: Review kernel creation failure reasons and error messages
 - **Image Validity**: Verify the image being used is correct
 - **Agent State**: Check agent resource state
 
@@ -891,6 +874,7 @@ CANCELLED
 1. Validate and fix image
 2. Review session configuration (environ, mounts, etc.)
 3. Secure agent resources
+4. Retry session creation after fixing issues
 
 ### 4. Session Termination Not Completing
 

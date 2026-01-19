@@ -1,6 +1,6 @@
 """Session related types."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional
