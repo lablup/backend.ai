@@ -6,7 +6,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
-from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelEdgeGQL,
