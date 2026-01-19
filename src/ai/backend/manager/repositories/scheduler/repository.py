@@ -17,6 +17,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ResourceSlot,
     SessionId,
     SlotName,
     SlotTypes,
@@ -764,6 +765,27 @@ class SchedulerRepository:
             log.warning("Failed to update total resource slots cache: {}", e)
 
         return total_resource_data
+
+    @scheduler_repository_resilience.apply()
+    async def get_total_resource_slots_by_scaling_group(
+        self, scaling_group_name: str
+    ) -> TotalResourceData:
+        """
+        Get total resource slots from agents in a specific scaling group.
+        Calculates directly from DB without caching.
+
+        :param scaling_group_name: The name of the scaling group to filter by
+        :return: TotalResourceData with total used, free, and capable slots
+        """
+        if self._config_provider.config.manager.hide_agents:
+            return TotalResourceData(
+                total_capacity_slots=ResourceSlot(),
+                total_used_slots=ResourceSlot(),
+                total_free_slots=ResourceSlot(),
+            )
+        return await self._db_source.calculate_total_resource_slots_by_scaling_group(
+            scaling_group_name
+        )
 
     # =========================================================================
     # Handler-specific methods for SessionLifecycleHandler pattern

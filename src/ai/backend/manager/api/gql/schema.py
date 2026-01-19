@@ -120,7 +120,7 @@ from .resource_usage import (
     project_usage_buckets,
     user_usage_buckets,
 )
-from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
+from .scaling_group import all_scaling_groups_v2, scaling_group_resources, scaling_groups_v2
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -183,6 +183,7 @@ class Query:
     reservoir_registries = reservoir_registries
     scaling_groups_v2 = scaling_groups_v2
     all_scaling_groups_v2 = all_scaling_groups_v2
+    scaling_group_resources = scaling_group_resources
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
