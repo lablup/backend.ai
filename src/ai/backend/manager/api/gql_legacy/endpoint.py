@@ -911,14 +911,15 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if self._is_unhealthy():
+                if self.retries > SERVICE_MAX_RETRIES:
                     return EndpointStatus.UNHEALTHY
-                total_count = len(self.routings)
                 healthy_count = sum(
                     1 for r in self.routings if r.status == RouteStatus.HEALTHY.name
                 )
-                if healthy_count == total_count:
+                if healthy_count == len(self.routings):
                     return EndpointStatus.HEALTHY
+                if healthy_count == 0:
+                    return EndpointStatus.UNHEALTHY
                 return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
@@ -979,15 +980,6 @@ class Endpoint(graphene.ObjectType):
             graph_ctx, "EndpointStatistics.by_endpoint"
         )
         return await loader.load(self.endpoint_id)
-
-    def _is_unhealthy(self) -> bool:
-        if len(self.routings) == 0:
-            return True
-        if all(r.status == RouteStatus.TERMINATED.name for r in self.routings):
-            return True
-        if self.retries > SERVICE_MAX_RETRIES:
-            return True
-        return not any(r.status == RouteStatus.HEALTHY.name for r in self.routings)
 
 
 class EndpointList(graphene.ObjectType):
