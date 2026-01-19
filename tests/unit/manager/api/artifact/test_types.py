@@ -16,6 +16,3 @@ def test_import_artifacts_input_options_defaults_to_none() -> None:
     """
     input_data = ImportArtifactsInput(artifact_revision_ids=[ID("test-id")])
     assert input_data.options is None
-    # Resolver pattern
-    force = input_data.options.force if input_data.options else False
-    assert force is False
