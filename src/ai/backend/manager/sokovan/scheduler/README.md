@@ -32,9 +32,10 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
 └────┬────┘ └────┬────┘ └─────────┘
      │           │
      │           ├─── lifecycle/    (Session lifecycle)
-     │           ├─── progress/     (Progress checking)
+     │           ├─── promotion/    (Status promotion)
      │           ├─── recovery/     (Retry and recovery)
-     │           └─── maintenance/  (Cleanup and sweep)
+     │           ├─── maintenance/  (Cleanup and sweep)
+     │           └─── kernel/       (Kernel-level handlers)
      │
      └─── Provisioner (Session provisioning plugins)
           │
@@ -63,11 +64,12 @@ scheduler/
 │
 ├── handlers/               # State-specific handlers
 │   ├── lifecycle/          # Session lifecycle (schedule, start, terminate)
-│   ├── progress/           # Progress checking (pulling, creating, terminating)
+│   ├── promotion/          # Session status promotion (pulling, creating, terminating progress)
 │   ├── recovery/           # Retry and recovery (preparing, creating failures)
-│   └── maintenance/        # Cleanup and sweep operations
+│   ├── maintenance/        # Cleanup and sweep operations
+│   └── kernel/             # Kernel-level handlers (stale kernel sweep)
 │
-├── hooks/                  # Session type-specific hooks
+├── hooks/                  # Status-based transition hooks
 ├── kernel/                 # Kernel state management
 └── recorder/               # Event recording
 ```
@@ -146,7 +148,7 @@ Scheduler is the engine that executes actual scheduling algorithms, responsible 
 - **SessionAllocator**: Allocates resources to selected agents and reflects in database
 - **SchedulerRepository**: Database access
 - **AgentRPCPool**: RPC communication with agents
-- **HookRegistry**: Executes custom logic per session type
+- **HookRegistry**: Executes status-based transition hooks
 
 **Core Methods:**
 
@@ -584,40 +586,54 @@ RepositoryAllocator controls concurrency through row locks via SELECT FOR UPDATE
 
 ### Hooks
 
-Hook is an extension point that can execute custom logic according to session type. Different processing per session type can be performed before/after scheduling or at specific points in the session lifecycle.
+Hooks are status-based extension points that execute custom logic when sessions transition to specific states. The hook system is organized by target status, with session-type specific logic handled internally within each hook.
+
+**Architecture:**
+```
+HookRegistry
+    └── get_hook(SessionStatus) → Optional[StatusTransitionHook]
+            │
+            ├── SessionStatus.RUNNING → RunningTransitionHook
+            │       ├── Update occupied_slots
+            │       ├── Execute batch startup (BATCH sessions)
+            │       └── Create inference routes (INFERENCE sessions)
+            │
+            └── SessionStatus.TERMINATED → TerminatedTransitionHook
+                    └── Delete inference routes (INFERENCE sessions)
+```
 
 **Basic Interface:**
 ```python
-class SessionHook(abc.ABC):
+class StatusTransitionHook(ABC):
     """
-    Hook interface for session type-specific logic.
+    Hook interface for status-based transition logic.
     """
 
-    @abc.abstractmethod
-    async def on_schedule(
-        self,
-        session: SessionWorkload,
-        context: HookContext,
-    ) -> SessionWorkload:
+    @abstractmethod
+    async def execute(self, session: SessionWithKernels) -> None:
         """
-        Called before scheduling.
-        Can modify session configuration.
+        Execute hook logic for the session transitioning to this status.
+        Raises exception on failure to block the transition.
         """
 ```
 
 **Key Implementations:**
 
-#### InteractiveHook
+#### RunningTransitionHook
 
-InteractiveHook is for interactive sessions (Jupyter notebooks, terminals, etc.), applying configurations specific to sessions where users directly interact.
+RunningTransitionHook executes when sessions transition to RUNNING state. It performs three operations:
+1. **occupied_slots update**: Updates the agent's occupied resource slots
+2. **Batch execution**: For BATCH sessions, triggers the startup command execution
+3. **Inference route creation**: For INFERENCE sessions, creates routing entries in the deployment system
 
-#### BatchHook
+#### TerminatedTransitionHook
 
-BatchHook is for batch sessions, handling configurations and processing needed for sessions performing automated tasks.
+TerminatedTransitionHook executes when sessions transition to TERMINATED state. It handles cleanup operations:
+1. **Inference route deletion**: For INFERENCE sessions, removes routing entries from the deployment system
 
-#### InferenceHook
+**HookRegistry:**
 
-InferenceHook is for inference sessions (model serving), applying configurations optimized for sessions providing AI models as services.
+HookRegistry provides hooks by SessionStatus. The Coordinator calls `get_hook(status)` to retrieve the appropriate hook for a transition, then executes it if present. All hooks are blocking—failures will prevent the status transition.
 
 ## State-Specific Handlers
 
@@ -636,18 +652,21 @@ Starts scheduled sessions by calling Scheduler's start_sessions() method to begi
 #### TerminateSessionsHandler
 Terminates sessions by querying sessions with termination requests from the database, then calling Scheduler's terminate_sessions() method to send termination RPC to agents.
 
-### Progress Handlers (`handlers/progress/`)
+### Promotion Handlers (`handlers/promotion/`)
 
-Handlers for checking operation progress and handling timeouts.
+Handlers for promoting sessions to the next status based on progress checks.
 
-#### CheckPullingProgressHandler
-Checks image pulling progress. Queries sessions that have remained in PULLING state longer than the configured timeout to identify sessions where pulling is delayed or failed.
+#### PromoteToPreparedPromotionHandler
+Promotes sessions from PULLING to PREPARED status when all images have been pulled and are ready.
 
-#### CheckCreatingProgressHandler
-Checks kernel creation progress. Queries sessions that have remained in PREPARING state longer than the configured timeout to handle sessions where kernel creation is delayed or failed.
+#### PromoteToRunningPromotionHandler
+Promotes sessions from CREATING to RUNNING status when all kernels have started successfully.
 
-#### CheckTerminatingProgressHandler
-Checks termination progress. Queries sessions that have remained in TERMINATING state longer than the configured timeout to attempt forced termination for sessions that didn't terminate normally.
+#### PromoteToTerminatedPromotionHandler
+Promotes sessions from TERMINATING to TERMINATED status when all kernels have been cleaned up.
+
+#### DetectTerminationPromotionHandler
+Detects running sessions that need to be terminated and promotes them to TERMINATING status.
 
 ### Recovery Handlers (`handlers/recovery/`)
 
@@ -666,8 +685,12 @@ Handlers for cleanup and maintenance operations.
 #### SweepSessionsHandler
 Cleans up old sessions. Queries long-waiting sessions and cancels or cleans sessions according to configured policy. This removes sessions that occupy resources but aren't actually being used.
 
-#### SweepLostAgentKernelsHandler
-Sweeps kernels whose agents have been lost or are no longer available. Handles cleanup when agent connectivity is lost.
+### Kernel Handlers (`handlers/kernel/`)
+
+Handlers for kernel-level operations that operate independently of session lifecycle.
+
+#### SweepStaleKernelsKernelHandler
+Sweeps stale kernels that are in RUNNING state but no longer have presence on their agents. Checks kernel presence via agent RPC and terminates kernels that are no longer running on their assigned agents.
 
 ## Kernel State Engine
 
