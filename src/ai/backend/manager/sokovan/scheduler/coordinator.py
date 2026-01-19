@@ -63,17 +63,19 @@ from .handlers import (
     SessionLifecycleHandler,
     SessionPromotionHandler,
     StartSessionsLifecycleHandler,
-    SweepLostAgentKernelsLifecycleHandler,
     SweepSessionsLifecycleHandler,
-    SweepStaleKernelsLifecycleHandler,
     TerminateSessionsLifecycleHandler,
+)
+from .handlers.kernel import (
+    KernelLifecycleHandler,
+    SweepStaleKernelsKernelHandler,
 )
 from .hooks.base import AbstractSessionHook
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
 from .recorder import SessionRecorderContext
-from .results import SessionExecutionResult, SessionTransitionInfo
-from .types import KernelCreationInfo, KernelTerminationInfo, SessionWithKernels
+from .results import KernelExecutionResult, SessionExecutionResult, SessionTransitionInfo
+from .types import KernelCreationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -146,6 +148,7 @@ class ScheduleCoordinator:
     _repository: SchedulerRepository
     _lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
     _promotion_handlers: Mapping[ScheduleType, SessionPromotionHandler]
+    _kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
     _lock_factory: DistributedLockFactory
@@ -183,6 +186,9 @@ class ScheduleCoordinator:
 
         # Initialize promotion handlers
         self._promotion_handlers = self._init_promotion_handlers()
+
+        # Initialize kernel handlers
+        self._kernel_handlers = self._init_kernel_handlers()
 
     def _init_transition_hooks(self) -> Mapping[SessionStatus, TransitionHookConfig]:
         """Initialize mapping of target statuses to their hook configurations.
@@ -243,15 +249,23 @@ class ScheduleCoordinator:
                 launcher,
                 self._repository,
             ),
-            # Maintenance handlers
+            # Maintenance handlers (session-based)
             ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
                 self._repository,
             ),
-            ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsLifecycleHandler(
-                terminator,
-                self._repository,
-            ),
-            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsLifecycleHandler(
+            # Note: SWEEP_STALE_KERNELS is handled by kernel handlers
+        }
+
+    def _init_kernel_handlers(self) -> Mapping[ScheduleType, KernelLifecycleHandler]:
+        """Initialize and return the mapping of schedule types to their kernel handlers.
+
+        Kernel handlers operate on kernels directly, unlike session lifecycle handlers.
+        They are used for kernel-specific operations like sweeping stale kernels.
+        """
+        terminator = self._components.terminator
+
+        return {
+            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
                 terminator,
                 self._valkey_schedule,
             ),
@@ -303,10 +317,14 @@ class ScheduleCoordinator:
         Returns:
             True if operation was performed, False otherwise
         """
-        # Check promotion handlers first, then lifecycle handlers
+        # Check promotion handlers first, then kernel handlers, then lifecycle handlers
         promotion_handler = self._promotion_handlers.get(schedule_type)
         if promotion_handler:
             return await self._process_promotion_schedule(schedule_type, promotion_handler)
+
+        kernel_handler = self._kernel_handlers.get(schedule_type)
+        if kernel_handler:
+            return await self._process_kernel_schedule(schedule_type, kernel_handler)
 
         lifecycle_handler = self._lifecycle_handlers.get(schedule_type)
         if lifecycle_handler:
@@ -423,6 +441,197 @@ class ScheduleCoordinator:
             )
             raise
 
+    async def _process_kernel_schedule(
+        self,
+        schedule_type: ScheduleType,
+        handler: KernelLifecycleHandler,
+    ) -> bool:
+        """Process a kernel handler schedule type.
+
+        Kernel handlers operate on kernels directly. The flow:
+        1. Query sessions based on handler's target_kernel_statuses
+        2. Extract kernels from sessions
+        3. Execute handler logic
+        4. Apply kernel status transitions based on result
+        """
+        try:
+            log.debug("Processing kernel schedule type: {}", schedule_type.value)
+
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+
+                # Acquire lock if needed
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
+
+                # Process each scaling group in parallel
+                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+
+                results = await asyncio.gather(
+                    *[
+                        self._process_kernel_scaling_group(handler, schedule_type, scaling_group)
+                        for scaling_group in scaling_groups
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Log any exceptions that occurred during parallel processing
+                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error(
+                            "Error processing scaling group {} for {}: {}",
+                            scaling_group,
+                            schedule_type.value,
+                            result,
+                        )
+
+            return True
+
+        except Exception as e:
+            log.exception(
+                "Error processing kernel schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_kernel_scaling_group(
+        self,
+        handler: KernelLifecycleHandler,
+        schedule_type: ScheduleType,
+        scaling_group: str,
+    ) -> None:
+        """Process a single scaling group for the given kernel handler.
+
+        This method:
+        1. Queries sessions to get kernels for the handler
+        2. Extracts kernels matching the target status
+        3. Executes handler logic
+        4. Applies kernel status transitions
+
+        Args:
+            handler: The kernel handler to execute
+            schedule_type: Type of scheduling operation
+            scaling_group: The scaling group to process
+        """
+        # Query sessions to get kernels - use handler's target_kernel_statuses
+        # We query sessions but will extract kernels for the handler
+        target_kernel_statuses = handler.target_kernel_statuses()
+
+        # For kernel handlers, we need sessions that have kernels in target status
+        # Use RUNNING/TERMINATING session status based on kernel status
+        session_statuses = self._infer_session_statuses_for_kernel_handler(target_kernel_statuses)
+
+        sessions = await self._repository.get_sessions_for_handler(
+            scaling_group,
+            session_statuses,
+            target_kernel_statuses,
+        )
+
+        if not sessions:
+            return
+
+        # Extract kernels from sessions that match the target status
+        kernels = [
+            kernel_info
+            for session in sessions
+            for kernel_info in session.kernel_infos
+            if kernel_info.lifecycle.status in target_kernel_statuses
+        ]
+
+        if not kernels:
+            return
+
+        # Execute handler logic with kernels
+        result = await handler.execute(scaling_group, kernels)
+
+        # Apply kernel status transitions based on handler's status_transitions
+        await self._handle_kernel_result(handler, result)
+
+        # Emit metrics per scaling group
+        self._operation_metrics.observe_success(
+            operation=handler.name(),
+            count=result.success_count(),
+        )
+
+        # Post-process if there are any results
+        if result.successes or result.failures:
+            try:
+                await handler.post_process(result)
+            except Exception as e:
+                log.error(
+                    "Error during post-processing for scaling group {}: {}",
+                    scaling_group,
+                    e,
+                )
+
+    def _infer_session_statuses_for_kernel_handler(
+        self,
+        kernel_statuses: list[KernelStatus],
+    ) -> list[SessionStatus]:
+        """Infer session statuses based on target kernel statuses.
+
+        This is used to query sessions that contain kernels in the target status.
+
+        Args:
+            kernel_statuses: Target kernel statuses for the handler
+
+        Returns:
+            List of session statuses that typically contain these kernel statuses
+        """
+        session_statuses: list[SessionStatus] = []
+        for kernel_status in kernel_statuses:
+            if kernel_status == KernelStatus.RUNNING:
+                session_statuses.append(SessionStatus.RUNNING)
+            elif kernel_status == KernelStatus.TERMINATING:
+                session_statuses.append(SessionStatus.TERMINATING)
+            # Add more mappings as needed
+        return list(set(session_statuses))
+
+    async def _handle_kernel_result(
+        self,
+        handler: KernelLifecycleHandler,
+        result: KernelExecutionResult,
+    ) -> None:
+        """Apply kernel status transitions based on handler result.
+
+        Unlike session handlers which use BEP-1030 pattern with multiple outcome paths,
+        kernel handlers have simpler success/failure transitions.
+
+        Args:
+            handler: The kernel handler that produced the result
+            result: The execution result with successes and failures
+        """
+        handler_name = handler.name()
+        transitions = handler.status_transitions()
+
+        # Handle failures - apply failure transition (typically to TERMINATED)
+        if result.failures and transitions.failure:
+            for failure in result.failures:
+                await self._kernel_state_engine.mark_kernel_terminated(
+                    failure.kernel_id,
+                    failure.reason or "kernel_handler_failure",
+                )
+            log.debug(
+                "{}: Terminated {} kernels",
+                handler_name,
+                len(result.failures),
+            )
+
+        # Handle successes - typically no status change (success means kernel is healthy)
+        # Success transition is usually None, meaning no status change needed
+        if result.successes:
+            log.debug(
+                "{}: {} kernels processed successfully (no status change)",
+                handler_name,
+                len(result.successes),
+            )
+
     async def _process_scaling_group(
         self,
         handler: SessionLifecycleHandler,
@@ -475,7 +684,7 @@ class ScheduleCoordinator:
             )
 
             # Post-process if there are any results
-            if result.successes or result.failures or result.kernel_terminations:
+            if result.successes or result.failures:
                 try:
                     await handler.post_process(result)
                 except Exception as e:
@@ -850,10 +1059,6 @@ class ScheduleCoordinator:
         if result.skipped:
             await self._record_skipped_history(handler_name, result.skipped, records)
 
-        # Apply kernel terminations (processed together with session status changes)
-        if result.kernel_terminations:
-            await self._apply_kernel_terminations(handler_name, result.kernel_terminations)
-
     async def _apply_transition(
         self,
         handler_name: str,
@@ -908,32 +1113,6 @@ class ScheduleCoordinator:
         # Kernel status reset if transitioning to PENDING
         if transition.kernel == KernelStatus.PENDING:
             await self._apply_kernel_pending_resets(handler_name, session_ids)
-
-    async def _apply_kernel_terminations(
-        self,
-        handler_name: str,
-        kernel_terminations: list[KernelTerminationInfo],
-    ) -> None:
-        """Apply kernel terminations using the kernel state engine.
-
-        This is processed together with session status changes to ensure
-        consistency in the coordinator.
-
-        Args:
-            handler_name: Name of the handler for logging
-            kernel_terminations: List of kernel terminations to apply
-        """
-        for termination in kernel_terminations:
-            await self._kernel_state_engine.mark_kernel_terminated(
-                termination.kernel_id,
-                termination.reason,
-            )
-        if kernel_terminations:
-            log.debug(
-                "{}: Terminated {} kernels",
-                handler_name,
-                len(kernel_terminations),
-            )
 
     async def _apply_kernel_pending_resets(
         self,
@@ -1174,13 +1353,6 @@ class ScheduleCoordinator:
             # Sweep is a maintenance task - only needs long cycle task
             SchedulerTaskSpec(
                 ScheduleType.SWEEP,
-                short_interval=None,  # No short-cycle task for maintenance
-                long_interval=60.0,
-                initial_delay=30.0,
-            ),
-            # Sweep lost agent kernels - maintenance task to clean up kernels with lost agents
-            SchedulerTaskSpec(
-                ScheduleType.SWEEP_LOST_AGENT_KERNELS,
                 short_interval=None,  # No short-cycle task for maintenance
                 long_interval=60.0,
                 initial_delay=30.0,

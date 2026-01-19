@@ -8,10 +8,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import AccessKey, AgentId, KernelId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo
 
 
 @dataclass
@@ -113,10 +112,6 @@ class SessionExecutionResult:
     failures: list[SessionTransitionInfo] = field(default_factory=list)
     skipped: list[SessionTransitionInfo] = field(default_factory=list)
 
-    # Kernel terminations to be processed together with session status changes
-    # Note: Will be moved to KernelExecutionResult in Phase 3
-    kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
-
     def success_count(self) -> int:
         """Get the count of successfully processed sessions."""
         return len(self.successes)
@@ -138,4 +133,68 @@ class SessionExecutionResult:
         self.successes.extend(other.successes)
         self.failures.extend(other.failures)
         self.skipped.extend(other.skipped)
-        self.kernel_terminations.extend(other.kernel_terminations)
+
+
+# ============================================================================
+# Kernel handler types for KernelLifecycleHandler (Phase 3)
+# ============================================================================
+
+
+@dataclass
+class KernelTransitionInfo:
+    """Kernel transition information for history recording.
+
+    Contains kernel_id with its actual from_status at the time of processing.
+    """
+
+    kernel_id: KernelId
+    from_status: KernelStatus
+    reason: Optional[str] = None
+
+
+@dataclass
+class KernelExecutionResult:
+    """Result of a kernel lifecycle handler execution.
+
+    Follows the same pattern as SessionExecutionResult with successes and failures.
+    Handler reports what happened, Coordinator applies the status transitions.
+
+    Fields:
+    - successes: Kernels that completed successfully
+    - failures: Kernels that failed
+    """
+
+    successes: list[KernelTransitionInfo] = field(default_factory=list)
+    failures: list[KernelTransitionInfo] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get the count of successfully processed kernels."""
+        return len(self.successes)
+
+    def success_ids(self) -> list[KernelId]:
+        """Get list of successful kernel IDs."""
+        return [k.kernel_id for k in self.successes]
+
+    def failure_ids(self) -> list[KernelId]:
+        """Get list of failed kernel IDs."""
+        return [k.kernel_id for k in self.failures]
+
+    def merge(self, other: KernelExecutionResult) -> None:
+        """Merge another result into this one."""
+        self.successes.extend(other.successes)
+        self.failures.extend(other.failures)
+
+
+@dataclass(frozen=True)
+class KernelStatusTransitions:
+    """Defines state transitions for kernel handler outcomes.
+
+    Used by KernelLifecycleHandler for kernel status changes.
+
+    Attributes:
+        success: Target kernel status for success, None means no change
+        failure: Target kernel status for failure (e.g., TERMINATED)
+    """
+
+    success: Optional[KernelStatus] = None
+    failure: Optional[KernelStatus] = None

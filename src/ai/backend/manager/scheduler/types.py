@@ -48,9 +48,6 @@ class ScheduleType(StrEnum):
 
     SCHEDULE = "schedule"  # Schedule pending sessions
     SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
-    SWEEP_LOST_AGENT_KERNELS = (
-        "sweep_lost_agent_kernels"  # Sweep kernels with lost or missing agents
-    )
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions
     TERMINATE = "terminate"  # Terminate sessions
