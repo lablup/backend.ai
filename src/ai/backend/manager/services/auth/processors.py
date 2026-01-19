@@ -11,6 +11,10 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
     GenerateSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.get_credential import (
+    GetCredentialAction,
+    GetCredentialActionResult,
+)
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
@@ -50,6 +54,7 @@ class AuthProcessors(AbstractProcessorPackage):
     update_password_no_auth: ActionProcessor[
         UpdatePasswordNoAuthAction, UpdatePasswordNoAuthActionResult
     ]
+    get_credential: ActionProcessor[GetCredentialAction, GetCredentialActionResult]
 
     def __init__(self, service: AuthService, action_monitors: list[ActionMonitor]) -> None:
         self.signout = ActionProcessor(service.signout, action_monitors)
@@ -64,6 +69,7 @@ class AuthProcessors(AbstractProcessorPackage):
         self.update_password_no_auth = ActionProcessor(
             service.update_password_no_auth, action_monitors
         )
+        self.get_credential = ActionProcessor(service.get_credential, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -78,4 +84,5 @@ class AuthProcessors(AbstractProcessorPackage):
             SignupAction.spec(),
             UpdatePasswordAction.spec(),
             UpdatePasswordNoAuthAction.spec(),
+            GetCredentialAction.spec(),
         ]

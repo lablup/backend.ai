@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dtparse
@@ -33,21 +32,16 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.data.auth.types import CredentialData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
     InvalidClientIPConfig,
 )
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
-    keypair_resource_policies,
-    user_resource_policies,
-)
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
+from ai.backend.manager.services.auth.actions.get_credential import GetCredentialAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
@@ -426,103 +420,32 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-async def _query_cred_by_access_key(
-    root_ctx: RootContext,
-    access_key: str,
-) -> tuple[Any, Any]:
-    """
-    Query keypair and user information by access_key.
-
-    Returns:
-        Tuple of (user_row, keypair_row) or (None, None) if not found
-    """
-    async with root_ctx.db.begin_readonly() as conn:
-        # Query keypair with resource policy
-        j = keypairs.join(
-            keypair_resource_policies,
-            keypairs.c.resource_policy == keypair_resource_policies.c.name,
-        )
-        query = (
-            sa.select(keypairs, keypair_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(
-                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
-            )
-        )
-        result = await conn.execute(query)
-        keypair_row = result.first()
-
-        if keypair_row is None:
-            return None, None
-
-        # Query user with resource policy by joining keypairs table
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
-        )
-        query = (
-            sa.select(users, user_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(keypairs.c.access_key == access_key)
-        )
-        result = await conn.execute(query)
-        user_row = result.first()
-
-        return user_row, keypair_row
-
-
 def _populate_auth_result(
     request: web.Request,
-    user_row: Any,
-    keypair_row: Any,
+    credential: CredentialData,
 ) -> None:
     """
     Populate authentication result into request state.
 
     This function is called by all authentication flows (JWT, HMAC, Hook)
-    to set up the common request state structure.
+    to set up the common request state structure using CredentialData.
+
+    Args:
+        request: aiohttp request object to populate
+        credential: CredentialData containing user, keypair, and resource policies
     """
-    if not user_row or not keypair_row:
-        return
+    keypair_dict = credential.to_keypair_dict()
+    user_dict = credential.to_user_dict()
 
-    keypair_mapping = keypair_row._mapping
-    user_mapping = user_row._mapping
-
-    auth_result = {
-        "is_authorized": True,
-        "keypair": {
-            col.name: keypair_mapping[f"keypairs_{col.name}"]
-            for col in keypairs.c
-            if col.name != "secret_key"
-        },
-        "user": {
-            col.name: user_mapping[f"users_{col.name}"]
-            for col in users.c
-            if col.name not in ("password", "description", "created_at")
-        },
-        "is_admin": keypair_mapping["keypairs_is_admin"],
-    }
-
-    validate_ip(request, auth_result["user"])
-
-    auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
-        for col in keypair_resource_policies.c
-    }
-    auth_result["user"]["resource_policy"] = {
-        col.name: user_mapping[f"user_resource_policies_{col.name}"]
-        for col in user_resource_policies.c
-    }
-    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
-    auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
+    # Validate IP before populating
+    validate_ip(request, user_dict)
 
     # Populate the result to the per-request state dict
-    request.update(auth_result)
+    request["is_authorized"] = True
+    request["keypair"] = keypair_dict
+    request["user"] = user_dict
+    request["is_admin"] = credential.is_admin
+    request["is_superadmin"] = credential.is_superadmin
 
 
 async def _authenticate_via_jwt(
@@ -557,20 +480,20 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        # 2. Query keypair and user from database to get secret_key
-        user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-        )
+        # 2. Query credential via processor
+        action = GetCredentialAction(access_key=access_key)
+        result = await root_ctx.processors.auth.get_credential.wait_for_complete(action)
+        credential = result.credential
 
-        if keypair_row is None:
+        if credential is None:
             raise AuthorizationFailed("Access key not found in database")
 
         # 3. Validate JWT token using user's secret key
-        secret_key = keypair_row.keypairs_secret_key
+        secret_key = credential.secret_key
         root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
 
         # 4. Populate authentication result
-        _populate_auth_result(request, user_row, keypair_row)
+        _populate_auth_result(request, credential)
         log.trace("JWT authentication succeeded for access_key={}", access_key)
 
         # 5. Update statistics
@@ -610,22 +533,22 @@ async def _authenticate_via_hmac(
 
     sign_method, access_key, signature = params
 
-    # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    # 3. Query credential via processor
+    action = GetCredentialAction(access_key=access_key)
+    result = await root_ctx.processors.auth.get_credential.wait_for_complete(action)
+    credential = result.credential
 
-    if keypair_row is None:
+    if credential is None:
         raise AuthorizationFailed("Access key not found in HMAC")
 
     # 4. Verify HMAC signature
-    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
+    my_signature = await sign_request(sign_method, request, credential.secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")
 
     # 5. Populate authentication result
-    _populate_auth_result(request, user_row, keypair_row)
+    _populate_auth_result(request, credential)
 
     # 6. Update statistics
     await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
@@ -668,16 +591,16 @@ async def _authenticate_via_hook(
         # Anonymous access allowed
         return
 
-    # 3. Query keypair and user from database
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
-    )
+    # 3. Query credential via processor
+    action = GetCredentialAction(access_key=access_key)
+    result = await root_ctx.processors.auth.get_credential.wait_for_complete(action)
+    credential = result.credential
 
-    if keypair_row is None:
+    if credential is None:
         raise AuthorizationFailed("Access key not found in hook")
 
     # 4. Populate authentication result
-    _populate_auth_result(request, user_row, keypair_row)
+    _populate_auth_result(request, credential)
 
     # 5. Update statistics
     await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
