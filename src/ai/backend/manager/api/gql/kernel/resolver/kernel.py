@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.kernel import TooManyKernelsFound
 
 
 @strawberry.field(description="Added in 26.1.0. Query a single kernel by ID.")
@@ -22,6 +23,8 @@ async def kernel_v2(
     id: UUID,
 ) -> Optional[KernelV2GQL]:
     result = await fetch_kernels(info, filter=KernelFilterGQL(id=id), limit=1)
+    if len(result.edges) >= 2:
+        raise TooManyKernelsFound
     if result.edges:
         return result.edges[0].node
     return None
