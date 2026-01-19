@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import HttpUrl
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.model_serving.types import RouteInfo, ServiceInfo
@@ -178,5 +177,4 @@ class TestGetModelServiceInfo:
         async def get_model_service_info(action: GetModelServiceInfoAction):
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(get_model_service_info)
+        await scenario.test(get_model_service_info)

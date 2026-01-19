@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
@@ -165,5 +164,4 @@ class TestDeleteModelService:
         async def delete_model_service(action: DeleteModelServiceAction):
             return await model_serving_processors.delete_model_service.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(delete_model_service)
+        await scenario.test(delete_model_service)

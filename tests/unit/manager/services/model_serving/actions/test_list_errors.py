@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import ErrorInfo
 from ai.backend.manager.models.routing import RouteStatus
@@ -167,5 +166,4 @@ class TestListErrors:
         async def list_errors(action: ListErrorsAction):
             return await model_serving_processors.list_errors.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(list_errors)
+        await scenario.test(list_errors)

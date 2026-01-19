@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aioresponses import aioresponses
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import EndpointTokenData
@@ -230,5 +229,4 @@ class TestGenerateToken:
                 async def generate_token(action: GenerateTokenAction):
                     return await model_serving_processors.generate_token.wait_for_complete(action)
 
-                with with_user(user_data):
-                    await scenario.test(generate_token)
+                await scenario.test(generate_token)

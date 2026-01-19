@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
@@ -240,5 +239,4 @@ class TestScaleServiceReplicas:
         async def scale_service_replicas(action: ScaleServiceReplicasAction):
             return await auto_scaling_processors.scale_service_replicas.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(scale_service_replicas)
+        await scenario.test(scale_service_replicas)

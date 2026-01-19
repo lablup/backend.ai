@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuleId
 from ai.backend.manager.models.user import UserRole
@@ -162,5 +161,4 @@ class TestDeleteAutoScalingRule:
                 )
             )
 
-        with with_user(user_data):
-            await scenario.test(delete_auto_scaling_rule)
+        await scenario.test(delete_auto_scaling_rule)

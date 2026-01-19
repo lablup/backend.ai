@@ -179,8 +179,7 @@ class TestUpdateRoute:
         async def update_route(action: UpdateRouteAction):
             return await model_serving_processors.update_route.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(update_route)
+        await scenario.test(update_route)
 
     @pytest.mark.parametrize(
         ("scenario", "user_data"),
@@ -230,8 +229,7 @@ class TestUpdateRoute:
         async def update_route(action: UpdateRouteAction):
             return await model_serving_processors.update_route.wait_for_complete(action)
 
-        with with_user(user_data):
-            await scenario.test(update_route)
+        await scenario.test(update_route)
 
     @pytest.mark.asyncio
     async def test_update_route_appproxy_failure(

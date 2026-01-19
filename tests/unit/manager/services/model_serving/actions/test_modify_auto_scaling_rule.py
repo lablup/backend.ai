@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -264,16 +263,15 @@ class TestModifyAutoScalingRule:
                 )
             )
 
-        with with_user(user_data):
-            # For failure scenarios, expect exception
-            if scenario.expected_exception is not None:
-                await scenario.test(modify_auto_scaling_rule)
-                return
+        # For failure scenarios, expect exception
+        if scenario.expected_exception is not None:
+            await scenario.test(modify_auto_scaling_rule)
+            return
 
-            # For success scenarios, call the action and verify the result
-            result = await modify_auto_scaling_rule(action)
-            assert result.success is True
-            expected = scenario.expected
-            if expected and expected.data:
-                assert result.data is not None
-                assert result.data.id == expected.data.id
+        # For success scenarios, call the action and verify the result
+        result = await modify_auto_scaling_rule(action)
+        assert result.success is True
+        expected = scenario.expected
+        if expected and expected.data:
+            assert result.data is not None
+            assert result.data.id == expected.data.id

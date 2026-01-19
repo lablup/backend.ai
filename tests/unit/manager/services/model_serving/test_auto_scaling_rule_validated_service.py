@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.data.model_serving.types import (
@@ -48,7 +47,7 @@ class TestAutoScalingServiceSearch:
         )
 
     @pytest.fixture
-    def sample_user_data(self) -> UserData:
+    def user_data(self) -> UserData:
         """Create sample user data"""
         return UserData(
             user_id=uuid.uuid4(),
@@ -64,7 +63,7 @@ class TestAutoScalingServiceSearch:
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
         sample_auto_scaling_rule_data: EndpointAutoScalingRuleData,
-        sample_user_data: UserData,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules with querier"""
         mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
@@ -84,8 +83,7 @@ class TestAutoScalingServiceSearch:
         action = SearchAutoScalingRulesAction(
             querier=querier,
         )
-        with with_user(sample_user_data):
-            result = await auto_scaling_service.search_auto_scaling_rules(action)
+        result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.rules == [sample_auto_scaling_rule_data]
         assert result.total_count == 1
@@ -96,7 +94,7 @@ class TestAutoScalingServiceSearch:
         self,
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
-        sample_user_data: UserData,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules when no results are found"""
         mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
@@ -116,8 +114,7 @@ class TestAutoScalingServiceSearch:
         action = SearchAutoScalingRulesAction(
             querier=querier,
         )
-        with with_user(sample_user_data):
-            result = await auto_scaling_service.search_auto_scaling_rules(action)
+        result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.rules == []
         assert result.total_count == 0
@@ -127,7 +124,7 @@ class TestAutoScalingServiceSearch:
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
         sample_auto_scaling_rule_data: EndpointAutoScalingRuleData,
-        sample_user_data: UserData,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules with pagination"""
         mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
@@ -147,8 +144,7 @@ class TestAutoScalingServiceSearch:
         action = SearchAutoScalingRulesAction(
             querier=querier,
         )
-        with with_user(sample_user_data):
-            result = await auto_scaling_service.search_auto_scaling_rules(action)
+        result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
