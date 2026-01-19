@@ -11,6 +11,7 @@ from typing import NamedTuple
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
@@ -160,4 +161,5 @@ def test_validate_endpoint_access(case: EndpointAccessCase) -> None:
         domain_name=case.requester_domain,
     )
 
-    assert validate_endpoint_access(validation_data, user_data) == case.expected
+    with with_user(user_data):
+        assert validate_endpoint_access(validation_data) == case.expected

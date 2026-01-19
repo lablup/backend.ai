@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.data.model_serving.types import (
@@ -82,9 +83,9 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            user_data=sample_user_data,
         )
-        result = await auto_scaling_service.search_auto_scaling_rules(action)
+        with with_user(sample_user_data):
+            result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.rules == [sample_auto_scaling_rule_data]
         assert result.total_count == 1
@@ -114,9 +115,9 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            user_data=sample_user_data,
         )
-        result = await auto_scaling_service.search_auto_scaling_rules(action)
+        with with_user(sample_user_data):
+            result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.rules == []
         assert result.total_count == 0
@@ -145,9 +146,9 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            user_data=sample_user_data,
         )
-        result = await auto_scaling_service.search_auto_scaling_rules(action)
+        with with_user(sample_user_data):
+            result = await auto_scaling_service.search_auto_scaling_rules(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True
