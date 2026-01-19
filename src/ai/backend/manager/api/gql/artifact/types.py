@@ -533,8 +533,8 @@ class ImportArtifactsInput:
         default=None,
         description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
-    options: ImportArtifactsOptionsGQL = strawberry.field(
-        default_factory=ImportArtifactsOptionsGQL,
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
         description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
@@ -595,8 +595,8 @@ class DelegateImportArtifactsInput:
     )
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
-    options: ImportArtifactsOptionsGQL = strawberry.field(
-        default_factory=ImportArtifactsOptionsGQL,
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
         description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
