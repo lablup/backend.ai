@@ -18,8 +18,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
-        mock_endpoint._is_unhealthy = lambda: Endpoint._is_unhealthy(mock_endpoint)
 
         unhealthy_route = Mock()
         unhealthy_route.status = RouteStatus.UNHEALTHY.name
@@ -35,8 +33,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
-        mock_endpoint._is_unhealthy = lambda: Endpoint._is_unhealthy(mock_endpoint)
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.HEALTHY.name
@@ -58,8 +54,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
-        mock_endpoint._is_unhealthy = lambda: Endpoint._is_unhealthy(mock_endpoint)
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.HEALTHY.name
@@ -79,8 +73,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
-        mock_endpoint._is_unhealthy = lambda: Endpoint._is_unhealthy(mock_endpoint)
 
         terminated_route = Mock()
         terminated_route.status = RouteStatus.TERMINATED.name
@@ -98,8 +90,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
-        mock_endpoint._is_unhealthy = lambda: Endpoint._is_unhealthy(mock_endpoint)
         mock_endpoint.routings = []
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
