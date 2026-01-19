@@ -293,7 +293,7 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
         ),
         # Detect abnormal termination when ANY kernel is TERMINATED or CANCELLED
         # Covers all active session states where kernels can be terminated
-        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: PromotionSpec(
+        ScheduleType.DETECT_KERNEL_TERMINATION: PromotionSpec(
             name="detect-termination",
             target_statuses=[
                 SessionStatus.PENDING,

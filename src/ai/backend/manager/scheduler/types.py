@@ -60,7 +60,9 @@ class ScheduleType(StrEnum):
         "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
     )
     SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
-    CHECK_RUNNING_SESSION_TERMINATION = "check_running_session_termination"  # Check active sessions with any kernel TERMINATED/CANCELLED
+    DETECT_KERNEL_TERMINATION = (
+        "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
+    )
 
 
 def merge_resource(

@@ -1336,9 +1336,9 @@ class ScheduleCoordinator:
             event.kernel_id, event.reason, event.exit_code
         )
         if result:
-            # Request CHECK_RUNNING_SESSION_TERMINATION and CHECK_TERMINATING_PROGRESS
+            # Request DETECT_KERNEL_TERMINATION and CHECK_TERMINATING_PROGRESS
             await self._scheduling_controller.mark_scheduling_needed([
-                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
+                ScheduleType.DETECT_KERNEL_TERMINATION,
                 ScheduleType.CHECK_TERMINATING_PROGRESS,
             ])
         return result
@@ -1453,9 +1453,9 @@ class ScheduleCoordinator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            # Check RUNNING sessions where all kernels are TERMINATED
+            # Detect active sessions with any kernel TERMINATED/CANCELLED
             SchedulerTaskSpec(
-                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
+                ScheduleType.DETECT_KERNEL_TERMINATION,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,

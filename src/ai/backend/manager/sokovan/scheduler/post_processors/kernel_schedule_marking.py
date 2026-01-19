@@ -21,8 +21,8 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 # After kernels transition to a status, the coordinator marks the corresponding
 # schedule type to trigger the next phase.
 KERNEL_STATUS_TO_NEXT_SCHEDULE_TYPE: dict[KernelStatus, ScheduleType] = {
-    KernelStatus.TERMINATED: ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
-    KernelStatus.CANCELLED: ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
+    KernelStatus.TERMINATED: ScheduleType.DETECT_KERNEL_TERMINATION,
+    KernelStatus.CANCELLED: ScheduleType.DETECT_KERNEL_TERMINATION,
 }
 
 
