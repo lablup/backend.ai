@@ -65,12 +65,6 @@ from .types import KernelCreationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
-# Statuses that require hook execution during transition
-HOOK_TARGET_STATUSES: frozenset[SessionStatus] = frozenset({
-    SessionStatus.RUNNING,
-    SessionStatus.TERMINATED,
-})
-
 
 @dataclass
 class SchedulerTaskSpec:
@@ -626,7 +620,7 @@ class ScheduleCoordinator:
         4. Apply status transition for remaining sessions
 
         Note: Status-specific logic (e.g., occupied_slots for RUNNING) is handled
-        by SessionHook in the hook registry, not here in the Coordinator.
+        by StatusTransitionHook in the hook registry, not here in the Coordinator.
 
         Args:
             handler: The promotion handler that produced the result
@@ -642,13 +636,12 @@ class ScheduleCoordinator:
         to_status = transitions.success
         sessions_to_transition = result.successes
 
-        # Execute hooks if configured for this status
-        hook_config = self._handlers.transition_hooks.get(to_status)
-        if hook_config:
+        # Execute hooks if available for this status
+        hook = self._hook_registry.get_hook(to_status)
+        if hook:
             hook_result = await self._execute_transition_hooks(
                 sessions_to_transition,
                 to_status,
-                hook_config,
             )
             sessions_to_transition = hook_result.successful_sessions
 
@@ -671,18 +664,18 @@ class ScheduleCoordinator:
         self,
         session_infos: list[SessionTransitionInfo],
         target_status: SessionStatus,
-        hook_config: TransitionHookConfig,
     ) -> HookExecutionResult:
         """Execute transition hooks for sessions moving to target_status.
 
-        Fetches full session+kernel data, executes hooks per session type,
+        Fetches full session+kernel data, executes hooks per session,
         and returns sessions that should proceed with the transition along with
         their full session data (for occupied_slots calculation on RUNNING transition).
+
+        All hooks are blocking - if a hook fails, the session won't transition.
 
         Args:
             session_infos: Sessions to execute hooks for
             target_status: The status sessions are transitioning to
-            hook_config: Hook configuration (blocking behavior)
 
         Returns:
             HookExecutionResult containing:
@@ -717,7 +710,7 @@ class ScheduleCoordinator:
         ]
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 
-        # Process results based on blocking behavior
+        # Process results - all hooks are blocking
         successful_sessions: list[SessionTransitionInfo] = []
         successful_full_sessions: list[SessionWithKernels] = []
         for session, hook_result in zip(full_sessions, hook_results, strict=True):
@@ -729,15 +722,13 @@ class ScheduleCoordinator:
 
             if isinstance(hook_result, BaseException):
                 log.error(
-                    "Hook on_transition to {} failed for session {}: {}",
-                    target_status,
+                    "Hook failed for session {} transitioning to {}: {}",
                     session_id,
+                    target_status,
                     hook_result,
                 )
-                if hook_config.blocking:
-                    # Blocking hook failed - don't include in successful sessions
-                    continue
-                # Best-effort hook failed - still include in successful sessions
+                # Hook failed - don't include in successful sessions
+                continue
 
             successful_sessions.append(original_info)
             successful_full_sessions.append(session)
@@ -765,9 +756,9 @@ class ScheduleCoordinator:
             session: Full session+kernel data
             status: The status the session is transitioning to
         """
-        session_type = session.session_info.metadata.session_type
-        hook = self._hook_registry.get_hook(session_type)
-        await hook.on_transition(session, status)
+        hook = self._hook_registry.get_hook(status)
+        if hook:
+            await hook.execute(session)
 
     async def _broadcast_transition_events(
         self,

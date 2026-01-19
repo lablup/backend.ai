@@ -1271,7 +1271,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
             launcher=scheduler_components.launcher,
             terminator=scheduler_components.terminator,
             repository=scheduler_components.repository,
-            hook_registry=scheduler_components.hook_registry,
             valkey_schedule=root_ctx.valkey_schedule,
             scheduling_controller=root_ctx.scheduling_controller,
         )

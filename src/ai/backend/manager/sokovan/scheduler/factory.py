@@ -37,7 +37,6 @@ from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
     KernelLifecycleHandler,
     SweepStaleKernelsKernelHandler,
 )
-from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -176,7 +175,6 @@ def create_default_scheduler_components(
         deployment_repository=deployment_repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
-        network_plugin_ctx=network_plugin_ctx,
         event_producer=event_producer,
     )
 
@@ -207,7 +205,6 @@ class CoordinatorHandlersArgs:
     launcher: SessionLauncher
     terminator: SessionTerminator
     repository: SchedulerRepository
-    hook_registry: HookRegistry
     valkey_schedule: ValkeyScheduleClient
     scheduling_controller: SchedulingController
 
