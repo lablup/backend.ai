@@ -1,6 +1,6 @@
 """GraphQL scaling group module."""
 
-from .resolver import all_scaling_groups_v2, scaling_groups_v2
+from .resolver import all_scaling_groups_v2, scaling_group_resources, scaling_groups_v2
 from .types import (
     ScalingGroupFilterGQL,
     ScalingGroupOrderByGQL,
@@ -17,4 +17,5 @@ __all__ = (
     # Resolvers
     "scaling_groups_v2",
     "all_scaling_groups_v2",
+    "scaling_group_resources",
 )
