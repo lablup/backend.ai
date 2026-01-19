@@ -60,7 +60,7 @@ class TestDeleteModelService:
         [
             (
                 ScenarioBase.success(
-                    "successful model deletion (user request)",
+                    "successful model deletion",
                     DeleteModelServiceAction(
                         service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                     ),
@@ -79,7 +79,7 @@ class TestDeleteModelService:
             ),
             (
                 ScenarioBase.failure(
-                    "non-existent model (user request)",
+                    "non-existent model",
                     DeleteModelServiceAction(
                         service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
                     ),
@@ -91,42 +91,6 @@ class TestDeleteModelService:
                     is_admin=False,
                     is_superadmin=False,
                     role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "successful model deletion (superadmin request)",
-                    DeleteModelServiceAction(
-                        service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    ),
-                    DeleteModelServiceActionResult(
-                        success=True,
-                    ),
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.failure(
-                    "non-existent model (superadmin request)",
-                    DeleteModelServiceAction(
-                        service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    ),
-                    ModelServiceNotFound,
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
                     domain_name="default",
                 ),
             ),

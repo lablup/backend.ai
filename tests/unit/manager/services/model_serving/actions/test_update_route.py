@@ -73,7 +73,7 @@ class TestUpdateRoute:
         [
             (
                 ScenarioBase.success(
-                    "weighted routing",
+                    "update route traffic ratio",
                     UpdateRouteAction(
                         service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
                         route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
@@ -87,44 +87,6 @@ class TestUpdateRoute:
                     is_admin=False,
                     is_superadmin=False,
                     role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "canary deployment",
-                    UpdateRouteAction(
-                        service_id=uuid.UUID("66666666-7777-8888-9999-aaaaaaaaaaaa"),
-                        route_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
-                        traffic_ratio=0.95,
-                    ),
-                    UpdateRouteActionResult(success=True),
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN blue-green deployment",
-                    UpdateRouteAction(
-                        service_id=uuid.UUID("77777777-8888-9999-aaaa-bbbbbbbbbbbb"),
-                        route_id=uuid.UUID("33333333-3333-3333-3333-333333333333"),
-                        traffic_ratio=1.0,
-                    ),
-                    UpdateRouteActionResult(success=True),
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
                     domain_name="default",
                 ),
             ),

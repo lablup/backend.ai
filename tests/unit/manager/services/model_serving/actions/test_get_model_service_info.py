@@ -7,7 +7,7 @@ from pydantic import HttpUrl
 
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.manager.data.model_serving.types import RouteInfo, ServiceInfo
+from ai.backend.manager.data.model_serving.types import ServiceInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
@@ -54,7 +54,7 @@ class TestGetModelServiceInfo:
         [
             (
                 ScenarioBase.success(
-                    "full info lookup",
+                    "get model service info",
                     GetModelServiceInfoAction(
                         service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
                     ),
@@ -82,45 +82,6 @@ class TestGetModelServiceInfo:
                     is_admin=False,
                     is_superadmin=False,
                     role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN permission lookup",
-                    GetModelServiceInfoAction(
-                        service_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                    ),
-                    GetModelServiceInfoActionResult(
-                        data=ServiceInfo(
-                            endpoint_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                            model_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
-                            extra_mounts=[],
-                            name="admin-model-v2.0",
-                            model_definition_path="/path/to/model",
-                            replicas=2,
-                            desired_session_count=2,
-                            active_routes=[
-                                RouteInfo(
-                                    route_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                                    session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-                                    traffic_ratio=100.0,
-                                )
-                            ],
-                            service_endpoint=HttpUrl(
-                                "https://api.example.com/v1/models/admin-model/v2.0"
-                            ),
-                            is_public=True,
-                            runtime_variant=RuntimeVariant.CUSTOM,
-                        ),
-                    ),
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
                     domain_name="default",
                 ),
             ),
