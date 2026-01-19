@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__serena__find_symbol"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}
