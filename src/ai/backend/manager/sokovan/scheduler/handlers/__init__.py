@@ -14,16 +14,12 @@ from .promotion.detect_termination import DetectTerminationPromotionHandler
 from .promotion.promote_to_prepared import PromoteToPreparedPromotionHandler
 from .promotion.promote_to_running import PromoteToRunningPromotionHandler
 from .promotion.promote_to_terminated import PromoteToTerminatedPromotionHandler
-from .recovery.retry_creating import RetryCreatingLifecycleHandler
-from .recovery.retry_preparing import RetryPreparingLifecycleHandler
 
 __all__ = [
     # Session lifecycle handlers (SessionLifecycleHandler interface)
     "SessionLifecycleHandler",
     "CheckPreconditionLifecycleHandler",
     "DeprioritizeSessionsLifecycleHandler",
-    "RetryCreatingLifecycleHandler",
-    "RetryPreparingLifecycleHandler",
     "ScheduleSessionsLifecycleHandler",
     "StartSessionsLifecycleHandler",
     "SweepSessionsLifecycleHandler",

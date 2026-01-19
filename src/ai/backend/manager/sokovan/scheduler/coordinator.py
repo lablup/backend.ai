@@ -1316,19 +1316,6 @@ class ScheduleCoordinator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
-            # Retry operations - only long cycle tasks
-            SchedulerTaskSpec(
-                ScheduleType.RETRY_PREPARING,
-                short_interval=None,  # No short-cycle task
-                long_interval=10.0,  # 10 seconds for retry operations
-                initial_delay=10.0,  # Wait a bit before first retry
-            ),
-            SchedulerTaskSpec(
-                ScheduleType.RETRY_CREATING,
-                short_interval=None,  # No short-cycle task
-                long_interval=10.0,  # 10 seconds for retry operations
-                initial_delay=10.0,  # Wait a bit before first retry
-            ),
         ]
 
     def create_task_specs(self) -> list[EventTaskSpec]:

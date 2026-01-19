@@ -25,8 +25,6 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
     PromoteToPreparedPromotionHandler,
     PromoteToRunningPromotionHandler,
     PromoteToTerminatedPromotionHandler,
-    RetryCreatingLifecycleHandler,
-    RetryPreparingLifecycleHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
     SessionPromotionHandler,
@@ -251,14 +249,6 @@ def _create_lifecycle_handlers(
         ),
         ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
             args.terminator,
-            args.repository,
-        ),
-        ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
-            args.launcher,
-            args.repository,
-        ),
-        ScheduleType.RETRY_CREATING: RetryCreatingLifecycleHandler(
-            args.launcher,
             args.repository,
         ),
         ScheduleType.SWEEP: SweepSessionsLifecycleHandler(

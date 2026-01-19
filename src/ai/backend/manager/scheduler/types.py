@@ -59,8 +59,6 @@ class ScheduleType(StrEnum):
     CHECK_TERMINATING_PROGRESS = (
         "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
     )
-    RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
-    RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
     SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
     CHECK_RUNNING_SESSION_TERMINATION = (
         "check_running_session_termination"  # Check RUNNING sessions with all kernels TERMINATED
