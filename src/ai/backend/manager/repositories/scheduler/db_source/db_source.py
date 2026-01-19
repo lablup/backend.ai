@@ -3728,7 +3728,7 @@ class ScheduleDBSource:
         async with self._begin_readonly_session_read_committed() as db_sess:
             stmt = sa.select(SessionRow)
             result = await execute_batch_querier(db_sess, stmt, querier)
-            return [row.to_session_info() for row in result.rows]
+            return [row.SessionRow.to_session_info() for row in result.rows]
 
     async def update_sessions_status_bulk(
         self,
@@ -4578,7 +4578,8 @@ class ScheduleDBSource:
             # Build session map
             session_ids: list[SessionId] = []
             sessions_map: dict[SessionId, SessionWithKernels] = {}
-            for session_row in session_result.rows:
+            for row in session_result.rows:
+                session_row: SessionRow = row.SessionRow
                 session_ids.append(session_row.id)
                 sessions_map[session_row.id] = SessionWithKernels(
                     session_info=session_row.to_session_info(),
