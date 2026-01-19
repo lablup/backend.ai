@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .fetcher import fetch_kernels_by_agent
+from .fetcher import fetch_kernels
 from .types import (
     KernelAttachedDeviceEntryGQL,
     KernelAttachedDevicesGQL,
@@ -69,5 +69,5 @@ __all__ = [
     "KernelUserPermissionInfoGQL",
     "KernelV2GQL",
     # Fetchers
-    "fetch_kernels_by_agent",
+    "fetch_kernels",
 ]
