@@ -1213,5 +1213,6 @@ def _validate_container_uid_gid(value: Any) -> None:
 def validate_user_mutation_props(props: UserInput | ModifyUserInput) -> None:
     for value in [props.container_uid, props.container_main_gid]:
         _validate_container_uid_gid(value)
-    for value in props.container_gids:
-        _validate_container_uid_gid(value)
+    if props.container_gids is not Undefined and props.container_gids is not None:
+        for value in props.container_gids:
+            _validate_container_uid_gid(value)
