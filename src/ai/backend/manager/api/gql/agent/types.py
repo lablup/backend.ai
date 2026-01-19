@@ -13,14 +13,17 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.types import AgentId
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels_by_agent
+from ai.backend.manager.api.gql.base import (
+    OrderDirection,
+    StringFilter,
+)
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelFilterGQL,
     KernelOrderByGQL,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -345,8 +348,8 @@ class AgentNetworkInfoGQL:
     name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
 )
 class AgentV2GQL(Node):
-    _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
+    _agent_id: strawberry.Private[AgentId]
     resource_info: AgentResourceGQL = strawberry.field(
         description=dedent_strip("""
             Hardware resource capacity, usage, and availability information.
@@ -389,16 +392,6 @@ class AgentV2GQL(Node):
         """)
     )
 
-    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")
-    async def container_count(
-        self,
-        info: Info[StrawberryGQLContext],
-    ) -> int:
-        """
-        Get the container count for a specific agent.
-        """
-        return await info.context.data_loaders.container_count_loader.load(self._agent_id)
-
     @strawberry.field(
         description="Added in 26.1.0. List of kernels running on this agent with pagination support."
     )
@@ -413,13 +406,11 @@ class AgentV2GQL(Node):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        resource_occupied_only: bool = False,
     ) -> KernelConnectionV2GQL:
         """Fetch kernels associated with this agent."""
 
-        return await fetch_kernels_by_agent(
+        return await fetch_kernels(
             info=info,
-            agent_id=self._agent_id,
             filter=filter,
             order_by=order_by,
             before=before,
@@ -428,7 +419,7 @@ class AgentV2GQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            resource_occupied_only=resource_occupied_only,
+            agent_id=self._agent_id,
         )
 
     @classmethod
@@ -436,8 +427,8 @@ class AgentV2GQL(Node):
         data = detail_data.agent
 
         return cls(
-            _agent_id=AgentId(data.id),
             id=ID(data.id),
+            _agent_id=AgentId(data.id),
             resource_info=AgentResourceGQL(
                 capacity=data.available_slots.to_json(),
                 used=data.actual_occupied_slots.to_json(),
