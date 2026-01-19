@@ -1,30 +1,30 @@
+"""
+Repository for fetching container registry information for quota management.
+
+This repository was migrated from `ai.backend.manager.service.container_registry.base`.
+"""
+
 from __future__ import annotations
 
 import abc
-import logging
-import uuid
 from dataclasses import dataclass
 from typing import Any, cast, override
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.image import (
-    ContainerRegistryNotFound,
-)
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
 
 @dataclass
 class ContainerRegistryRowInfo:
-    id: uuid.UUID
+    id: UUID
     url: str
     registry_name: str
     type: ContainerRegistryType
@@ -36,16 +36,17 @@ class ContainerRegistryRowInfo:
     extra: dict[str, Any]
 
 
-class AbstractPerProjectRegistryQuotaRepository(abc.ABC):
+class AbstractRegistryQuotaRepository(abc.ABC):
+    @abc.abstractmethod
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
     ) -> ContainerRegistryRowInfo:
         raise NotImplementedError
 
 
-class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepository):
+class RegistryQuotaRepository(AbstractRegistryQuotaRepository):
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self.db = db
+        self._db = db
 
     @classmethod
     def _is_valid_group_row(cls, group_row: GroupRow | None) -> bool:
@@ -60,7 +61,7 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
     ) -> ContainerRegistryRowInfo:
-        async with self.db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             project_id = scope_id.project_id
             group_query = (
                 sa.select(GroupRow)
@@ -70,12 +71,11 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
             result = await db_sess.execute(group_query)
             group_row = result.scalar_one_or_none()
 
-            if not PerProjectRegistryQuotaRepository._is_valid_group_row(group_row):
+            if not RegistryQuotaRepository._is_valid_group_row(group_row):
                 raise ContainerRegistryNotFound(
                     f"Container registry info does not exist or is invalid in the group. (group: {project_id})"
                 )
 
-            # After _is_valid_group_row check, group_row and container_registry are not None
             assert group_row is not None
             container_registry = group_row.container_registry
             assert container_registry is not None
