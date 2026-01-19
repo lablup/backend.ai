@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
@@ -34,6 +34,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionStatus,
+    StatusTransitions,
     TransitionStatus,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
@@ -63,8 +64,21 @@ from .handlers import (
 from .handlers.kernel import KernelLifecycleHandler
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
+from .post_processors import (
+    KernelPostProcessor,
+    KernelPostProcessorContext,
+    PostProcessor,
+    PostProcessorContext,
+    create_kernel_post_processors,
+    create_session_post_processors,
+)
 from .recorder import SessionRecorderContext
-from .results import KernelExecutionResult, SessionExecutionResult, SessionTransitionInfo
+from .results import (
+    KernelExecutionResult,
+    KernelStatusTransitions,
+    SessionExecutionResult,
+    SessionTransitionInfo,
+)
 from .types import KernelCreationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -158,6 +172,8 @@ class ScheduleCoordinator:
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
     _hook_registry: HookRegistry
+    _post_processors: Sequence[PostProcessor]
+    _kernel_post_processors: Sequence[KernelPostProcessor]
 
     def __init__(
         self,
@@ -183,6 +199,17 @@ class ScheduleCoordinator:
 
         # Initialize hook registry from components
         self._hook_registry = components.hook_registry
+
+        # Initialize post-processors for session handlers
+        self._post_processors = create_session_post_processors(
+            scheduling_controller,
+            components.repository,
+        )
+
+        # Initialize post-processors for kernel handlers
+        self._kernel_post_processors = create_kernel_post_processors(
+            scheduling_controller,
+        )
 
     async def process_lifecycle_schedule(
         self,
@@ -439,13 +466,15 @@ class ScheduleCoordinator:
             count=result.success_count(),
         )
 
-        # Post-process if there are any results
-        if result.successes or result.failures:
+        # Run kernel post-processors
+        if result.has_transitions():
+            transitions = handler.status_transitions()
+            target_statuses = self._collect_kernel_target_statuses(transitions, result)
             try:
-                await handler.post_process(result)
+                await self._run_kernel_post_processors(result, target_statuses)
             except Exception as e:
                 log.error(
-                    "Error during post-processing for scaling group {}: {}",
+                    "Error during kernel post-processing for scaling group {}: {}",
                     scaling_group,
                     e,
                 )
@@ -546,7 +575,7 @@ class ScheduleCoordinator:
             all_records = pool.build_all_records()
 
             # Apply status transitions immediately for this scaling group (BEP-1030)
-            await self._handle_result(handler, result, all_records, sessions)
+            classified = await self._handle_result(handler, result, all_records, sessions)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -554,13 +583,18 @@ class ScheduleCoordinator:
                 count=result.success_count(),
             )
 
-            # Post-process if there are any results
-            if result.successes or result.failures:
+            # Common post-process: mark next schedule and invalidate cache
+            if result.has_transitions():
+                transitions = handler.status_transitions()
+                # Collect all target statuses from success and classified failures
+                target_statuses = self._collect_target_statuses(
+                    transitions, result.successes, classified
+                )
                 try:
-                    await handler.post_process(result)
+                    await self._run_post_processors(result, target_statuses)
                 except Exception as e:
                     log.error(
-                        "Error during post-processing for scaling group {}: {}",
+                        "Error during common post-processing for scaling group {}: {}",
                         scaling_group,
                         e,
                     )
@@ -628,13 +662,17 @@ class ScheduleCoordinator:
                 count=result.success_count(),
             )
 
-            # Post-process if there are any results
-            if result.successes or result.failures:
+            # Common post-process: mark next schedule and invalidate cache
+            if result.has_transitions():
+                # Promotion handlers use PromotionStatusTransitions where success is SessionStatus directly
+                # Promotion handlers don't have failure classification - all results are successes
+                target_status = handler.status_transitions().success
+                target_statuses = {target_status} if target_status else set()
                 try:
-                    await handler.post_process(result)
+                    await self._run_post_processors(result, target_statuses)
                 except Exception as e:
                     log.error(
-                        "Error during post-processing for scaling group {}: {}",
+                        "Error during common post-processing for scaling group {}: {}",
                         scaling_group,
                         e,
                     )
@@ -855,7 +893,7 @@ class ScheduleCoordinator:
         result: SessionExecutionResult,
         records: Mapping[SessionId, ExecutionRecord],
         sessions: list[SessionWithKernels],
-    ) -> None:
+    ) -> FailureClassificationResult | None:
         """Apply status transitions using handler.status_transitions() (BEP-1030).
 
         Handler reports what happened (successes/failures/skipped), and Coordinator applies
@@ -871,9 +909,14 @@ class ScheduleCoordinator:
             result: Execution result containing successes, failures, and skipped
             records: Mapping of session IDs to their execution records for sub_steps
             sessions: Original sessions with phase_attempts for failure classification
+
+        Returns:
+            FailureClassificationResult if there were failures, None otherwise.
+            Used by caller for post-processing with correct target statuses.
         """
         transitions = handler.status_transitions()
         handler_name = handler.name()
+        classified: FailureClassificationResult | None = None
 
         # SUCCESS transitions
         if transitions.success and result.successes:
@@ -925,6 +968,8 @@ class ScheduleCoordinator:
         # SKIPPED - Record history without status change
         if result.skipped:
             await self._record_skipped_history(handler_name, result.skipped, records)
+
+        return classified
 
     def _classify_failures(
         self,
@@ -1106,6 +1151,110 @@ class ScheduleCoordinator:
             len(session_infos),
         )
 
+    def _collect_target_statuses(
+        self,
+        transitions: StatusTransitions,
+        successes: list[SessionTransitionInfo],
+        classified: FailureClassificationResult | None,
+    ) -> set[SessionStatus]:
+        """Collect all target statuses from successes and classified failures.
+
+        Args:
+            transitions: Status transitions defined by the handler
+            successes: List of successful session transitions
+            classified: Classified failures (give_up, expired, need_retry)
+
+        Returns:
+            Set of all target statuses that sessions transitioned to
+        """
+        target_statuses: set[SessionStatus] = set()
+
+        # Add success target status
+        if successes and transitions.success and transitions.success.session:
+            target_statuses.add(transitions.success.session)
+
+        # Add failure target statuses from classified failures
+        if classified:
+            if classified.give_up and transitions.give_up and transitions.give_up.session:
+                target_statuses.add(transitions.give_up.session)
+            if classified.expired and transitions.expired and transitions.expired.session:
+                target_statuses.add(transitions.expired.session)
+            if classified.need_retry and transitions.need_retry and transitions.need_retry.session:
+                target_statuses.add(transitions.need_retry.session)
+
+        return target_statuses
+
+    async def _run_post_processors(
+        self,
+        result: SessionExecutionResult,
+        target_statuses: set[SessionStatus],
+    ) -> None:
+        """Run all post-processors for session handlers in parallel.
+
+        Args:
+            result: Execution result containing successes and failures
+            target_statuses: Set of target statuses sessions transitioned to
+        """
+        context = PostProcessorContext(result=result, target_statuses=target_statuses)
+        results = await asyncio.gather(
+            *[post_processor.execute(context) for post_processor in self._post_processors],
+            return_exceptions=True,
+        )
+        for post_processor, res in zip(self._post_processors, results, strict=True):
+            if isinstance(res, BaseException):
+                log.warning(
+                    "Post-processor {} failed: {}",
+                    post_processor.__class__.__name__,
+                    res,
+                )
+
+    async def _run_kernel_post_processors(
+        self,
+        result: KernelExecutionResult,
+        target_statuses: set[KernelStatus],
+    ) -> None:
+        """Run all post-processors for kernel handlers in parallel.
+
+        Args:
+            result: Kernel execution result containing successes and failures
+            target_statuses: Set of target kernel statuses that kernels transitioned to
+        """
+        context = KernelPostProcessorContext(result=result, target_statuses=target_statuses)
+        results = await asyncio.gather(
+            *[post_processor.execute(context) for post_processor in self._kernel_post_processors],
+            return_exceptions=True,
+        )
+        for post_processor, res in zip(self._kernel_post_processors, results, strict=True):
+            if isinstance(res, BaseException):
+                log.warning(
+                    "Kernel post-processor {} failed: {}",
+                    post_processor.__class__.__name__,
+                    res,
+                )
+
+    def _collect_kernel_target_statuses(
+        self,
+        transitions: KernelStatusTransitions,
+        result: KernelExecutionResult,
+    ) -> set[KernelStatus]:
+        """Collect all target kernel statuses from successes and failures.
+
+        Args:
+            transitions: Kernel status transitions defined by the handler
+            result: Kernel execution result
+
+        Returns:
+            Set of all target kernel statuses that kernels transitioned to
+        """
+        target_statuses: set[KernelStatus] = set()
+
+        if result.successes and transitions.success:
+            target_statuses.add(transitions.success)
+        if result.failures and transitions.failure:
+            target_statuses.add(transitions.failure)
+
+        return target_statuses
+
     async def process_schedule(
         self,
         schedule_type: ScheduleType,
@@ -1141,9 +1290,9 @@ class ScheduleCoordinator:
         result = await self._kernel_state_engine.mark_kernel_pulling(event.kernel_id, event.reason)
         if result:
             # Request CHECK_PULLING_PROGRESS to monitor image pull progress
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_PULLING_PROGRESS
-            )
+            await self._scheduling_controller.mark_scheduling_needed([
+                ScheduleType.CHECK_PULLING_PROGRESS,
+            ])
         return result
 
     async def handle_kernel_creating(self, event: KernelCreatingAnycastEvent) -> bool:
@@ -1161,9 +1310,9 @@ class ScheduleCoordinator:
         )
         if result:
             # Request CHECK_CREATING_PROGRESS to check if session should transition to RUNNING
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_CREATING_PROGRESS
-            )
+            await self._scheduling_controller.mark_scheduling_needed([
+                ScheduleType.CHECK_CREATING_PROGRESS,
+            ])
         return result
 
     async def handle_kernel_preparing(self, event: KernelPreparingAnycastEvent) -> bool:
@@ -1171,9 +1320,9 @@ class ScheduleCoordinator:
         result = await self._kernel_state_engine.mark_kernel_preparing(event.kernel_id)
         if result:
             # Request CHECK_PRECONDITION to check if images are ready
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_PRECONDITION
-            )
+            await self._scheduling_controller.mark_scheduling_needed([
+                ScheduleType.CHECK_PRECONDITION,
+            ])
         return result
 
     async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
@@ -1189,14 +1338,11 @@ class ScheduleCoordinator:
             event.kernel_id, event.reason, event.exit_code
         )
         if result:
-            # Request CHECK_RUNNING_SESSION_TERMINATION to check if RUNNING session should become TERMINATING
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
-            )
-            # Request CHECK_TERMINATING_PROGRESS to check if session should transition to TERMINATED
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_TERMINATING_PROGRESS
-            )
+            # Request CHECK_RUNNING_SESSION_TERMINATION and CHECK_TERMINATING_PROGRESS
+            await self._scheduling_controller.mark_scheduling_needed([
+                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION,
+                ScheduleType.CHECK_TERMINATING_PROGRESS,
+            ])
         return result
 
     # Image-related kernel state update methods
@@ -1230,9 +1376,9 @@ class ScheduleCoordinator:
                 image,
             )
             # Request scheduling to check if sessions can transition to RUNNING
-            await self._scheduling_controller.mark_scheduling_needed(
+            await self._scheduling_controller.mark_scheduling_needed([
                 ScheduleType.CHECK_PULLING_PROGRESS,
-            )
+            ])
 
     async def cancel_kernels_for_failed_image(
         self,

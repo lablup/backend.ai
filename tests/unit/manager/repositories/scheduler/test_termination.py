@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
-import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.types import (
@@ -17,7 +16,6 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     DefaultForUnspecified,
-    KernelId,
     ResourceSlot,
     SecretKey,
     SessionId,
@@ -53,7 +51,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.db import with_tables
 
 

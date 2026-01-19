@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -17,8 +16,6 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
@@ -42,13 +39,8 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
     ensures session cleanup proceeds through the normal termination flow.
     """
 
-    def __init__(
-        self,
-        valkey_schedule_client: ValkeyScheduleClient,
-        repository: SchedulerRepository,
-    ) -> None:
-        self._valkey_schedule_client = valkey_schedule_client
-        self._repository = repository
+    def __init__(self) -> None:
+        pass
 
     @classmethod
     def name(cls) -> str:
@@ -113,27 +105,3 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Trigger CHECK_TERMINATING_PROGRESS and invalidate cache.
-
-        Events are broadcast by Coordinator.
-        """
-        log.info(
-            "{} RUNNING sessions marked as TERMINATING",
-            len(result.successes),
-        )
-
-        # Trigger CHECK_TERMINATING_PROGRESS to finalize session termination
-        await self._valkey_schedule_client.mark_schedule_needed(
-            ScheduleType.CHECK_TERMINATING_PROGRESS
-        )
-
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {s.access_key for s in result.successes if s.access_key}
-        if affected_keys:
-            await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug(
-                "Invalidated kernel-related cache for {} access keys",
-                len(affected_keys),
-            )

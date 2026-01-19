@@ -1,6 +1,7 @@
 """Scheduling controller for managing session lifecycle and scheduling operations."""
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -279,7 +280,7 @@ class SchedulingController:
         ])
 
         try:
-            await self.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self.mark_scheduling_needed([ScheduleType.SCHEDULE])
         except Exception as e:
             log.warning(
                 "Failed to request scheduling for session {}: {}",
@@ -292,18 +293,23 @@ class SchedulingController:
         )
         return session_id
 
-    async def mark_scheduling_needed(self, schedule_type: ScheduleType) -> None:
+    async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """
-        Request a scheduling operation for the next cycle.
+        Request scheduling operations for the next cycle.
 
         This is the public interface for requesting scheduling operations.
         The actual scheduling will be handled internally by the coordinator.
 
         Args:
-            schedule_type: Type of scheduling to request
+            schedule_types: Types of scheduling to request
         """
-        await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
-        log.debug("Requested scheduling for type: {}", schedule_type.value)
+        if not schedule_types:
+            return
+        await self._valkey_schedule.mark_schedules_needed_batch([st.value for st in schedule_types])
+        log.debug(
+            "Requested scheduling for type(s): {}",
+            ", ".join(st.value for st in schedule_types),
+        )
 
     async def mark_sessions_for_termination(
         self,
@@ -361,7 +367,7 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
-            await self.mark_scheduling_needed(ScheduleType.TERMINATE)
+            await self.mark_scheduling_needed([ScheduleType.TERMINATE])
 
         return result
 

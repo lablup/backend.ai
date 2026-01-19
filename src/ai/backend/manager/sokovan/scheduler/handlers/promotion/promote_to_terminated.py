@@ -16,14 +16,11 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -42,13 +39,8 @@ class PromoteToTerminatedPromotionHandler(SessionPromotionHandler):
     Hook failures are logged but don't prevent session termination.
     """
 
-    def __init__(
-        self,
-        scheduling_controller: SchedulingController,
-        repository: SchedulerRepository,
-    ) -> None:
-        self._scheduling_controller = scheduling_controller
-        self._repository = repository
+    def __init__(self) -> None:
+        pass
 
     @classmethod
     def name(cls) -> str:
@@ -118,14 +110,3 @@ class PromoteToTerminatedPromotionHandler(SessionPromotionHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Invalidate cache for terminated sessions. Events are broadcast by Coordinator."""
-        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
-        log.info("{} sessions transitioned to TERMINATED state", len(result.successes))
-
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {s.access_key for s in result.successes if s.access_key}
-        if affected_keys:
-            await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))

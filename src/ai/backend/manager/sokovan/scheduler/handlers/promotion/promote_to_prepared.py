@@ -95,7 +95,3 @@ class PromoteToPreparedPromotionHandler(SessionPromotionHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Log transition completion. Events are broadcast by Coordinator."""
-        log.info("{} sessions transitioned to PREPARED state", len(result.successes))

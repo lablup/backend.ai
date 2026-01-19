@@ -127,7 +127,3 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Log the number of deprioritized sessions."""
-        log.info("Deprioritized {} sessions, returning to PENDING", len(result.successes))

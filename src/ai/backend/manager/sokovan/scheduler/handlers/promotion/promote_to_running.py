@@ -16,13 +16,11 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.promotion.base import SessionPromotionHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -42,11 +40,8 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
     by Coordinator after handler returns, ensuring hook failures don't affect sessions.
     """
 
-    def __init__(
-        self,
-        scheduling_controller: SchedulingController,
-    ) -> None:
-        self._scheduling_controller = scheduling_controller
+    def __init__(self) -> None:
+        pass
 
     @classmethod
     def name(cls) -> str:
@@ -111,8 +106,3 @@ class PromoteToRunningPromotionHandler(SessionPromotionHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Request next scheduling phase. Events are broadcast by Coordinator."""
-        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
-        log.info("{} sessions transitioned to RUNNING state", len(result.successes))

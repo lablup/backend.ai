@@ -123,6 +123,10 @@ class SessionExecutionResult:
         """Get list of successful session IDs."""
         return [s.session_id for s in self.successes]
 
+    def has_transitions(self) -> bool:
+        """Check if there are any transitions (successes or failures)."""
+        return bool(self.successes or self.failures)
+
 
 # ============================================================================
 # Kernel handler types for KernelLifecycleHandler (Phase 3)
@@ -163,6 +167,10 @@ class KernelExecutionResult:
     def success_ids(self) -> list[KernelId]:
         """Get list of successful kernel IDs."""
         return [k.kernel_id for k in self.successes]
+
+    def has_transitions(self) -> bool:
+        """Check if there are any transitions (successes or failures)."""
+        return bool(self.successes or self.failures)
 
 
 @dataclass(frozen=True)

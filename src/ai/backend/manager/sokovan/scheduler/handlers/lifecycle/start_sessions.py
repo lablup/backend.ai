@@ -137,7 +137,3 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Log the number of started sessions. Events are broadcast by Coordinator."""
-        log.info("Started {} sessions", len(result.successes))

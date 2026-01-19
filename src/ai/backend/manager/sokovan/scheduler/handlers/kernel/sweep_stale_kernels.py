@@ -6,11 +6,9 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import KernelLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
@@ -32,15 +30,15 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
     - Handler checks kernel presence in Redis and terminates stale ones
     - Before termination, confirms with agent that kernel is truly gone
     - Returns affected kernels for Coordinator to apply status transitions
+
+    Note: Post-processing (schedule marking) is handled by the Coordinator.
     """
 
     def __init__(
         self,
         terminator: SessionTerminator,
-        valkey_schedule_client: ValkeyScheduleClient,
     ) -> None:
         self._terminator = terminator
-        self._valkey_schedule_client = valkey_schedule_client
 
     @classmethod
     def name(cls) -> str:
@@ -115,12 +113,3 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
                 )
 
         return result
-
-    async def post_process(self, result: KernelExecutionResult) -> None:
-        """Trigger CHECK_RUNNING_SESSION_TERMINATION for swept kernels."""
-        if result.failures:
-            log.info("Swept {} stale kernels", len(result.failures))
-            # Trigger CHECK_RUNNING_SESSION_TERMINATION to check if sessions need termination
-            await self._valkey_schedule_client.mark_schedule_needed(
-                ScheduleType.CHECK_RUNNING_SESSION_TERMINATION
-            )

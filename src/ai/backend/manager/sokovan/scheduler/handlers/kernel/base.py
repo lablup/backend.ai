@@ -81,17 +81,3 @@ class KernelLifecycleHandler(ABC):
             Result containing successes and failures for status transitions
         """
         raise NotImplementedError("Subclasses must implement execute()")
-
-    @abstractmethod
-    async def post_process(self, result: KernelExecutionResult) -> None:
-        """Handle post-processing after the operation.
-
-        Typically includes:
-        - Triggering follow-up scheduling phases
-        - Invalidating caches
-        - Logging completion
-
-        Args:
-            result: The result from execute()
-        """
-        raise NotImplementedError("Subclasses must implement post_process()")

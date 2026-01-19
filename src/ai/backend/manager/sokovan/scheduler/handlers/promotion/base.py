@@ -112,17 +112,3 @@ class SessionPromotionHandler(ABC):
             Failures and stales are not typically used for promotion handlers.
         """
         raise NotImplementedError("Subclasses must implement execute()")
-
-    @abstractmethod
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Handle post-processing after the operation.
-
-        Typically includes:
-        - Broadcasting events for status transitions
-        - Invalidating caches for affected access keys
-        - Requesting next scheduling phase
-
-        Args:
-            result: The result from execute()
-        """
-        raise NotImplementedError("Subclasses must implement post_process()")

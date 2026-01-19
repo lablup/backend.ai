@@ -118,7 +118,3 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         # The Coordinator won't update any status because success_status is None
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """No post-processing needed - termination events come from agents."""
-        pass

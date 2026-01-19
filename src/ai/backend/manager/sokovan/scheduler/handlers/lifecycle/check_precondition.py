@@ -12,14 +12,12 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
@@ -41,11 +39,9 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         self,
         launcher: SessionLauncher,
         repository: SchedulerRepository,
-        scheduling_controller: SchedulingController,
     ) -> None:
         self._launcher = launcher
         self._repository = repository
-        self._scheduling_controller = scheduling_controller
 
     @classmethod
     def name(cls) -> str:
@@ -134,8 +130,3 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
             )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Request session start. Events are broadcast by Coordinator."""
-        log.info("Checked preconditions for {} sessions", len(result.successes))
-        await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)

@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -125,12 +124,3 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
                 )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Log the number of swept sessions and invalidate cache."""
-        log.info("Swept {} failed sessions", len(result.failures))
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {s.access_key for s in result.failures if s.access_key}
-        if affected_keys:
-            await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))

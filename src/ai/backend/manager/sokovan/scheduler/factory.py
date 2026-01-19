@@ -232,7 +232,6 @@ def _create_lifecycle_handlers(
     return {
         ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
             args.provisioner,
-            args.scheduling_controller,
             args.repository,
         ),
         ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
@@ -241,7 +240,6 @@ def _create_lifecycle_handlers(
         ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
             args.launcher,
             args.repository,
-            args.scheduling_controller,
         ),
         ScheduleType.START: StartSessionsLifecycleHandler(
             args.launcher,
@@ -263,17 +261,9 @@ def _create_promotion_handlers(
     """Create promotion handlers mapping."""
     return {
         ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
-        ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
-            args.scheduling_controller,
-        ),
-        ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
-            args.scheduling_controller,
-            args.repository,
-        ),
-        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
-            args.valkey_schedule,
-            args.repository,
-        ),
+        ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(),
+        ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(),
+        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(),
     }
 
 
@@ -284,6 +274,5 @@ def _create_kernel_handlers(
     return {
         ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
             args.terminator,
-            args.valkey_schedule,
         ),
     }
