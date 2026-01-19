@@ -27,6 +27,5 @@ async def load_container_counts(
         LoadContainerCountsAction(agent_ids=agent_ids)
     )
 
-    # Convert dict to list in the same order as input agent_ids
-    # This is required by Strawberry DataLoader contract which expects list[Value]
-    return [action_result.container_counts.get(aid, 0) for aid in agent_ids]
+    # container_counts is already in the same order as input agent_ids
+    return list(action_result.container_counts)

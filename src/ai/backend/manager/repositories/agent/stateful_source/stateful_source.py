@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -33,13 +33,10 @@ class AgentStatefulSource:
         """Read installed images for the given agent IDs."""
         return await self._valkey_image.get_agent_installed_images(agent_id)
 
-    async def read_agent_container_counts(
-        self, agent_ids: Sequence[AgentId]
-    ) -> Mapping[AgentId, int]:
-        """Read container count for the given agent IDs."""
+    async def read_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
+        """Read container count for the given agent IDs.
+
+        Returns counts in the same order as the input agent_ids.
+        """
         agent_id_list = [str(agent_id) for agent_id in agent_ids]
-        counts = await self._valkey_stat.get_agent_container_counts_batch(agent_id_list)
-        container_counts: dict[AgentId, int] = {}
-        for agent_id, count in zip(agent_ids, counts, strict=True):
-            container_counts[agent_id] = count
-        return container_counts
+        return await self._valkey_stat.get_agent_container_counts_batch(agent_id_list)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -28,9 +28,12 @@ class LoadContainerCountsAction(AgentAction):
 
 @dataclass
 class LoadContainerCountsActionResult(BaseActionResult):
-    """Result of loading container counts."""
+    """Result of loading container counts.
 
-    container_counts: Mapping[AgentId, int]
+    container_counts is in the same order as the input agent_ids.
+    """
+
+    container_counts: Sequence[int]
 
     @override
     def entity_id(self) -> str | None:

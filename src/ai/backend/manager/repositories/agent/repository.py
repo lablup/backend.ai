@@ -78,9 +78,11 @@ class AgentRepository:
         self._config_provider = config_provider
 
     @agent_repository_resilience.apply()
-    async def load_agent_container_counts(
-        self, agent_ids: Sequence[AgentId]
-    ) -> Mapping[AgentId, int]:
+    async def load_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
+        """Load container counts for the given agent IDs.
+
+        Returns counts in the same order as the input agent_ids.
+        """
         return await self._stateful_source.read_agent_container_counts(agent_ids)
 
     @agent_repository_resilience.apply()
