@@ -37,4 +37,9 @@ class AgentStatefulSource:
         self, agent_ids: Sequence[AgentId]
     ) -> Mapping[AgentId, int]:
         """Read container count for the given agent IDs."""
-        return await self._valkey_stat.get_agent_container_counts_as_dict(list(agent_ids))
+        agent_id_list = [str(agent_id) for agent_id in agent_ids]
+        counts = await self._valkey_stat.get_agent_container_counts_batch(agent_id_list)
+        container_counts: dict[AgentId, int] = {}
+        for agent_id, count in zip(agent_ids, counts, strict=True):
+            container_counts[agent_id] = count
+        return container_counts
