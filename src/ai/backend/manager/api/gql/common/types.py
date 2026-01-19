@@ -89,6 +89,27 @@ class ResourceOptsGQL:
         return cls(entries=entries)
 
 
+@strawberry.input(
+    description="Added in 26.1.0. A single key-value entry representing a resource option."
+)
+class ResourceOptsEntryInput:
+    """Single resource option entry input with name and value."""
+
+    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
+    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
+
+
+@strawberry.input(
+    description="Added in 26.1.0. A collection of additional resource options for input."
+)
+class ResourceOptsInput:
+    """Resource options input containing multiple key-value entries."""
+
+    entries: list[ResourceOptsEntryInput] = strawberry.field(
+        description="List of resource option entries."
+    )
+
+
 # ========== Service Port Types ==========
 
 
