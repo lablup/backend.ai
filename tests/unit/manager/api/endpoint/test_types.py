@@ -18,7 +18,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
 
         unhealthy_route = Mock()
         unhealthy_route.status = RouteStatus.UNHEALTHY.name
@@ -34,7 +33,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.HEALTHY.name
@@ -56,7 +54,6 @@ class TestEndpointType:
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
-        mock_endpoint.retries = 0
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.HEALTHY.name
@@ -67,3 +64,33 @@ class TestEndpointType:
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.DEGRADED
+
+    async def test_status_unhealthy_when_all_routes_terminated(self) -> None:
+        """
+        When all routes are terminated, the endpoint status should be UNHEALTHY.
+
+        No active routes means the endpoint cannot serve any requests.
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+
+        terminated_route = Mock()
+        terminated_route.status = RouteStatus.TERMINATED.name
+
+        mock_endpoint.routings = [terminated_route, terminated_route]
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.UNHEALTHY
+
+    async def test_status_unhealthy_when_no_routes(self) -> None:
+        """
+        When there are no routes at all, the endpoint status should be UNHEALTHY.
+
+        An endpoint with no routes cannot serve any requests.
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+        mock_endpoint.routings = []
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.UNHEALTHY

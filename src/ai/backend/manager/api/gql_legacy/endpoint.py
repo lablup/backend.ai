@@ -43,7 +43,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     RequesterCtx,
 )
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -911,18 +910,13 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if len(self.routings) == 0:
-                    return EndpointStatus.READY
-                if self.retries > SERVICE_MAX_RETRIES:
+                healthy_count = sum(
+                    1 for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                )
+                if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY
-                if (spawned_service_count := len([r for r in self.routings])) > 0:
-                    healthy_service_count = len([
-                        r for r in self.routings if r.status == RouteStatus.HEALTHY.name
-                    ])
-                    if healthy_service_count == spawned_service_count:
-                        return EndpointStatus.HEALTHY
-                    if healthy_service_count == 0:
-                        return EndpointStatus.UNHEALTHY
+                if healthy_count == len(self.routings):
+                    return EndpointStatus.HEALTHY
                 return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
