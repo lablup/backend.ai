@@ -7,7 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
@@ -174,7 +174,7 @@ class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
-    def by_id(kernel_id: UUID) -> QueryCondition:
+    def by_id(kernel_id: KernelId) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.id == kernel_id
 
