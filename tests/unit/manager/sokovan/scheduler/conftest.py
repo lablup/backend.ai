@@ -16,7 +16,11 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
+from ai.backend.manager.sokovan.scheduler.results import (
+    SessionExecutionResult,
+    SessionTransitionInfo,
+)
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -467,6 +471,186 @@ def batch_session_future_start_time() -> SessionWorkload:
         kernels=[],
         designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
+    )
+
+
+# =============================================================================
+# Coordinator Test Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def session_transition_info_pending() -> SessionTransitionInfo:
+    """SessionTransitionInfo for PENDING session."""
+    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
+
+    return SessionTransitionInfo(
+        session_id=SessionId(uuid4()),
+        from_status=SessionStatus.PENDING,
+        reason="test-reason",
+        creation_id=str(uuid4()),
+        access_key=AccessKey("test-key"),
+    )
+
+
+@pytest.fixture
+def session_transition_info_preparing() -> SessionTransitionInfo:
+    """SessionTransitionInfo for PREPARING session."""
+    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
+
+    return SessionTransitionInfo(
+        session_id=SessionId(uuid4()),
+        from_status=SessionStatus.PREPARING,
+        reason="test-reason",
+        creation_id=str(uuid4()),
+        access_key=AccessKey("test-key"),
+    )
+
+
+@pytest.fixture
+def failure_sessions_for_classification() -> list[SessionTransitionInfo]:
+    """Multiple failure sessions for classification tests."""
+    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
+
+    return [
+        SessionTransitionInfo(
+            session_id=SessionId(uuid4()),
+            from_status=SessionStatus.PREPARING,
+            reason="failure-1",
+            creation_id=str(uuid4()),
+            access_key=AccessKey("test-key"),
+        ),
+        SessionTransitionInfo(
+            session_id=SessionId(uuid4()),
+            from_status=SessionStatus.PREPARING,
+            reason="failure-2",
+            creation_id=str(uuid4()),
+            access_key=AccessKey("test-key"),
+        ),
+        SessionTransitionInfo(
+            session_id=SessionId(uuid4()),
+            from_status=SessionStatus.PREPARING,
+            reason="failure-3",
+            creation_id=str(uuid4()),
+            access_key=AccessKey("test-key"),
+        ),
+    ]
+
+
+@pytest.fixture
+def session_execution_result_success() -> SessionExecutionResult:
+    """SessionExecutionResult with successful sessions."""
+    from ai.backend.manager.sokovan.scheduler.results import (
+        SessionExecutionResult,
+        SessionTransitionInfo,
+    )
+
+    return SessionExecutionResult(
+        successes=[
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()),
+                from_status=SessionStatus.PREPARING,
+                reason="scheduled",
+                creation_id=str(uuid4()),
+                access_key=AccessKey("test-key"),
+            ),
+        ],
+        failures=[],
+        skipped=[],
+    )
+
+
+@pytest.fixture
+def session_execution_result_with_failures() -> SessionExecutionResult:
+    """SessionExecutionResult with failures."""
+    from ai.backend.manager.sokovan.scheduler.results import (
+        SessionExecutionResult,
+        SessionTransitionInfo,
+    )
+
+    return SessionExecutionResult(
+        successes=[
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()),
+                from_status=SessionStatus.PREPARING,
+                reason="scheduled",
+                creation_id=str(uuid4()),
+                access_key=AccessKey("test-key"),
+            ),
+        ],
+        failures=[
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()),
+                from_status=SessionStatus.PREPARING,
+                reason="failed",
+                creation_id=str(uuid4()),
+                access_key=AccessKey("test-key"),
+            ),
+        ],
+        skipped=[],
+    )
+
+
+@pytest.fixture
+def session_execution_result_with_skipped() -> SessionExecutionResult:
+    """SessionExecutionResult with skipped sessions."""
+    from ai.backend.manager.sokovan.scheduler.results import (
+        SessionExecutionResult,
+        SessionTransitionInfo,
+    )
+
+    return SessionExecutionResult(
+        successes=[],
+        failures=[],
+        skipped=[
+            SessionTransitionInfo(
+                session_id=SessionId(uuid4()),
+                from_status=SessionStatus.PENDING,
+                reason="skipped-due-to-priority",
+                creation_id=str(uuid4()),
+                access_key=AccessKey("test-key"),
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def session_execution_result_empty() -> SessionExecutionResult:
+    """Empty SessionExecutionResult."""
+    from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
+
+    return SessionExecutionResult(
+        successes=[],
+        failures=[],
+        skipped=[],
+    )
+
+
+@pytest.fixture
+def status_transitions_with_all_outcomes() -> StatusTransitions:
+    """StatusTransitions with all outcome types defined."""
+    from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.session.types import StatusTransitions, TransitionStatus
+
+    return StatusTransitions(
+        success=TransitionStatus(session=SessionStatus.SCHEDULED, kernel=KernelStatus.SCHEDULED),
+        need_retry=TransitionStatus(session=SessionStatus.PENDING, kernel=KernelStatus.PENDING),
+        expired=TransitionStatus(session=SessionStatus.CANCELLED, kernel=KernelStatus.CANCELLED),
+        give_up=TransitionStatus(session=SessionStatus.CANCELLED, kernel=KernelStatus.CANCELLED),
+    )
+
+
+@pytest.fixture
+def status_transitions_success_only() -> StatusTransitions:
+    """StatusTransitions with only success outcome."""
+    from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.session.types import StatusTransitions, TransitionStatus
+
+    return StatusTransitions(
+        success=TransitionStatus(session=SessionStatus.SCHEDULED, kernel=KernelStatus.SCHEDULED),
+        need_retry=None,
+        expired=None,
+        give_up=None,
     )
 
 
