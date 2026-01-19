@@ -8,6 +8,7 @@ from typing import Any, Final, Optional, Self
 from aiotools import cancel_and_wait
 from glide import (
     AdvancedGlideClientConfiguration,
+    ClosingError,
     GlideClient,
     GlideClientConfiguration,
     Logger,
@@ -16,7 +17,6 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
-from glide import ClosingError
 from redis.asyncio.sentinel import Sentinel
 
 from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
