@@ -846,3 +846,22 @@ class SchedulerRepository:
             Dict mapping session_id to latest history record
         """
         return await self._db_source.get_last_session_histories(session_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def lower_session_priority(
+        self,
+        session_ids: list[SessionId],
+        amount: int,
+        min_priority: int,
+    ) -> None:
+        """Lower the priority of sessions by a specified amount with a floor.
+
+        Used when sessions exceed max scheduling retries (give_up) and need to be
+        deprioritized before returning to PENDING for re-scheduling.
+
+        Args:
+            session_ids: List of session IDs to update
+            amount: Amount to subtract from current priority
+            min_priority: Minimum priority floor (priority will not go below this)
+        """
+        await self._db_source.lower_session_priority(session_ids, amount, min_priority)

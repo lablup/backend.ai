@@ -4079,3 +4079,32 @@ class ScheduleDBSource:
                     sessions_map[session_id].kernel_infos.append(kernel_row.to_kernel_info())
 
             return list(sessions_map.values())
+
+    async def lower_session_priority(
+        self,
+        session_ids: list[SessionId],
+        amount: int,
+        min_priority: int,
+    ) -> None:
+        """
+        Lower the priority of sessions by a specified amount with a floor.
+
+        Used when sessions exceed max scheduling retries (give_up) and need to be
+        deprioritized before returning to PENDING for re-scheduling.
+
+        :param session_ids: List of session IDs to update
+        :param amount: Amount to subtract from current priority
+        :param min_priority: Minimum priority floor (priority will not go below this)
+        """
+        if not session_ids:
+            return
+
+        async with self._begin_session_read_committed() as db_sess:
+            # Use GREATEST to ensure priority doesn't go below min_priority
+            new_priority = sa.func.greatest(SessionRow.priority - amount, min_priority)
+            update_stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+                .values(priority=new_priority)
+            )
+            await db_sess.execute(update_stmt)

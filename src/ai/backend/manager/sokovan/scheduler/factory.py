@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
+    DeprioritizeSessionsLifecycleHandler,
     DetectTerminationPromotionHandler,
     PromoteToPreparedPromotionHandler,
     PromoteToRunningPromotionHandler,
@@ -236,6 +237,9 @@ def _create_lifecycle_handlers(
             args.scheduling_controller,
             args.repository,
         ),
+        ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
+            args.repository,
+        ),
         ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
             args.launcher,
             args.repository,
@@ -293,5 +297,3 @@ def _create_kernel_handlers(
             args.valkey_schedule,
         ),
     }
-
-

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -66,6 +67,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATED,
                 cls.CANCELLED,
             )
@@ -81,6 +83,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATING,
                 cls.TERMINATED,
                 cls.CANCELLED,

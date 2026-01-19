@@ -47,6 +47,7 @@ class ScheduleType(StrEnum):
     """Types of scheduling operations that can be triggered."""
 
     SCHEDULE = "schedule"  # Schedule pending sessions
+    DEPRIORITIZE = "deprioritize"  # Lower priority and return to PENDING
     SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions

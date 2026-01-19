@@ -71,7 +71,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         - success: Session/kernel → SCHEDULED
         - need_retry: None (stays PENDING, will retry on next schedule)
         - expired: Session/kernel → TERMINATING (some kernels may be in higher states)
-        - give_up: Session/kernel → TERMINATING (some kernels may be in higher states)
+        - give_up: Session → DEPRIORITIZING (lower priority and re-schedule)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -84,8 +84,8 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                 kernel=KernelStatus.TERMINATING,
             ),
             give_up=TransitionStatus(
-                session=SessionStatus.TERMINATING,
-                kernel=KernelStatus.TERMINATING,
+                session=SessionStatus.DEPRIORITIZING,
+                kernel=None,  # Kernel status unchanged
             ),
         )
 
