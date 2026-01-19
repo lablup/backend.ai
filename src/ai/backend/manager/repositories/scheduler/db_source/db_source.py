@@ -3272,10 +3272,8 @@ class ScheduleDBSource:
         async with self._begin_readonly_session_read_committed() as db_sess:
             stmt = sa.select(KernelRow)
             result = await execute_batch_querier(db_sess, stmt, querier)
-            # Convert Row to KernelInfo via KernelRow
-            kernel_rows = [KernelRow(**dict(row._mapping)) for row in result.rows]
             return KernelListResult(
-                items=[row.to_kernel_info() for row in kernel_rows],
+                items=[row.KernelRow.to_kernel_info() for row in result.rows],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
