@@ -1728,6 +1728,20 @@ input DomainUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+"""Input for email message settings"""
+input EmailMessageInput {
+  fromEmail: String!
+  toEmails: [String!]!
+  subjectTemplate: String = null
+}
+
+"""Input for email notification channel configuration"""
+input EmailSpecInput {
+  smtp: SMTPConnectionInput!
+  message: EmailMessageInput!
+  auth: SMTPAuthInput = null
+}
+
 """
 Added in 26.1.0. A single environment variable entry with name and value.
 """
