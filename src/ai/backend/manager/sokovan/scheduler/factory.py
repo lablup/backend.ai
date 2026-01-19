@@ -1,4 +1,10 @@
-"""Factory functions for creating scheduler components."""
+"""Factory functions for creating scheduler components and coordinator handlers."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -7,6 +13,31 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.scheduler.types import ScheduleType
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+
+from ai.backend.manager.sokovan.scheduler.handlers import (
+    CheckPreconditionLifecycleHandler,
+    DetectTerminationPromotionHandler,
+    PromoteToPreparedPromotionHandler,
+    PromoteToRunningPromotionHandler,
+    PromoteToTerminatedPromotionHandler,
+    RetryCreatingLifecycleHandler,
+    RetryPreparingLifecycleHandler,
+    ScheduleSessionsLifecycleHandler,
+    SessionLifecycleHandler,
+    SessionPromotionHandler,
+    StartSessionsLifecycleHandler,
+    SweepSessionsLifecycleHandler,
+    TerminateSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
+    KernelLifecycleHandler,
+    SweepStaleKernelsKernelHandler,
+)
+from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -148,3 +179,122 @@ def create_default_scheduler_components(
         network_plugin_ctx=network_plugin_ctx,
         event_producer=event_producer,
     )
+
+
+# =============================================================================
+# Coordinator Handlers
+# =============================================================================
+
+
+@dataclass
+class CoordinatorHandlers:
+    """Container for all handlers and hooks injected into Coordinator.
+
+    This dataclass decouples the Coordinator from handler creation logic,
+    allowing handlers to be created externally and injected.
+    """
+
+    lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
+    promotion_handlers: Mapping[ScheduleType, SessionPromotionHandler]
+    kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
+
+
+@dataclass
+class CoordinatorHandlersArgs:
+    """Arguments for creating CoordinatorHandlers."""
+
+    provisioner: SessionProvisioner
+    launcher: SessionLauncher
+    terminator: SessionTerminator
+    repository: SchedulerRepository
+    hook_registry: HookRegistry
+    valkey_schedule: ValkeyScheduleClient
+    scheduling_controller: SchedulingController
+
+
+def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
+    """Create all handlers and hooks for the Coordinator.
+
+    This factory function centralizes handler creation, decoupling the
+    Coordinator from the details of handler instantiation.
+    """
+    lifecycle_handlers = _create_lifecycle_handlers(args)
+    promotion_handlers = _create_promotion_handlers(args)
+    kernel_handlers = _create_kernel_handlers(args)
+
+    return CoordinatorHandlers(
+        lifecycle_handlers=lifecycle_handlers,
+        promotion_handlers=promotion_handlers,
+        kernel_handlers=kernel_handlers,
+    )
+
+
+def _create_lifecycle_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, SessionLifecycleHandler]:
+    """Create lifecycle handlers mapping."""
+    return {
+        ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
+            args.provisioner,
+            args.scheduling_controller,
+            args.repository,
+        ),
+        ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
+            args.launcher,
+            args.repository,
+            args.scheduling_controller,
+        ),
+        ScheduleType.START: StartSessionsLifecycleHandler(
+            args.launcher,
+            args.repository,
+        ),
+        ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
+            args.terminator,
+            args.repository,
+        ),
+        ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
+            args.launcher,
+            args.repository,
+        ),
+        ScheduleType.RETRY_CREATING: RetryCreatingLifecycleHandler(
+            args.launcher,
+            args.repository,
+        ),
+        ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
+            args.repository,
+        ),
+    }
+
+
+def _create_promotion_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, SessionPromotionHandler]:
+    """Create promotion handlers mapping."""
+    return {
+        ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
+        ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
+            args.scheduling_controller,
+        ),
+        ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
+            args.scheduling_controller,
+            args.repository,
+        ),
+        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
+            args.valkey_schedule,
+            args.repository,
+        ),
+    }
+
+
+def _create_kernel_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, KernelLifecycleHandler]:
+    """Create kernel handlers mapping."""
+    return {
+        ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
+            args.terminator,
+            args.valkey_schedule,
+        ),
+    }
+
+

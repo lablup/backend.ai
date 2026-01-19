@@ -51,25 +51,12 @@ from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
+from .factory import CoordinatorHandlers
 from .handlers import (
-    CheckPreconditionLifecycleHandler,
-    DetectTerminationPromotionHandler,
-    PromoteToPreparedPromotionHandler,
-    PromoteToRunningPromotionHandler,
-    PromoteToTerminatedPromotionHandler,
-    RetryCreatingLifecycleHandler,
-    RetryPreparingLifecycleHandler,
-    ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
     SessionPromotionHandler,
-    StartSessionsLifecycleHandler,
-    SweepSessionsLifecycleHandler,
-    TerminateSessionsLifecycleHandler,
 )
-from .handlers.kernel import (
-    KernelLifecycleHandler,
-    SweepStaleKernelsKernelHandler,
-)
+from .handlers.kernel import KernelLifecycleHandler
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
 from .recorder import SessionRecorderContext
@@ -77,6 +64,12 @@ from .results import KernelExecutionResult, SessionExecutionResult, SessionTrans
 from .types import KernelCreationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+# Statuses that require hook execution during transition
+HOOK_TARGET_STATUSES: frozenset[SessionStatus] = frozenset({
+    SessionStatus.RUNNING,
+    SessionStatus.TERMINATED,
+})
 
 
 @dataclass
@@ -107,19 +100,6 @@ class SchedulerTaskSpec:
         return f"sokovan_process_schedule_{self.schedule_type.value}"
 
 
-@dataclass(frozen=True)
-class TransitionHookConfig:
-    """Configuration for hooks triggered on session status transitions.
-
-    Used by Coordinator to execute hooks when sessions transition to specific statuses.
-    Hooks are executed after handler logic but before status transition is applied.
-    """
-
-    blocking: bool
-    """If True, hook failure prevents the session from transitioning.
-    If False, hook is best-effort - failures are logged but transition proceeds."""
-
-
 @dataclass
 class HookExecutionResult:
     """Result of hook execution for sessions transitioning to a new status.
@@ -143,29 +123,28 @@ class ScheduleCoordinator:
 
     _valkey_schedule: ValkeyScheduleClient
     _components: SchedulerComponents
+    _handlers: CoordinatorHandlers
     _scheduling_controller: SchedulingController
     _repository: SchedulerRepository
-    _lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
-    _promotion_handlers: Mapping[ScheduleType, SessionPromotionHandler]
-    _kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
     _hook_registry: HookRegistry
-    _transition_hooks: Mapping[SessionStatus, TransitionHookConfig]
 
     def __init__(
         self,
         valkey_schedule: ValkeyScheduleClient,
         components: SchedulerComponents,
+        handlers: CoordinatorHandlers,
         scheduling_controller: SchedulingController,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
     ) -> None:
         self._valkey_schedule = valkey_schedule
         self._components = components
+        self._handlers = handlers
         self._scheduling_controller = scheduling_controller
         self._repository = components.repository
         self._event_producer = event_producer
@@ -176,120 +155,8 @@ class ScheduleCoordinator:
         # Initialize kernel state engine with the component's repository
         self._kernel_state_engine = KernelStateEngine(components.repository)
 
-        # Initialize hook registry and transition hooks
+        # Initialize hook registry from components
         self._hook_registry = components.hook_registry
-        self._transition_hooks = self._init_transition_hooks()
-
-        # Initialize lifecycle handlers
-        self._lifecycle_handlers = self._init_lifecycle_handlers()
-
-        # Initialize promotion handlers
-        self._promotion_handlers = self._init_promotion_handlers()
-
-        # Initialize kernel handlers
-        self._kernel_handlers = self._init_kernel_handlers()
-
-    def _init_transition_hooks(self) -> Mapping[SessionStatus, TransitionHookConfig]:
-        """Initialize mapping of target statuses to their hook configurations.
-
-        Hooks are executed when sessions transition to specific statuses:
-        - RUNNING: blocking hook (failure prevents transition)
-        - TERMINATED: best-effort hook (failure logged but transition proceeds)
-        """
-        return {
-            SessionStatus.RUNNING: TransitionHookConfig(blocking=True),
-            SessionStatus.TERMINATED: TransitionHookConfig(blocking=False),
-        }
-
-    def _init_lifecycle_handlers(self) -> Mapping[ScheduleType, SessionLifecycleHandler]:
-        """Initialize and return the mapping of schedule types to their lifecycle handlers.
-
-        Lifecycle handlers follow the DeploymentCoordinator pattern where:
-        - Coordinator queries sessions based on handler's target_statuses()
-        - Coordinator iterates over scaling groups
-        - Handler executes business logic and returns successes/failures/stales
-        - Coordinator applies status transitions based on handler's declared statuses
-
-        Note: Promotion handlers (CHECK_*_PROGRESS, CHECK_RUNNING_SESSION_TERMINATION)
-        are now in _init_promotion_handlers() using SessionPromotionHandler interface.
-        Legacy progress handlers are kept here for backward compatibility during migration.
-        """
-        # Get components for handlers that need them
-        launcher = self._components.launcher
-        terminator = self._components.terminator
-        provisioner = self._components.provisioner
-
-        return {
-            # Lifecycle handlers
-            ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
-                provisioner,
-                self._scheduling_controller,
-                self._repository,
-            ),
-            ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
-                launcher,
-                self._repository,
-                self._scheduling_controller,
-            ),
-            ScheduleType.START: StartSessionsLifecycleHandler(
-                launcher,
-                self._repository,
-            ),
-            ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
-                terminator,
-                self._repository,
-            ),
-            # Recovery handlers
-            ScheduleType.RETRY_PREPARING: RetryPreparingLifecycleHandler(
-                launcher,
-                self._repository,
-            ),
-            ScheduleType.RETRY_CREATING: RetryCreatingLifecycleHandler(
-                launcher,
-                self._repository,
-            ),
-            # Maintenance handlers (session-based)
-            ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
-                self._repository,
-            ),
-            # Note: SWEEP_STALE_KERNELS is handled by kernel handlers
-        }
-
-    def _init_kernel_handlers(self) -> Mapping[ScheduleType, KernelLifecycleHandler]:
-        """Initialize and return the mapping of schedule types to their kernel handlers.
-
-        Kernel handlers operate on kernels directly, unlike session lifecycle handlers.
-        They are used for kernel-specific operations like sweeping stale kernels.
-        """
-        terminator = self._components.terminator
-
-        return {
-            ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
-                terminator,
-                self._valkey_schedule,
-            ),
-        }
-
-    def _init_promotion_handlers(self) -> Mapping[ScheduleType, SessionPromotionHandler]:
-        """Initialize and return the mapping of schedule types to their promotion handlers.
-
-        Promotion handlers check kernel status conditions (ALL/ANY/NOT_ANY) to
-        determine if sessions should be promoted to a new status.
-        """
-        return {
-            ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
-            ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(
-                self._scheduling_controller,
-            ),
-            ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(
-                self._scheduling_controller,
-                self._repository,
-            ),
-            ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(
-                self._valkey_schedule,
-                self._repository,
-            ),
-        }
 
     async def process_lifecycle_schedule(
         self,
@@ -317,15 +184,15 @@ class ScheduleCoordinator:
             True if operation was performed, False otherwise
         """
         # Check promotion handlers first, then kernel handlers, then lifecycle handlers
-        promotion_handler = self._promotion_handlers.get(schedule_type)
+        promotion_handler = self._handlers.promotion_handlers.get(schedule_type)
         if promotion_handler:
             return await self._process_promotion_schedule(schedule_type, promotion_handler)
 
-        kernel_handler = self._kernel_handlers.get(schedule_type)
+        kernel_handler = self._handlers.kernel_handlers.get(schedule_type)
         if kernel_handler:
             return await self._process_kernel_schedule(schedule_type, kernel_handler)
 
-        lifecycle_handler = self._lifecycle_handlers.get(schedule_type)
+        lifecycle_handler = self._handlers.lifecycle_handlers.get(schedule_type)
         if lifecycle_handler:
             return await self._process_lifecycle_handler_schedule(schedule_type, lifecycle_handler)
 
@@ -776,7 +643,7 @@ class ScheduleCoordinator:
         sessions_to_transition = result.successes
 
         # Execute hooks if configured for this status
-        hook_config = self._transition_hooks.get(to_status)
+        hook_config = self._handlers.transition_hooks.get(to_status)
         if hook_config:
             hook_result = await self._execute_transition_hooks(
                 sessions_to_transition,
