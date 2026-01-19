@@ -67,3 +67,22 @@ class TestEndpointType:
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.DEGRADED
+
+    async def test_status_ready_when_all_routes_terminated(self) -> None:
+        """
+        When all routes are terminated, the endpoint status should be READY.
+
+        This allows the endpoint to be considered available for new deployments
+        even when it has terminated routes from previous sessions.
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+        mock_endpoint.retries = 0
+
+        terminated_route = Mock()
+        terminated_route.status = RouteStatus.TERMINATED.name
+
+        mock_endpoint.routings = [terminated_route, terminated_route]
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.READY
