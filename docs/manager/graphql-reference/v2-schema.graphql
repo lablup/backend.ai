@@ -2001,6 +2001,13 @@ type DotfileInfo {
   perm: String!
 }
 
+"""Input for email message settings"""
+input EmailMessageInput {
+  fromEmail: String!
+  toEmails: [String!]!
+  subjectTemplate: String = null
+}
+
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
 """
@@ -2023,27 +2030,11 @@ type EnvironmentVariableEntry {
   value: String!
 }
 
-"""
-Added in 26.1.0. A single environment variable entry with name and value.
-"""
-input EnvironmentVariableEntryInput {
-  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
-  name: String!
-
-  """Environment variable value."""
-  value: String!
-}
-
-"""Added in 26.1.0. A collection of environment variable entries."""
-type EnvironmentVariables {
-  """List of environment variable entries."""
-  entries: [EnvironmentVariableEntry!]!
-}
-
-"""Added in 26.1.0. A collection of environment variable entries."""
-input EnvironmentVariablesInput {
-  """List of environment variable entries."""
-  entries: [EnvironmentVariableEntryInput!]!
+"""Input for email notification channel configuration"""
+input EmailSpecInput {
+  smtp: SMTPConnectionInput!
+  message: EmailMessageInput!
+  auth: SMTPAuthInput = null
 }
 
 type ExtraVFolderMount implements Node {
@@ -4800,7 +4791,7 @@ type Query {
   inferenceRuntimeConfig(name: String!): JSON!
 
   """Added in 26.1.0. Query a single kernel by ID."""
-  kernelV2(id: ID!): KernelV2
+  kernelV2(id: UUID!): KernelV2
 
   """Added in 26.1.0. Query kernels with pagination and filtering."""
   kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
@@ -5487,6 +5478,20 @@ Added in 25.19.0. Traffic routing status for a route. Controls whether traffic s
 enum RouteTrafficStatus {
   ACTIVE
   INACTIVE
+}
+
+"""Input for SMTP authentication credentials"""
+input SMTPAuthInput {
+  username: String = null
+  password: String = null
+}
+
+"""Input for SMTP server connection settings"""
+input SMTPConnectionInput {
+  host: String!
+  port: Int!
+  useTls: Boolean! = true
+  timeout: Int! = 30
 }
 
 """Added in 26.1.0. SSH keypair for secure access."""
