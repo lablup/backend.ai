@@ -1,10 +1,14 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, Optional
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import ErrorCode
+from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import (
     BaseAction,
     BaseActionResult,
@@ -12,9 +16,16 @@ from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
     ProcessResult,
 )
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
+from ai.backend.manager.actions.monitors.exclusions import AUDIT_LOG_EXCLUDED_ACTIONS
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionSpec
+from ai.backend.manager.repositories.audit_log import AuditLogRepository
+from ai.backend.manager.services.agent.actions.handle_heartbeat import (
+    HandleHeartbeatAction,
+    HandleHeartbeatActionResult,
+)
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -300,3 +311,65 @@ class TestMonitorExclusionBySpec:
         monitor_excluding_nothing.log_generated = False
         await processor.wait_for_complete(action_type_b)
         assert monitor_excluding_nothing.log_generated is True
+
+
+class TestHeartbeatExcludedFromAuditLog:
+    """Test that heartbeat action is excluded from audit logging.
+
+    This verifies the production configuration where high-frequency heartbeat
+    actions are excluded to prevent excessive audit log entries.
+    """
+
+    def test_heartbeat_action_spec_is_in_exclusion_list(self) -> None:
+        """HandleHeartbeatAction.spec() should be in AUDIT_LOG_EXCLUDED_ACTIONS."""
+        heartbeat_spec = HandleHeartbeatAction.spec()
+
+        assert heartbeat_spec in AUDIT_LOG_EXCLUDED_ACTIONS
+        assert heartbeat_spec.entity_type == "agent"
+        assert heartbeat_spec.operation_type == "handle_heartbeat"
+
+    @pytest.fixture
+    def mock_heartbeat_action(self) -> HandleHeartbeatAction:
+        return HandleHeartbeatAction(
+            agent_id=AgentId(f"{uuid4()}"), agent_info=MagicMock(spec=AgentInfo)
+        )
+
+    @pytest.fixture
+    def mock_audit_log_repository(self) -> MagicMock:
+        """Mock AuditLogRepository to track create() calls."""
+        return MagicMock(spec=AuditLogRepository)
+
+    @pytest.fixture
+    def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
+        """Real AuditLogMonitor with mocked repository."""
+        return AuditLogMonitor(repository=mock_audit_log_repository)
+
+    @pytest.fixture
+    def heartbeat_processor_with_audit_monitor(
+        self,
+        audit_log_monitor: AuditLogMonitor,
+    ) -> ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]:
+        async def _mock_heartbeat_func(
+            action: HandleHeartbeatAction,
+        ) -> HandleHeartbeatActionResult:
+            return HandleHeartbeatActionResult(agent_id=action.agent_id)
+
+        return ActionProcessor(
+            func=_mock_heartbeat_func,
+            monitors=[audit_log_monitor],
+        )
+
+    @pytest.mark.asyncio
+    async def test_audit_log_monitor_skips_heartbeat_action(
+        self,
+        mock_heartbeat_action: HandleHeartbeatAction,
+        heartbeat_processor_with_audit_monitor: ActionProcessor[
+            HandleHeartbeatAction, HandleHeartbeatActionResult
+        ],
+        mock_audit_log_repository: MagicMock,
+    ) -> None:
+        """AuditLogMonitor should not call repository.create() for heartbeat actions."""
+        await heartbeat_processor_with_audit_monitor.wait_for_complete(mock_heartbeat_action)
+
+        # Verify that repository.create() was NOT called for heartbeat action
+        mock_audit_log_repository.create.assert_not_called()
