@@ -923,18 +923,7 @@ class Endpoint(graphene.ObjectType):
                         return EndpointStatus.HEALTHY
                     if healthy_service_count == 0:
                         return EndpointStatus.UNHEALTHY
-                    problematic_service_count = len([
-                        r
-                        for r in self.routings
-                        if r.status
-                        in (
-                            RouteStatus.UNHEALTHY.name,
-                            RouteStatus.DEGRADED.name,
-                        )
-                    ])
-                    if problematic_service_count > 0:
-                        return EndpointStatus.DEGRADED
-                return EndpointStatus.PROVISIONING
+                return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
