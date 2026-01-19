@@ -934,7 +934,7 @@ class Endpoint(graphene.ObjectType):
                     ])
                     if problematic_service_count > 0:
                         return EndpointStatus.DEGRADED
-                return EndpointStatus.PROVISIONING
+                return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:

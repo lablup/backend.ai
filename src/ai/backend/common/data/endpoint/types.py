@@ -4,6 +4,7 @@ from functools import lru_cache
 
 class EndpointStatus(StrEnum):
     READY = "READY"
+    # Deprecated: No longer used, kept for backwards compatibility
     PROVISIONING = "PROVISIONING"
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
