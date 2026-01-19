@@ -821,7 +821,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "need_password_change": False,
             "full_name": params["full_name"] if "full_name" in params else "",
             "description": params["description"] if "description" in params else "",
-            "status": UserStatus.ACTIVE,
+            "status": UserStatus.INACTIVE,
             "status_info": "user-signup",
             "role": UserRole.USER,
             "integration_id": None,
