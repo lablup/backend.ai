@@ -9533,6 +9533,29 @@ type ResourceOptsEntry
   value: String!
 }
 
+"""
+Added in 26.1.0. A single key-value entry representing a resource option.
+"""
+input ResourceOptsEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
+
+  """The value for this resource option (e.g., '64m')."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for input.
+"""
+input ResourceOptsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of resource option entries."""
+  entries: [ResourceOptsEntryInput!]!
+}
+
 type ResourcePreset
   @join__type(graph: GRAPHENE)
 {
@@ -10067,6 +10090,17 @@ type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.1.0. Scheduler-specific configuration options"""
+type SchedulerConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Number of scheduling retries to skip before attempting to schedule a session.
+  Used to prevent repeated scheduling attempts for sessions that previously failed.
+  """
+  numRetriesToSkip: Int!
 }
 
 """

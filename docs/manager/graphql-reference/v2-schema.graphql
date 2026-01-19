@@ -2037,6 +2037,40 @@ input EmailSpecInput {
   auth: SMTPAuthInput = null
 }
 
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+type EnvironmentVariableEntry {
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+input EnvironmentVariableEntryInput {
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+type EnvironmentVariables {
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntry!]!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+input EnvironmentVariablesInput {
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntryInput!]!
+}
+
 type ExtraVFolderMount implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -5207,6 +5241,25 @@ type ResourceOptsEntry {
 }
 
 """
+Added in 26.1.0. A single key-value entry representing a resource option.
+"""
+input ResourceOptsEntryInput {
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
+
+  """The value for this resource option (e.g., '64m')."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for input.
+"""
+input ResourceOptsInput {
+  """List of resource option entries."""
+  entries: [ResourceOptsEntryInput!]!
+}
+
+"""
 Added in 26.1.0. A collection of compute resource allocations. Represents the resources consumed, allocated, or available for a workload. Each entry specifies a resource type and its quantity.
 """
 type ResourceSlot {
@@ -5564,6 +5617,15 @@ These artifacts are registered with SCANNED status and can be imported for actua
 """
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.1.0. Scheduler-specific configuration options"""
+type SchedulerConfig {
+  """
+  Number of scheduling retries to skip before attempting to schedule a session.
+  Used to prevent repeated scheduling attempts for sessions that previously failed.
+  """
+  numRetriesToSkip: Int!
 }
 
 """
