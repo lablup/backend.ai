@@ -38,7 +38,6 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
-    RetryUpdateResult,
     SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -54,7 +53,6 @@ from .types.search import (
     SessionWithKernelsSearchResult,
 )
 from .types.session import (
-    KernelTerminationResult,
     MarkTerminatingResult,
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
@@ -549,22 +547,6 @@ class SchedulerRepository:
         return await self._db_source.get_container_info_for_kernels(session_id)
 
     @scheduler_repository_resilience.apply()
-    async def batch_update_stuck_session_retries(
-        self, session_ids: list[SessionId], max_retries: int = 5
-    ) -> RetryUpdateResult:
-        """
-        Batch update retry counts for stuck sessions.
-
-        Status changes for exceeded sessions are handled by the Coordinator
-        via handler's stale_status().
-
-        :param session_ids: List of session IDs to update
-        :param max_retries: Maximum retries allowed (default: 5)
-        :return: RetryUpdateResult containing sessions to retry and sessions that exceeded
-        """
-        return await self._db_source.batch_update_stuck_session_retries(session_ids, max_retries)
-
-    @scheduler_repository_resilience.apply()
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo
     ) -> None:
@@ -845,3 +827,22 @@ class SchedulerRepository:
             List of SessionInfo objects.
         """
         return await self._db_source.search_sessions_for_handler(querier)
+
+    @scheduler_repository_resilience.apply()
+    async def get_last_session_histories(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, SessionSchedulingHistoryRow]:
+        """Get last history records for multiple sessions.
+
+        Returns the most recent history record for each session. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+
+        Args:
+            session_ids: List of session IDs to fetch history for
+
+        Returns:
+            Dict mapping session_id to latest history record
+        """
+        return await self._db_source.get_last_session_histories(session_ids)

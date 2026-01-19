@@ -76,7 +76,6 @@ from ai.backend.manager.repositories.scheduler.types.search import (
 )
 from ai.backend.manager.repositories.scheduler.types.session import (
     KernelData,
-    KernelTerminationResult,
     MarkTerminatingResult,
     PendingSessionData,
     PendingSessions,
@@ -107,7 +106,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
-    RetryUpdateResult,
     SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
@@ -2948,96 +2946,6 @@ class ScheduleDBSource:
             )
             await db_sess.execute(kernel_stmt)
 
-    async def _increment_session_retry_count(
-        self, db_sess: SASession, session_id: SessionId, max_retries: int
-    ) -> tuple[bool, bool]:
-        """
-        Private method to increment retry count for a session.
-
-        This method only updates the retry count without changing session/kernel status.
-        Status changes are handled by the Coordinator via handler's stale_status().
-
-        :param db_sess: Database session to use
-        :param session_id: The session ID to update
-        :param max_retries: Maximum retries before being marked as exceeded
-        :return: Tuple of (should_retry, exceeded) - should_retry is True if within limit,
-                 exceeded is True if max retries was reached
-        """
-        # Get current session and its retry count
-        stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-        result = await db_sess.execute(stmt)
-        session_row = result.scalar()
-
-        if not session_row:
-            log.warning("Session {} not found for retry count update", session_id)
-            return (False, False)
-
-        # Get current retries count from existing status_data
-        current_status_data = session_row.status_data or {}
-        scheduler_data = current_status_data.get("scheduler", {})
-        current_retries = scheduler_data.get("retries", 0)
-        new_retries = current_retries + 1
-
-        # Check if we exceeded max retries
-        exceeded = new_retries >= max_retries
-
-        if exceeded:
-            # Reset retry count to 0 when exceeded (will be moved to PENDING by Coordinator)
-            status_data = {"retries": 0}
-            log.info("Session {} exceeded max retries ({})", session_id, max_retries)
-        else:
-            # Update with incremented retry count
-            status_data = {"retries": new_retries}
-            log.debug("Session {} retry count incremented to {}", session_id, new_retries)
-
-        # Update retry count in status_data (no status change)
-        update_stmt = (
-            sa.update(SessionRow)
-            .where(SessionRow.id == session_id)
-            .values(
-                status_data=sql_json_merge(
-                    SessionRow.__table__.c.status_data,
-                    ("scheduler",),
-                    obj=status_data,
-                ),
-            )
-        )
-        await db_sess.execute(update_stmt)
-
-        return (not exceeded, exceeded)  # Should continue retrying
-
-    async def batch_update_stuck_session_retries(
-        self, session_ids: list[SessionId], max_retries: int = 5
-    ) -> RetryUpdateResult:
-        """
-        Batch update retry counts for stuck sessions.
-
-        This method only updates retry counts. Status changes (PENDING for exceeded sessions)
-        are handled by the Coordinator via handler's stale_status().
-
-        :param session_ids: List of session IDs to update
-        :param max_retries: Maximum retries allowed (default: 5)
-        :return: RetryUpdateResult containing sessions to retry and sessions that exceeded
-        """
-        sessions_to_retry: list[SessionId] = []
-        sessions_exceeded: list[SessionId] = []
-
-        async with self._begin_session_read_committed() as db_sess:
-            for session_id in session_ids:
-                should_retry, exceeded = await self._increment_session_retry_count(
-                    db_sess, session_id, max_retries
-                )
-
-                if should_retry:
-                    sessions_to_retry.append(session_id)
-                if exceeded:
-                    sessions_exceeded.append(session_id)
-
-        return RetryUpdateResult(
-            sessions_to_retry=sessions_to_retry,
-            sessions_exceeded=sessions_exceeded,
-        )
-
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo
     ) -> None:
@@ -3421,6 +3329,40 @@ class ScheduleDBSource:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return {SessionId(row.session_id): row for row in rows}
+
+    async def get_last_session_histories(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, SessionSchedulingHistoryRow]:
+        """Get last history records for multiple sessions (regardless of phase).
+
+        Returns the most recent history record for each session. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+
+        Args:
+            session_ids: List of session IDs to fetch history for
+
+        Returns:
+            Dict mapping session_id to latest history record
+        """
+        if not session_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Use DISTINCT ON to get latest record per session (no phase filter)
+            query = (
+                sa.select(SessionSchedulingHistoryRow)
+                .where(SessionSchedulingHistoryRow.session_id.in_(session_ids))
+                .distinct(SessionSchedulingHistoryRow.session_id)
+                .order_by(
+                    SessionSchedulingHistoryRow.session_id,
+                    SessionSchedulingHistoryRow.created_at.desc(),
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+            return {SessionId(row.session_id): row for row in rows}
 
     async def get_sessions_for_pull_by_ids(
         self,

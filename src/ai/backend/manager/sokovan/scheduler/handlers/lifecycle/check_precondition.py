@@ -68,8 +68,8 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session/kernel → PREPARING
         - need_retry: None (stays SCHEDULED)
-        - expired: Session/kernel → PENDING (re-scheduling)
-        - give_up: Session/kernel → PENDING (re-scheduling)
+        - expired: Session/kernel → PENDING (re-scheduling after timeout)
+        - give_up: None (image pulling is time-based, only timeout applies)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -81,10 +81,7 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
                 session=SessionStatus.PENDING,
                 kernel=KernelStatus.PENDING,
             ),
-            give_up=TransitionStatus(
-                session=SessionStatus.PENDING,
-                kernel=KernelStatus.PENDING,
-            ),
+            give_up=None,
         )
 
     @property

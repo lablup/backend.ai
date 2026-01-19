@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Optional
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
-from ai.backend.manager.defs import LockID
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -93,20 +93,35 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
     ) -> SessionExecutionResult:
         """Check and retry stuck PREPARING/PULLING sessions.
 
-        Fetches detailed session data and delegates to Launcher's retry method which handles:
-        - Filtering truly stuck sessions
-        - Checking with agents if sessions are actively pulling
-        - Updating retry counts
-        - Re-triggering image pulling for sessions that should retry
-        - Returning exceeded sessions for Coordinator to update to PENDING
+        Uses phase_attempts from History to determine which sessions can be retried.
+        Sessions that have exceeded max retries are reported as failures for
+        Coordinator to apply give_up transition.
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
 
-        # Extract session IDs from SessionWithKernels
-        session_ids = [s.session_info.identity.id for s in sessions]
+        # Filter sessions by phase_attempts from History
+        # Sessions exceeding max retries are reported as failures (Coordinator applies give_up)
+        sessions_to_retry: list[SessionWithKernels] = []
+        for session in sessions:
+            if session.phase_attempts >= SERVICE_MAX_RETRIES:
+                result.failures.append(
+                    SessionTransitionInfo(
+                        session_id=session.session_info.identity.id,
+                        from_status=session.session_info.lifecycle.status,
+                        reason="EXCEEDED_MAX_RETRIES",
+                    )
+                )
+            else:
+                sessions_to_retry.append(session)
+
+        if not sessions_to_retry:
+            return result
+
+        # Extract session IDs for retry
+        session_ids = [s.session_info.identity.id for s in sessions_to_retry]
 
         # Fetch detailed session data (SessionDataForPull) from repository
         sessions_with_images = await self._repository.get_sessions_for_pull_by_ids(session_ids)
@@ -123,7 +138,7 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
         )
 
         # Sessions that were retried are successes
-        session_map = {s.session_info.identity.id: s for s in sessions}
+        session_map = {s.session_info.identity.id: s for s in sessions_to_retry}
         for session_id in retry_result.retried_ids:
             original_session = session_map.get(session_id)
             from_status = (
@@ -135,22 +150,6 @@ class RetryPreparingLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_id,
                     from_status=from_status,
-                )
-            )
-
-        # Sessions that exceeded max retries are failures (Coordinator applies policy-based transition)
-        for session_id in retry_result.exceeded_ids:
-            original_session = session_map.get(session_id)
-            from_status = (
-                original_session.session_info.lifecycle.status
-                if original_session
-                else SessionStatus.PREPARING  # fallback to expected status
-            )
-            result.failures.append(
-                SessionTransitionInfo(
-                    session_id=session_id,
-                    from_status=from_status,
-                    reason="EXCEEDED_MAX_RETRIES",
                 )
             )
 

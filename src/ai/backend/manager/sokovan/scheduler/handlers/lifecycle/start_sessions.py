@@ -66,8 +66,8 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session/kernel → CREATING
         - need_retry: None (stays PREPARED)
-        - expired: Session/kernel → PENDING (re-scheduling)
-        - give_up: Session/kernel → PENDING (re-scheduling)
+        - expired: Session/kernel → PENDING (re-scheduling after timeout)
+        - give_up: None (container creation is time-based, only timeout applies)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -79,10 +79,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                 session=SessionStatus.PENDING,
                 kernel=KernelStatus.PENDING,
             ),
-            give_up=TransitionStatus(
-                session=SessionStatus.PENDING,
-                kernel=KernelStatus.PENDING,
-            ),
+            give_up=None,
         )
 
     @property

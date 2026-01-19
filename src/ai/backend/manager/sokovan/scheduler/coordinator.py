@@ -3,7 +3,10 @@ import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
+
+from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -33,6 +36,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     TransitionStatus,
 )
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -64,6 +68,14 @@ from .results import KernelExecutionResult, SessionExecutionResult, SessionTrans
 from .types import KernelCreationInfo, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+# Status timeout thresholds (in seconds) for failure classification
+# Sessions exceeding these times in a status are classified as 'expired'
+STATUS_TIMEOUT_MAP: dict[SessionStatus, float] = {
+    SessionStatus.PREPARING: 900.0,  # 15 minutes
+    SessionStatus.PULLING: 900.0,  # 15 minutes
+    SessionStatus.CREATING: 600.0,  # 10 minutes
+}
 
 
 @dataclass
@@ -107,6 +119,26 @@ class HookExecutionResult:
 
     full_session_data: list[SessionWithKernels]
     """Full session+kernel data for successful sessions (for occupied_slots calculation)."""
+
+
+@dataclass
+class FailureClassificationResult:
+    """Result of classifying failures into give_up, expired, and need_retry.
+
+    Classification priority (first match wins):
+    1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
+    2. expired: status_changed elapsed > STATUS_TIMEOUT_MAP threshold
+    3. need_retry: default (can be retried)
+    """
+
+    give_up: list[SessionTransitionInfo]
+    """Sessions that exceeded max retries - should transition to give_up status."""
+
+    expired: list[SessionTransitionInfo]
+    """Sessions that exceeded timeout threshold - should transition to expired status."""
+
+    need_retry: list[SessionTransitionInfo]
+    """Sessions that can be retried - should transition to need_retry status."""
 
 
 class ScheduleCoordinator:
@@ -490,6 +522,20 @@ class ScheduleCoordinator:
         # Extract session IDs for recorder entity_ids
         session_ids = [s.session_info.identity.id for s in sessions]
 
+        # Populate phase_attempts and phase_started_at from scheduling history for failure classification
+        # Get last history records (regardless of phase), then compare phase at application level
+        history_map = await self._repository.get_last_session_histories(session_ids)
+        handler_name = handler.name()
+        for session in sessions:
+            history = history_map.get(session.session_info.identity.id)
+            # Only use history data if the last history is for the current phase
+            if history and history.phase == handler_name:
+                session.phase_attempts = history.attempts
+                session.phase_started_at = history.created_at
+            else:
+                session.phase_attempts = 0
+                session.phase_started_at = None
+
         # Create recorder scoped to this scaling group
         recorder_scope = f"{schedule_type.value}:{scaling_group}"
         with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
@@ -500,7 +546,7 @@ class ScheduleCoordinator:
             all_records = pool.build_all_records()
 
             # Apply status transitions immediately for this scaling group (BEP-1030)
-            await self._handle_result(handler, result, all_records)
+            await self._handle_result(handler, result, all_records, sessions)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -808,6 +854,7 @@ class ScheduleCoordinator:
         handler: SessionLifecycleHandler,
         result: SessionExecutionResult,
         records: Mapping[SessionId, ExecutionRecord],
+        sessions: list[SessionWithKernels],
     ) -> None:
         """Apply status transitions using handler.status_transitions() (BEP-1030).
 
@@ -823,6 +870,7 @@ class ScheduleCoordinator:
             handler: The lifecycle handler that produced the result
             result: Execution result containing successes, failures, and skipped
             records: Mapping of session IDs to their execution records for sub_steps
+            sessions: Original sessions with phase_attempts for failure classification
         """
         transitions = handler.status_transitions()
         handler_name = handler.name()
@@ -842,43 +890,100 @@ class ScheduleCoordinator:
                     result.successes, transitions.success.session
                 )
 
-        # FAILURE transitions - Coordinator classifies failures into need_retry/expired/give_up
-        # TODO: Implement policy-based classification in Phase 4:
-        #   - Check timeout threshold → expired
-        #   - Check retry count vs max retries → give_up
-        #   - Otherwise → need_retry
-        # For now, use the first defined transition in handler's status_transitions()
+        # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry
         if result.failures:
-            if transitions.need_retry:
+            classified = self._classify_failures(result.failures, sessions)
+
+            # Apply transitions for each classification
+            if classified.give_up and transitions.give_up:
                 await self._apply_transition(
                     handler_name,
-                    result.failures,
-                    transitions.need_retry,
-                    SchedulingResult.NEED_RETRY,
+                    classified.give_up,
+                    transitions.give_up,
+                    SchedulingResult.GIVE_UP,
                     records,
                 )
-            elif transitions.expired:
-                # Use expired if need_retry is not defined (e.g., sweep handlers)
+
+            if classified.expired and transitions.expired:
                 await self._apply_transition(
                     handler_name,
-                    result.failures,
+                    classified.expired,
                     transitions.expired,
                     SchedulingResult.EXPIRED,
                     records,
                 )
-            elif transitions.give_up:
-                # Fallback to give_up
+
+            if classified.need_retry and transitions.need_retry:
                 await self._apply_transition(
                     handler_name,
-                    result.failures,
-                    transitions.give_up,
-                    SchedulingResult.GIVE_UP,
+                    classified.need_retry,
+                    transitions.need_retry,
+                    SchedulingResult.NEED_RETRY,
                     records,
                 )
 
         # SKIPPED - Record history without status change
         if result.skipped:
             await self._record_skipped_history(handler_name, result.skipped, records)
+
+    def _classify_failures(
+        self,
+        failures: list[SessionTransitionInfo],
+        sessions: list[SessionWithKernels],
+    ) -> FailureClassificationResult:
+        """Classify failures into give_up, expired, need_retry.
+
+        Pure classification based on conditions only. The caller (_handle_result)
+        decides whether to apply transitions based on handler's transition definitions.
+
+        Classification priority (first match wins):
+        1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
+        2. expired: timeout exceeded
+        3. need_retry: default
+
+        Args:
+            failures: Failed session transition info
+            sessions: Original sessions with phase_attempts and phase_started_at populated
+
+        Returns:
+            FailureClassificationResult with give_up, expired, need_retry lists
+        """
+        session_map = {s.session_info.identity.id: s for s in sessions}
+        now = datetime.now(tzutc())
+
+        give_up_failures: list[SessionTransitionInfo] = []
+        expired_failures: list[SessionTransitionInfo] = []
+        retry_failures: list[SessionTransitionInfo] = []
+
+        for failure in failures:
+            session = session_map.get(failure.session_id)
+            if not session:
+                # Session not found - skip (shouldn't happen)
+                continue
+
+            # 1. Check max retries exceeded → give_up
+            if session.phase_attempts >= SERVICE_MAX_RETRIES:
+                give_up_failures.append(failure)
+                continue
+
+            # 2. Check timeout exceeded → expired
+            if session.phase_started_at:
+                status = session.session_info.lifecycle.status
+                timeout = STATUS_TIMEOUT_MAP.get(status)
+                if timeout:
+                    elapsed = (now - session.phase_started_at).total_seconds()
+                    if elapsed > timeout:
+                        expired_failures.append(failure)
+                        continue
+
+            # 3. Default → need_retry
+            retry_failures.append(failure)
+
+        return FailureClassificationResult(
+            give_up=give_up_failures,
+            expired=expired_failures,
+            need_retry=retry_failures,
+        )
 
     async def _apply_transition(
         self,

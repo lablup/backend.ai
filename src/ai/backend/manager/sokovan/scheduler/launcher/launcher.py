@@ -31,7 +31,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -807,9 +807,12 @@ class SessionLauncher:
         Handler-specific method that works with pre-fetched data.
         Used by RetryPreparingLifecycleHandler.
 
-        :param sessions: List of sessions to check for retry
+        Note: Max retry filtering is now done by the Handler using phase_attempts
+        from History. This method only handles stuck session detection and retry triggering.
+
+        :param sessions: List of sessions to check for retry (already filtered by max_retries)
         :param image_configs: Image configurations indexed by image name
-        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
+        :return: RetryResult with retried_ids (exceeded_ids is always empty)
         """
         PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
@@ -835,23 +838,6 @@ class SessionLauncher:
 
         log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
 
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        retry_update_result = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not retry_update_result.sessions_to_retry:
-            log.info("All stuck sessions exceeded max retries")
-            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in retry_update_result.sessions_to_retry
-        ]
-
         # Use the existing _trigger_image_pulling_for_sessions method
         with RecorderContext[SessionId].shared_phase(
             "prepare_images",
@@ -861,12 +847,10 @@ class SessionLauncher:
                 "retry_image_pulling",
                 success_detail="Image pull retried",
             ):
-                await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
+                await self._trigger_image_pulling_for_sessions(truly_stuck_sessions, image_configs)
 
-        return RetryResult(
-            retried_ids=list(retry_update_result.sessions_to_retry),
-            exceeded_ids=list(retry_update_result.sessions_exceeded),
-        )
+        retried_ids = [session.session_id for session in truly_stuck_sessions]
+        return RetryResult(retried_ids=retried_ids, exceeded_ids=[])
 
     async def retry_creating_for_handler(
         self,
@@ -879,9 +863,12 @@ class SessionLauncher:
         Handler-specific method that works with pre-fetched data.
         Used by RetryCreatingLifecycleHandler.
 
-        :param sessions: List of sessions to check for retry
+        Note: Max retry filtering is now done by the Handler using phase_attempts
+        from History. This method only handles stuck session detection and retry triggering.
+
+        :param sessions: List of sessions to check for retry (already filtered by max_retries)
         :param image_configs: Image configurations indexed by image name
-        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
+        :return: RetryResult with retried_ids (exceeded_ids is always empty)
         """
         CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
 
@@ -905,27 +892,8 @@ class SessionLauncher:
 
         log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
 
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        retry_update_result = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not retry_update_result.sessions_to_retry:
-            log.info("All stuck sessions exceeded max retries")
-            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in retry_update_result.sessions_to_retry
-        ]
-
         # Use the existing _start_sessions_concurrently method to retry
-        await self._start_sessions_concurrently(sessions_to_retry, image_configs)
+        await self._start_sessions_concurrently(truly_stuck_sessions, image_configs)
 
-        return RetryResult(
-            retried_ids=list(retry_update_result.sessions_to_retry),
-            exceeded_ids=list(retry_update_result.sessions_exceeded),
-        )
+        retried_ids = [session.session_id for session in truly_stuck_sessions]
+        return RetryResult(retried_ids=retried_ids, exceeded_ids=[])

@@ -796,10 +796,20 @@ class SessionWithKernels:
 
     This is the primary data unit for scheduler operations,
     representing a session and all its kernels as an atomic unit.
+
+    Attributes:
+        session_info: Session information including lifecycle data
+        kernel_infos: List of kernels belonging to this session
+        phase_attempts: Number of attempts for current phase from scheduling history
+                       (used for failure classification: give_up when >= max_retries)
+        phase_started_at: When the current phase started from scheduling history
+                         (used for failure classification: expired when timeout exceeded)
     """
 
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
+    phase_attempts: int = 0
+    phase_started_at: Optional[datetime] = None
 
     @property
     def main_kernel(self) -> KernelInfo:
@@ -868,18 +878,6 @@ class SweepStaleKernelsResult:
 
     dead_kernel_ids: list[KernelId]
     affected_sessions: list[SessionWithKernels]
-
-
-@dataclass
-class RetryUpdateResult:
-    """Result of batch_update_stuck_session_retries operation.
-
-    Used by repository to communicate which sessions should be retried
-    and which have exceeded max retries (for Coordinator to update status).
-    """
-
-    sessions_to_retry: list[SessionId]
-    sessions_exceeded: list[SessionId]
 
 
 @dataclass
