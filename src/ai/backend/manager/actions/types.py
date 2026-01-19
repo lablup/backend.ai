@@ -10,7 +10,7 @@ class OperationStatus(enum.StrEnum):
     RUNNING = "running"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ActionSpec:
     entity_type: str
     operation_type: str

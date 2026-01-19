@@ -8,7 +8,9 @@ from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
+from ai.backend.manager.actions.monitors.exclusions import AUDIT_LOG_EXCLUDED_ACTIONS
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import ActionSpec
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec, AuditLogRepository
 from ai.backend.manager.repositories.base import Creator
@@ -20,9 +22,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class AuditLogMonitor(ActionMonitor):
     _repository: AuditLogRepository
+    _excluded_action_specs: frozenset[ActionSpec]
 
-    def __init__(self, repository: AuditLogRepository) -> None:
+    def __init__(
+        self,
+        repository: AuditLogRepository,
+        excluded_action_specs: frozenset[ActionSpec] | None = None,
+    ) -> None:
         self._repository = repository
+        self._excluded_action_specs = (
+            excluded_action_specs
+            if excluded_action_specs is not None
+            else AUDIT_LOG_EXCLUDED_ACTIONS
+        )
 
     async def _generate_log(self, action: BaseAction, result: ProcessResult) -> None:
         user = current_user()
@@ -61,4 +73,6 @@ class AuditLogMonitor(ActionMonitor):
 
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        if action.spec() in self._excluded_action_specs:
+            return
         await self._generate_log(action, result)
