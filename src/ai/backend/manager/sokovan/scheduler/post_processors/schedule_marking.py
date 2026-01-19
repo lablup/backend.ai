@@ -21,12 +21,11 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 # After a session transitions to a status, the coordinator marks the corresponding
 # schedule type to trigger the next phase.
 STATUS_TO_NEXT_SCHEDULE_TYPE: dict[SessionStatus, ScheduleType] = {
+    SessionStatus.PENDING: ScheduleType.SCHEDULE,
     SessionStatus.SCHEDULED: ScheduleType.CHECK_PRECONDITION,
-    SessionStatus.PULLING: ScheduleType.START,
-    SessionStatus.PREPARING: ScheduleType.START,
-    SessionStatus.RUNNING: ScheduleType.START,
-    SessionStatus.TERMINATED: ScheduleType.SCHEDULE,
-    SessionStatus.TERMINATING: ScheduleType.CHECK_TERMINATING_PROGRESS,
+    SessionStatus.PREPARED: ScheduleType.START,
+    SessionStatus.DEPRIORITIZING: ScheduleType.DEPRIORITIZE,
+    SessionStatus.TERMINATING: ScheduleType.TERMINATE,
 }
 
 
@@ -42,7 +41,7 @@ class ScheduleMarkingPostProcessor(PostProcessor):
             return
 
         # Collect unique schedule types to mark (deduplicate since multiple statuses
-        # might map to the same schedule type, e.g., PULLING and PREPARING both map to START)
+        # might map to the same schedule type)
         schedule_types_to_mark: set[ScheduleType] = set()
         for target_status in context.target_statuses:
             next_schedule_type = STATUS_TO_NEXT_SCHEDULE_TYPE.get(target_status)
