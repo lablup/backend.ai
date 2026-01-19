@@ -7737,6 +7737,12 @@ type Query
   """Added in 26.1.0. Query kernels with pagination and filtering."""
   kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.1.0. Query a single session by ID."""
+  sessionV2(id: ID!): SessionV2 @join__field(graph: STRAWBERRY)
+
+  """Added in 26.1.0. Query sessions with pagination and filtering."""
+  sessionsV2(filter: SessionFilter = null, orderBy: [SessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionConnectionV2! @join__field(graph: STRAWBERRY)
+
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route @join__field(graph: STRAWBERRY)
 
@@ -8968,6 +8974,195 @@ type ServicePorts
   entries: [ServicePortEntry!]!
 }
 
+"""Added in 26.1.0. Connection type for paginated session results."""
+type SessionConnectionV2
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionV2Edge!]!
+  count: Int!
+}
+
+"""Added in 26.1.0. Execution configuration for a session."""
+type SessionExecutionInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Environment variables set for the session."""
+  environ: JSON
+
+  """Bootstrap script executed at session start."""
+  bootstrapScript: String
+
+  """Startup command executed after bootstrap."""
+  startupCommand: String
+
+  """Whether the session uses host network mode."""
+  useHostNetwork: Boolean!
+
+  """URL to call back when session status changes."""
+  callbackUrl: String
+}
+
+"""Added in 26.1.0. Filter criteria for querying sessions."""
+input SessionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID = null
+  status: SessionStatusFilter = null
+  name: String = null
+  domainName: String = null
+  groupId: UUID = null
+  userUuid: UUID = null
+}
+
+"""Added in 26.1.0. Basic identity information for a session."""
+type SessionIdentityInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique identifier of the session."""
+  id: ID!
+
+  """Client-provided creation ID for idempotent session creation."""
+  creationId: String!
+
+  """Human-readable name of the session."""
+  name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+}
+
+"""Added in 26.1.0. Container image information for a session."""
+type SessionImageInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """List of container image references used by the session."""
+  images: [String!]
+
+  """Image tag if specified."""
+  tag: String
+}
+
+"""Added in 26.1.0. Lifecycle status and timestamps for a session."""
+type SessionLifecycleInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Current status of the session."""
+  status: SessionStatus!
+
+  """Result of the session execution (success, failure, etc.)."""
+  result: SessionResult!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Timestamp when the session was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the session, if applicable."""
+  startsAt: DateTime
+
+  """Timestamp when the status was last changed."""
+  statusChanged: DateTime
+
+  """Timeout in seconds for batch sessions."""
+  batchTimeout: Int
+
+  """Additional information about the current status."""
+  statusInfo: String
+
+  """Structured status data including scheduler information."""
+  statusData: SessionStatusDataContainer
+
+  """History of status transitions with timestamps."""
+  statusHistory: SessionStatusHistory
+}
+
+"""Added in 26.1.0. Metadata information for a session."""
+type SessionMetadataInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Human-readable name of the session."""
+  name: String!
+
+  """Domain to which this session belongs."""
+  domainName: String!
+
+  """Group/project ID that owns this session."""
+  groupId: UUID!
+
+  """User UUID who created this session."""
+  userUuid: UUID!
+
+  """Access key used to create this session."""
+  accessKey: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Optional user-provided tag for the session."""
+  tag: String
+}
+
+"""Added in 26.1.0. Metrics and statistics for a session."""
+type SessionMetricsInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The number of queries/executions performed in this session."""
+  numQueries: Int!
+
+  """The last collected statistics for this session."""
+  lastStat: SessionStat
+}
+
+"""Added in 26.1.0. Virtual folder mount information for a session."""
+type SessionMountInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """List of virtual folders mounted to this session."""
+  vfolderMounts: [VFolderMount!]
+}
+
+"""Added in 26.1.0. Network configuration for a session."""
+type SessionNetworkInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of network used by the session."""
+  networkType: String
+
+  """ID of the network if applicable."""
+  networkId: String
+}
+
+"""Added in 26.1.0. Ordering specification for sessions."""
+input SessionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: SessionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.1.0. Fields available for ordering sessions."""
+enum SessionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  ID @join__enumValue(graph: STRAWBERRY)
+  NAME @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -9000,6 +9195,32 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.1.0. Resource allocation information for a session."""
+type SessionResourceInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Cluster mode for distributed sessions (single-node, multi-node)."""
+  clusterMode: String!
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int!
+
+  """Currently occupied resource slots."""
+  occupyingSlots: ResourceSlot!
+
+  """Originally requested resource slots."""
+  requestedSlots: ResourceSlot!
+
+  """Name of the scaling group where the session is running."""
+  scalingGroupName: String
+
+  """Target scaling group names for scheduling."""
+  targetSgroupNames: [String!]
+
+  """IDs of agents running the session's kernels."""
+  agentIds: [String!]
+}
 
 """Added in 26.1.0. Result status of a session execution."""
 enum SessionResult
@@ -9086,6 +9307,88 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.1.0. Collection of session statistics."""
+type SessionStat
+  @join__type(graph: STRAWBERRY)
+{
+  """List of statistic entries."""
+  entries: [SessionStatEntry!]!
+}
+
+"""Added in 26.1.0. A single statistic entry for session metrics."""
+type SessionStatEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the statistic."""
+  name: String!
+
+  """Current value."""
+  current: String!
+
+  """Maximum capacity if applicable."""
+  capacity: String
+
+  """Unit hint for display."""
+  unitHint: String
+}
+
+"""Added in 26.1.0"""
+enum SessionStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  SCHEDULED @join__enumValue(graph: STRAWBERRY)
+  PREPARING @join__enumValue(graph: STRAWBERRY)
+  PULLING @join__enumValue(graph: STRAWBERRY)
+  PREPARED @join__enumValue(graph: STRAWBERRY)
+  CREATING @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
+  RESTARTING @join__enumValue(graph: STRAWBERRY)
+  RUNNING_DEGRADED @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+  ERROR @join__enumValue(graph: STRAWBERRY)
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.1.0. Container for session status data."""
+type SessionStatusDataContainer
+  @join__type(graph: STRAWBERRY)
+{
+  """Scheduler-related status information."""
+  scheduler: SchedulerInfo
+
+  """Raw status data as JSON."""
+  raw: JSON
+}
+
+"""Added in 26.1.0. Filter for session status."""
+input SessionStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [SessionStatus!] = null
+  notIn: [SessionStatus!] = null
+}
+
+"""Added in 26.1.0. History of session status transitions."""
+type SessionStatusHistory
+  @join__type(graph: STRAWBERRY)
+{
+  """List of status history entries."""
+  entries: [SessionStatusHistoryEntry!]!
+}
+
+"""Added in 26.1.0. A single entry in session status history."""
+type SessionStatusHistoryEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The status value."""
+  status: String!
+
+  """When this status was recorded."""
+  timestamp: DateTime!
+}
+
 """Added in 26.1.0. Type of compute session."""
 enum SessionType
   @join__type(graph: STRAWBERRY)
@@ -9094,6 +9397,53 @@ enum SessionType
   BATCH @join__enumValue(graph: STRAWBERRY)
   INFERENCE @join__enumValue(graph: STRAWBERRY)
   SYSTEM @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.1.0. Represents a compute session in Backend.AI."""
+type SessionV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Basic identity information for the session."""
+  identity: SessionIdentityInfo!
+
+  """Metadata including domain, group, and user information."""
+  metadata: SessionMetadataInfo!
+
+  """Resource allocation and cluster information."""
+  resource: SessionResourceInfo!
+
+  """Container image information."""
+  image: SessionImageInfo!
+
+  """Virtual folder mounts information."""
+  mounts: SessionMountInfo!
+
+  """Execution configuration (environment, scripts)."""
+  execution: SessionExecutionInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: SessionLifecycleInfo!
+
+  """Execution metrics and statistics."""
+  metrics: SessionMetricsInfo!
+
+  """Network configuration."""
+  network: SessionNetworkInfo!
+}
+
+"""An edge in a connection."""
+type SessionV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionV2!
 }
 
 type SetQuotaScope

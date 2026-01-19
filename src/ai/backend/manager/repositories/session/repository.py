@@ -582,7 +582,7 @@ class SessionRepository:
                 querier,
             )
 
-            items = [row.SessionRow.to_dataclass() for row in result.rows]
+            items = [row.SessionRow.to_session_info() for row in result.rows]
 
             return SessionListResult(
                 items=items,
