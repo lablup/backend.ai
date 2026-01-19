@@ -36,6 +36,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from .common import detect_os
 from .dev import (
     bootstrap_pants,
+    get_current_branch,
     install_editable_webui,
     install_git_hooks,
     install_git_lfs,
@@ -1102,7 +1103,17 @@ class DevContext(Context):
 
     async def install(self) -> None:
         await pants_export(self)
-        await install_editable_webui(self)
+        editable_webui = self.install_variable.editable_webui
+        if editable_webui is None:
+            # Auto: enable on main branch only
+            current_branch = await get_current_branch()
+            editable_webui = current_branch == "main"
+            if not editable_webui:
+                self.log.write(f"Skipping editable webui (branch: {current_branch}, not main)")
+        if editable_webui:
+            await install_editable_webui(self)
+        else:
+            self.log.write("Skipping editable webui (explicitly disabled)")
         await self.install_halfstack()
 
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
