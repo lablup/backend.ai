@@ -291,11 +291,21 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             success_status=SessionStatus.TERMINATED,
             reason="triggered-by-scheduler",
         ),
-        # Detect abnormal termination when ANY kernel is TERMINATED
+        # Detect abnormal termination when ANY kernel is TERMINATED or CANCELLED
+        # Covers all active session states where kernels can be terminated
         ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: PromotionSpec(
             name="detect-termination",
-            target_statuses=[SessionStatus.RUNNING],
-            target_kernel_statuses=[KernelStatus.TERMINATED],
+            target_statuses=[
+                SessionStatus.PENDING,
+                SessionStatus.SCHEDULED,
+                SessionStatus.PREPARING,
+                SessionStatus.PULLING,
+                SessionStatus.PREPARED,
+                SessionStatus.CREATING,
+                SessionStatus.RUNNING,
+                SessionStatus.DEPRIORITIZING,
+            ],
+            target_kernel_statuses=[KernelStatus.TERMINATED, KernelStatus.CANCELLED],
             kernel_match_type=KernelMatchType.ANY,
             success_status=SessionStatus.TERMINATING,
             reason="ABNORMAL_TERMINATION",

@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -99,19 +100,37 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         Delegates to Provisioner's scheduling method which handles:
         - Resource allocation and agent selection
         - Session placement decisions
+
+        Returns:
+        - successes: Sessions that were scheduled
+        - skipped: Sessions that were not attempted (priority-based, resource constraints)
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
 
+        # Build session map for lookup
+        session_map = {s.session_info.identity.id: s for s in sessions}
+
         # Fetch scheduling data required by Provisioner
         scheduling_data = await self._repository.get_scheduling_data(scaling_group)
         if scheduling_data is None:
             log.debug(
-                "No scheduling data for scaling group {}. Skipping scheduling.",
+                "No scheduling data for scaling group {}. Skipping all sessions.",
                 scaling_group,
             )
+            # All sessions are skipped when no scheduling data available
+            for session in sessions:
+                result.skipped.append(
+                    SessionTransitionInfo(
+                        session_id=session.session_info.identity.id,
+                        from_status=session.session_info.lifecycle.status,
+                        reason="no-scheduling-data",
+                        creation_id=session.session_info.identity.creation_id,
+                        access_key=AccessKey(session.session_info.metadata.access_key),
+                    )
+                )
             return result
 
         # Delegate to Provisioner with pre-fetched data
@@ -119,9 +138,12 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             scaling_group, scheduling_data
         )
 
+        # Track scheduled session IDs
+        scheduled_session_ids = set()
+
         # Mark scheduled sessions as success for status transition
-        session_map = {s.session_info.identity.id: s for s in sessions}
         for event_data in schedule_result.scheduled_sessions:
+            scheduled_session_ids.add(event_data.session_id)
             original_session = session_map.get(event_data.session_id)
             from_status = (
                 original_session.session_info.lifecycle.status
@@ -137,5 +159,19 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                     access_key=event_data.access_key,
                 )
             )
+
+        # Mark non-scheduled sessions as skipped (not attempted due to priority/resources)
+        for session in sessions:
+            session_id = session.session_info.identity.id
+            if session_id not in scheduled_session_ids:
+                result.skipped.append(
+                    SessionTransitionInfo(
+                        session_id=session_id,
+                        from_status=session.session_info.lifecycle.status,
+                        reason="not-scheduled-this-cycle",
+                        creation_id=session.session_info.identity.creation_id,
+                        access_key=AccessKey(session.session_info.metadata.access_key),
+                    )
+                )
 
         return result
