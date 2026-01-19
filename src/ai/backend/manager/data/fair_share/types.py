@@ -11,6 +11,14 @@ from ai.backend.common.types import ResourceSlot
 
 
 @dataclass(frozen=True)
+class ProjectUserIds:
+    """A project with its associated user IDs for batch fair share lookup."""
+
+    project_id: uuid.UUID
+    user_ids: frozenset[uuid.UUID]
+
+
+@dataclass(frozen=True)
 class FairShareSpec:
     """Specification parameters for fair share calculation.
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -12,6 +14,7 @@ from ai.backend.manager.data.fair_share import (
     DomainFairShareSearchResult,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
+    ProjectUserIds,
     UserFairShareData,
     UserFairShareSearchResult,
 )
@@ -242,3 +245,48 @@ class FairShareDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def get_user_fair_share_factors_batch(
+        self,
+        resource_group: str,
+        project_user_ids: Sequence[ProjectUserIds],
+    ) -> dict[uuid.UUID, Decimal]:
+        """Get fair share factors for multiple users across projects.
+
+        Args:
+            resource_group: The resource group (scaling group) name.
+            project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
+
+        Returns:
+            A mapping from user_uuid to fair_share_factor.
+            Users not found in the database are omitted from the result.
+        """
+        if not project_user_ids:
+            return {}
+
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Build OR conditions for each project-users group
+            conditions = [
+                sa.and_(
+                    UserFairShareRow.project_id == pu.project_id,
+                    UserFairShareRow.user_uuid.in_(pu.user_ids),
+                )
+                for pu in project_user_ids
+                if pu.user_ids
+            ]
+
+            if not conditions:
+                return {}
+
+            query = sa.select(
+                UserFairShareRow.user_uuid,
+                UserFairShareRow.fair_share_factor,
+            ).where(
+                sa.and_(
+                    UserFairShareRow.resource_group == resource_group,
+                    sa.or_(*conditions),
+                )
+            )
+
+            result = await db_sess.execute(query)
+            return {row.user_uuid: row.fair_share_factor for row in result}

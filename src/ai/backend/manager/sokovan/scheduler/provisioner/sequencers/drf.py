@@ -31,11 +31,16 @@ class DRFSequencer(WorkloadSequencer):
         return "Sessions sequenced using Dominant Resource Fairness algorithm"
 
     @override
-    def sequence(
-        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
+    async def sequence(
+        self,
+        resource_group: str,
+        system_snapshot: SystemSnapshot,
+        workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on Dominant Resource Fairness.
+
+        :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects sequenced by DRF.
