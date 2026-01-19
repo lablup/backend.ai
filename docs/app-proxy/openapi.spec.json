@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Proxy Coordinator API",
     "description": "Backend.AI Proxy Coordinator REST API specification",
-    "version": "25.18.0",
+    "version": "25.19.2",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
