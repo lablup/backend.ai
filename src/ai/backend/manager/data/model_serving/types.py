@@ -238,10 +238,7 @@ class CompactServiceInfo:
 
 @dataclass
 class RequesterCtx:
-    """
-    .. deprecated::
-        Use :class:`ai.backend.common.data.user.types.UserData` instead.
-    """
+    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
 
     is_authorized: Optional[bool]
     user_id: uuid.UUID
