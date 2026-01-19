@@ -904,6 +904,16 @@ class Endpoint(graphene.ObjectType):
         except NoResultFound:
             raise EndpointNotFound
 
+    def _is_unhealthy(self) -> bool:
+        if len(self.routings) == 0:
+            return True
+        if all(r.status == RouteStatus.TERMINATED.name for r in self.routings):
+            return True
+        if self.retries > SERVICE_MAX_RETRIES:
+            return True
+        healthy_count = sum(1 for r in self.routings if r.status == RouteStatus.HEALTHY.name)
+        return healthy_count == 0
+
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
             case EndpointLifecycle.DESTROYED.name:
@@ -911,20 +921,14 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if (
-                    len(self.routings) == 0
-                    or all(r.status == RouteStatus.TERMINATED.name for r in self.routings)
-                    or self.retries > SERVICE_MAX_RETRIES
-                ):
+                if self._is_unhealthy():
                     return EndpointStatus.UNHEALTHY
-                if (spawned_service_count := len([r for r in self.routings])) > 0:
-                    healthy_service_count = len([
-                        r for r in self.routings if r.status == RouteStatus.HEALTHY.name
-                    ])
-                    if healthy_service_count == spawned_service_count:
-                        return EndpointStatus.HEALTHY
-                    if healthy_service_count == 0:
-                        return EndpointStatus.UNHEALTHY
+                total_count = len(self.routings)
+                healthy_count = sum(
+                    1 for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                )
+                if healthy_count == total_count:
+                    return EndpointStatus.HEALTHY
                 return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
