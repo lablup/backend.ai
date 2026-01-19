@@ -11,9 +11,9 @@ from uuid import UUID
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
-from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,

@@ -130,9 +130,7 @@ class DetectTerminationPromotionHandler(SessionPromotionHandler):
         )
 
         # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            s.access_key for s in result.successes if s.access_key
-        }
+        affected_keys: set[AccessKey] = {s.access_key for s in result.successes if s.access_key}
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
             log.debug(

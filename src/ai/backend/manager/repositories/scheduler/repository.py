@@ -25,7 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
@@ -799,6 +799,25 @@ class SchedulerRepository:
         return await self._db_source.fetch_sessions_for_handler(
             scaling_group, session_statuses, kernel_statuses
         )
+
+    @scheduler_repository_resilience.apply()
+    async def search_kernels_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelListResult:
+        """Search kernels for kernel handler execution.
+
+        This method is used by KernelLifecycleHandler implementations.
+        The coordinator calls this to query kernels using BatchQuerier.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use KernelConditions for filtering by status, scaling_group, etc.
+
+        Returns:
+            KernelListResult containing KernelInfo objects with pagination info.
+        """
+        return await self._db_source.search_kernels_for_handler(querier)
 
     @scheduler_repository_resilience.apply()
     async def update_sessions_status_bulk(

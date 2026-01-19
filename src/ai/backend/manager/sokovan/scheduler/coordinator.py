@@ -15,16 +15,16 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
-from ai.backend.common.events.event_types.session.broadcast import (
-    SchedulingBroadcastEvent,
-)
-from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
 )
+from ai.backend.common.events.event_types.session.broadcast import (
+    SchedulingBroadcastEvent,
+)
+from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.types import AgentId, SessionId, SessionTypes
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -38,7 +38,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.scheduler.options import SessionConditions
+from ai.backend.manager.repositories.scheduler.options import KernelConditions, SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history.creators import (
@@ -70,7 +70,6 @@ from .handlers.kernel import (
     KernelLifecycleHandler,
     SweepStaleKernelsKernelHandler,
 )
-from .hooks.base import AbstractSessionHook
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
 from .recorder import SessionRecorderContext
@@ -519,36 +518,24 @@ class ScheduleCoordinator:
             schedule_type: Type of scheduling operation
             scaling_group: The scaling group to process
         """
-        # Query sessions to get kernels - use handler's target_kernel_statuses
-        # We query sessions but will extract kernels for the handler
+        # Build querier with kernel conditions
         target_kernel_statuses = handler.target_kernel_statuses()
 
-        # For kernel handlers, we need sessions that have kernels in target status
-        # Use RUNNING/TERMINATING session status based on kernel status
-        session_statuses = self._infer_session_statuses_for_kernel_handler(target_kernel_statuses)
-
-        sessions = await self._repository.get_sessions_for_handler(
-            scaling_group,
-            session_statuses,
-            target_kernel_statuses,
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                KernelConditions.by_scaling_group(scaling_group),
+                KernelConditions.by_statuses(target_kernel_statuses),
+            ],
         )
 
-        if not sessions:
-            return
+        kernel_result = await self._repository.search_kernels_for_handler(querier)
 
-        # Extract kernels from sessions that match the target status
-        kernels = [
-            kernel_info
-            for session in sessions
-            for kernel_info in session.kernel_infos
-            if kernel_info.lifecycle.status in target_kernel_statuses
-        ]
-
-        if not kernels:
+        if not kernel_result.items:
             return
 
         # Execute handler logic with kernels
-        result = await handler.execute(scaling_group, kernels)
+        result = await handler.execute(scaling_group, kernel_result.items)
 
         # Apply kernel status transitions based on handler's status_transitions
         await self._handle_kernel_result(handler, result)
@@ -569,29 +556,6 @@ class ScheduleCoordinator:
                     scaling_group,
                     e,
                 )
-
-    def _infer_session_statuses_for_kernel_handler(
-        self,
-        kernel_statuses: list[KernelStatus],
-    ) -> list[SessionStatus]:
-        """Infer session statuses based on target kernel statuses.
-
-        This is used to query sessions that contain kernels in the target status.
-
-        Args:
-            kernel_statuses: Target kernel statuses for the handler
-
-        Returns:
-            List of session statuses that typically contain these kernel statuses
-        """
-        session_statuses: list[SessionStatus] = []
-        for kernel_status in kernel_statuses:
-            if kernel_status == KernelStatus.RUNNING:
-                session_statuses.append(SessionStatus.RUNNING)
-            elif kernel_status == KernelStatus.TERMINATING:
-                session_statuses.append(SessionStatus.TERMINATING)
-            # Add more mappings as needed
-        return list(set(session_statuses))
 
     async def _handle_kernel_result(
         self,
@@ -882,8 +846,7 @@ class ScheduleCoordinator:
 
         # Execute hooks concurrently
         hook_coroutines = [
-            self._execute_single_hook(session, target_status)
-            for session in full_sessions
+            self._execute_single_hook(session, target_status) for session in full_sessions
         ]
         hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
 

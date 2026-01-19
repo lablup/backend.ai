@@ -34,7 +34,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
@@ -3709,6 +3709,34 @@ class ScheduleDBSource:
                 )
 
             return handler_sessions
+
+    async def search_kernels_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelListResult:
+        """Search kernels for kernel handler execution.
+
+        This method is for KernelLifecycleHandler. It queries kernels
+        directly using BatchQuerier conditions.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use KernelConditions for filtering.
+
+        Returns:
+            KernelListResult containing KernelInfo objects.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            stmt = sa.select(KernelRow)
+            result = await execute_batch_querier(db_sess, stmt, querier)
+            # Convert Row to KernelInfo via KernelRow
+            kernel_rows = [KernelRow(**dict(row._mapping)) for row in result.rows]
+            return KernelListResult(
+                items=[row.to_kernel_info() for row in kernel_rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def search_sessions_for_handler(
         self,

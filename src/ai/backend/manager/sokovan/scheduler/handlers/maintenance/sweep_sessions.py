@@ -130,9 +130,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         """Log the number of swept sessions and invalidate cache."""
         log.info("Swept {} failed sessions", len(result.failures))
         # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            s.access_key for s in result.failures if s.access_key
-        }
+        affected_keys: set[AccessKey] = {s.access_key for s in result.failures if s.access_key}
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
             log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))

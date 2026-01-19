@@ -152,9 +152,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         log.info("Scheduled {} sessions, requesting precondition check", len(result.successes))
 
         # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            s.access_key for s in result.successes if s.access_key
-        }
+        affected_keys: set[AccessKey] = {s.access_key for s in result.successes if s.access_key}
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
             log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))

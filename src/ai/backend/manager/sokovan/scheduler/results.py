@@ -8,7 +8,14 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, AgentId, KernelId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 

@@ -8,7 +8,10 @@ from typing import Optional
 
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.sokovan.scheduler.results import KernelExecutionResult, KernelStatusTransitions
+from ai.backend.manager.sokovan.scheduler.results import (
+    KernelExecutionResult,
+    KernelStatusTransitions,
+)
 
 
 class KernelLifecycleHandler(ABC):
