@@ -236,7 +236,7 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        creator: Creator[EndpointRow],
+        creator: RBACEntityCreator[EndpointRow],
         policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo.
@@ -253,13 +253,7 @@ class DeploymentDBSource:
             await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
 
             # Create endpoint with RBAC scope association
-            rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
-                spec=spec,
-                scope_type=ScopeType.USER,
-                scope_id=str(spec.metadata.created_user_id),
-                entity_type=EntityType.MODEL_DEPLOYMENT,
-            )
-            rbac_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
             # Create deployment policy if provided

@@ -80,6 +80,7 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -145,7 +146,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
-        creator: Creator[EndpointRow],
+        creator: RBACEntityCreator[EndpointRow],
         policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint and return DeploymentInfo.
@@ -163,6 +164,7 @@ class DeploymentRepository:
     async def create_endpoint_legacy(
         self,
         creator: DeploymentCreator,
+        # RBACEntityCreator
     ) -> DeploymentInfo:
         """Create a new endpoint using legacy DeploymentCreator.
 

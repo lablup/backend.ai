@@ -8,6 +8,7 @@ from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
 )
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import (
     ResourceSlot,
 )
@@ -32,6 +33,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -326,7 +328,12 @@ class DeploymentService:
                 ),
             ),
         )
-        creator: Creator[EndpointRow] = Creator(spec=creator_spec)
+        creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
+            spec=creator_spec,
+            scope_type=ScopeType.USER,
+            scope_id=str(metadata.created_user),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
 
         # Create endpoint via repository
         deployment_info = await self._deployment_repository.create_endpoint(
