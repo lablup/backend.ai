@@ -904,16 +904,6 @@ class Endpoint(graphene.ObjectType):
         except NoResultFound:
             raise EndpointNotFound
 
-    def _is_unhealthy(self) -> bool:
-        if len(self.routings) == 0:
-            return True
-        if all(r.status == RouteStatus.TERMINATED.name for r in self.routings):
-            return True
-        if self.retries > SERVICE_MAX_RETRIES:
-            return True
-        healthy_count = sum(1 for r in self.routings if r.status == RouteStatus.HEALTHY.name)
-        return healthy_count == 0
-
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
             case EndpointLifecycle.DESTROYED.name:
@@ -989,6 +979,15 @@ class Endpoint(graphene.ObjectType):
             graph_ctx, "EndpointStatistics.by_endpoint"
         )
         return await loader.load(self.endpoint_id)
+
+    def _is_unhealthy(self) -> bool:
+        if len(self.routings) == 0:
+            return True
+        if all(r.status == RouteStatus.TERMINATED.name for r in self.routings):
+            return True
+        if self.retries > SERVICE_MAX_RETRIES:
+            return True
+        return not any(r.status == RouteStatus.HEALTHY.name for r in self.routings)
 
 
 class EndpointList(graphene.ObjectType):
