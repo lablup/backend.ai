@@ -1,3 +1,5 @@
+directive @oneOf on INPUT_OBJECT
+
 schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
   query: Query
   mutation: Mutation
@@ -989,8 +991,8 @@ type CreateHuggingFaceRegistryPayload {
 input CreateNotificationChannelInput {
   name: String!
   description: String = null
-  channelType: NotificationChannelType! = WEBHOOK
-  config: WebhookConfigInput!
+  channelType: NotificationChannelType!
+  spec: NotificationChannelSpecInput!
   enabled: Boolean! = true
 }
 
@@ -1660,6 +1662,20 @@ input DomainUsageBucketOrderBy {
   Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
   """
   direction: OrderDirection! = DESC
+}
+
+"""Input for email message settings"""
+input EmailMessageInput {
+  fromEmail: String!
+  toEmails: [String!]!
+  subjectTemplate: String = null
+}
+
+"""Input for email notification channel configuration"""
+input EmailSpecInput {
+  smtp: SMTPConnectionInput!
+  message: EmailMessageInput!
+  auth: SMTPAuthInput = null
 }
 
 type ExtraVFolderMount implements Node {
@@ -2450,7 +2466,7 @@ type NotificationChannel implements Node {
   name: String!
   description: String
   channelType: NotificationChannelType!
-  config: WebhookConfigGQL!
+  spec: NotificationChannelSpec!
   enabled: Boolean!
   createdAt: DateTime!
 }
@@ -2496,9 +2512,23 @@ enum NotificationChannelOrderField {
   UPDATED_AT
 }
 
+"""Interface for notification channel specifications"""
+interface NotificationChannelSpec {
+  channelType: NotificationChannelType!
+}
+
+"""
+Input for notification channel configuration. Exactly one of webhook or email must be set.
+"""
+input NotificationChannelSpecInput @oneOf {
+  webhook: WebhookSpecInput
+  email: EmailSpecInput
+}
+
 """Notification channel types"""
 enum NotificationChannelType {
   WEBHOOK
+  EMAIL
 }
 
 """Notification rule"""
@@ -3421,6 +3451,20 @@ enum RouteTrafficStatus {
   INACTIVE
 }
 
+"""Input for SMTP authentication credentials"""
+input SMTPAuthInput {
+  username: String = null
+  password: String = null
+}
+
+"""Input for SMTP server connection settings"""
+input SMTPConnectionInput {
+  host: String!
+  port: Int!
+  useTls: Boolean! = true
+  timeout: Int! = 30
+}
+
 """Added in 25.18.0. Driver configuration for resource allocation"""
 type ScalingGroupDriverConfig {
   """
@@ -4071,7 +4115,7 @@ input UpdateNotificationChannelInput {
   id: ID!
   name: String
   description: String
-  config: WebhookConfigInput
+  spec: NotificationChannelSpecInput
   enabled: Boolean
 }
 
@@ -4506,12 +4550,8 @@ extend type VirtualFolderNode @key(fields: "id") {
   id: ID! @external
 }
 
-type WebhookConfigGQL {
-  url: String!
-}
-
 """Input for webhook configuration"""
-input WebhookConfigInput {
+input WebhookSpecInput {
   url: String!
 }
 

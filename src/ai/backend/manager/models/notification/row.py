@@ -8,9 +8,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.notification import (
+    EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -27,9 +28,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "NotificationChannelRow",
-    "NotificationChannelType",
     "NotificationRuleRow",
-    "WebhookConfig",
 )
 
 
@@ -104,18 +103,19 @@ class NotificationChannelRow(Base):
         channel_type_enum = NotificationChannelType(self.channel_type)
 
         # Parse config based on channel_type
+        parsed_config: WebhookSpec | EmailSpec
         match channel_type_enum:
             case NotificationChannelType.WEBHOOK:
-                parsed_config = WebhookConfig(**self.config)
-            case _:
-                raise ValueError(f"Unknown channel type: {self.channel_type}")
+                parsed_config = WebhookSpec.model_validate(self.config)
+            case NotificationChannelType.EMAIL:
+                parsed_config = EmailSpec.model_validate(self.config)
 
         return NotificationChannelData(
             id=self.id,
             name=self.name,
             description=self.description,
             channel_type=channel_type_enum,
-            config=parsed_config,
+            spec=parsed_config,
             enabled=self.enabled,
             created_by=self.created_by,
             created_at=self.created_at,

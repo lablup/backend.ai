@@ -2094,8 +2094,8 @@ input CreateNotificationChannelInput
 {
   name: String!
   description: String = null
-  channelType: NotificationChannelType! = WEBHOOK
-  config: WebhookConfigInput!
+  channelType: NotificationChannelType!
+  spec: NotificationChannelSpecInput!
   enabled: Boolean! = true
 }
 
@@ -3281,6 +3281,24 @@ input DomainUsageBucketOrderBy
   Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
   """
   direction: OrderDirection! = DESC
+}
+
+"""Input for email message settings"""
+input EmailMessageInput
+  @join__type(graph: STRAWBERRY)
+{
+  fromEmail: String!
+  toEmails: [String!]!
+  subjectTemplate: String = null
+}
+
+"""Input for email notification channel configuration"""
+input EmailSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  smtp: SMTPConnectionInput!
+  message: EmailMessageInput!
+  auth: SMTPAuthInput = null
 }
 
 type Endpoint implements Item
@@ -5818,7 +5836,7 @@ type NotificationChannel implements Node
   name: String!
   description: String
   channelType: NotificationChannelType!
-  config: WebhookConfigGQL!
+  spec: NotificationChannelSpec!
   enabled: Boolean!
   createdAt: DateTime!
 }
@@ -5874,11 +5892,29 @@ enum NotificationChannelOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Interface for notification channel specifications"""
+interface NotificationChannelSpec
+  @join__type(graph: STRAWBERRY)
+{
+  channelType: NotificationChannelType!
+}
+
+"""
+Input for notification channel configuration. Exactly one of webhook or email must be set.
+"""
+input NotificationChannelSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  webhook: WebhookSpecInput
+  email: EmailSpecInput
+}
+
 """Notification channel types"""
 enum NotificationChannelType
   @join__type(graph: STRAWBERRY)
 {
   WEBHOOK @join__enumValue(graph: STRAWBERRY)
+  EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
 """Notification rule"""
@@ -8188,6 +8224,24 @@ type SetQuotaScope
   quota_scope: QuotaScope
 }
 
+"""Input for SMTP authentication credentials"""
+input SMTPAuthInput
+  @join__type(graph: STRAWBERRY)
+{
+  username: String = null
+  password: String = null
+}
+
+"""Input for SMTP server connection settings"""
+input SMTPConnectionInput
+  @join__type(graph: STRAWBERRY)
+{
+  host: String!
+  port: Int!
+  useTls: Boolean! = true
+  timeout: Int! = 30
+}
+
 """
 Added in 25.14.0.
 
@@ -8546,7 +8600,7 @@ input UpdateNotificationChannelInput
   id: ID!
   name: String
   description: String
-  config: WebhookConfigInput
+  spec: NotificationChannelSpecInput
   enabled: Boolean
 }
 
@@ -9454,14 +9508,8 @@ type VirtualFolderPermissionList implements PaginatedList
   total_count: Int!
 }
 
-type WebhookConfigGQL
-  @join__type(graph: STRAWBERRY)
-{
-  url: String!
-}
-
 """Input for webhook configuration"""
-input WebhookConfigInput
+input WebhookSpecInput
   @join__type(graph: STRAWBERRY)
 {
   url: String!
