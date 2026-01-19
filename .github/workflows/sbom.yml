@@ -66,6 +66,9 @@ jobs:
   sbom-containers:
     name: Generate Container SBOMs
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
     needs: prepare-matrix
     if: needs.prepare-matrix.outputs.matrix != '{"include":[]}'
     strategy:
