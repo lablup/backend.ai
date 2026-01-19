@@ -4501,16 +4501,8 @@ type ModelReplica implements Node
   """Traffic weight for load balancing between replicas."""
   weight: Int!
 
-  """
-  Detailed information about the routing node including error or success messages.
-  """
-  detail: JSON!
-
   """Timestamp when the replica was created."""
   createdAt: DateTime!
-
-  """Live statistics of the routing node (CPU utilization, etc.)."""
-  liveStat: JSON!
 
   """
   The session ID associated with the replica. This can be null right after replica creation.
@@ -7645,20 +7637,6 @@ type ScalingGroupConnection
   count: Int
 }
 
-"""Added in 25.18.0. Driver configuration for resource allocation"""
-type ScalingGroupDriverConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Agent resource driver implementation name.
-  'static' uses a predefined set of agents registered to this scaling group.
-  """
-  name: String!
-
-  """Driver-specific configuration options. Contents vary by driver type."""
-  options: JSON!
-}
-
 """
 Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
 """
@@ -7680,7 +7658,6 @@ input ScalingGroupFilter
   description: StringFilter = null
   isActive: Boolean = null
   isPublic: Boolean = null
-  driver: String = null
   scheduler: String = null
   useHostNetwork: Boolean = null
   AND: [ScalingGroupFilter!] = null
@@ -7910,12 +7887,6 @@ type ScalingGroupV2 implements Node
   (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
   """
   network: ScalingGroupNetworkConfig!
-
-  """
-  Agent resource management driver determining how compute agents are provisioned
-  and registered to this scaling group (static registration vs dynamic provisioning).
-  """
-  driver: ScalingGroupDriverConfig!
 
   """
   Session scheduling configuration controlling queue management,

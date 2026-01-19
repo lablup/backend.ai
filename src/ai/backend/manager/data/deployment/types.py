@@ -417,7 +417,6 @@ class ModelReplicaData:
     weight: int
     detail: dict[str, Any]
     created_at: datetime
-    live_stat: dict[str, Any]
 
 
 @dataclass

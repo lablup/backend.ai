@@ -246,7 +246,6 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
         detail=route.error_data,
         created_at=route.created_at or datetime.now(tz=UTC),
-        live_stat={},  # Not available in RouteInfo
     )
 
 
