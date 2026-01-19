@@ -80,7 +80,6 @@ from ai.backend.manager.repositories.scheduler.types.session import (
     MarkTerminatingResult,
     PendingSessionData,
     PendingSessions,
-    SessionTerminationResult,
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingKernelWithAgentData,
@@ -834,58 +833,6 @@ class ScheduleDBSource:
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
 
-    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
-        """Fetch all sessions with TERMINATING status."""
-        async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.status == SessionStatus.TERMINATING)
-                .options(
-                    selectinload(SessionRow.kernels).options(
-                        load_only(
-                            KernelRow.id,
-                            KernelRow.status,
-                            KernelRow.container_id,
-                            KernelRow.agent,
-                            KernelRow.agent_addr,
-                            KernelRow.occupied_slots,
-                        )
-                    )
-                )
-            )
-            result = await session.execute(query)
-            session_rows = list(result.scalars().all())
-
-            terminating_sessions = []
-            for session_row in session_rows:
-                kernels = [
-                    TerminatingKernelData(
-                        kernel_id=KernelId(kernel.id),
-                        status=kernel.status,
-                        container_id=kernel.container_id,
-                        agent_id=AgentId(kernel.agent) if kernel.agent else None,
-                        agent_addr=kernel.agent_addr,
-                        occupied_slots=kernel.occupied_slots,
-                    )
-                    for kernel in session_row.kernels
-                ]
-
-                terminating_sessions.append(
-                    TerminatingSessionData(
-                        session_id=session_row.id,
-                        access_key=AccessKey(session_row.access_key)
-                        if session_row.access_key
-                        else AccessKey(""),
-                        creation_id=session_row.creation_id or "",
-                        status=session_row.status,
-                        status_info=session_row.status_info or "UNKNOWN",
-                        session_type=session_row.session_type,
-                        kernels=kernels,
-                    )
-                )
-
-            return terminating_sessions
-
     async def get_terminating_sessions_by_ids(
         self,
         session_ids: list[SessionId],
@@ -951,95 +898,6 @@ class ScheduleDBSource:
                 )
 
             return terminating_sessions
-
-    async def get_terminating_kernels_with_lost_agents(
-        self,
-    ) -> list[TerminatingKernelWithAgentData]:
-        """
-        Fetch kernels in TERMINATING state that have lost or missing agents.
-
-        This includes kernels where:
-        - agent_id is None (never assigned)
-        - agent status is unavailable (LOST or TERMINATED)
-        """
-        async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(
-                    KernelRow.id,
-                    KernelRow.session_id,
-                    KernelRow.status,
-                    KernelRow.agent,
-                    AgentRow.status.label("agent_status"),
-                )
-                .select_from(KernelRow)
-                .outerjoin(AgentRow, KernelRow.agent == AgentRow.id)
-                .where(
-                    KernelRow.status == KernelStatus.TERMINATING,
-                    sa.or_(
-                        KernelRow.agent.is_(None),  # No agent assigned
-                        AgentRow.status.in_(
-                            AgentStatus.unavailable_statuses()
-                        ),  # Agent unavailable
-                    ),
-                )
-            )
-            result = await session.execute(query)
-            rows = result.fetchall()
-
-            return [
-                TerminatingKernelWithAgentData(
-                    kernel_id=KernelId(row.id),
-                    session_id=row.session_id,
-                    status=row.status,
-                    agent_id=row.agent,
-                    agent_status=str(row.agent_status) if row.agent_status else None,
-                )
-                for row in rows
-            ]
-
-    async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
-        """Get sessions that have exceeded their pending timeout."""
-        now = datetime.now(tzutc())
-        timed_out_sessions: list[SweptSessionInfo] = []
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(
-                    SessionRow.id,
-                    SessionRow.creation_id,
-                    SessionRow.access_key,
-                    SessionRow.created_at,
-                    SessionRow.scaling_group_name,
-                    ScalingGroupRow.scheduler_opts,
-                )
-                .select_from(SessionRow)
-                .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
-                .where(SessionRow.status == SessionStatus.PENDING)
-            )
-
-            result = await db_sess.execute(query)
-            pending_sessions = result.fetchall()
-
-            for row in pending_sessions:
-                scheduler_opts = row.scheduler_opts
-                if not scheduler_opts:
-                    continue
-
-                timeout = scheduler_opts.pending_timeout
-                if timeout.total_seconds() <= 0:
-                    continue
-
-                elapsed_time = now - row.created_at
-                if elapsed_time >= timeout:
-                    timed_out_sessions.append(
-                        SweptSessionInfo(
-                            session_id=row.id,
-                            creation_id=row.creation_id,
-                            access_key=row.access_key,
-                        )
-                    )
-
-        return timed_out_sessions
 
     async def get_pending_timeout_sessions_by_ids(
         self,
@@ -1871,140 +1729,6 @@ class ScheduleDBSource:
         )
         await db_sess.execute(kernel_query)
 
-    async def batch_update_terminated_status(
-        self, session_results: list[SessionTerminationResult]
-    ) -> None:
-        """
-        Batch update kernel and session statuses to TERMINATED for successful terminations.
-        Syncs agent occupied slots after termination.
-
-        :param session_results: List of session termination results with nested kernel results
-        """
-        if not session_results:
-            return
-
-        now = datetime.now(tzutc())
-
-        # Collect affected agents
-        affected_agent_ids: set[AgentId] = set()
-
-        for session_result in session_results:
-            for kernel in session_result.kernel_results:
-                if kernel.success and kernel.agent_id:
-                    affected_agent_ids.add(kernel.agent_id)
-
-        async with self._begin_session_read_committed() as db_sess:
-            # Process each session's results
-            for session_result in session_results:
-                # Collect successful kernel IDs
-                successful_kernel_ids = []
-                for kernel in session_result.kernel_results:
-                    if kernel.success:
-                        successful_kernel_ids.append(kernel.kernel_id)
-
-                # Update successful kernels to TERMINATED (only if currently TERMINATING)
-                if successful_kernel_ids:
-                    kernel_stmt = (
-                        sa.update(KernelRow)
-                        .where(
-                            sa.and_(
-                                KernelRow.id.in_(successful_kernel_ids),
-                                KernelRow.status == KernelStatus.TERMINATING,
-                            )
-                        )
-                        .values(
-                            status=KernelStatus.TERMINATED,
-                            status_info=session_result.reason,
-                            status_changed=now,
-                            terminated_at=now,
-                            status_history=sql_json_merge(
-                                KernelRow.__table__.c.status_history,
-                                (),
-                                {KernelStatus.TERMINATED.name: now.isoformat()},
-                            ),
-                        )
-                    )
-                    await db_sess.execute(kernel_stmt)
-
-                # Update session if all kernels succeeded (only if currently TERMINATING)
-                if session_result.should_terminate_session:
-                    session_stmt = (
-                        sa.update(SessionRow)
-                        .where(
-                            sa.and_(
-                                SessionRow.id == session_result.session_id,
-                                SessionRow.status == SessionStatus.TERMINATING,
-                            )
-                        )
-                        .values(
-                            status=SessionStatus.TERMINATED,
-                            status_info=session_result.reason,
-                            status_history=sql_json_merge(
-                                SessionRow.__table__.c.status_history,
-                                (),
-                                {SessionStatus.TERMINATED.name: now.isoformat()},
-                            ),
-                            terminated_at=now,
-                        )
-                    )
-                    await db_sess.execute(session_stmt)
-
-            # Sync agent occupied slots to AgentRow
-            # This must be done within the same transaction to ensure consistency
-            await self._sync_agent_occupied_slots(db_sess, affected_agent_ids)
-
-    async def batch_update_kernels_terminated(
-        self,
-        kernel_results: list[KernelTerminationResult],
-        reason: str,
-    ) -> None:
-        """
-        Batch update kernel statuses to TERMINATED without updating session status.
-        Used for cleanup operations where kernels need to be marked terminated
-        but session state management is handled separately.
-
-        :param kernel_results: List of kernel termination results
-        :param reason: Termination reason to record in status_info
-        """
-        if not kernel_results:
-            return
-
-        now = datetime.now(tzutc())
-
-        # Collect successful kernel IDs
-        successful_kernel_ids = []
-
-        for kernel in kernel_results:
-            if kernel.success:
-                successful_kernel_ids.append(kernel.kernel_id)
-
-        if not successful_kernel_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            # Update successful kernels to TERMINATED (only if currently TERMINATING)
-            kernel_stmt = (
-                sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.id.in_(successful_kernel_ids),
-                        KernelRow.status == KernelStatus.TERMINATING,
-                    )
-                )
-                .values(
-                    status=KernelStatus.TERMINATED,
-                    status_info=reason,
-                    status_changed=now,
-                    terminated_at=now,
-                    status_history=sql_json_merge(
-                        KernelRow.__table__.c.status_history,
-                        (),
-                        {KernelStatus.TERMINATED.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(kernel_stmt)
-
     async def sync_agent_occupied_slots(self, agent_ids: Optional[set[AgentId]] = None) -> None:
         """
         Public method to sync agent occupied slots to AgentRow.
@@ -2662,64 +2386,6 @@ class ScheduleDBSource:
                 if allowed_registries is None or image_row.registry not in allowed_registries:
                     raise ImageNotFound
 
-    async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from PULLING or PREPARING to PREPARED state.
-        """
-        if not session_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status.in_([
-                            SessionStatus.PULLING,
-                            SessionStatus.PREPARING,
-                        ]),
-                    )
-                )
-                .values(
-                    status=SessionStatus.PREPARED,
-                    status_info=None,  # Clear any previous error status
-                    status_history=sql_json_merge(
-                        SessionRow.__table__.c.status_history,
-                        (),
-                        {SessionStatus.PREPARED.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
-
-    async def get_sessions_ready_to_run(self) -> list[SessionId]:
-        """
-        Get sessions in CREATING state where all kernels are RUNNING.
-        Returns sessions that can transition to RUNNING state.
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            # Find sessions in CREATING state where ALL kernels are RUNNING
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.status == SessionStatus.CREATING)
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_session_ids: list[SessionId] = []
-            for session in sessions:
-                # Check if all kernels are RUNNING
-                all_running = all(
-                    kernel.status == KernelStatus.RUNNING for kernel in session.kernels
-                )
-                if all_running and session.kernels:  # Ensure there are kernels
-                    ready_session_ids.append(session.id)
-
-            return ready_session_ids
-
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
         Update sessions with occupying_slots.
@@ -2739,32 +2405,6 @@ class ScheduleDBSource:
                     .values(occupying_slots=session_data.occupying_slots)
                 )
                 await db_sess.execute(stmt)
-
-    async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
-        """
-        Get sessions in TERMINATING state where all kernels are TERMINATED.
-        Returns sessions that can transition to TERMINATED state.
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            # Find sessions in TERMINATING state where ALL kernels are TERMINATED
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.status == SessionStatus.TERMINATING)
-                .options(selectinload(SessionRow.kernels))
-            )
-            result = await db_sess.execute(stmt)
-            sessions = result.scalars().all()
-
-            ready_session_ids: list[SessionId] = []
-            for session in sessions:
-                # Check if all kernels are TERMINATED
-                all_terminated = all(
-                    kernel.status == KernelStatus.TERMINATED for kernel in session.kernels
-                )
-                if all_terminated:  # Include sessions even with no kernels
-                    ready_session_ids.append(session.id)
-
-            return ready_session_ids
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
@@ -3264,103 +2904,6 @@ class ScheduleDBSource:
 
         return sessions_for_start
 
-    async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from SCHEDULED to PREPARING status.
-        Also updates kernel status to PREPARING.
-        Uses UPDATE WHERE for READ COMMITTED isolation.
-        """
-        if not session_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-
-            # Update session status
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.SCHEDULED,
-                    )
-                )
-                .values(
-                    status=SessionStatus.PREPARING,
-                    status_info=None,  # Clear any previous error status
-                    status_history=sql_json_merge(
-                        SessionRow.__table__.c.status_history,
-                        (),
-                        {SessionStatus.PREPARING.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
-
-            # Update kernel statuses
-            kernel_stmt = (
-                sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.session_id.in_(session_ids),
-                        KernelRow.status == KernelStatus.SCHEDULED,
-                    )
-                )
-                .values(
-                    status=KernelStatus.PREPARING,
-                    status_changed=now,
-                )
-            )
-            await db_sess.execute(kernel_stmt)
-
-    async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions and kernels from PREPARED to CREATING status.
-        Uses UPDATE WHERE for READ COMMITTED isolation.
-        """
-        if not session_ids:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
-
-            # Update session status
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.PREPARED,
-                    )
-                )
-                .values(
-                    status=SessionStatus.CREATING,
-                    status_info=None,  # Clear any previous error status
-                    status_history=sql_json_merge(
-                        SessionRow.__table__.c.status_history,
-                        (),
-                        {SessionStatus.CREATING.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
-
-            # Update kernel statuses
-            kernel_stmt = (
-                sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.session_id.in_(session_ids),
-                        KernelRow.status == KernelStatus.PREPARED,
-                    )
-                )
-                .values(
-                    status=KernelStatus.CREATING,
-                    status_changed=now,
-                )
-            )
-            await db_sess.execute(kernel_stmt)
-
     async def mark_session_cancelled(
         self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
     ) -> None:
@@ -3758,43 +3301,6 @@ class ScheduleDBSource:
             result = await execute_batch_querier(db_sess, stmt, querier)
             return [row.SessionRow.to_session_info() for row in result.rows]
 
-    async def update_sessions_status_bulk(
-        self,
-        session_ids: list[SessionId],
-        from_statuses: list[SessionStatus],
-        to_status: SessionStatus,
-        reason: Optional[str] = None,
-    ) -> int:
-        """Update session statuses in bulk.
-
-        Args:
-            session_ids: List of session IDs to update
-            from_statuses: Only update sessions currently in these statuses (safety check)
-            to_status: The new status to set
-            reason: Optional reason to set in status_info
-
-        Returns:
-            Number of rows updated
-        """
-        if not session_ids:
-            return 0
-
-        async with self._begin_session_read_committed() as db_sess:
-            values: dict[str, SessionStatus | str] = {"status": to_status}
-            if reason is not None:
-                values["status_info"] = reason
-
-            stmt = (
-                sa.update(SessionRow.__table__)
-                .where(
-                    SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(from_statuses),
-                )
-                .values(**values)
-            )
-            result = cast(CursorResult, await db_sess.execute(stmt))
-            return cast(int, result.rowcount) if result.rowcount else 0
-
     async def update_with_history(
         self,
         updater: BatchUpdater[SessionRow],
@@ -3917,43 +3423,6 @@ class ScheduleDBSource:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return {SessionId(row.session_id): row for row in rows}
-
-    async def update_kernels_status_bulk(
-        self,
-        session_ids: list[SessionId],
-        from_statuses: list[KernelStatus],
-        to_status: KernelStatus,
-        reason: Optional[str] = None,
-    ) -> int:
-        """Update kernel statuses for sessions in bulk.
-
-        Args:
-            session_ids: List of session IDs whose kernels to update
-            from_statuses: Only update kernels currently in these statuses
-            to_status: The new status to set
-            reason: Optional reason to set in status_info
-
-        Returns:
-            Number of rows updated
-        """
-        if not session_ids:
-            return 0
-
-        async with self._begin_session_read_committed() as db_sess:
-            values: dict[str, KernelStatus | str] = {"status": to_status}
-            if reason is not None:
-                values["status_info"] = reason
-
-            stmt = (
-                sa.update(KernelRow.__table__)
-                .where(
-                    KernelRow.session_id.in_(session_ids),
-                    KernelRow.status.in_(from_statuses),
-                )
-                .values(**values)
-            )
-            result = cast(CursorResult, await db_sess.execute(stmt))
-            return cast(int, result.rowcount) if result.rowcount else 0
 
     async def get_sessions_for_pull_by_ids(
         self,

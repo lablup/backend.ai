@@ -56,7 +56,6 @@ from .types.search import (
 from .types.session import (
     KernelTerminationResult,
     MarkTerminatingResult,
-    SessionTerminationResult,
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
@@ -140,14 +139,6 @@ class SchedulerRepository:
         return await self._db_source.allocate_sessions(allocation_batch)
 
     @scheduler_repository_resilience.apply()
-    async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
-        """
-        Get sessions that have exceeded their pending timeout.
-        The timeout is determined by each scaling group's scheduler_opts.
-        """
-        return await self._db_source.get_pending_timeout_sessions()
-
-    @scheduler_repository_resilience.apply()
     async def get_pending_timeout_sessions_by_ids(
         self,
         session_ids: list[SessionId],
@@ -157,35 +148,6 @@ class SchedulerRepository:
         Used by SweepSessionsLifecycleHandler for scaling group based processing.
         """
         return await self._db_source.get_pending_timeout_sessions_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def batch_update_terminated_status(
-        self,
-        session_results: list[SessionTerminationResult],
-    ) -> None:
-        """
-        Update terminated status in DB.
-        Agent occupied slots are synced directly in the DB.
-        """
-        if not session_results:
-            return
-
-        await self._db_source.batch_update_terminated_status(session_results)
-
-    @scheduler_repository_resilience.apply()
-    async def batch_update_kernels_terminated(
-        self,
-        kernel_results: list[KernelTerminationResult],
-        reason: str,
-    ) -> None:
-        """
-        Update kernel statuses to TERMINATED without updating session status.
-        Agent occupied slots are synced directly in the DB.
-        """
-        if not kernel_results:
-            return
-
-        await self._db_source.batch_update_kernels_terminated(kernel_results, reason)
 
     @scheduler_repository_resilience.apply()
     async def mark_sessions_terminating(
@@ -206,14 +168,6 @@ class SchedulerRepository:
         return await self._db_source.get_schedulable_scaling_groups()
 
     @scheduler_repository_resilience.apply()
-    async def get_terminating_sessions(self) -> list[TerminatingSessionData]:
-        """
-        Get sessions with TERMINATING status.
-        For sokovan scheduler compatibility.
-        """
-        return await self._db_source.get_terminating_sessions()
-
-    @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
         self,
         session_ids: list[SessionId],
@@ -228,16 +182,6 @@ class SchedulerRepository:
         :return: List of TerminatingSessionData objects with kernel details
         """
         return await self._db_source.get_terminating_sessions_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def get_terminating_kernels_with_lost_agents(
-        self,
-    ) -> list[TerminatingKernelWithAgentData]:
-        """
-        Get kernels in TERMINATING sessions that have lost or missing agents.
-        For lost agent cleanup operations.
-        """
-        return await self._db_source.get_terminating_kernels_with_lost_agents()
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_kernels_with_lost_agents_by_ids(
@@ -396,34 +340,11 @@ class SchedulerRepository:
         await self._db_source.check_available_image(image_identifier, domain, user_uuid)
 
     @scheduler_repository_resilience.apply()
-    async def update_sessions_to_prepared(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from PULLING or PREPARING to PREPARED state.
-        """
-        await self._db_source.update_sessions_to_prepared(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_ready_to_run(self) -> list[SessionId]:
-        """
-        Get sessions in CREATING state where all kernels are RUNNING.
-        These sessions are ready to transition to RUNNING state.
-        """
-        return await self._db_source.get_sessions_ready_to_run()
-
-    @scheduler_repository_resilience.apply()
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
         Update sessions from CREATING to RUNNING state with occupying_slots.
         """
         await self._db_source.update_sessions_to_running(sessions_data)
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
-        """
-        Get sessions in TERMINATING state where all kernels are TERMINATED.
-        These sessions are ready to transition to TERMINATED state.
-        """
-        return await self._db_source.get_sessions_ready_to_terminate()
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
@@ -608,20 +529,6 @@ class SchedulerRepository:
         :return: SessionsForStartWithImages object with sessions and image configs
         """
         return await self._db_source.get_sessions_for_start_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def update_sessions_to_preparing(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions from SCHEDULED to PREPARING status.
-        """
-        await self._db_source.update_sessions_to_preparing(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def update_sessions_and_kernels_to_creating(self, session_ids: list[SessionId]) -> None:
-        """
-        Update sessions and kernels from PREPARED to CREATING status.
-        """
-        await self._db_source.update_sessions_and_kernels_to_creating(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def mark_session_cancelled(
@@ -820,32 +727,6 @@ class SchedulerRepository:
         return await self._db_source.search_kernels_for_handler(querier)
 
     @scheduler_repository_resilience.apply()
-    async def update_sessions_status_bulk(
-        self,
-        session_ids: list[SessionId],
-        from_statuses: list[SessionStatus],
-        to_status: SessionStatus,
-        reason: Optional[str] = None,
-    ) -> int:
-        """Update session statuses in bulk.
-
-        This method is used by the coordinator to apply status transitions
-        based on handler execution results.
-
-        Args:
-            session_ids: List of session IDs to update
-            from_statuses: Only update sessions currently in these statuses (safety check)
-            to_status: The new status to set
-            reason: Optional reason to set in status_info
-
-        Returns:
-            Number of rows updated
-        """
-        return await self._db_source.update_sessions_status_bulk(
-            session_ids, from_statuses, to_status, reason
-        )
-
-    @scheduler_repository_resilience.apply()
     async def update_with_history(
         self,
         updater: BatchUpdater[SessionRow],
@@ -882,32 +763,6 @@ class SchedulerRepository:
             Number of history records created
         """
         return await self._db_source.create_scheduling_history(bulk_creator)
-
-    @scheduler_repository_resilience.apply()
-    async def update_kernels_status_bulk(
-        self,
-        session_ids: list[SessionId],
-        from_statuses: list[KernelStatus],
-        to_status: KernelStatus,
-        reason: Optional[str] = None,
-    ) -> int:
-        """Update kernel statuses for sessions in bulk.
-
-        This method is used when kernel status transitions need to accompany
-        session status transitions.
-
-        Args:
-            session_ids: List of session IDs whose kernels to update
-            from_statuses: Only update kernels currently in these statuses
-            to_status: The new status to set
-            reason: Optional reason to set in status_info
-
-        Returns:
-            Number of rows updated
-        """
-        return await self._db_source.update_kernels_status_bulk(
-            session_ids, from_statuses, to_status, reason
-        )
 
     # ========================================================================
     # Search methods (BatchQuerier pattern)

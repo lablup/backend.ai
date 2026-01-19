@@ -17,12 +17,10 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
-    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels, SweepStaleKernelsResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -185,158 +183,6 @@ class SessionTerminator:
                 success=False,
                 error=str(e),
             )
-
-    async def sweep_lost_agent_kernels_for_handler(
-        self,
-        lost_kernels: list[TerminatingKernelWithAgentData],
-    ) -> list[KernelTerminationResult]:
-        """
-        Sweep kernels with lost/missing agents from given list.
-
-        Handler-specific method that works with pre-fetched data.
-        Legacy method - retained for backward compatibility.
-
-        Note: This method only returns kernel termination results.
-        The Coordinator is responsible for applying the status changes.
-
-        :param lost_kernels: List of kernels with lost agents
-        :return: List of kernel termination results for Coordinator to process
-        """
-        if not lost_kernels:
-            return []
-
-        log.info(
-            "Sweeping {} kernels with lost/missing agents",
-            len(lost_kernels),
-        )
-
-        # Build kernel results
-        kernel_results: list[KernelTerminationResult] = []
-
-        for kernel in lost_kernels:
-            log.info(
-                "Sweeping kernel {} in session {} (agent: {}, agent_status: {})",
-                kernel.kernel_id,
-                kernel.session_id,
-                kernel.agent_id,
-                kernel.agent_status,
-            )
-
-            # Mark as successfully terminated since agent is gone
-            kernel_result = KernelTerminationResult(
-                kernel_id=kernel.kernel_id,
-                agent_id=kernel.agent_id,
-                occupied_slots=ResourceSlot(),  # Empty since agent is lost/missing
-                success=True,
-            )
-            kernel_results.append(kernel_result)
-
-        return kernel_results
-
-    async def sweep_stale_kernels_for_handler(
-        self,
-        sessions: list[SessionWithKernels],
-    ) -> SweepStaleKernelsResult:
-        """
-        Sweep stale kernels from given sessions.
-
-        Handler-specific method that works with SessionWithKernels data.
-        Legacy method - retained for backward compatibility.
-        Note: Use check_stale_kernels() for KernelLifecycleHandler.
-
-        Note: This method only detects stale kernels and returns the results.
-        The Coordinator is responsible for applying the status changes.
-
-        :param sessions: List of RUNNING sessions to check for stale kernels
-        :return: Result containing dead kernel IDs and affected sessions
-        """
-        empty_result = SweepStaleKernelsResult(
-            dead_kernel_ids=[],
-            affected_sessions=[],
-        )
-
-        if not sessions:
-            return empty_result
-
-        # 1. Extract kernel IDs and agent IDs, then check presence status
-        running_kernel_ids: list[KernelId] = []
-        agent_ids: set[AgentId] = set()
-        for session in sessions:
-            for kernel_info in session.kernel_infos:
-                running_kernel_ids.append(KernelId(kernel_info.id))
-                if kernel_info.resource.agent:
-                    agent_ids.add(AgentId(kernel_info.resource.agent))
-
-        if not running_kernel_ids:
-            return empty_result
-
-        with RecorderContext[SessionId].shared_phase(
-            "verify_kernel_liveness",
-            success_detail="Kernel liveness verification completed",
-        ):
-            with RecorderContext[SessionId].shared_step(
-                "check_kernel_presence",
-                success_detail="Kernel presence checked",
-            ):
-                statuses = await self._valkey_schedule.check_kernel_presence_status_batch(
-                    running_kernel_ids,
-                    agent_ids=agent_ids,
-                )
-
-        # 2. Filter STALE kernels (None status or STALE presence)
-        stale_kernel_id_set: set[UUID] = {
-            kernel_id
-            for kernel_id in running_kernel_ids
-            if (status := statuses.get(kernel_id)) is None
-            or status.presence == HealthCheckStatus.STALE
-        }
-        if not stale_kernel_id_set:
-            return empty_result
-
-        # 3. Check with agent - only explicit False terminates
-        dead_kernel_ids: list[KernelId] = []
-        affected_sessions: list[SessionWithKernels] = []
-        pool = RecorderContext[SessionId].current_pool()
-
-        for session in sessions:
-            for kernel_info in session.kernel_infos:
-                if kernel_info.id not in stale_kernel_id_set:
-                    continue
-                if not kernel_info.resource.agent:
-                    continue
-                try:
-                    recorder = pool.recorder(session.session_info.identity.id)
-                    with recorder.phase(
-                        "verify_kernel_liveness",
-                        success_detail="Kernel liveness verified",
-                    ):
-                        with recorder.step(
-                            "confirm_with_agent",
-                            success_detail=f"Kernel {kernel_info.id} status confirmed",
-                        ):
-                            agent_id = AgentId(kernel_info.resource.agent)
-                            async with self._agent_client_pool.acquire(agent_id) as client:
-                                is_running = await client.check_running(kernel_info.id)
-                            if is_running is False:
-                                dead_kernel_ids.append(KernelId(kernel_info.id))
-                                if session not in affected_sessions:
-                                    affected_sessions.append(session)
-                except Exception as e:
-                    log.warning(
-                        "Failed to check kernel {} status: {}. Skipping.",
-                        kernel_info.id,
-                        e,
-                    )
-
-        if not dead_kernel_ids:
-            return empty_result
-
-        log.info("Found {} stale kernels to be terminated", len(dead_kernel_ids))
-
-        return SweepStaleKernelsResult(
-            dead_kernel_ids=dead_kernel_ids,
-            affected_sessions=affected_sessions,
-        )
 
     async def check_stale_kernels(
         self,

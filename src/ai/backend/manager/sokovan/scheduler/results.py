@@ -37,10 +37,6 @@ class ScheduleResult:
     # List of scheduled session data
     scheduled_sessions: list[ScheduledSessionData] = field(default_factory=list)
 
-    def needs_post_processing(self) -> bool:
-        """Check if post-processing is needed based on the result."""
-        return len(self.scheduled_sessions) > 0
-
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""
         return len(self.scheduled_sessions)
@@ -127,20 +123,6 @@ class SessionExecutionResult:
         """Get list of successful session IDs."""
         return [s.session_id for s in self.successes]
 
-    def failure_ids(self) -> list[SessionId]:
-        """Get list of failed session IDs."""
-        return [s.session_id for s in self.failures]
-
-    def skipped_ids(self) -> list[SessionId]:
-        """Get list of skipped session IDs."""
-        return [s.session_id for s in self.skipped]
-
-    def merge(self, other: SessionExecutionResult) -> None:
-        """Merge another result into this one."""
-        self.successes.extend(other.successes)
-        self.failures.extend(other.failures)
-        self.skipped.extend(other.skipped)
-
 
 # ============================================================================
 # Kernel handler types for KernelLifecycleHandler (Phase 3)
@@ -181,15 +163,6 @@ class KernelExecutionResult:
     def success_ids(self) -> list[KernelId]:
         """Get list of successful kernel IDs."""
         return [k.kernel_id for k in self.successes]
-
-    def failure_ids(self) -> list[KernelId]:
-        """Get list of failed kernel IDs."""
-        return [k.kernel_id for k in self.failures]
-
-    def merge(self, other: KernelExecutionResult) -> None:
-        """Merge another result into this one."""
-        self.successes.extend(other.successes)
-        self.failures.extend(other.failures)
 
 
 @dataclass(frozen=True)

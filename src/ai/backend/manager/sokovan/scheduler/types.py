@@ -845,11 +845,6 @@ class SchedulerExecutionResult:
         """Check if there are any failed operations."""
         return len(self.errors) > 0
 
-    @property
-    def has_successes(self) -> bool:
-        """Check if there are any successful operations."""
-        return len(self.successes) > 0
-
 
 @dataclass
 class KernelTerminationInfo:

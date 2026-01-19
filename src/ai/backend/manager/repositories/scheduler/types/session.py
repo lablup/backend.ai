@@ -155,25 +155,6 @@ class KernelTerminationResult:
 
 
 @dataclass
-class SessionTerminationResult:
-    """Result of termination for a session and its kernels."""
-
-    session_id: SessionId
-    access_key: AccessKey
-    creation_id: str
-    session_type: SessionTypes
-    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
-    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
-
-    @property
-    def should_terminate_session(self) -> bool:
-        """Check if all kernels in the session were successfully terminated."""
-        if not self.kernel_results:
-            return False
-        return all(kernel.success for kernel in self.kernel_results)
-
-
-@dataclass
 class SweptSessionInfo:
     """Information about a session that was swept during cleanup."""
 
