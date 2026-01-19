@@ -18,16 +18,13 @@ from ai.backend.manager.scheduler.types import ScheduleType
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
-    DetectTerminationPromotionHandler,
-    PromoteToPreparedPromotionHandler,
-    PromoteToRunningPromotionHandler,
-    PromoteToTerminatedPromotionHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
-    SessionPromotionHandler,
     StartSessionsLifecycleHandler,
     SweepSessionsLifecycleHandler,
     TerminateSessionsLifecycleHandler,
@@ -90,6 +87,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
 )
+from ai.backend.manager.sokovan.scheduler.types import PromotionSpec
 
 
 def create_default_scheduler_components(
@@ -185,14 +183,14 @@ def create_default_scheduler_components(
 
 @dataclass
 class CoordinatorHandlers:
-    """Container for all handlers and hooks injected into Coordinator.
+    """Container for all handlers and specs injected into Coordinator.
 
     This dataclass decouples the Coordinator from handler creation logic,
     allowing handlers to be created externally and injected.
     """
 
     lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
-    promotion_handlers: Mapping[ScheduleType, SessionPromotionHandler]
+    promotion_specs: Mapping[ScheduleType, PromotionSpec]
     kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
 
 
@@ -209,18 +207,18 @@ class CoordinatorHandlersArgs:
 
 
 def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
-    """Create all handlers and hooks for the Coordinator.
+    """Create all handlers and specs for the Coordinator.
 
     This factory function centralizes handler creation, decoupling the
     Coordinator from the details of handler instantiation.
     """
     lifecycle_handlers = _create_lifecycle_handlers(args)
-    promotion_handlers = _create_promotion_handlers(args)
+    promotion_specs = _create_promotion_specs()
     kernel_handlers = _create_kernel_handlers(args)
 
     return CoordinatorHandlers(
         lifecycle_handlers=lifecycle_handlers,
-        promotion_handlers=promotion_handlers,
+        promotion_specs=promotion_specs,
         kernel_handlers=kernel_handlers,
     )
 
@@ -255,15 +253,53 @@ def _create_lifecycle_handlers(
     }
 
 
-def _create_promotion_handlers(
-    args: CoordinatorHandlersArgs,
-) -> Mapping[ScheduleType, SessionPromotionHandler]:
-    """Create promotion handlers mapping."""
+def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
+    """Create promotion specs mapping.
+
+    Kernel matching semantics:
+    - NOT_ANY: None of the kernels should be in these statuses (used for "no longer in X" checks)
+    - ANY: At least one kernel should be in these statuses (used for early detection)
+    - ALL: All kernels must be in these statuses (used for completion checks)
+    """
     return {
-        ScheduleType.CHECK_PULLING_PROGRESS: PromoteToPreparedPromotionHandler(),
-        ScheduleType.CHECK_CREATING_PROGRESS: PromoteToRunningPromotionHandler(),
-        ScheduleType.CHECK_TERMINATING_PROGRESS: PromoteToTerminatedPromotionHandler(),
-        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: DetectTerminationPromotionHandler(),
+        # Promote to PREPARED when no kernel is in pre-prepared states
+        # (handles terminal statuses gracefully)
+        ScheduleType.CHECK_PULLING_PROGRESS: PromotionSpec(
+            name="promote-to-prepared",
+            target_statuses=[SessionStatus.PREPARING, SessionStatus.PULLING],
+            target_kernel_statuses=list(KernelStatus.pre_prepared_statuses()),
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.PREPARED,
+            reason="triggered-by-scheduler",
+        ),
+        # Promote to RUNNING when no kernel is in pre-running states
+        # (allows partial failure - some kernels may be TERMINATED)
+        ScheduleType.CHECK_CREATING_PROGRESS: PromotionSpec(
+            name="promote-to-running",
+            target_statuses=[SessionStatus.CREATING],
+            target_kernel_statuses=list(KernelStatus.pre_running_statuses()),
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.RUNNING,
+            reason="triggered-by-scheduler",
+        ),
+        # Promote to TERMINATED when all kernels are TERMINATED
+        ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
+            name="promote-to-terminated",
+            target_statuses=[SessionStatus.TERMINATING],
+            target_kernel_statuses=[KernelStatus.TERMINATED],
+            kernel_match_type=KernelMatchType.ALL,
+            success_status=SessionStatus.TERMINATED,
+            reason="triggered-by-scheduler",
+        ),
+        # Detect abnormal termination when ANY kernel is TERMINATED
+        ScheduleType.CHECK_RUNNING_SESSION_TERMINATION: PromotionSpec(
+            name="detect-termination",
+            target_statuses=[SessionStatus.RUNNING],
+            target_kernel_statuses=[KernelStatus.TERMINATED],
+            kernel_match_type=KernelMatchType.ANY,
+            success_status=SessionStatus.TERMINATING,
+            reason="ABNORMAL_TERMINATION",
+        ),
     }
 
 

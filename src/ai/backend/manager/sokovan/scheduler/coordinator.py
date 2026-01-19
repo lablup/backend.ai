@@ -27,7 +27,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
 )
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AccessKey, AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -57,10 +57,7 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.types import DistributedLockFactory
 
 from .factory import CoordinatorHandlers
-from .handlers import (
-    SessionLifecycleHandler,
-    SessionPromotionHandler,
-)
+from .handlers import SessionLifecycleHandler
 from .handlers.kernel import KernelLifecycleHandler
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
@@ -79,7 +76,7 @@ from .results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from .types import KernelCreationInfo, SessionWithKernels
+from .types import KernelCreationInfo, PromotionSpec, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -236,10 +233,10 @@ class ScheduleCoordinator:
         Returns:
             True if operation was performed, False otherwise
         """
-        # Check promotion handlers first, then kernel handlers, then lifecycle handlers
-        promotion_handler = self._handlers.promotion_handlers.get(schedule_type)
-        if promotion_handler:
-            return await self._process_promotion_schedule(schedule_type, promotion_handler)
+        # Check promotion specs first, then kernel handlers, then lifecycle handlers
+        promotion_spec = self._handlers.promotion_specs.get(schedule_type)
+        if promotion_spec:
+            return await self._process_promotion_schedule(schedule_type, promotion_spec)
 
         kernel_handler = self._handlers.kernel_handlers.get(schedule_type)
         if kernel_handler:
@@ -307,34 +304,23 @@ class ScheduleCoordinator:
     async def _process_promotion_schedule(
         self,
         schedule_type: ScheduleType,
-        handler: SessionPromotionHandler,
+        spec: PromotionSpec,
     ) -> bool:
-        """Process a promotion handler schedule type.
+        """Process a promotion spec schedule type.
 
-        Promotion handlers use ALL/ANY/NOT_ANY kernel status conditions,
-        so they use get_sessions_for_promotion() instead of get_sessions_for_handler().
+        Promotion specs define query conditions and target status declaratively.
+        The Coordinator processes sessions matching the spec directly.
         """
         try:
             log.debug("Processing promotion schedule type: {}", schedule_type.value)
 
-            async with AsyncExitStack() as stack:
-                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
-
-                # Acquire lock if needed
-                if handler.lock_id is not None:
-                    lock_lifetime = (
-                        self._config_provider.config.manager.session_schedule_lock_lifetime
-                    )
-                    await stack.enter_async_context(
-                        self._lock_factory(handler.lock_id, lock_lifetime)
-                    )
-
+            with self._operation_metrics.measure_operation(spec.name):
                 # Process each scaling group in parallel
                 scaling_groups = await self._repository.get_schedulable_scaling_groups()
 
                 results = await asyncio.gather(
                     *[
-                        self._process_promotion_scaling_group(handler, schedule_type, scaling_group)
+                        self._process_promotion_scaling_group(spec, schedule_type, scaling_group)
                         for scaling_group in scaling_groups
                     ],
                     return_exceptions=True,
@@ -610,17 +596,17 @@ class ScheduleCoordinator:
 
     async def _process_promotion_scaling_group(
         self,
-        handler: SessionPromotionHandler,
+        spec: PromotionSpec,
         schedule_type: ScheduleType,
         scaling_group: str,
     ) -> None:
-        """Process a single scaling group for the given promotion handler.
+        """Process a single scaling group for the given promotion spec.
 
         This method handles all processing for one scaling group using
-        promotion handler semantics (ALL/ANY/NOT_ANY kernel matching).
+        promotion spec semantics (ALL/ANY/NOT_ANY kernel matching).
 
         Args:
-            handler: The promotion handler to execute
+            spec: The promotion spec to process
             schedule_type: Type of scheduling operation
             scaling_group: The scaling group to process
         """
@@ -628,10 +614,10 @@ class ScheduleCoordinator:
             pagination=NoPagination(),
             conditions=[
                 SessionConditions.by_scaling_group(scaling_group),
-                SessionConditions.by_statuses(handler.target_statuses()),
+                SessionConditions.by_statuses(spec.target_statuses),
                 SessionConditions.by_kernel_match(
-                    handler.target_kernel_statuses(),
-                    handler.kernel_match_type(),
+                    spec.target_kernel_statuses,
+                    spec.kernel_match_type,
                 ),
             ],
         )
@@ -647,27 +633,42 @@ class ScheduleCoordinator:
         # Create recorder scoped to this scaling group
         recorder_scope = f"{schedule_type.value}:{scaling_group}"
         with SessionRecorderContext.scope(recorder_scope, entity_ids=session_ids) as pool:
-            # Execute handler logic (handlers receive SessionInfo directly)
-            result = await handler.execute(scaling_group, session_infos)
+            # Build transition info from matched sessions
+            with SessionRecorderContext.shared_phase(
+                spec.name,
+                success_detail=f"Promoting to {spec.success_status.value}",
+            ):
+                with SessionRecorderContext.shared_step(
+                    "check_kernel_status",
+                    success_detail=f"All kernels ready for {spec.success_status.value}",
+                ):
+                    result = SessionExecutionResult()
+                    for session_info in session_infos:
+                        result.successes.append(
+                            SessionTransitionInfo(
+                                session_id=session_info.identity.id,
+                                from_status=session_info.lifecycle.status,
+                                reason=spec.reason,
+                                creation_id=session_info.identity.creation_id,
+                                access_key=AccessKey(session_info.metadata.access_key),
+                            )
+                        )
 
             # Get recorded steps for history
             all_records = pool.build_all_records()
 
-            # Apply status transitions immediately for this scaling group
-            await self._handle_promotion_status_transitions(handler, result, all_records)
+            # Phase 2: Apply status transitions (includes hook execution)
+            await self._handle_promotion_status_transitions(spec, result, all_records)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
-                operation=handler.name(),
+                operation=spec.name,
                 count=result.success_count(),
             )
 
             # Common post-process: mark next schedule and invalidate cache
             if result.has_transitions():
-                # Promotion handlers use PromotionStatusTransitions where success is SessionStatus directly
-                # Promotion handlers don't have failure classification - all results are successes
-                target_status = handler.status_transitions().success
-                target_statuses = {target_status} if target_status else set()
+                target_statuses = {spec.success_status}
                 try:
                     await self._run_post_processors(result, target_statuses)
                 except Exception as e:
@@ -688,13 +689,13 @@ class ScheduleCoordinator:
 
     async def _handle_promotion_status_transitions(
         self,
-        handler: SessionPromotionHandler,
+        spec: PromotionSpec,
         result: SessionExecutionResult,
         records: Mapping[SessionId, ExecutionRecord],
     ) -> None:
-        """Apply status transitions for promotion handler execution results (BEP-1030).
+        """Apply status transitions for promotion spec results.
 
-        Promotion handlers only change session status (not kernel status).
+        Promotion specs only change session status (not kernel status).
         Kernel status changes are driven by agent events, not coordinator.
 
         Hook execution is centralized here:
@@ -707,17 +708,14 @@ class ScheduleCoordinator:
         by StatusTransitionHook in the hook registry, not here in the Coordinator.
 
         Args:
-            handler: The promotion handler that produced the result
+            spec: The promotion spec that defines the transition
             result: Execution result containing successes
             records: Mapping of session IDs to their execution records for sub_steps
         """
-        transitions = handler.status_transitions()
-        handler_name = handler.name()
-
-        if not transitions.success or not result.successes:
+        if not result.successes:
             return
 
-        to_status = transitions.success
+        to_status = spec.success_status
         sessions_to_transition = result.successes
 
         # Execute hooks if available for this status
@@ -734,7 +732,7 @@ class ScheduleCoordinator:
             # Create TransitionStatus with kernel=None (promotion doesn't change kernel status)
             transition = TransitionStatus(session=to_status, kernel=None)
             await self._apply_transition(
-                handler_name,
+                spec.name,
                 sessions_to_transition,
                 transition,
                 SchedulingResult.SUCCESS,

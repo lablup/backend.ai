@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.data.session.types import SessionInfo
+from ai.backend.manager.data.session.types import KernelMatchType, SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -890,3 +890,24 @@ class RetryResult:
 
     retried_ids: list[SessionId]
     exceeded_ids: list[SessionId]
+
+
+# ============================================================================
+# Promotion Spec for simplified promotion handling
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class PromotionSpec:
+    """Specification for session promotion operations.
+
+    Replaces promotion handlers with a declarative spec. The Coordinator
+    processes promotions directly based on these specs.
+    """
+
+    name: str
+    target_statuses: list[SessionStatus]
+    target_kernel_statuses: list[KernelStatus]
+    kernel_match_type: KernelMatchType
+    success_status: SessionStatus
+    reason: str
