@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.19.2 (2026-01-19)
+
+### Fixes
+* Fix unintended status update in UserUpdaterSpec when fields are nop ([#8094](https://github.com/lablup/backend.ai/issues/8094))
+
+
 ## 25.19.1 (2026-01-12)
 
 ### Fixes

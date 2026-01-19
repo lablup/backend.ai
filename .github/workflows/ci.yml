@@ -284,7 +284,7 @@ jobs:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - name: Calculate the fetch depth
       run: |
