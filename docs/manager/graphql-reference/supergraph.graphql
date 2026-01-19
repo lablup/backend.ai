@@ -338,6 +338,22 @@ type AgentResource
   free: JSON!
 }
 
+"""Added in 26.1.0. Configuration for the agent selection strategy"""
+type AgentSelectorConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Number of existing kernels already running on the same endpoint.
+  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
+  
+  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
+  across different agents for improved fault tolerance. This count helps the scheduler
+  avoid placing new replicas on agents that already host replicas for the same endpoint,
+  ensuring better distribution of model serving workloads.
+  """
+  kernelCountsAtSameEndpoint: Int!
+}
+
 """Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -457,10 +473,10 @@ type AgentSystemInfo
   """
   List of compute plugin metadata supported by this agent.
   Each plugin represents a specific accelerator or resource type (e.g., CUDA).
-  Expressed as a JSON object where keys are plugin names and values contain
+  Entries contain plugin names and their associated metadata with
   plugin-specific configuration and capabilities.
   """
-  computePlugins: JSON!
+  computePlugins: ComputePlugins!
 }
 
 """Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
@@ -1011,6 +1027,35 @@ type ArtifactVerificationResult
 }
 
 """
+Added in 26.1.0.
+
+A collection of metadata from an artifact verifier.
+Contains key-value pairs providing additional information about the verification.
+"""
+type ArtifactVerifierMetadata
+  @join__type(graph: STRAWBERRY)
+{
+  """List of metadata entries. Each entry contains a key-value pair."""
+  entries: [ArtifactVerifierMetadataEntry!]!
+}
+
+"""
+Added in 26.1.0.
+
+A single key-value entry representing metadata from an artifact verifier.
+Contains additional information about the verification process.
+"""
+type ArtifactVerifierMetadataEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The key identifier for this metadata entry."""
+  key: String!
+
+  """The value for this metadata entry."""
+  value: String!
+}
+
+"""
 Added in 25.17.0.
 
 Result from a single malware verifier containing scan results and metadata.
@@ -1036,8 +1081,8 @@ type ArtifactVerifierResult
   """Total number of files scanned"""
   scannedCount: Int!
 
-  """Additional metadata from the verifier"""
-  metadata: JSON!
+  """Added in 26.1.0. Additional metadata from the verifier."""
+  metadata: ArtifactVerifierMetadata!
 
   """Fatal error message if the verifier failed to complete"""
   error: String
@@ -1540,6 +1585,35 @@ type ComputeContainerList implements PaginatedList
 {
   items: [ComputeContainer]!
   total_count: Int!
+}
+
+"""
+Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
+"""
+type ComputePluginEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Name of the compute plugin (e.g., 'cuda', 'rocm', 'tpu'). This identifier corresponds to the accelerator or resource type supported by the agent.
+  """
+  pluginName: String!
+
+  """
+  Plugin value string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
+  """
+  value: String!
+}
+
+"""
+Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
+"""
+type ComputePlugins
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  """
+  entries: [ComputePluginEntry!]!
 }
 
 type ComputeSession implements Item
@@ -3462,6 +3536,48 @@ type EndpointTokenList implements PaginatedList
   total_count: Int!
 }
 
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+type EnvironmentVariableEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A single environment variable entry with name and value.
+"""
+input EnvironmentVariableEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  name: String!
+
+  """Environment variable value."""
+  value: String!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+type EnvironmentVariables
+  @join__type(graph: STRAWBERRY)
+{
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntry!]!
+}
+
+"""Added in 26.1.0. A collection of environment variable entries."""
+input EnvironmentVariablesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of environment variable entries."""
+  entries: [EnvironmentVariableEntryInput!]!
+}
+
 """Added in 24.03.4."""
 input ExtraMountInput
   @join__type(graph: GRAPHENE)
@@ -4621,10 +4737,8 @@ type ModelRuntimeConfig
   """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}.
-  """
-  environ: JSON
+  """Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0."""
+  environ: EnvironmentVariables
 }
 
 """Added in 25.19.0"""
@@ -4634,10 +4748,8 @@ input ModelRuntimeConfigInput
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON = null
 
-  """
-  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
-  """
-  environ: JSON = null
+  """Environment variables for the service."""
+  environ: EnvironmentVariablesInput = null
 }
 
 """
@@ -7224,14 +7336,12 @@ type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  JSON describing allocated resources. Example: {"cpu": "1", "mem": "1073741824", "cuda.device": "0"}.
+  Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
   """
-  resourceSlots: JSON!
+  resourceSlots: ResourceSlot!
 
-  """
-  Additional resource options such as shared memory. Example: {"shmem": "64m"}.
-  """
-  resourceOpts: JSON
+  """Added in 26.1.0. Additional resource options such as shared memory."""
+  resourceOpts: ResourceOpts
   resourceGroup: ScalingGroupNode!
 }
 
@@ -7241,15 +7351,13 @@ input ResourceConfigInput
 {
   resourceGroup: ResourceGroupInput!
 
-  """
-  Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
-  """
-  resourceSlots: JSON!
+  """Added in 26.1.0. Resources allocated for the deployment."""
+  resourceSlots: ResourceSlotInput!
 
   """
-  Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  Added in 26.1.0. Additional options for the resources such as shared memory.
   """
-  resourceOpts: JSON = null
+  resourceOpts: ResourceOptsInput = null
 }
 
 """Added in 25.19.0"""
@@ -7273,6 +7381,52 @@ input ResourceLimitInput
   key: String
   min: String
   max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
+"""
+type ResourceOpts
+  @join__type(graph: STRAWBERRY)
+{
+  """List of resource option entries. Each entry contains a key-value pair."""
+  entries: [ResourceOptsEntry!]!
+}
+
+"""
+Added in 26.1.0. A single key-value entry representing a resource option. Contains additional resource configuration such as shared memory settings.
+"""
+type ResourceOptsEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of this resource option. Example: 'shmem'."""
+  name: String!
+
+  """The value for this resource option. Example: '64m'."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A single key-value entry representing a resource option.
+"""
+input ResourceOptsEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of this resource option (e.g., 'shmem')."""
+  name: String!
+
+  """The value for this resource option (e.g., '64m')."""
+  value: String!
+}
+
+"""
+Added in 26.1.0. A collection of additional resource options for input.
+"""
+input ResourceOptsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of resource option entries."""
+  entries: [ResourceOptsEntryInput!]!
 }
 
 type ResourcePreset
@@ -7317,6 +7471,29 @@ type ResourceSlotEntry
   Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
   """
   quantity: String!
+}
+
+"""
+Added in 26.1.0. A single entry representing one resource type and its allocated quantity.
+"""
+input ResourceSlotEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  resourceType: String!
+
+  """Quantity of the resource as a decimal string."""
+  quantity: String!
+}
+
+"""
+Added in 26.1.0. A collection of compute resource allocations for input.
+"""
+input ResourceSlotInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of resource allocations."""
+  entries: [ResourceSlotEntryInput!]!
 }
 
 """
@@ -7781,7 +7958,7 @@ type ScalingGroupSchedulerOptions
   Contents depend on the scheduler implementation (fifo/lifo/drf).
   Used for advanced scheduling behavior customization.
   """
-  config: JSON!
+  config: SchedulerConfig!
 
   """
   Algorithm for selecting target agents when scheduling sessions.
@@ -7796,7 +7973,7 @@ type ScalingGroupSchedulerOptions
   Structure varies by strategy - for example,
   concentrated strategy may specify endpoint spreading rules.
   """
-  agentSelectorConfig: JSON!
+  agentSelectorConfig: AgentSelectorConfig!
 
   """
   Whether inference service replicas should be distributed across different agents
@@ -7986,6 +8163,17 @@ type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.1.0. Scheduler-specific configuration options"""
+type SchedulerConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Number of scheduling retries to skip before attempting to schedule a session.
+  Used to prevent repeated scheduling attempts for sessions that previously failed.
+  """
+  numRetriesToSkip: Int!
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
