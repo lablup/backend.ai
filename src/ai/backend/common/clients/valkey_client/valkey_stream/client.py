@@ -10,9 +10,9 @@ from glide import (
     StreamAddOptions,
     StreamGroupOptions,
     StreamReadGroupOptions,
+    TimeoutError as GlideTimeoutError,
     TrimByMaxLen,
 )
-from glide.exceptions import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,

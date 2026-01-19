@@ -243,6 +243,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Domain",
         "Dotfile",
         "EtcdConfig",
+        "Events",
         "Export",
         "FairShare",
         "Group",
@@ -304,6 +305,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.events import Events
         from .func.export import Export
         from .func.fair_share import FairShare
         from .func.group import Group
@@ -339,6 +341,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.BackgroundTask = BackgroundTask
         self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
+        self.Events = Events
         self.Deployment = Deployment
         self.Domain = Domain
         self.Group = Group
