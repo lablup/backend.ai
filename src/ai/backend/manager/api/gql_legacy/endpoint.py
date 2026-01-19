@@ -911,11 +911,11 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if len(self.routings) == 0 or all(
-                    r.status == RouteStatus.TERMINATED.name for r in self.routings
+                if (
+                    len(self.routings) == 0
+                    or all(r.status == RouteStatus.TERMINATED.name for r in self.routings)
+                    or self.retries > SERVICE_MAX_RETRIES
                 ):
-                    return EndpointStatus.UNHEALTHY
-                if self.retries > SERVICE_MAX_RETRIES:
                     return EndpointStatus.UNHEALTHY
                 if (spawned_service_count := len([r for r in self.routings])) > 0:
                     healthy_service_count = len([
