@@ -254,7 +254,7 @@ class MovingStatistics:
     def diff(self) -> Decimal:
         if len(self._last) == 2:
             delta = self._last[-1][0] - self._last[-2][0]
-            if delta < 0:  # Counter reset detected (container restart, cgroup migration, etc.)
+            if delta < 0:  # Counter reset (e.g., container restart)
                 return Decimal(0)
             return delta
         return Decimal(0)
@@ -263,7 +263,7 @@ class MovingStatistics:
     def rate(self) -> Decimal:
         if len(self._last) == 2:
             delta = self._last[-1][0] - self._last[-2][0]
-            if delta < 0:  # Counter reset detected (container restart, cgroup migration, etc.)
+            if delta < 0:  # Counter reset (e.g., container restart)
                 return Decimal(0)
             return delta / Decimal(self._last[-1][1] - self._last[-2][1])
         return Decimal(0)
