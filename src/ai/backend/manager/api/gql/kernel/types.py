@@ -13,7 +13,7 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.common.types import (
     DotfileInfoGQL,
@@ -77,7 +77,7 @@ class KernelFilterGQL(GQLFilter):
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.id:
-            conditions.append(KernelConditions.by_id(self.id))
+            conditions.append(KernelConditions.by_id(KernelId(self.id)))
         if self.status:
             condition = self.status.build_condition()
             if condition:
