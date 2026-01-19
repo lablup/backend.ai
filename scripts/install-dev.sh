@@ -92,9 +92,10 @@ usage() {
   echo "    TensorFlow ROCm kernel for testing/demo."
   echo "    (default: false)"
   echo ""
-  echo "  ${LWHITE}--editable-webui${NC}"
+  echo "  ${LWHITE}--editable-webui[=true|false]${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
-  echo "    If you are on the main branch, this will be automatically enabled."
+  echo "    If not specified, automatically enabled on the main branch."
+  echo "    (default: true on main branch, false otherwise)"
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
@@ -326,7 +327,7 @@ ENABLE_CUDA_MOCK=0
 ENABLE_CUDA_MIG_MOCK=0
 ENABLE_ROCM_MOCK=0
 CONFIGURE_HA=0
-EDITABLE_WEBUI=0
+EDITABLE_WEBUI=""
 POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
@@ -371,6 +372,17 @@ while [ $# -gt 0 ]; do
     --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
     --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
+    --editable-webui=*)
+      _val="${1#*=}"
+      if [ "$_val" = "true" ] || [ "$_val" = "1" ]; then
+        EDITABLE_WEBUI=1
+      elif [ "$_val" = "false" ] || [ "$_val" = "0" ]; then
+        EDITABLE_WEBUI=0
+      else
+        echo "Invalid value for --editable-webui: $_val (expected true/false)"
+        exit 1
+      fi
+      ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
     --redis-port)          REDIS_PORT=$2; shift ;;
@@ -407,8 +419,13 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-if [ "$CURRENT_BRANCH" = "main" ]; then
-  EDITABLE_WEBUI=1  # auto-enable if we're on the main branch
+# Auto-enable editable webui on main branch if not explicitly set
+if [ -z "$EDITABLE_WEBUI" ]; then
+  if [ "$CURRENT_BRANCH" = "main" ]; then
+    EDITABLE_WEBUI=1
+  else
+    EDITABLE_WEBUI=0
+  fi
 fi
 
 install_brew() {

@@ -75,43 +75,59 @@ async def pants_export(ctx: Context) -> None:
     )
 
 
+async def get_current_branch() -> str:
+    """Get the current git branch name."""
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        "rev-parse",
+        "--abbrev-ref",
+        "HEAD",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    stdout, _ = await proc.communicate()
+    return stdout.decode().strip()
+
+
 async def install_editable_webui(ctx: Context) -> None:
     ctx.log_header("Installing the editable version of webui")
-    """
-    if ! command -v node &> /dev/null; then
-      install_node
-    fi
-    if ! command -v pnpm &> /dev/null; then
-        show_info "Installing pnpm..."
-        npm install -g pnpm
-    fi
-    show_info "Installing editable version of Web UI..."
-    if [ -d "./src/ai/backend/webui" ]; then
-      echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
-      cd src/ai/backend/webui
-      make clean
-    else
-      git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
-      cd src/ai/backend/webui
-      cp configs/default.toml config.toml
-      local site_name=$(basename $(pwd))
-      # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
-      # (e.g., separate debugging of Electron's renderer and main threads)
-      sed_inplace "s@debug = true@debug = false@" config.toml
-      # The webserver endpoint to use in the session mode.
-      sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-      sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
-      # webServerURL lets the electron app use the web UI contents from the server.
-      # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
-      # In the former case, you may live-edit the webui sources while running them in the electron app.
-      sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-      sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
-      echo "PROXYLISTENIP=0.0.0.0" >> .env
-      echo "PROXYBASEHOST=localhost" >> .env
-      echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
-    fi
-    pnpm i
-    make compile
-    make compile_wsproxy
-    cd ../../../..
-    """
+    webui_path = ctx.install_info.base_path / "src" / "ai" / "backend" / "webui"
+
+    if webui_path.exists():
+        ctx.log.write("src/ai/backend/webui already exists, cleaning and pulling latest...")
+        await ctx.run_shell("make clean", cwd=webui_path)
+        await ctx.run_shell(
+            "git pull --ff-only || echo 'Local changes exist, skipping pull...'", cwd=webui_path
+        )
+    else:
+        ctx.log.write("Cloning backend.ai-webui repository...")
+        await ctx.run_shell(
+            "git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui"
+        )
+        # Copy and configure config.toml
+        config_src = webui_path / "configs" / "default.toml"
+        config_dst = webui_path / "config.toml"
+        shutil.copy(config_src, config_dst)
+
+        service = ctx.install_info.service_config
+        webserver_port = service.webserver_addr.face.port
+        wsproxy_port = service.local_proxy_addr.face.port
+
+        config_path = str(config_dst)
+        toml_set(config_path, "general.debug", "false")
+        toml_set(config_path, "general.apiEndpoint", f"http://127.0.0.1:{webserver_port}")
+        toml_set(config_path, "general.apiEndpointText", "Backend.AI")
+        toml_set(config_path, "general.webServerURL", f"http://127.0.0.1:{webserver_port}")
+        toml_set(config_path, "general.proxyURL", f"http://127.0.0.1:{wsproxy_port}")
+
+        # Configure .env
+        env_path = webui_path / ".env"
+        env_path.write_text(
+            f"PROXYLISTENIP=0.0.0.0\nPROXYBASEHOST=localhost\nPROXYBASEPORT={wsproxy_port}\n"
+        )
+
+    # Install dependencies and build
+    ctx.log.write("Installing pnpm dependencies...")
+    await ctx.run_shell("pnpm i", cwd=webui_path)
+    ctx.log.write("Compiling webui...")
+    await ctx.run_shell("make compile", cwd=webui_path)
