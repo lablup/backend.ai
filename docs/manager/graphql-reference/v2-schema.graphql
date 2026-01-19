@@ -3443,6 +3443,20 @@ enum RouteTrafficStatus {
   INACTIVE
 }
 
+"""Input for SMTP authentication credentials"""
+input SMTPAuthInput {
+  username: String = null
+  password: String = null
+}
+
+"""Input for SMTP server connection settings"""
+input SMTPConnectionInput {
+  host: String!
+  port: Int!
+  useTls: Boolean! = true
+  timeout: Int! = 30
+}
+
 """Added in 25.18.0. Filter for scaling groups"""
 input ScalingGroupFilter {
   name: StringFilter = null
