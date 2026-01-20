@@ -683,7 +683,7 @@ class Query(graphene.ObjectType):
         reference=graphene.String(),
         architecture=graphene.String(
             default_value=None,
-            description="If not provided, defaults to the server's architecture.",
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
         ),
     )
 

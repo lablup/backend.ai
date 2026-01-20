@@ -1044,7 +1044,7 @@ class AliasImage(graphene.Mutation):
         target = graphene.String(required=True)
         architecture = graphene.String(
             default_value=None,
-            description="If not provided, defaults to the server's architecture.",
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
         )
 
     ok = graphene.Boolean()
@@ -1205,7 +1205,7 @@ class ModifyImage(graphene.Mutation):
         architecture = graphene.String(
             required=False,
             default_value=None,
-            description="If not provided, defaults to the server's architecture.",
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
         )
         props = ModifyImageInput(required=True)
 
@@ -1329,7 +1329,7 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     architecture = graphene.String(
         required=False,
         default_value=None,
-        description="If not provided, defaults to the server's architecture.",
+        description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
     )
 
 

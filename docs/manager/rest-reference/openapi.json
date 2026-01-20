@@ -992,7 +992,7 @@
               }
             ],
             "default": null,
-            "description": "Image architecture",
+            "description": "Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
             "title": "Arch"
           },
           "group": {

@@ -1494,7 +1494,9 @@ input ClearImageCustomResourceLimitKey
 {
   image_canonical: String!
 
-  """If not provided, defaults to the server's architecture."""
+  """
+  Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+  """
   architecture: String = null
 }
 
@@ -5349,7 +5351,9 @@ type Mutation
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage @join__field(graph: GRAPHENE)
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage @join__field(graph: GRAPHENE)
   modify_image(
-    """If not provided, defaults to the server's architecture."""
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
     architecture: String = null
     props: ModifyImageInput!
     target: String!
@@ -5383,7 +5387,9 @@ type Mutation
   alias_image(
     alias: String!
 
-    """If not provided, defaults to the server's architecture."""
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
     architecture: String = null
     target: String!
   ): AliasImage @join__field(graph: GRAPHENE)
@@ -6692,7 +6698,9 @@ type Query
     id: String
     reference: String
 
-    """If not provided, defaults to the server's architecture."""
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
     architecture: String = null
   ): Image @join__field(graph: GRAPHENE)
   images(
