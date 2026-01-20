@@ -790,11 +790,12 @@ class ModelServingRepository:
                     user_role=session_owner.role.value,
                 )
 
-                resource_policy = await self.get_keypair_resource_policy(
+                resource_policy_row = await self.get_keypair_resource_policy(
                     session_owner.resource_policy
                 )
-                if not resource_policy:
+                if not resource_policy_row:
                     raise InvalidAPIParameters("Resource policy not found")
+                resource_policy = resource_policy_row._mapping  # for backward compatibility
                 extra_mounts_input = spec.extra_mounts.optional_value()
                 if extra_mounts_input is not None:
                     extra_mounts = {
