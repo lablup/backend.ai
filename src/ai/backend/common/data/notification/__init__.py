@@ -1,5 +1,6 @@
 from .messages import (
     ArtifactDownloadCompletedMessage,
+    EndpointLifecycleChangedMessage,
     NotifiableMessage,
     SessionStartedMessage,
     SessionTerminatedMessage,
@@ -18,6 +19,7 @@ __all__ = (
     "ArtifactDownloadCompletedMessage",
     "EmailSpec",
     "EmailMessage",
+    "EndpointLifecycleChangedMessage",
     "NotifiableMessage",
     "NotificationChannelType",
     "NotificationRuleType",

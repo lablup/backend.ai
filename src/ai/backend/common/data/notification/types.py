@@ -18,6 +18,7 @@ class NotificationRuleType(CIStrEnum):
     SESSION_STARTED = "session.started"
     SESSION_TERMINATED = "session.terminated"
     ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
+    ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
 
 
 class WebhookSpec(BaseModel):

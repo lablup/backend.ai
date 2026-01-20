@@ -8,13 +8,18 @@ import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.notification import NotificationRuleType
+from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
@@ -22,6 +27,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -215,6 +221,8 @@ class DeploymentCoordinator:
         # Collect all batch updaters and history specs
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []
+        notification_events: list[NotificationTriggeredEvent] = []
+        timestamp_now = datetime.now(UTC).isoformat()
 
         # Handle success transitions
         next_status = handler.next_status()
@@ -242,6 +250,16 @@ class DeploymentCoordinator:
                 )
             )
             all_history_specs.extend(success_history_specs)
+            notification_events.extend([
+                self._build_lifecycle_notification_event(
+                    deployment=d,
+                    from_status=from_status,
+                    to_status=next_status,
+                    transition_result="success",
+                    timestamp=timestamp_now,
+                )
+                for d in result.successes
+            ])
 
         # Handle failure transitions
         failure_status = handler.failure_status()
@@ -270,12 +288,55 @@ class DeploymentCoordinator:
                 )
             )
             all_history_specs.extend(failure_history_specs)
+            notification_events.extend([
+                self._build_lifecycle_notification_event(
+                    deployment=e.deployment_info,
+                    from_status=from_status,
+                    to_status=failure_status,
+                    transition_result="failure",
+                    timestamp=timestamp_now,
+                )
+                for e in result.errors
+            ])
 
         # Execute all updates in a single transaction
         if batch_updaters:
             await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
+
+        # Anycast notification events
+        for event in notification_events:
+            try:
+                await self._event_producer.anycast_event(event)
+            except Exception as e:
+                log.warning("Failed to send lifecycle notification: {}", e)
+
+    def _build_lifecycle_notification_event(
+        self,
+        deployment: DeploymentInfo,
+        from_status: EndpointLifecycle | None,
+        to_status: EndpointLifecycle,
+        transition_result: str,
+        timestamp: str,
+    ) -> NotificationTriggeredEvent:
+        """Build a notification event for a lifecycle transition."""
+        message = EndpointLifecycleChangedMessage(
+            endpoint_id=str(deployment.id),
+            endpoint_name=deployment.metadata.name,
+            domain=deployment.metadata.domain,
+            project_id=str(deployment.metadata.project),
+            resource_group=deployment.metadata.resource_group,
+            from_status=from_status.value if from_status else None,
+            to_status=to_status.value,
+            transition_result=transition_result,
+            event_timestamp=timestamp,
+        )
+        return NotificationTriggeredEvent(
+            rule_type=NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED.value,
+            timestamp=datetime.now(UTC),
+            notification_data=message.model_dump(),
+        )
 
     async def process_if_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """
