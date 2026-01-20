@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import logging
 import uuid
 from collections.abc import (
@@ -459,9 +460,12 @@ class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
             return [item.model_dump(mode="json") for item in value]
         return []
 
-    def process_result_value(self, value: list | None, dialect) -> list[TBaseModel]:
+    def process_result_value(self, value: list | str | None, dialect) -> list[TBaseModel]:
         # JSONB returns already parsed Python objects, not strings
+        # Handle case where value is stored as JSON string (legacy data)
         if value is not None:
+            if isinstance(value, str):
+                value = json.loads(value)
             return [self._schema.model_validate(item) for item in value]
         return []
 

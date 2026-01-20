@@ -114,6 +114,38 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
+    def pre_prepared_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns statuses before image pulling is complete.
+        Used for NOT_ANY kernel matching to promote sessions to PREPARED.
+        """
+        return frozenset((
+            cls.PENDING,
+            cls.SCHEDULED,
+            cls.PREPARING,
+            cls.BUILDING,
+            cls.PULLING,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def pre_running_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns statuses before kernel is actually running.
+        Used for NOT_ANY kernel matching to promote sessions to RUNNING.
+        """
+        return frozenset((
+            cls.PENDING,
+            cls.SCHEDULED,
+            cls.PREPARING,
+            cls.BUILDING,
+            cls.PULLING,
+            cls.PREPARED,
+            cls.CREATING,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
     def retriable_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered retriable.

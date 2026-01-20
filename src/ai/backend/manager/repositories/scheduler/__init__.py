@@ -5,7 +5,6 @@ from .types.scheduling import SchedulingData
 from .types.session import (
     KernelTerminationResult,
     MarkTerminatingResult,
-    SessionTerminationResult,
     SweptSessionInfo,
     TerminatingKernelData,
     TerminatingKernelWithAgentData,
@@ -17,7 +16,6 @@ __all__ = [
     "MarkTerminatingResult",
     "SchedulerRepository",
     "SchedulingData",
-    "SessionTerminationResult",
     "SweptSessionInfo",
     "TerminatingKernelData",
     "TerminatingKernelWithAgentData",

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -66,6 +67,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATED,
                 cls.CANCELLED,
             )
@@ -81,6 +83,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATING,
                 cls.TERMINATED,
                 cls.CANCELLED,
@@ -297,6 +300,8 @@ class TransitionStatus:
 class StatusTransitions:
     """Defines state transitions for different handler outcomes.
 
+    Used by SessionLifecycleHandler for session and kernel status changes.
+
     Attributes:
         success: Transition when handler succeeds
         need_retry: Transition when handler fails but will retry (None = no change)
@@ -312,6 +317,20 @@ class StatusTransitions:
     need_retry: TransitionStatus | None = None
     expired: TransitionStatus | None = None
     give_up: TransitionStatus | None = None
+
+
+@dataclass(frozen=True)
+class PromotionStatusTransitions:
+    """Defines state transitions for promotion handlers.
+
+    Used by SessionPromotionHandler - only changes session status, not kernel status.
+    Promotion handlers typically only have success transition (no retry/expired/give_up).
+
+    Attributes:
+        success: Target session status when promotion succeeds (None = no change)
+    """
+
+    success: SessionStatus | None = None
 
 
 class SubStepResult(BaseModel):

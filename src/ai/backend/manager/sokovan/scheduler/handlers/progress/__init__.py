@@ -1,1 +1,0 @@
-"""Session progress check handlers."""

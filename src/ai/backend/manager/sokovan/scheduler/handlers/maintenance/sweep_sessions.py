@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import Optional
 
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -14,7 +13,6 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
@@ -52,21 +50,6 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
     def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """No kernel filtering for sweep check."""
         return None
-
-    @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """No success status - sweep operation moves to TERMINATING."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status for sweep handler."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """Stale sessions transition to TERMINATING."""
-        return SessionStatus.TERMINATING
 
     @classmethod
     def status_transitions(cls) -> StatusTransitions:
@@ -126,34 +109,18 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         # Build session map for getting current status
         session_map = {s.session_info.identity.id: s for s in sessions}
 
-        # Add timed out sessions to stales - Coordinator will handle status transition
+        # Add timed out sessions to failures - Coordinator will apply policy-based transition
         for timed_out in timed_out_sessions:
             session_data = session_map.get(timed_out.session_id)
             if session_data:
-                result.stales.append(
+                result.failures.append(
                     SessionTransitionInfo(
                         session_id=timed_out.session_id,
                         from_status=session_data.session_info.lifecycle.status,
-                    )
-                )
-                result.scheduled_data.append(
-                    ScheduledSessionData(
-                        session_id=timed_out.session_id,
+                        reason="PENDING_TIMEOUT_EXCEEDED",
                         creation_id=timed_out.creation_id,
                         access_key=timed_out.access_key,
-                        reason="sweeped-as-stale",
                     )
                 )
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Log the number of swept sessions and invalidate cache."""
-        log.info("Swept {} stale sessions", len(result.stales))
-        # Invalidate cache for affected access keys
-        affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_data
-        }
-        if affected_keys:
-            await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))

@@ -1209,7 +1209,12 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .sokovan.scheduler.factory import create_default_scheduler_components
+    from .sokovan.scheduler.coordinator import ScheduleCoordinator
+    from .sokovan.scheduler.factory import (
+        CoordinatorHandlersArgs,
+        create_coordinator_handlers,
+        create_default_scheduler_components,
+    )
     from .sokovan.sokovan import SokovanOrchestrator
 
     # Create scheduler components
@@ -1259,13 +1264,31 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         service_discovery=root_ctx.service_discovery,
     )
 
-    # Create sokovan orchestrator with lock factory for timers
-    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler_components=scheduler_components,
-        event_producer=root_ctx.event_producer,
+    # Create coordinator handlers using factory
+    coordinator_handlers = create_coordinator_handlers(
+        CoordinatorHandlersArgs(
+            provisioner=scheduler_components.provisioner,
+            launcher=scheduler_components.launcher,
+            terminator=scheduler_components.terminator,
+            repository=scheduler_components.repository,
+            valkey_schedule=root_ctx.valkey_schedule,
+            scheduling_controller=root_ctx.scheduling_controller,
+        )
+    )
+
+    # Create schedule coordinator
+    schedule_coordinator = ScheduleCoordinator(
         valkey_schedule=root_ctx.valkey_schedule,
-        lock_factory=root_ctx.distributed_lock_factory,
+        components=scheduler_components,
+        handlers=coordinator_handlers,
         scheduling_controller=root_ctx.scheduling_controller,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+    )
+
+    # Create sokovan orchestrator with all coordinators injected
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        schedule_coordinator=schedule_coordinator,
         deployment_coordinator=deployment_coordinator,
         route_coordinator=route_coordinator,
     )

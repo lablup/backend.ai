@@ -58,21 +58,6 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         return None
 
     @classmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """No automatic status transition - handled by agent events."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """No failure status - RPC failures are handled by sweep."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """No stale status for this handler."""
-        return None
-
-    @classmethod
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for terminate sessions handler (BEP-1030).
 
@@ -133,7 +118,3 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         # The Coordinator won't update any status because success_status is None
 
         return result
-
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """No post-processing needed - termination events come from agents."""
-        pass

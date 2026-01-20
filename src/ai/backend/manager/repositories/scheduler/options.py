@@ -183,6 +183,15 @@ class KernelConditions:
 
         return inner
 
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        """Filter kernels by scaling group."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.scaling_group == scaling_group
+
+        return inner
+
 
 class KernelOrders:
     """Query orders for kernels."""

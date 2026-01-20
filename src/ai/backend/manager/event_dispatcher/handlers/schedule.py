@@ -66,7 +66,7 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Request scheduling for next cycle through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -75,7 +75,7 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Request scheduling for next cycle through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -84,14 +84,14 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Request scheduling for next cycle through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
     async def handle_do_schedule(self, context: None, agent_id: str, ev: DoScheduleEvent) -> None:
         if self._use_sokovan:
             # Request scheduling for next cycle through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         else:
             await self._scheduler_dispatcher.schedule(ev.event_name())
 
@@ -100,7 +100,7 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Request start scheduling through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(ScheduleType.START)
+            await self._scheduling_controller.mark_scheduling_needed([ScheduleType.START])
         else:
             await self._scheduler_dispatcher.start(ev.event_name())
 
@@ -109,9 +109,9 @@ class ScheduleEventHandler:
     ) -> None:
         if self._use_sokovan:
             # Request check precondition through SchedulingController
-            await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_PRECONDITION
-            )
+            await self._scheduling_controller.mark_scheduling_needed([
+                ScheduleType.CHECK_PRECONDITION,
+            ])
         else:
             await self._scheduler_dispatcher.check_precond(ev.event_name())
 
