@@ -42,7 +42,7 @@ class WSProxyVersionQueryParams:
 async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
-    headers: dict[str, str] = {"Accept": "application/json"}
+    headers = {"Accept": "application/json"}
     bind_request_id(headers, f"wsproxy status query: {wsproxy_addr}")
     async with (
         aiohttp.ClientSession() as session,
