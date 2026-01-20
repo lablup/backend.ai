@@ -992,7 +992,7 @@
               }
             ],
             "default": null,
-            "description": "Image architecture",
+            "description": "Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
             "title": "Arch"
           },
           "group": {
@@ -5801,8 +5801,7 @@
                     "type": "string"
                   },
                   "arch": {
-                    "type": "string",
-                    "default": "x86_64"
+                    "type": "string"
                   },
                   "type": {
                     "type": "string",
@@ -5910,7 +5909,6 @@
                   "name",
                   "priority",
                   "image",
-                  "arch",
                   "type",
                   "group",
                   "domain",
@@ -5966,8 +5964,7 @@
                     "type": "string"
                   },
                   "arch": {
-                    "type": "string",
-                    "default": "x86_64"
+                    "type": "string"
                   },
                   "type": {
                     "type": "string",
@@ -6075,7 +6072,6 @@
                   "name",
                   "priority",
                   "image",
-                  "arch",
                   "type",
                   "group",
                   "domain",
