@@ -126,7 +126,9 @@ class RouteExecutor:
         # Phase 1: Terminate sessions
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
-                await self._scheduling_controller.mark_sessions_for_termination(target_session_ids)
+                await self._scheduling_controller.mark_sessions_for_termination(
+                    target_session_ids, reason="ROUTE_TERMINATION"
+                )
 
         return RouteExecutionResult(
             successes=list(routes),
