@@ -45,7 +45,6 @@ KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description
 )
 class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
-    ID = "id"
 
 
 @strawberry.input(
@@ -99,8 +98,8 @@ class KernelOrderByGQL(GQLOrderBy):
         match self.field:
             case KernelOrderFieldGQL.CREATED_AT:
                 return KernelOrders.created_at(ascending)
-            case KernelOrderFieldGQL.ID:
-                return KernelOrders.id(ascending)
+            case _:
+                raise ValueError(f"Unhandled KernelOrderFieldGQL value: {self.field!r}")
 
 
 # ========== Kernel Status History Types ==========

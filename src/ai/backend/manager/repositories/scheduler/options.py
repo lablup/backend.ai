@@ -249,12 +249,6 @@ class KernelOrders:
             return KernelRow.created_at.asc()
         return KernelRow.created_at.desc()
 
-    @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KernelRow.id.asc()
-        return KernelRow.id.desc()
-
 
 class UserConditions:
     """Query conditions for users."""
