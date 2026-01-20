@@ -321,6 +321,9 @@ type AgentV2 implements Node {
   quota management, and workload isolation across different user groups or projects.
   """
   scalingGroup: String!
+
+  """Added in 26.1.0. Load the container count for this agent."""
+  containerCount: Int!
 }
 
 """
