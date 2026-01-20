@@ -812,9 +812,6 @@ class AgentRPCServer(aobject):
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
-        print(
-            f"[Agent] create_kernels - request_id: {current_request_id()}, session_id: {session_id}"
-        )
         coros = []
         agent = self.runtime.get_agent(agent_id)
         throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)

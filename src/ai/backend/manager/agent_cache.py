@@ -47,8 +47,6 @@ class PeerInvoker(Peer):
                     "args": args,
                     "kwargs": kwargs,
                 }
-                # NOTE: callosum's Peer.invoke() API doesn't expose metadata parameter,
-                # so we pass request_id through the body instead of RPC metadata/headers.
                 bind_request_id(request_body, f"RPC call to agent: {name}", key="request_id")
                 self.peer.last_used = time.monotonic()
                 ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
