@@ -60,7 +60,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.contexts.request_id import current_request_id, receive_request_id
+from ai.backend.common.contexts.request_id import receive_request_id
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (

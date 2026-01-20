@@ -146,7 +146,7 @@ class StorageProxyHTTPClient:
         :param timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
-        headers = {
+        headers: dict[str, str] = {
             AUTH_TOKEN_HDR: self._secret,
         }
         bind_request_id(headers, f"storage proxy request: {method} {url}")

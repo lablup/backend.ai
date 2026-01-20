@@ -184,7 +184,7 @@ class TestStorageProxyClientRequestId:
         self, request_id: str, aiohttp_client: Any
     ) -> None:
         """Verify that request_id from context is included in HTTP headers."""
-        received_headers = {}
+        received_headers: dict[str, str] = {}
 
         async def capture_headers_handler(request: web.Request) -> web.Response:
             received_headers.update(dict(request.headers))

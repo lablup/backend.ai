@@ -2295,7 +2295,7 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
         try:
             client_timeout = aiohttp.ClientTimeout(total=10.0)
             async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 bind_request_id(headers, f"watcher fstab request: agent={params['agent_id']}")
                 url = watcher_info["addr"] / "fstab"
                 async with sess.get(url, headers=headers, params=params) as watcher_resp:
@@ -2389,7 +2389,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     ) -> tuple[str, Mapping]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
-            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+            headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
             bind_request_id(headers, f"watcher mounts GET request: agent={agent_id}")
             url = watcher_info["addr"] / "mounts"
             try:
@@ -2509,7 +2509,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 bind_request_id(headers, f"watcher mount POST request: agent={agent_id}")
                 url = watcher_info["addr"] / "mounts"
                 async with sess.post(url, json=params, headers=headers) as resp:
@@ -2638,7 +2638,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 bind_request_id(headers, f"watcher umount DELETE request: agent={agent_id}")
                 url = watcher_info["addr"] / "mounts"
                 async with sess.delete(url, json=params, headers=headers) as resp:
