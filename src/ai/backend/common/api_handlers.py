@@ -22,6 +22,7 @@ from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 
@@ -506,7 +507,9 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
 
         body_stream = result.body
         status = result.status
-        resp = web.StreamResponse(status=status, headers=result.headers)
+        headers: dict[str, str] = dict(result.headers) if result.headers else {}
+        bind_request_id(headers, "stream_api_handler response")
+        resp = web.StreamResponse(status=status, headers=headers)
 
         body_iter = body_stream.read()
 

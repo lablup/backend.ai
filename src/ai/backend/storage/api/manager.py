@@ -53,6 +53,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
@@ -1257,6 +1258,7 @@ def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
 async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             token_auth_middleware,
             general_exception_middleware,
             build_api_metric_middleware(ctx.metric_registry.api),

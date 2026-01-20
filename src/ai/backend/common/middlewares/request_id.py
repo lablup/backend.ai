@@ -21,4 +21,7 @@ async def request_id_middleware(request: web.Request, handler: Handler) -> web.S
         with_request_id(request_id),
         with_log_context_fields({"request_id": request_id}),
     ):
-        return await _handler(request)
+        response = await _handler(request)
+        if request_id:
+            response.headers[REQUEST_ID_HEADER] = request_id
+        return response
