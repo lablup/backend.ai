@@ -159,7 +159,7 @@ class AgentService:
             with _timeout(5.0):
                 watcher_url = watcher_info["addr"] / endpoint
                 headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                bind_request_id(headers, "agent watcher request")
+                bind_request_id(headers, f"agent watcher request: {method} {endpoint}")
 
                 async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:

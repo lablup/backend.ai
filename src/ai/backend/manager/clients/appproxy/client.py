@@ -37,10 +37,10 @@ class AppProxyClient:
         self._address = address
         self._token = token
 
-    def _get_headers(self) -> dict[str, str]:
+    def _get_headers(self, operation: str) -> dict[str, str]:
         """Get common headers for API requests."""
         headers = {"X-BackendAI-Token": self._token}
-        bind_request_id(headers, "AppProxy request")
+        bind_request_id(headers, f"AppProxy request: {operation}")
         return headers
 
     @appproxy_client_resilience.apply()
@@ -52,7 +52,7 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
-            headers=self._get_headers(),
+            headers=self._get_headers("create_endpoint"),
         ) as resp:
             resp.raise_for_status()
             return await resp.json()
@@ -64,6 +64,6 @@ class AppProxyClient:
     ) -> None:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
-            headers=self._get_headers(),
+            headers=self._get_headers("delete_endpoint"),
         ):
             pass

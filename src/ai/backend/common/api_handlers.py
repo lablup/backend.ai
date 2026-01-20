@@ -503,7 +503,7 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
         body_stream = result.body
         status = result.status
         headers: dict[str, str] = dict(result.headers) if result.headers else {}
-        bind_request_id(headers, "stream_api_handler response")
+        bind_request_id(headers, f"stream_api_handler response: {handler.__name__}")
         resp = web.StreamResponse(status=status, headers=headers)
 
         body_iter = body_stream.read()

@@ -60,7 +60,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.contexts.request_id import receive_request_id
+from ai.backend.common.contexts.request_id import current_request_id, receive_request_id
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -181,7 +181,7 @@ class RPCFunctionRegistry:
                 if request.body is None:
                     return await meth(self_)
                 request_id = request.body.get("request_id")
-                receive_request_id(request_id, "RPC call from manager")
+                receive_request_id(request_id, f"RPC call from manager: {meth.__name__}")
                 result = await meth(
                     self_,
                     *request.body["args"],
@@ -229,7 +229,7 @@ class RPCFunctionRegistryV2:
                 if request.body is None:
                     return await meth(self_)
                 request_id = request.body.get("request_id")
-                receive_request_id(request_id, "RPC call from manager")
+                receive_request_id(request_id, f"RPC call from manager: {meth.__name__}")
                 res = await meth(
                     self_,
                     *request.body["args"],
@@ -812,6 +812,9 @@ class AgentRPCServer(aobject):
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
+        print(
+            f"[Agent] create_kernels - request_id: {current_request_id()}, session_id: {session_id}"
+        )
         coros = []
         agent = self.runtime.get_agent(agent_id)
         throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)

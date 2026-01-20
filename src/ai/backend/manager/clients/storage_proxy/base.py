@@ -149,7 +149,7 @@ class StorageProxyHTTPClient:
         headers: dict[str, str] = {
             AUTH_TOKEN_HDR: self._secret,
         }
-        bind_request_id(headers, "storage proxy request")
+        bind_request_id(headers, f"storage proxy request: {method} {url}")
         try:
             async with self._client_session.request(
                 method,
