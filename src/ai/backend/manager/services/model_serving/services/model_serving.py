@@ -11,7 +11,7 @@ from yarl import URL
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -758,8 +758,7 @@ class ModelServingService:
             "accept": "application/json",
             "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
         }
-        if request_id := current_request_id():
-            headers["X-BackendAI-RequestID"] = request_id
+        bind_request_id(headers, "wsproxy token generation request")
         async with (
             aiohttp.ClientSession() as session,
             session.post(

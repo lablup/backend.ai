@@ -9,11 +9,10 @@ from aiohttp import ClientTimeout, web
 from aiohttp.test_utils import TestClient
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
-from ai.backend.common.contexts.request_id import with_request_id
+from ai.backend.common.contexts.request_id import REQUEST_ID_HEADER, with_request_id
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
-    REQUEST_ID_HDR,
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
 )
@@ -205,5 +204,5 @@ class TestStorageProxyClientRequestId:
 
         await storage_client.request(method="GET", url="test", timeout=DEFAULT_TIMEOUT)
 
-        assert REQUEST_ID_HDR in received_headers
-        assert received_headers[REQUEST_ID_HDR] == request_id
+        assert REQUEST_ID_HEADER in received_headers
+        assert received_headers[REQUEST_ID_HEADER] == request_id

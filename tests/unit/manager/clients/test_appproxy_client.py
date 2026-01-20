@@ -8,8 +8,8 @@ import aiohttp
 import pytest
 from aioresponses import aioresponses
 
-from ai.backend.common.contexts.request_id import with_request_id
-from ai.backend.manager.clients.appproxy.client import REQUEST_ID_HDR, AppProxyClient
+from ai.backend.common.contexts.request_id import REQUEST_ID_HEADER, with_request_id
+from ai.backend.manager.clients.appproxy.client import AppProxyClient
 from ai.backend.manager.clients.appproxy.types import (
     CreateEndpointRequestBody,
     EndpointTagsModel,
@@ -69,5 +69,5 @@ class TestAppProxyClientRequestId:
                 appproxy_client = AppProxyClient(session, base_url, "test-token")
                 await appproxy_client.create_endpoint(endpoint_id, sample_request_body)
 
-        assert REQUEST_ID_HDR in captured_headers
-        assert captured_headers[REQUEST_ID_HDR] == request_id
+        assert REQUEST_ID_HEADER in captured_headers
+        assert captured_headers[REQUEST_ID_HEADER] == request_id

@@ -9,7 +9,7 @@ import aiohttp
 import yarl
 from aiohttp import ClientTimeout
 
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
@@ -32,7 +32,6 @@ from ai.backend.manager.errors.storage import (
 )
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
-REQUEST_ID_HDR: Final = "X-BackendAI-RequestID"
 DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -150,8 +149,7 @@ class StorageProxyHTTPClient:
         headers: dict[str, str] = {
             AUTH_TOKEN_HDR: self._secret,
         }
-        if request_id := current_request_id():
-            headers[REQUEST_ID_HDR] = request_id
+        bind_request_id(headers, "storage proxy request")
         try:
             async with self._client_session.request(
                 method,

@@ -40,7 +40,7 @@ from ai.backend.common.api_handlers import (
     BaseFieldModel,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     VFolderHostPermission,
@@ -2296,8 +2296,7 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
             client_timeout = aiohttp.ClientTimeout(total=10.0)
             async with aiohttp.ClientSession(timeout=client_timeout) as sess:
                 headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                if request_id := current_request_id():
-                    headers["X-BackendAI-RequestID"] = request_id
+                bind_request_id(headers, "watcher fstab request")
                 url = watcher_info["addr"] / "fstab"
                 async with sess.get(url, headers=headers, params=params) as watcher_resp:
                     if watcher_resp.status == 200:
@@ -2391,8 +2390,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-            if request_id := current_request_id():
-                headers["X-BackendAI-RequestID"] = request_id
+            bind_request_id(headers, "watcher mounts GET request")
             url = watcher_info["addr"] / "mounts"
             try:
                 async with sess.get(url, headers=headers) as watcher_resp:
@@ -2512,8 +2510,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
                 headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                if request_id := current_request_id():
-                    headers["X-BackendAI-RequestID"] = request_id
+                bind_request_id(headers, "watcher mount POST request")
                 url = watcher_info["addr"] / "mounts"
                 async with sess.post(url, json=params, headers=headers) as resp:
                     if resp.status == 200:
@@ -2642,8 +2639,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
                 headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                if request_id := current_request_id():
-                    headers["X-BackendAI-RequestID"] = request_id
+                bind_request_id(headers, "watcher umount DELETE request")
                 url = watcher_info["addr"] / "mounts"
                 async with sess.delete(url, json=params, headers=headers) as resp:
                     if resp.status == 200:
