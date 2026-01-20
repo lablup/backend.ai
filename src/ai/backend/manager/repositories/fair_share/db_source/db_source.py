@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -246,20 +245,20 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def get_user_fair_share_factors_batch(
+    async def get_user_scheduling_ranks_batch(
         self,
         resource_group: str,
         project_user_ids: Sequence[ProjectUserIds],
-    ) -> dict[uuid.UUID, Decimal]:
-        """Get fair share factors for multiple users across projects.
+    ) -> dict[uuid.UUID, int]:
+        """Get scheduling ranks for multiple users across projects.
 
         Args:
             resource_group: The resource group (scaling group) name.
             project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
 
         Returns:
-            A mapping from user_uuid to fair_share_factor.
-            Users not found in the database are omitted from the result.
+            A mapping from user_uuid to scheduling_rank.
+            Users not found in the database or with NULL rank are omitted.
         """
         if not project_user_ids:
             return {}
@@ -280,13 +279,14 @@ class FairShareDBSource:
 
             query = sa.select(
                 UserFairShareRow.user_uuid,
-                UserFairShareRow.fair_share_factor,
+                UserFairShareRow.scheduling_rank,
             ).where(
                 sa.and_(
                     UserFairShareRow.resource_group == resource_group,
+                    UserFairShareRow.scheduling_rank.is_not(None),
                     sa.or_(*conditions),
                 )
             )
 
             result = await db_sess.execute(query)
-            return {row.user_uuid: row.fair_share_factor for row in result}
+            return {row.user_uuid: row.scheduling_rank for row in result}

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import sys
 from collections import defaultdict
 from collections.abc import Sequence
-from decimal import Decimal
 from typing import TYPE_CHECKING, override
 from uuid import UUID
 
@@ -14,15 +14,18 @@ from .sequencer import WorkloadSequencer
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.fair_share import FairShareRepository
 
+# Default rank for users without a computed rank (placed at lowest priority)
+DEFAULT_RANK = sys.maxsize
+
 
 class FairShareSequencer(WorkloadSequencer):
     """
     A scheduling sequencer that implements Fair Share sequencing.
 
-    This sequencer orders workloads based on fair share factors fetched from the repository.
-    Users with higher fair share factors (less historical usage) get higher priority.
+    This sequencer orders workloads based on scheduling ranks fetched from the repository.
+    Users with lower scheduling rank (1 = highest priority) get scheduled first.
 
-    If factors are not available for a user, a default value of 1.0 (highest priority) is used.
+    If rank is not available for a user (NULL or not computed), they are placed at lowest priority.
     """
 
     _repository: FairShareRepository
@@ -50,35 +53,35 @@ class FairShareSequencer(WorkloadSequencer):
         workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
-        Sequence the workloads based on Fair Share factors.
+        Sequence the workloads based on scheduling ranks.
 
-        Workloads are sorted by fair_share_factor in descending order.
-        Higher fair_share_factor = less historical usage = higher scheduling priority.
+        Workloads are sorted by scheduling_rank in ascending order.
+        Lower rank = higher priority (1 = highest).
 
         :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
-        :return: A sequence of SessionWorkload objects ordered by fair share factor.
+        :return: A sequence of SessionWorkload objects ordered by scheduling rank.
         """
         if not workloads:
             return []
 
-        # Load fair share factors from repository
-        fair_share_factors = await self._load_factors(resource_group, workloads)
+        # Load scheduling ranks from repository
+        scheduling_ranks = await self._load_ranks(resource_group, workloads)
 
-        # Sort by fair_share_factor in descending order (higher = more priority)
-        # If a user doesn't have a recorded factor, use 1.0 (highest priority for new users)
+        # Sort by scheduling_rank in ascending order (lower rank = higher priority)
+        # If a user doesn't have a recorded rank, use DEFAULT_RANK (lowest priority)
         return sorted(
             workloads,
-            key=lambda w: -fair_share_factors.get(w.user_uuid, Decimal("1.0")),
+            key=lambda w: scheduling_ranks.get(w.user_uuid, DEFAULT_RANK),
         )
 
-    async def _load_factors(
+    async def _load_ranks(
         self,
         resource_group: str,
         workloads: Sequence[SessionWorkload],
-    ) -> dict[UUID, Decimal]:
-        """Load fair share factors from the repository for the given workloads."""
+    ) -> dict[UUID, int]:
+        """Load scheduling ranks from the repository for the given workloads."""
         # Group user_ids by project_id
         project_users: dict[UUID, set[UUID]] = defaultdict(set)
         for w in workloads:
@@ -90,7 +93,7 @@ class FairShareSequencer(WorkloadSequencer):
             for project_id, user_ids in project_users.items()
         ]
 
-        # Fetch factors from repository
-        return await self._repository.get_user_fair_share_factors_batch(
+        # Fetch ranks from repository
+        return await self._repository.get_user_scheduling_ranks_batch(
             resource_group, project_user_ids
         )

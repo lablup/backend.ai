@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -184,21 +183,21 @@ class FairShareRepository:
         return await self._db_source.search_user_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def get_user_fair_share_factors_batch(
+    async def get_user_scheduling_ranks_batch(
         self,
         resource_group: str,
         project_user_ids: Sequence[ProjectUserIds],
-    ) -> dict[uuid.UUID, Decimal]:
-        """Get fair share factors for multiple users across projects.
+    ) -> dict[uuid.UUID, int]:
+        """Get scheduling ranks for multiple users across projects.
 
         Args:
             resource_group: The resource group (scaling group) name.
             project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
 
         Returns:
-            A mapping from user_uuid to fair_share_factor.
-            Users not found in the database are omitted from the result.
+            A mapping from user_uuid to scheduling_rank.
+            Users not found in the database or with NULL rank are omitted.
         """
-        return await self._db_source.get_user_fair_share_factors_batch(
+        return await self._db_source.get_user_scheduling_ranks_batch(
             resource_group, project_user_ids
         )

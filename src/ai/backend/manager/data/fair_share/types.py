@@ -112,6 +112,9 @@ class UserFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    scheduling_rank: int | None = None
+    """Computed scheduling priority rank. Lower value = higher priority.
+    None means rank calculation has not been performed yet."""
 
 
 @dataclass(frozen=True)
