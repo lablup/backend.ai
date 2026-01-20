@@ -157,6 +157,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 P = ParamSpec("P")
 
 
+def _build_watcher_headers(watcher_info: Mapping[str, Any]) -> dict[str, str]:
+    """Build headers for watcher API requests including token and request ID."""
+    headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+    if request_id := current_request_id():
+        headers["X-BackendAI-RequestID"] = request_id
+    return headers
+
+
 class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
