@@ -1339,7 +1339,7 @@ class SessionService:
             },
         }
 
-        headers = {}
+        headers: dict[str, str] = {}
         bind_request_id(headers, "wsproxy conf request")
         async with (
             aiohttp.ClientSession() as req,
