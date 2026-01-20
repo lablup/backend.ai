@@ -72,6 +72,8 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
         def value_or_none(val):
             return None if val is Undefined else val
 
+        sanitized_allowed_groups: AllowedGroups | None = value_or_none(self.allowed_groups)
+
         return CreateContainerRegistryAction(
             creator=Creator(
                 spec=ContainerRegistryCreatorSpec(
@@ -84,8 +86,8 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
                     password=value_or_none(self.password),
                     ssl_verify=value_or_none(self.ssl_verify),
                     extra=value_or_none(self.extra),
-                    allowed_groups=self.allowed_groups.to_model()
-                    if self.allowed_groups is not Undefined
+                    allowed_groups=sanitized_allowed_groups.to_model()
+                    if sanitized_allowed_groups is not None
                     else None,
                 )
             )

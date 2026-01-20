@@ -310,8 +310,8 @@ class AllowedGroups(graphene.InputObjectType):
 
     def to_model(self) -> AllowedGroupsModel:
         return AllowedGroupsModel(
-            add=self.add if self.add is not Undefined else [],
-            remove=self.remove if self.remove is not Undefined else [],
+            add=[] if (self.add is Undefined or self.add is None) else self.add,
+            remove=[] if (self.remove is Undefined or self.remove is None) else self.remove,
         )
 
 
