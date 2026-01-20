@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
@@ -69,26 +68,16 @@ def mock_notify_endpoint_route_update_to_appproxy(mocker, mock_agent_registry):
 
 class TestUpdateRoute:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "update route traffic ratio",
-                    UpdateRouteAction(
-                        service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
-                        route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                        traffic_ratio=0.7,
-                    ),
-                    UpdateRouteActionResult(success=True),
+            ScenarioBase.success(
+                "update route traffic ratio",
+                UpdateRouteAction(
+                    service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
+                    route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                    traffic_ratio=0.7,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
+                UpdateRouteActionResult(success=True),
             ),
         ],
     )
@@ -144,26 +133,16 @@ class TestUpdateRoute:
         await scenario.test(update_route)
 
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.failure(
-                    "non-existent route",
-                    UpdateRouteAction(
-                        service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
-                        route_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
-                        traffic_ratio=0.5,
-                    ),
-                    ModelServiceNotFound,
+            ScenarioBase.failure(
+                "non-existent route",
+                UpdateRouteAction(
+                    service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
+                    route_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
+                    traffic_ratio=0.5,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
+                ModelServiceNotFound,
             ),
         ],
     )
@@ -196,6 +175,7 @@ class TestUpdateRoute:
     @pytest.mark.asyncio
     async def test_update_route_appproxy_failure(
         self,
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_check_user_access_update_route,
         mock_get_endpoint_access_validation_data_update_route,
@@ -203,14 +183,6 @@ class TestUpdateRoute:
         mock_get_endpoint_for_appproxy_update,
         mock_notify_endpoint_route_update_to_appproxy,
     ) -> None:
-        user_data = UserData(
-            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            is_authorized=True,
-            is_admin=False,
-            is_superadmin=False,
-            role=UserRole.USER.value,
-            domain_name="default",
-        )
         action = UpdateRouteAction(
             service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),
             route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
@@ -235,6 +207,5 @@ class TestUpdateRoute:
         )
 
         # AppProxy failure should propagate as exception
-        with with_user(user_data):
-            with pytest.raises(aiohttp.ClientError, match="Connection failed"):
-                await model_serving_processors.update_route.wait_for_complete(action)
+        with pytest.raises(aiohttp.ClientError, match="Connection failed"):
+            await model_serving_processors.update_route.wait_for_complete(action)

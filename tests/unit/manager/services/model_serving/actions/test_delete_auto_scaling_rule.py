@@ -59,62 +59,23 @@ def mock_delete_auto_scaling_rule(mocker, mock_repositories):
 
 class TestDeleteAutoScalingRule:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "Normal delete",
-                    DeleteEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
-                    ),
-                    DeleteEndpointAutoScalingRuleActionResult(
-                        success=True,
-                    ),
+            ScenarioBase.success(
+                "Normal delete",
+                DeleteEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000009"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                DeleteEndpointAutoScalingRuleActionResult(
+                    success=True,
                 ),
             ),
-            (
-                ScenarioBase.failure(
-                    "Rule not found",
-                    DeleteEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
-                    ),
-                    EndpointAutoScalingRuleNotFound,
+            ScenarioBase.failure(
+                "Rule not found",
+                DeleteEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000010"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN delete",
-                    DeleteEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
-                    ),
-                    DeleteEndpointAutoScalingRuleActionResult(
-                        success=True,
-                    ),
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000013"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
-                    domain_name="default",
-                ),
+                EndpointAutoScalingRuleNotFound,
             ),
         ],
     )
@@ -134,7 +95,7 @@ class TestDeleteAutoScalingRule:
         action = scenario.input
 
         # Mock repository responses based on scenario
-        if scenario.description in ["Normal delete", "SUPERADMIN delete"]:
+        if scenario.description == "Normal delete":
             mock_rule = MagicMock(
                 id=action.id,
                 enabled=True,

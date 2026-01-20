@@ -50,39 +50,29 @@ def mock_get_endpoint_access_validation_data_get_info(mocker, mock_repositories)
 
 class TestGetModelServiceInfo:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "get model service info",
-                    GetModelServiceInfoAction(
-                        service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
-                    ),
-                    GetModelServiceInfoActionResult(
-                        data=ServiceInfo(
-                            endpoint_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
-                            model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                            extra_mounts=[],
-                            name="test-model-v1.0",
-                            model_definition_path=None,
-                            replicas=3,
-                            desired_session_count=3,
-                            active_routes=[],
-                            service_endpoint=HttpUrl(
-                                "https://api.example.com/v1/models/test-model/v1.0"
-                            ),
-                            is_public=False,
-                            runtime_variant=RuntimeVariant.CUSTOM,
-                        ),
-                    ),
+            ScenarioBase.success(
+                "get model service info",
+                GetModelServiceInfoAction(
+                    service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                GetModelServiceInfoActionResult(
+                    data=ServiceInfo(
+                        endpoint_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
+                        model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                        extra_mounts=[],
+                        name="test-model-v1.0",
+                        model_definition_path=None,
+                        replicas=3,
+                        desired_session_count=3,
+                        active_routes=[],
+                        service_endpoint=HttpUrl(
+                            "https://api.example.com/v1/models/test-model/v1.0"
+                        ),
+                        is_public=False,
+                        runtime_variant=RuntimeVariant.CUSTOM,
+                    ),
                 ),
             ),
         ],

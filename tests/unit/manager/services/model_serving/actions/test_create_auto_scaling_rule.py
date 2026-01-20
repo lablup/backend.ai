@@ -55,153 +55,103 @@ def mock_create_auto_scaling_rule(mocker, mock_repositories):
 
 class TestCreateEndpointAutoScalingRule:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "CPU based scaling",
-                    CreateEndpointAutoScalingRuleAction(
-                        endpoint_id=EndpointId(uuid.UUID("11111111-1111-1111-1111-111111111111")),
-                        creator=EndpointAutoScalingRuleCreator(
-                            metric_source=AutoScalingMetricSource.KERNEL,
-                            metric_name="cpu_utilization",
-                            threshold="70.0",
-                            comparator=AutoScalingMetricComparator.GREATER_THAN,
-                            step_size=1,
-                            cooldown_seconds=300,
-                            min_replicas=2,
-                            max_replicas=10,
-                        ),
-                    ),
-                    CreateEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("22222222-2222-2222-2222-222222222222")),
+            ScenarioBase.success(
+                "CPU based scaling",
+                CreateEndpointAutoScalingRuleAction(
+                    endpoint_id=EndpointId(uuid.UUID("11111111-1111-1111-1111-111111111111")),
+                    creator=EndpointAutoScalingRuleCreator(
+                        metric_source=AutoScalingMetricSource.KERNEL,
+                        metric_name="cpu_utilization",
+                        threshold="70.0",
+                        comparator=AutoScalingMetricComparator.GREATER_THAN,
+                        step_size=1,
+                        cooldown_seconds=300,
+                        min_replicas=2,
+                        max_replicas=10,
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                CreateEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("22222222-2222-2222-2222-222222222222")),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "Request count based scaling",
-                    CreateEndpointAutoScalingRuleAction(
-                        endpoint_id=EndpointId(uuid.UUID("33333333-3333-3333-3333-333333333333")),
-                        creator=EndpointAutoScalingRuleCreator(
-                            metric_source=AutoScalingMetricSource.KERNEL,
-                            metric_name="requests_per_second",
-                            threshold="100.0",
-                            comparator=AutoScalingMetricComparator.GREATER_THAN,
-                            step_size=2,
-                            cooldown_seconds=600,
-                            min_replicas=1,
-                            max_replicas=20,
-                        ),
-                    ),
-                    CreateEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("44444444-4444-4444-4444-444444444444")),
+            ScenarioBase.success(
+                "Request count based scaling",
+                CreateEndpointAutoScalingRuleAction(
+                    endpoint_id=EndpointId(uuid.UUID("33333333-3333-3333-3333-333333333333")),
+                    creator=EndpointAutoScalingRuleCreator(
+                        metric_source=AutoScalingMetricSource.KERNEL,
+                        metric_name="requests_per_second",
+                        threshold="100.0",
+                        comparator=AutoScalingMetricComparator.GREATER_THAN,
+                        step_size=2,
+                        cooldown_seconds=600,
+                        min_replicas=1,
+                        max_replicas=20,
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                CreateEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("44444444-4444-4444-4444-444444444444")),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "Custom metric",
-                    CreateEndpointAutoScalingRuleAction(
-                        endpoint_id=EndpointId(uuid.UUID("55555555-5555-5555-5555-555555555555")),
-                        creator=EndpointAutoScalingRuleCreator(
-                            metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
-                            metric_name="queue_length",
-                            threshold="50.0",
-                            comparator=AutoScalingMetricComparator.GREATER_THAN,
-                            step_size=1,
-                            cooldown_seconds=180,
-                            min_replicas=3,
-                            max_replicas=15,
-                        ),
-                    ),
-                    CreateEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("66666666-6666-6666-6666-666666666666")),
+            ScenarioBase.success(
+                "Custom metric",
+                CreateEndpointAutoScalingRuleAction(
+                    endpoint_id=EndpointId(uuid.UUID("55555555-5555-5555-5555-555555555555")),
+                    creator=EndpointAutoScalingRuleCreator(
+                        metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
+                        metric_name="queue_length",
+                        threshold="50.0",
+                        comparator=AutoScalingMetricComparator.GREATER_THAN,
+                        step_size=1,
+                        cooldown_seconds=180,
+                        min_replicas=3,
+                        max_replicas=15,
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                CreateEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("66666666-6666-6666-6666-666666666666")),
                 ),
             ),
-            (
-                ScenarioBase.failure(
-                    "Endpoint not found",
-                    CreateEndpointAutoScalingRuleAction(
-                        endpoint_id=EndpointId(uuid.UUID("77777777-7777-7777-7777-777777777777")),
-                        creator=EndpointAutoScalingRuleCreator(
-                            metric_source=AutoScalingMetricSource.KERNEL,
-                            metric_name="cpu_utilization",
-                            threshold="80.0",
-                            comparator=AutoScalingMetricComparator.GREATER_THAN,
-                            step_size=1,
-                            cooldown_seconds=300,
-                            min_replicas=1,
-                            max_replicas=5,
-                        ),
+            ScenarioBase.failure(
+                "Endpoint not found",
+                CreateEndpointAutoScalingRuleAction(
+                    endpoint_id=EndpointId(uuid.UUID("77777777-7777-7777-7777-777777777777")),
+                    creator=EndpointAutoScalingRuleCreator(
+                        metric_source=AutoScalingMetricSource.KERNEL,
+                        metric_name="cpu_utilization",
+                        threshold="80.0",
+                        comparator=AutoScalingMetricComparator.GREATER_THAN,
+                        step_size=1,
+                        cooldown_seconds=300,
+                        min_replicas=1,
+                        max_replicas=5,
                     ),
-                    EndpointNotFound,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
+                EndpointNotFound,
             ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN CPU based scaling",
-                    CreateEndpointAutoScalingRuleAction(
-                        endpoint_id=EndpointId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
-                        creator=EndpointAutoScalingRuleCreator(
-                            metric_source=AutoScalingMetricSource.KERNEL,
-                            metric_name="memory_utilization",
-                            threshold="80.0",
-                            comparator=AutoScalingMetricComparator.GREATER_THAN,
-                            step_size=2,
-                            cooldown_seconds=240,
-                            min_replicas=1,
-                            max_replicas=15,
-                        ),
-                    ),
-                    CreateEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
+            ScenarioBase.success(
+                "Memory utilization based scaling",
+                CreateEndpointAutoScalingRuleAction(
+                    endpoint_id=EndpointId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
+                    creator=EndpointAutoScalingRuleCreator(
+                        metric_source=AutoScalingMetricSource.KERNEL,
+                        metric_name="memory_utilization",
+                        threshold="80.0",
+                        comparator=AutoScalingMetricComparator.GREATER_THAN,
+                        step_size=2,
+                        cooldown_seconds=240,
+                        min_replicas=1,
+                        max_replicas=15,
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
-                    domain_name="default",
+                CreateEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
                 ),
             ),
         ],
@@ -225,7 +175,7 @@ class TestCreateEndpointAutoScalingRule:
             "CPU based scaling",
             "Request count based scaling",
             "Custom metric",
-            "SUPERADMIN CPU based scaling",
+            "Memory utilization based scaling",
         ]:
             mock_validation_data = MagicMock(
                 session_owner_id=user_data.user_id,

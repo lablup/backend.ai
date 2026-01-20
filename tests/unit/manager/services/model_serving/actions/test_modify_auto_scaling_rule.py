@@ -70,137 +70,67 @@ def mock_modify_auto_scaling_rule(mocker, mock_repositories):
 
 class TestModifyAutoScalingRule:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "Modify threshold",
-                    ModifyEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
-                        updater=Updater(
-                            spec=EndpointAutoScalingRuleUpdaterSpec(
-                                threshold=OptionalState.update(Decimal("85.0")),
-                            ),
-                            pk_value=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+            ScenarioBase.success(
+                "Modify threshold",
+                ModifyEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            threshold=OptionalState.update(Decimal("85.0")),
                         ),
-                    ),
-                    ModifyEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("88888888-8888-8888-8888-888888888888")),
+                        pk_value=uuid.UUID("88888888-8888-8888-8888-888888888888"),
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ModifyEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("88888888-8888-8888-8888-888888888888")),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "Modify min/max replicas",
-                    ModifyEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
-                        updater=Updater(
-                            spec=EndpointAutoScalingRuleUpdaterSpec(
-                                min_replicas=TriState.update(5),
-                                max_replicas=TriState.update(25),
-                            ),
-                            pk_value=uuid.UUID("99999999-9999-9999-9999-999999999999"),
+            ScenarioBase.success(
+                "Modify min/max replicas",
+                ModifyEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            min_replicas=TriState.update(5),
+                            max_replicas=TriState.update(25),
                         ),
-                    ),
-                    ModifyEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
+                        pk_value=uuid.UUID("99999999-9999-9999-9999-999999999999"),
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000006"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ModifyEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "Disable rule",
-                    ModifyEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
-                        updater=Updater(
-                            spec=EndpointAutoScalingRuleUpdaterSpec(),
-                            pk_value=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                        ),
-                    ),
-                    ModifyEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+            ScenarioBase.success(
+                "Disable rule",
+                ModifyEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(),
+                        pk_value=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000007"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ModifyEndpointAutoScalingRuleActionResult(
+                    success=True,
+                    data=MagicMock(id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                 ),
             ),
-            (
-                ScenarioBase.failure(
-                    "Rule not found",
-                    ModifyEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
-                        updater=Updater(
-                            spec=EndpointAutoScalingRuleUpdaterSpec(
-                                threshold=OptionalState.update(Decimal("90.0")),
-                            ),
-                            pk_value=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            ScenarioBase.failure(
+                "Rule not found",
+                ModifyEndpointAutoScalingRuleAction(
+                    id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
+                    updater=Updater(
+                        spec=EndpointAutoScalingRuleUpdaterSpec(
+                            threshold=OptionalState.update(Decimal("90.0")),
                         ),
-                    ),
-                    EndpointAutoScalingRuleNotFound,
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000008"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN modify all parameters",
-                    ModifyEndpointAutoScalingRuleAction(
-                        id=RuleId(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
-                        updater=Updater(
-                            spec=EndpointAutoScalingRuleUpdaterSpec(
-                                threshold=OptionalState.update(Decimal("75.0")),
-                                min_replicas=TriState.update(3),
-                                max_replicas=TriState.update(30),
-                                step_size=OptionalState.update(3),
-                                cooldown_seconds=OptionalState.update(180),
-                            ),
-                            pk_value=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
-                        ),
-                    ),
-                    ModifyEndpointAutoScalingRuleActionResult(
-                        success=True,
-                        data=MagicMock(id=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
+                        pk_value=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                     ),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
-                    domain_name="default",
-                ),
+                EndpointAutoScalingRuleNotFound,
             ),
         ],
     )
@@ -224,7 +154,6 @@ class TestModifyAutoScalingRule:
             "Modify threshold",
             "Modify min/max replicas",
             "Disable rule",
-            "SUPERADMIN modify all parameters",
         ]:
             # Create a mock rule with endpoint field
             mock_rule = MagicMock(

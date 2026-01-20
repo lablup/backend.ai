@@ -6,6 +6,7 @@ Tests verify service layer business logic using mocked repositories.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -34,27 +35,25 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
+@pytest.fixture
+def user_data() -> UserData:
+    """User data for tests."""
+    from ai.backend.manager.models.user import UserRole
+
+    return UserData(
+        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=UserRole.USER.value,
+        domain_name="default",
+    )
+
+
 @pytest.fixture(autouse=True)
-def set_user_context(request: pytest.FixtureRequest) -> Iterator[None]:
-    """Automatically set user context for tests that have user_data parameter.
-
-    This fixture checks if 'user_data' is available in the test's parameters
-    (either via parametrize or fixture) and wraps the test execution with
-    the with_user context manager.
-    """
-    user_data: UserData | None = None
-
-    # Check if user_data is in parametrized values
-    if hasattr(request, "param") and isinstance(request.param, UserData):
-        user_data = request.param
-    # Check if user_data is available as a fixture
-    elif "user_data" in request.fixturenames:
-        user_data = request.getfixturevalue("user_data")
-
-    if user_data is not None:
-        with with_user(user_data):
-            yield
-    else:
+def set_user_context(user_data: UserData) -> Iterator[None]:
+    """Automatically set user context for all tests."""
+    with with_user(user_data):
         yield
 
 

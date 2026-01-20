@@ -69,96 +69,66 @@ def mock_get_scaling_group_info_token(mocker, mock_repositories):
 
 class TestGenerateToken:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "regular token generation",
-                    GenerateTokenAction(
-                        service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                        duration=None,
-                        valid_until=None,
-                        expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
-                    ),
-                    GenerateTokenActionResult(
-                        data=EndpointTokenData(
-                            id=uuid.UUID("12345678-1234-1234-1234-123456789012"),
-                            token="jwt_token_example",
-                            endpoint=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                            domain="default",
-                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                            created_at=datetime.now(tz=UTC),
-                        ),
-                    ),
+            ScenarioBase.success(
+                "regular token generation",
+                GenerateTokenAction(
+                    service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                    duration=None,
+                    valid_until=None,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                GenerateTokenActionResult(
+                    data=EndpointTokenData(
+                        id=uuid.UUID("12345678-1234-1234-1234-123456789012"),
+                        token="jwt_token_example",
+                        endpoint=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        domain="default",
+                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                        created_at=datetime.now(tz=UTC),
+                    ),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "unlimited token",
-                    GenerateTokenAction(
-                        service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
-                        duration=None,
-                        valid_until=None,
-                        expires_at=0,  # No expiry
-                    ),
-                    GenerateTokenActionResult(
-                        data=EndpointTokenData(
-                            id=uuid.UUID("12345678-1234-1234-1234-123456789013"),
-                            token="jwt_token_unlimited",
-                            endpoint=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
-                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                            domain="default",
-                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                            created_at=datetime.now(tz=UTC),
-                        ),
-                    ),
+            ScenarioBase.success(
+                "unlimited token",
+                GenerateTokenAction(
+                    service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                    duration=None,
+                    valid_until=None,
+                    expires_at=0,  # No expiry
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                GenerateTokenActionResult(
+                    data=EndpointTokenData(
+                        id=uuid.UUID("12345678-1234-1234-1234-123456789013"),
+                        token="jwt_token_unlimited",
+                        endpoint=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        domain="default",
+                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                        created_at=datetime.now(tz=UTC),
+                    ),
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "limited scope token",
-                    GenerateTokenAction(
-                        service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
-                        duration=None,
-                        valid_until=None,
-                        expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
-                    ),
-                    GenerateTokenActionResult(
-                        data=EndpointTokenData(
-                            id=uuid.UUID("12345678-1234-1234-1234-123456789014"),
-                            token="jwt_token_restricted",
-                            endpoint=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
-                            session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                            domain="default",
-                            project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                            created_at=datetime.now(tz=UTC),
-                        ),
-                    ),
+            ScenarioBase.success(
+                "limited scope token",
+                GenerateTokenAction(
+                    service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                    duration=None,
+                    valid_until=None,
+                    expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                GenerateTokenActionResult(
+                    data=EndpointTokenData(
+                        id=uuid.UUID("12345678-1234-1234-1234-123456789014"),
+                        token="jwt_token_restricted",
+                        endpoint=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                        session_owner=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                        domain="default",
+                        project=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                        created_at=datetime.now(tz=UTC),
+                    ),
                 ),
             ),
         ],

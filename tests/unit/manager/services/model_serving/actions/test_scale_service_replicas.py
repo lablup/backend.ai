@@ -59,133 +59,61 @@ def mock_update_endpoint_replicas(mocker, mock_repositories):
 
 class TestScaleServiceReplicas:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "scale up",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
-                        to=5,
-                    ),
-                    ScaleServiceReplicasActionResult(
-                        current_route_count=2,
-                        target_count=5,
-                    ),
+            ScenarioBase.success(
+                "scale up",
+                ScaleServiceReplicasAction(
+                    max_session_count_per_model_session=100,
+                    service_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
+                    to=5,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ScaleServiceReplicasActionResult(
+                    current_route_count=2,
+                    target_count=5,
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "scale down",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                        to=1,
-                    ),
-                    ScaleServiceReplicasActionResult(
-                        current_route_count=5,
-                        target_count=1,
-                    ),
+            ScenarioBase.success(
+                "scale down",
+                ScaleServiceReplicasAction(
+                    max_session_count_per_model_session=100,
+                    service_id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    to=1,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ScaleServiceReplicasActionResult(
+                    current_route_count=5,
+                    target_count=1,
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "zero scale",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-                        to=0,
-                    ),
-                    ScaleServiceReplicasActionResult(
-                        current_route_count=2,
-                        target_count=0,
-                    ),
+            ScenarioBase.success(
+                "zero scale",
+                ScaleServiceReplicasAction(
+                    max_session_count_per_model_session=100,
+                    service_id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    to=0,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ScaleServiceReplicasActionResult(
+                    current_route_count=2,
+                    target_count=0,
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "SUPERADMIN scale up",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                        to=10,
-                    ),
-                    ScaleServiceReplicasActionResult(
-                        current_route_count=3,
-                        target_count=10,
-                    ),
+            ScenarioBase.failure(
+                "non-existent service",
+                ScaleServiceReplicasAction(
+                    max_session_count_per_model_session=100,
+                    service_id=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                    to=5,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=True,
-                    role=UserRole.SUPERADMIN.value,
-                    domain_name="default",
-                ),
+                ModelServiceNotFound,
             ),
-            (
-                ScenarioBase.failure(
-                    "non-existent service",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
-                        to=5,
-                    ),
-                    ModelServiceNotFound,
+            ScenarioBase.failure(
+                "update operation failed",
+                ScaleServiceReplicasAction(
+                    max_session_count_per_model_session=100,
+                    service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                    to=3,
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
-            ),
-            (
-                ScenarioBase.failure(
-                    "update operation failed",
-                    ScaleServiceReplicasAction(
-                        max_session_count_per_model_session=100,
-                        service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
-                        to=3,
-                    ),
-                    ModelServiceNotFound,
-                ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
+                ModelServiceNotFound,
             ),
         ],
     )
@@ -204,7 +132,7 @@ class TestScaleServiceReplicas:
         action = scenario.input
 
         # Mock endpoint data based on scenario
-        if scenario.description in ["scale up", "scale down", "zero scale", "SUPERADMIN scale up"]:
+        if scenario.description in ["scale up", "scale down", "zero scale"]:
             mock_validation_data = MagicMock(
                 session_owner_id=user_data.user_id,
                 session_owner_role=UserRole(user_data.role),

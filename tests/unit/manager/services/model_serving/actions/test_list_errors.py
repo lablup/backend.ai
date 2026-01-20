@@ -50,72 +50,52 @@ def mock_get_endpoint_access_validation_data_list_errors(mocker, mock_repositori
 
 class TestListErrors:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "recent errors lookup",
-                    ListErrorsAction(
-                        service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
-                    ),
-                    ListErrorsActionResult(
-                        error_info=[
-                            ErrorInfo(
-                                session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                                error={
-                                    "timestamp": datetime.now(tz=UTC).isoformat(),
-                                    "error_type": "OOMKilled",
-                                    "message": "Container killed due to out of memory",
-                                },
-                            ),
-                            ErrorInfo(
-                                session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-                                error={
-                                    "timestamp": datetime.now(tz=UTC).isoformat(),
-                                    "error_type": "ImagePullError",
-                                    "message": "Failed to pull image",
-                                },
-                            ),
-                        ],
-                        retries=0,
-                    ),
+            ScenarioBase.success(
+                "recent errors lookup",
+                ListErrorsAction(
+                    service_id=uuid.UUID("11111111-2222-3333-4444-555555555555"),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ListErrorsActionResult(
+                    error_info=[
+                        ErrorInfo(
+                            session_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                            error={
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
+                                "error_type": "OOMKilled",
+                                "message": "Container killed due to out of memory",
+                            },
+                        ),
+                        ErrorInfo(
+                            session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                            error={
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
+                                "error_type": "ImagePullError",
+                                "message": "Failed to pull image",
+                            },
+                        ),
+                    ],
+                    retries=0,
                 ),
             ),
-            (
-                ScenarioBase.success(
-                    "error type filtered",
-                    ListErrorsAction(
-                        service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
-                    ),
-                    ListErrorsActionResult(
-                        error_info=[
-                            ErrorInfo(
-                                session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                                error={
-                                    "timestamp": datetime.now(tz=UTC).isoformat(),
-                                    "error_type": "OOMKilled",
-                                    "message": "Container killed due to out of memory",
-                                },
-                            ),
-                        ],
-                        retries=0,
-                    ),
+            ScenarioBase.success(
+                "error type filtered",
+                ListErrorsAction(
+                    service_id=uuid.UUID("22222222-3333-4444-5555-666666666666"),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                ListErrorsActionResult(
+                    error_info=[
+                        ErrorInfo(
+                            session_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
+                            error={
+                                "timestamp": datetime.now(tz=UTC).isoformat(),
+                                "error_type": "OOMKilled",
+                                "message": "Container killed due to out of memory",
+                            },
+                        ),
+                    ],
+                    retries=0,
                 ),
             ),
         ],

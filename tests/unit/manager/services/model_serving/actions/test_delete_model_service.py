@@ -56,43 +56,23 @@ def mock_check_user_access(mocker, model_serving_service):
 
 class TestDeleteModelService:
     @pytest.mark.parametrize(
-        ("scenario", "user_data"),
+        "scenario",
         [
-            (
-                ScenarioBase.success(
-                    "successful model deletion",
-                    DeleteModelServiceAction(
-                        service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    ),
-                    DeleteModelServiceActionResult(
-                        success=True,
-                    ),
+            ScenarioBase.success(
+                "successful model deletion",
+                DeleteModelServiceAction(
+                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
+                DeleteModelServiceActionResult(
+                    success=True,
                 ),
             ),
-            (
-                ScenarioBase.failure(
-                    "non-existent model",
-                    DeleteModelServiceAction(
-                        service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    ),
-                    ModelServiceNotFound,
+            ScenarioBase.failure(
+                "non-existent model",
+                DeleteModelServiceAction(
+                    service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
                 ),
-                UserData(
-                    user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                    is_authorized=True,
-                    is_admin=False,
-                    is_superadmin=False,
-                    role=UserRole.USER.value,
-                    domain_name="default",
-                ),
+                ModelServiceNotFound,
             ),
         ],
     )
