@@ -36,7 +36,7 @@ from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
-from ai.backend.storage.errors import InvalidAPIParameters
+from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import CheckParamSource, check_params
 
@@ -345,6 +345,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
             upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+
+            # TUS protocol requires Upload-Offset validation before appending data
+            upload_offset_header = request.headers.get("Upload-Offset")
+            if upload_offset_header is None:
+                raise InvalidAPIParameters(
+                    "Missing required Upload-Offset header for TUS PATCH request"
+                )
+
+            try:
+                client_offset = int(upload_offset_header)
+            except ValueError:
+                raise InvalidAPIParameters(
+                    f"Invalid Upload-Offset header value: {upload_offset_header}"
+                )
+
+            actual_offset = int(headers["Upload-Offset"])
+            if client_offset != actual_offset:
+                raise UploadOffsetMismatchError(
+                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                )
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
