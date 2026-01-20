@@ -92,8 +92,7 @@ def mock_config_provider() -> MagicMock:
 @pytest.fixture
 def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
-    client = AsyncMock()
-    return client
+    return AsyncMock()
 
 
 @pytest.fixture

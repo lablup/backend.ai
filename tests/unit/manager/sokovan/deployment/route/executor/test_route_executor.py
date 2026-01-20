@@ -581,7 +581,7 @@ class TestSyncServiceDiscovery:
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
-            result = await route_executor.sync_service_discovery([healthy_route])
+            await route_executor.sync_service_discovery([healthy_route])
 
         # Assert
         mock_service_discovery.sync_model_service_routes.assert_awaited_once()
@@ -608,7 +608,7 @@ class TestSyncServiceDiscovery:
         entity_ids = [route_without_session.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
-            result = await route_executor.sync_service_discovery([route_without_session])
+            await route_executor.sync_service_discovery([route_without_session])
 
         # Assert
         mock_deployment_repo.fetch_route_service_discovery_info.assert_not_awaited()
@@ -661,7 +661,7 @@ class TestSyncServiceDiscovery:
         entity_ids = [r.route_id for r in healthy_routes_multiple]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
-            result = await route_executor.sync_service_discovery(healthy_routes_multiple)
+            await route_executor.sync_service_discovery(healthy_routes_multiple)
 
         # Assert
         mock_service_discovery.sync_model_service_routes.assert_awaited_once()

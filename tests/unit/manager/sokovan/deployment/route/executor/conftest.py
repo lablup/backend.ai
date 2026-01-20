@@ -53,15 +53,13 @@ def mock_scheduling_controller() -> AsyncMock:
 @pytest.fixture
 def mock_config_provider() -> MagicMock:
     """Mock ManagerConfigProvider."""
-    provider = MagicMock()
-    return provider
+    return MagicMock()
 
 
 @pytest.fixture
 def mock_client_pool() -> MagicMock:
     """Mock ClientPool."""
-    pool = MagicMock()
-    return pool
+    return MagicMock()
 
 
 @pytest.fixture

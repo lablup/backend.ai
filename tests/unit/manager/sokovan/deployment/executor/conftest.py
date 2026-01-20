@@ -46,8 +46,7 @@ def mock_deployment_repo() -> AsyncMock:
 @pytest.fixture
 def mock_scheduling_controller() -> AsyncMock:
     """Mock SchedulingController."""
-    controller = AsyncMock()
-    return controller
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -70,8 +69,7 @@ def mock_client_pool() -> MagicMock:
 @pytest.fixture
 def mock_valkey_stat() -> AsyncMock:
     """Mock ValkeyStatClient."""
-    client = AsyncMock()
-    return client
+    return AsyncMock()
 
 
 @pytest.fixture
