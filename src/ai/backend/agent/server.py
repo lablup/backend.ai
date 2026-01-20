@@ -181,10 +181,7 @@ class RPCFunctionRegistry:
                 if request.body is None:
                     return await meth(self_)
                 request_id = request.body.get("request_id")
-                if request_id:
-                    receive_request_id(request_id)
-                else:
-                    log.warning("No request_id received from manager for RPC call")
+                receive_request_id(request_id, "RPC call from manager")
                 return await meth(
                     self_,
                     *request.body["args"],
@@ -223,10 +220,7 @@ class RPCFunctionRegistryV2:
                 if request.body is None:
                     return await meth(self_)
                 request_id = request.body.get("request_id")
-                if request_id:
-                    receive_request_id(request_id)
-                else:
-                    log.warning("No request_id received from manager for RPC call")
+                receive_request_id(request_id, "RPC call from manager")
                 res = await meth(
                     self_,
                     *request.body["args"],
