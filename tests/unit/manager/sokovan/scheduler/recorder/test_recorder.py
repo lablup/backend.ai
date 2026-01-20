@@ -80,8 +80,8 @@ class TestValidatorPattern:
                     pass
                 with recorder.step("dependency_check", success_detail="Dependencies OK"):
                     pass
+            pool.build_all_records()
 
-        # Records are built when scope exits
         record = pool.get_record(session_id)
         assert record is not None
         assert len(record.phases) == 1
@@ -112,6 +112,7 @@ class TestValidatorPattern:
                     # This step won't be reached due to exception
                     with recorder.step("dependency_check", success_detail="Dependencies OK"):
                         pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -170,6 +171,7 @@ class TestValidatorPattern:
             with recorder2.phase("phase_b"):
                 with recorder2.step("step2"):
                     pass
+            pool.build_all_records()
 
         record1 = pool.get_record(session1)
         record2 = pool.get_record(session2)
@@ -193,6 +195,7 @@ class TestValidatorPattern:
             with recorder.phase("phase2"):
                 with recorder.step("step2"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -220,6 +223,7 @@ class TestStructuredRecords:
             with recorder.phase("validation"):
                 with recorder.step("quota_check", success_detail="OK"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
 
@@ -239,6 +243,7 @@ class TestStructuredRecords:
                     pass
                 with recorder.step("resource_check", success_detail="Resource OK"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -262,6 +267,7 @@ class TestStructuredRecords:
             with recorder.phase("validation"):
                 with recorder.step("quota_check", success_detail="Quota OK"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -288,6 +294,7 @@ class TestStructuredRecords:
                         pass
                     with recorder.step("resource_check"):
                         raise ValueError("Resource limit exceeded")
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -313,6 +320,7 @@ class TestStructuredRecords:
             with recorder.phase("allocation"):
                 with recorder.step("allocate"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -335,6 +343,7 @@ class TestStructuredRecords:
             with recorder2.phase("phase2"):
                 with recorder2.step("step2"):
                     pass
+            pool.build_all_records()
 
         all_records = pool.get_all_records()
         assert session1 in all_records
@@ -352,6 +361,7 @@ class TestStructuredRecords:
             with recorder.phase("validation"):
                 with recorder.step("quota_check", success_detail="OK"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -385,6 +395,7 @@ class TestRecorderAPI:
             with recorder.phase("validation"):
                 with recorder.step("quota_check", success_detail="Quota OK"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -403,6 +414,7 @@ class TestRecorderAPI:
             with recorder.phase("validation", success_detail="Validation passed"):
                 with recorder.step("check"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -422,6 +434,7 @@ class TestRecorderAPI:
             with recorder.phase("allocation"):
                 with recorder.step("allocate"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -442,6 +455,7 @@ class TestRecorderAPI:
                         pass
                     with recorder.step("resource_check"):
                         raise ValueError("Resource limit exceeded")
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -473,6 +487,7 @@ class TestRecorderAPI:
                 with recorder.phase("validation", success_detail="All passed"):
                     with recorder.step("check"):
                         raise ValueError("Check failed")
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -500,6 +515,7 @@ class TestSharedPhases:
                     "drf", success_detail="DRF sequencing applied"
                 ):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -523,6 +539,7 @@ class TestSharedPhases:
             with recorder.phase("validation"):
                 with recorder.step("quota_check"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -554,6 +571,7 @@ class TestSharedPhases:
             with recorder2.phase("allocation"):
                 with recorder2.step("allocate"):
                     pass
+            pool.build_all_records()
 
         record1 = pool.get_record(session1)
         record2 = pool.get_record(session2)
@@ -577,6 +595,7 @@ class TestSharedPhases:
         with RecorderContext[SessionId].scope("schedule", entity_ids=[session1, session2]) as pool:
             with RecorderContext[SessionId].shared_phase("sequencing", success_detail="Sorted"):
                 pass
+            pool.build_all_records()
 
         record1 = pool.get_record(session1)
         record2 = pool.get_record(session2)
@@ -597,6 +616,7 @@ class TestSharedPhases:
             with recorder.phase("validation"):
                 with recorder.step("check"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -626,6 +646,7 @@ class TestSharedPhaseContextManager:
             with recorder.phase("validation"):
                 with recorder.step("check"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -645,6 +666,7 @@ class TestSharedPhaseContextManager:
             with RecorderContext[SessionId].shared_phase("sequencing", success_detail="Sequenced"):
                 with RecorderContext[SessionId].shared_step("drf", success_detail="DRF applied"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -664,6 +686,7 @@ class TestSharedPhaseContextManager:
             with pytest.raises(ValueError, match="Sequencing failed"):
                 with RecorderContext[SessionId].shared_phase("sequencing", success_detail="OK"):
                     raise ValueError("Sequencing failed")
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -683,6 +706,7 @@ class TestSharedPhaseContextManager:
                 with RecorderContext[SessionId].shared_phase("sequencing"):
                     with RecorderContext[SessionId].shared_step("drf", success_detail="OK"):
                         raise ValueError("Step failed")
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -719,6 +743,7 @@ class TestSharedPhaseContextManager:
                     pass
                 with RecorderContext[SessionId].shared_step("drf", success_detail="DRF"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -736,6 +761,7 @@ class TestSharedPhaseContextManager:
             with RecorderContext[SessionId].shared_phase("sequencing"):
                 with RecorderContext[SessionId].shared_step("drf"):
                     pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None
@@ -771,6 +797,7 @@ class TestSharedPhaseContextManager:
             with recorder2.phase("allocation"):
                 with recorder2.step("allocate"):
                     pass
+            pool.build_all_records()
 
         record1 = pool.get_record(session1)
         record2 = pool.get_record(session2)
@@ -810,6 +837,7 @@ class TestPhaseOrdering:
             # Shared phase after (but should appear based on started_at)
             with RecorderContext[SessionId].shared_phase("sequencing"):
                 pass
+            pool.build_all_records()
 
         record = pool.get_record(session_id)
         assert record is not None

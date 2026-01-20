@@ -39,22 +39,16 @@ from .response import (
     UpdateNotificationRuleResponse,
     ValidateNotificationChannelResponse,
     ValidateNotificationRuleResponse,
-    WebhookConfigResponse,
+    WebhookSpecResponse,
 )
 from .types import (
     NotificationChannelOrderField,
-    NotificationChannelType,
     NotificationRuleOrderField,
-    NotificationRuleType,
     OrderDirection,
-    WebhookConfig,
 )
 
 __all__ = (
     # Types
-    "NotificationChannelType",
-    "NotificationRuleType",
-    "WebhookConfig",
     "OrderDirection",
     "NotificationChannelOrderField",
     "NotificationRuleOrderField",
@@ -75,7 +69,7 @@ __all__ = (
     "NotificationChannelOrder",
     "NotificationRuleOrder",
     # Response DTOs
-    "WebhookConfigResponse",
+    "WebhookSpecResponse",
     "NotificationChannelDTO",
     "NotificationRuleDTO",
     "CreateNotificationChannelResponse",

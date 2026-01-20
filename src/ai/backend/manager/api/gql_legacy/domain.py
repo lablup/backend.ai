@@ -245,6 +245,8 @@ class DomainNode(graphene.ObjectType):
             if cond is None:
                 return None
             row = await db_session.scalar(sa.select(DomainRow).where(DomainRow.name == domain_name))
+            if row is None:
+                return None
             permissions = await permission_ctx.calculate_final_permission(row)
 
             return cls.from_rbac_model(graph_ctx, DomainModel.from_row(row, permissions))

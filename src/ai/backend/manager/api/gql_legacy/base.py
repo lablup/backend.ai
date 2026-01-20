@@ -790,11 +790,12 @@ async def simple_db_mutate_returning_item(
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
             result = await conn.execute(_query)
+            row: Row[Any] | None
             if post_func:
                 row = await post_func(conn, result)
             else:
                 row = result.first()
-            if result.rowcount > 0:
+            if result.rowcount > 0 and row is not None:
                 return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
             return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 

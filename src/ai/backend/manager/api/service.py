@@ -431,7 +431,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default=RuntimeVariant.CUSTOM,
     )
     architecture: Optional[str] = Field(
-        description="Image architecture",
+        description="Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
         alias="arch",
         default=None,
     )

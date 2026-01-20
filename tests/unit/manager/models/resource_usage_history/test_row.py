@@ -59,7 +59,7 @@ class TestDomainUsageBucketRow:
         """Duplicate (domain_name, scaling_group, period_start) should raise IntegrityError."""
         duplicate = DomainUsageBucketRow(
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,
@@ -100,7 +100,7 @@ class TestProjectUsageBucketRow:
         duplicate = ProjectUsageBucketRow(
             project_id=project_id,
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,
@@ -145,7 +145,7 @@ class TestUserUsageBucketRow:
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,

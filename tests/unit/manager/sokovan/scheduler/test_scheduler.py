@@ -133,6 +133,11 @@ class TestProvisionerAllocation:
         return repo
 
     @pytest.fixture
+    def mock_fair_share_repository(self) -> MagicMock:
+        """Create a mock fair share repository."""
+        return MagicMock()
+
+    @pytest.fixture
     def mock_agent_selector_with_verification(self) -> Mock:
         """Create a mock agent selector that tracks call history."""
         selector = MagicMock(spec=AgentSelector)
@@ -238,7 +243,10 @@ class TestProvisionerAllocation:
 
     @pytest.fixture
     def provisioner(
-        self, mock_repository: MagicMock, mock_agent_selector_with_verification: Mock
+        self,
+        mock_repository: MagicMock,
+        mock_fair_share_repository: MagicMock,
+        mock_agent_selector_with_verification: Mock,
     ) -> SessionProvisioner:
         """Create a provisioner instance with mocked dependencies."""
         mock_config_provider = MagicMock()
@@ -250,6 +258,7 @@ class TestProvisionerAllocation:
                 default_agent_selector=mock_agent_selector_with_verification,
                 allocator=MagicMock(),
                 repository=mock_repository,
+                fair_share_repository=mock_fair_share_repository,
                 config_provider=mock_config_provider,
                 valkey_schedule=mock_valkey_schedule,
             )

@@ -36,7 +36,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 
 @pytest.fixture
-def mock_agent_client_pool():
+def mock_agent_client_pool() -> MagicMock:
     """Mock AgentClientPool for testing."""
     mock_pool = MagicMock(spec=AgentClientPool)
 
@@ -69,7 +69,7 @@ def mock_agent_client_pool():
 
 
 @pytest.fixture
-def mock_repository():
+def mock_repository() -> MagicMock:
     """Mock ScheduleRepository for testing."""
     mock_repo = MagicMock()
     mock_repo.get_terminating_sessions = AsyncMock()

@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
 from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
@@ -67,8 +68,7 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics, EndpointTokenRow
-from ai.backend.manager.models.kernel import KernelStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,

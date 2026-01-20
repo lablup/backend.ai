@@ -79,7 +79,6 @@ class RecorderContext(Generic[EntityIdT]):
         try:
             yield pool
         finally:
-            pool._build_all_records()
             cls._pool_context.reset(token)
 
     @classmethod

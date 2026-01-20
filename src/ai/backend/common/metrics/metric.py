@@ -433,6 +433,8 @@ class LayerType(enum.StrEnum):
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
     VFOLDER_REPOSITORY = "vfolder_repository"
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
+    FAIR_SHARE_REPOSITORY = "fair_share_repository"
+    RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
 
     # DB Source layers
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"

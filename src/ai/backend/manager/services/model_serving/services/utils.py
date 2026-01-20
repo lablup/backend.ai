@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import uuid
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.manager.data.model_serving.types import (
+    EndpointAccessValidationData,
+    RequesterCtx,
+)
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
@@ -29,3 +35,31 @@ async def verify_user_access_scopes(
             raise InvalidAPIParameters(str(e))
         except RuntimeError as e:
             raise GenericForbidden(str(e))
+
+
+def validate_endpoint_access(
+    validation_data: EndpointAccessValidationData,
+    ctx: RequesterCtx,
+) -> bool:
+    """Validate user access to endpoint based on role.
+
+    Returns True if the user has access to the endpoint, False otherwise.
+
+    Access rules:
+    - SUPERADMIN: Full access to all endpoints
+    - ADMIN: Access to endpoints in their domain, except those owned by SUPERADMIN
+    - USER/others: Access only to endpoints they own
+    """
+    if validation_data.session_owner_id is None:
+        return True
+
+    match ctx.user_role:
+        case UserRole.SUPERADMIN:
+            return True
+        case UserRole.ADMIN:
+            # ADMIN cannot access SUPERADMIN's resources
+            if validation_data.session_owner_role == UserRole.SUPERADMIN:
+                return False
+            return validation_data.domain == ctx.domain_name
+        case _:
+            return validation_data.session_owner_id == ctx.user_id

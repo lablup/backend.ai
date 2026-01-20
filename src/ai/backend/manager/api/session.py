@@ -519,8 +519,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
-        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-        >> "architecture": t.String,
+        tx.AliasedKey(["arch", "architecture"], default=None) >> "architecture": t.Null | t.String,
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "session_type": tx.Enum(
             SessionTypes
         ),
@@ -600,13 +599,16 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
         params["image"],
         params["session_name"],
     )
+    architecture = (
+        params["architecture"] if params["architecture"] is not None else DEFAULT_IMAGE_ARCH
+    )
 
     result = await root_ctx.processors.session.create_from_params.wait_for_complete(
         CreateFromParamsAction(
             params=CreateFromParamsActionParams(
                 session_name=params["session_name"],
                 image=params["image"],
-                architecture=params["architecture"],
+                architecture=architecture,
                 session_type=params["session_type"],
                 group_name=params["group"],
                 domain_name=domain_name,

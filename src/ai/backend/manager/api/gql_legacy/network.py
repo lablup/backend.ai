@@ -251,10 +251,12 @@ class CreateNetwork(graphene.Mutation):
             ):
                 raise GenericForbidden
             query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
-            project_network_count = await db_session.scalar(query)
+            project_network_count = await db_session.scalar(query) or 0
+            max_network_count = project.resource_policy_row.max_network_count
             if (
-                project_network_count >= 0
-                and project_network_count >= project.resource_policy_row.max_network_count
+                max_network_count is not None
+                and project_network_count >= 0
+                and project_network_count >= max_network_count
             ):
                 raise GenericForbidden(
                     "Cannot create more networks on this project (restricted by project resource policy)"

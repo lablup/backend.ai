@@ -38,6 +38,7 @@ __all__ = (
     "RoleOrder",
     "ScopeFilter",
     "ScopeOrder",
+    "SearchEntitiesRequest",
     "SearchRolesRequest",
     "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
@@ -189,6 +190,15 @@ class SearchScopesRequest(BaseRequestModel):
 
     filter: Optional[ScopeFilter] = Field(default=None, description="Filter conditions")
     order: Optional[list[ScopeOrder]] = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class SearchEntitiesRequest(BaseRequestModel):
+    """Request body for searching entities within a scope."""
+
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )

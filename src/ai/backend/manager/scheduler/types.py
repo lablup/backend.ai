@@ -47,10 +47,8 @@ class ScheduleType(StrEnum):
     """Types of scheduling operations that can be triggered."""
 
     SCHEDULE = "schedule"  # Schedule pending sessions
+    DEPRIORITIZE = "deprioritize"  # Lower priority and return to PENDING
     SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
-    SWEEP_LOST_AGENT_KERNELS = (
-        "sweep_lost_agent_kernels"  # Sweep kernels with lost or missing agents
-    )
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions
     TERMINATE = "terminate"  # Terminate sessions
@@ -61,11 +59,9 @@ class ScheduleType(StrEnum):
     CHECK_TERMINATING_PROGRESS = (
         "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
     )
-    RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
-    RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
     SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
-    CHECK_RUNNING_SESSION_TERMINATION = (
-        "check_running_session_termination"  # Check RUNNING sessions with all kernels TERMINATED
+    DETECT_KERNEL_TERMINATION = (
+        "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
     )
 
 

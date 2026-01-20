@@ -67,11 +67,12 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.container_gids.update_dict(to_update, "container_gids")
         # Set status based on is_active if not explicitly set
         status = self.status.optional_value()
-        if status is None:
-            is_active = self.is_active.optional_value()
-            to_update["status"] = UserStatus.ACTIVE if is_active else UserStatus.INACTIVE
-        else:
+        if status is not None:
             to_update["status"] = status
+        else:
+            is_active = self.is_active.optional_value()
+            if is_active is not None:
+                to_update["status"] = UserStatus.ACTIVE if is_active else UserStatus.INACTIVE
         return to_update
 
     @property

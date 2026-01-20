@@ -20,6 +20,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -33,6 +34,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
@@ -203,3 +205,11 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
+
+    @agent_repository_resilience.apply()
+    async def search_agents(
+        self,
+        querier: BatchQuerier,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+        return await self._db_source.search_agents(querier=querier)

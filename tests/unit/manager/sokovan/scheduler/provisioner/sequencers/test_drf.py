@@ -19,6 +19,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
 
 class TestDRFSequencer:
     @pytest.fixture
+    def scaling_group(self) -> str:
+        return "default"
+
+    @pytest.fixture
     def sequencer(self) -> DRFSequencer:
         return DRFSequencer()
 
@@ -104,14 +108,14 @@ class TestDRFSequencer:
 
     @pytest.mark.asyncio
     async def test_empty_workload(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
-        result = sequencer.sequence(empty_system_snapshot, [])
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
     async def test_single_user_workloads(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -136,7 +140,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
 
         # With no existing allocations, order should be preserved
         assert len(result) == 2
@@ -146,6 +150,7 @@ class TestDRFSequencer:
     @pytest.mark.asyncio
     async def test_multiple_users_different_dominant_shares(
         self,
+        scaling_group: str,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -182,7 +187,9 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(
+            scaling_group, system_snapshot_with_allocations, workloads
+        )
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
         assert len(result) == 3
@@ -192,7 +199,7 @@ class TestDRFSequencer:
 
     @pytest.mark.asyncio
     async def test_multiple_users_same_dominant_share(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         # All users have no existing allocations (0% dominant share)
         workloads = [
@@ -228,7 +235,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
 
         # With same dominant share, order should be preserved
         assert len(result) == 3
@@ -239,6 +246,7 @@ class TestDRFSequencer:
     @pytest.mark.asyncio
     async def test_new_user_gets_priority(
         self,
+        scaling_group: str,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -265,7 +273,9 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(
+            scaling_group, system_snapshot_with_allocations, workloads
+        )
 
         # New user with 0% dominant share should get priority
         assert len(result) == 2
@@ -274,7 +284,7 @@ class TestDRFSequencer:
 
     @pytest.mark.asyncio
     async def test_dominant_share_calculation_with_zero_capacity(
-        self, sequencer: DRFSequencer
+        self, scaling_group: str, sequencer: DRFSequencer
     ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
@@ -327,5 +337,5 @@ class TestDRFSequencer:
         ]
 
         # Should not crash when dividing by zero capacity
-        result = sequencer.sequence(system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
         assert len(result) == 1

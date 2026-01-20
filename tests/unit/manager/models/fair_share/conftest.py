@@ -185,7 +185,7 @@ async def domain_fair_share_id(
     """Create DomainFairShareRow and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -208,7 +208,7 @@ async def domain_fair_share_with_usage_id(
     """Create DomainFairShareRow with calculated usage values and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         weight=Decimal("2.0"),
         total_decayed_usage=ResourceSlot({"cpu": Decimal("3600"), "mem": Decimal("7200")}),
         normalized_usage=Decimal("0.15"),
@@ -233,7 +233,7 @@ async def project_fair_share_id(
     row = ProjectFairShareRow(
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -260,7 +260,7 @@ async def user_fair_share_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -287,7 +287,7 @@ async def user_fair_share_with_large_usage_id(
         user_uuid=user_uuid,
         project_id=project_id,
         domain_name=domain_name,
-        scaling_group=scaling_group,
+        resource_group=scaling_group,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot({
             "cpu": Decimal("241920000"),

@@ -17,7 +17,11 @@ from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+    ArtifactStorageType,
+    VFolderStorageTarget,
+)
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
@@ -25,8 +29,9 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
+from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
@@ -41,7 +46,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import DelegateImportArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
+    ImportArtifactsOptions,
+)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -61,6 +69,7 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -129,6 +138,7 @@ class ArtifactRevisionService:
     _storage_namespace_repository: StorageNamespaceRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
+    _vfolder_repository: VfolderRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _background_task_manager: BackgroundTaskManager
@@ -142,6 +152,7 @@ class ArtifactRevisionService:
         storage_namespace_repository: StorageNamespaceRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
+        vfolder_repository: VfolderRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
@@ -154,6 +165,7 @@ class ArtifactRevisionService:
         self._storage_namespace_repository = storage_namespace_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
+        self._vfolder_repository = vfolder_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_artifact_client = valkey_artifact_client
@@ -402,6 +414,16 @@ class ArtifactRevisionService:
             )
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
+
+            # Look up vfolder to get volume_name (host) if vfolder_id is provided
+            vfolder_id: VFolderID | None = None
+            volume_name: str | None = None
+            if action.vfolder_id:
+                vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+                if vfolder_data:
+                    vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+                    _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+
             task_id: UUID
             match artifact.registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
@@ -423,7 +445,10 @@ class ArtifactRevisionService:
 
                     # Skip import if artifact revision is already Available and commit hash matches
                     # If current_commit_hash is None, always proceed with import
-                    if self._is_latest_commit_hash(revision_data, latest_commit_hash):
+                    # If force is True, skip this check and always re-download
+                    if not action.force and self._is_latest_commit_hash(
+                        revision_data, latest_commit_hash
+                    ):
                         # Return early without calling import API
                         return ImportArtifactRevisionActionResult(
                             result=revision_data, task_id=None
@@ -433,13 +458,25 @@ class ArtifactRevisionService:
                         action.artifact_revision_id, ArtifactStatus.PULLING
                     )
 
+                    vfolder_target: VFolderStorageTarget | None = None
+                    if vfolder_id is not None and volume_name is not None:
+                        vfolder_target = VFolderStorageTarget(
+                            vfolder_id=vfolder_id,
+                            volume_name=volume_name,
+                        )
+
                     huggingface_result = await storage_proxy_client.import_huggingface_models(
                         HuggingFaceImportModelsReq(
                             models=[
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                            storage_step_target_mappings=(
+                                dict.fromkeys(ArtifactStorageImportStep, vfolder_target)
+                                if vfolder_target is not None
+                                else reservoir_config.resolve_storage_step_selection()
+                            ),
+                            storage_prefix=action.storage_prefix,
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -529,6 +566,13 @@ class ArtifactRevisionService:
                             action.artifact_revision_id, ArtifactStatus.PULLING
                         )
 
+                        vfolder_target: VFolderStorageTarget | None = None
+                        if vfolder_id is not None and volume_name is not None:
+                            vfolder_target = VFolderStorageTarget(
+                                vfolder_id=vfolder_id,
+                                volume_name=volume_name,
+                            )
+
                         # TODO: Utilize this internal import task_id
                         _result = await storage_proxy_client.import_reservoir_models(
                             ReservoirImportModelsReq(
@@ -538,8 +582,13 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                storage_step_target_mappings=(
+                                    dict.fromkeys(ArtifactStorageImportStep, vfolder_target)
+                                    if vfolder_target is not None
+                                    else reservoir_config.resolve_storage_step_selection()
+                                ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
+                                storage_prefix=action.storage_prefix,
                             )
                         )
 
@@ -672,7 +721,10 @@ class ArtifactRevisionService:
                 result: list[ArtifactRevisionData] = []
                 for revision_id in action.artifact_revision_ids:
                     import_result = await self.import_revision(
-                        ImportArtifactRevisionAction(artifact_revision_id=revision_id)
+                        ImportArtifactRevisionAction(
+                            artifact_revision_id=revision_id,
+                            force=action.force,
+                        )
                     )
                     task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
@@ -714,6 +766,7 @@ class ArtifactRevisionService:
             delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
+            options=ImportArtifactsOptions(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)

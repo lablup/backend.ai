@@ -30,19 +30,19 @@ def mock_check_requester_access_list_errors(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_list_errors(mocker, mock_repositories):
+def mock_get_endpoint_by_id_list_errors(mocker, mock_repositories):
     return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
+        mock_repositories.repository,
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_validated_list_errors(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_list_errors(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -117,11 +117,20 @@ class TestListErrors:
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_list_errors,
-        mock_get_endpoint_by_id_force_list_errors,
-        mock_get_endpoint_by_id_validated_list_errors,
+        mock_get_endpoint_by_id_list_errors,
+        mock_get_endpoint_access_validation_data_list_errors,
     ):
         # Mock repository responses
         expected = cast(ListErrorsActionResult, scenario.expected)
+        action = scenario.input
+
+        mock_validation_data = MagicMock(
+            session_owner_id=action.requester_ctx.user_id,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=action.requester_ctx.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_list_errors.return_value = mock_validation_data
+
         mock_routings = [
             MagicMock(
                 status=RouteStatus.FAILED_TO_START,
@@ -142,10 +151,8 @@ class TestListErrors:
             retries=expected.retries,
         )
 
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_list_errors.return_value = mock_endpoint
-        else:
-            mock_get_endpoint_by_id_validated_list_errors.return_value = mock_endpoint
+        # Now uses single repository for all roles
+        mock_get_endpoint_by_id_list_errors.return_value = mock_endpoint
 
         async def list_errors(action: ListErrorsAction):
             return await model_serving_processors.list_errors.wait_for_complete(action)

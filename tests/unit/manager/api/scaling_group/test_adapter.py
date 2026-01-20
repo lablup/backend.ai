@@ -241,20 +241,6 @@ class TestBaseGQLAdapter:
         condition_result = querier.conditions[0]()
         assert condition_result is not None
 
-    def test_driver_filter(self) -> None:
-        """Test driver filter"""
-        filter_obj = ScalingGroupFilterGQL(driver="static")
-        adapter = BaseGQLAdapter()
-        querier = adapter.build_querier(
-            PaginationOptions(),
-            _get_pagination_spec(),
-            filter=filter_obj,
-        )
-
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
-        assert condition_result is not None
-
     def test_scheduler_filter(self) -> None:
         """Test scheduler filter"""
         filter_obj = ScalingGroupFilterGQL(scheduler="fifo")
@@ -303,7 +289,6 @@ class TestBaseGQLAdapter:
             name=StringFilter(contains="default"),
             is_active=True,
             is_public=True,
-            driver="static",
         )
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
@@ -312,8 +297,8 @@ class TestBaseGQLAdapter:
             filter=filter_obj,
         )
 
-        # Should have 4 conditions
-        assert len(querier.conditions) == 4
+        # Should have 3 conditions
+        assert len(querier.conditions) == 3
         for condition in querier.conditions:
             assert condition() is not None
 
@@ -323,7 +308,7 @@ class TestBaseGQLAdapter:
             name=StringFilter(contains="default"),
             AND=[
                 ScalingGroupFilterGQL(is_active=True),
-                ScalingGroupFilterGQL(driver="static"),
+                ScalingGroupFilterGQL(scheduler="fifo"),
             ],
         )
         adapter = BaseGQLAdapter()
@@ -385,8 +370,8 @@ class TestBaseGQLAdapter:
                 ScalingGroupFilterGQL(is_active=True),
             ],
             OR=[
-                ScalingGroupFilterGQL(driver="static"),
                 ScalingGroupFilterGQL(scheduler="fifo"),
+                ScalingGroupFilterGQL(use_host_network=True),
             ],
             NOT=[
                 ScalingGroupFilterGQL(is_public=False),

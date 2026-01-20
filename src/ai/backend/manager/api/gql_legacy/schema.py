@@ -88,14 +88,14 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api.api.manager import ManagerStatus
-    from ai.backend.manager.api.idle import IdleCheckerHost
-    from ai.backend.manager.api.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.api.registry import AgentRegistry
-    from ai.backend.manager.api.repositories.agent.repository import AgentRepository
-    from ai.backend.manager.api.repositories.scheduler.repository import SchedulerRepository
-    from ai.backend.manager.api.repositories.user.repository import UserRepository
+    from ai.backend.manager.api.manager import ManagerStatus
+    from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.agent.repository import AgentRepository
+    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+    from ai.backend.manager.repositories.user.repository import UserRepository
 
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -681,7 +681,10 @@ class Query(graphene.ObjectType):
         Image,
         id=graphene.String(description="Added in 24.03.1"),
         reference=graphene.String(),
-        architecture=graphene.String(default_value=DEFAULT_IMAGE_ARCH),
+        architecture=graphene.String(
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        ),
     )
 
     images = graphene.List(
@@ -1701,13 +1704,12 @@ class Query(graphene.ObjectType):
         if id:
             item = await Image.load_item_by_id(info.context, uuid.UUID(id), filter_by_statuses=None)
         else:
-            if not (reference and architecture):
+            if not reference:
                 raise InvalidAPIParameters(
                     "reference/architecture and id can't be omitted at the same time!"
                 )
-            item = await Image.load_item(
-                info.context, reference, architecture, filter_by_statuses=None
-            )
+            arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
+            item = await Image.load_item(info.context, reference, arch, filter_by_statuses=None)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):

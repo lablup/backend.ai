@@ -8,10 +8,16 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelTerminationInfo
 
 
 @dataclass
@@ -31,10 +37,6 @@ class ScheduleResult:
     # List of scheduled session data
     scheduled_sessions: list[ScheduledSessionData] = field(default_factory=list)
 
-    def needs_post_processing(self) -> bool:
-        """Check if post-processing is needed based on the result."""
-        return len(self.scheduled_sessions) > 0
-
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""
         return len(self.scheduled_sessions)
@@ -47,24 +49,19 @@ class ScheduleResult:
 
 @dataclass
 class SessionTransitionInfo:
-    """Session transition information for history recording.
+    """Session transition information for history recording and event broadcasting.
 
     Contains session_id with its actual from_status at the time of processing.
+    Also includes creation_id and access_key for:
+    - Event broadcasting (session_id, creation_id, reason)
+    - Cache invalidation (access_key)
     """
 
     session_id: SessionId
     from_status: SessionStatus
     reason: Optional[str] = None
-
-
-@dataclass
-class SessionExecutionError:
-    """Error information for a failed session operation."""
-
-    session_id: SessionId
-    from_status: SessionStatus
-    reason: str
-    error_detail: str
+    creation_id: Optional[str] = None
+    access_key: Optional[AccessKey] = None
 
 
 @dataclass
@@ -101,23 +98,22 @@ class HandlerSessionData:
 
 @dataclass
 class SessionExecutionResult:
-    """Result of a session lifecycle handler execution.
+    """Result of a session lifecycle handler execution (BEP-1030).
 
-    Follows the DeploymentCoordinator pattern with successes, failures, and stales.
-    Coordinator uses this result to apply status transitions.
+    Follows the DeploymentCoordinator pattern with successes, failures, and skipped.
+    Handler reports what happened, Coordinator applies policy (retry count, timeout)
+    to determine the outcome (need_retry/expired/give_up) for failures.
+
+    Fields:
+    - successes: Sessions that completed successfully
+    - failures: Sessions that failed (Coordinator determines retry/expired/give_up)
+    - skipped: Sessions that were skipped (no action needed, no status change)
     """
 
+    # Handler outcome fields
     successes: list[SessionTransitionInfo] = field(default_factory=list)
-    failures: list[SessionExecutionError] = field(default_factory=list)
-    stales: list[SessionTransitionInfo] = field(default_factory=list)
-    # For post-processing (event broadcasting, cache invalidation)
-    scheduled_data: list[ScheduledSessionData] = field(default_factory=list)
-    # Kernel terminations to be processed together with session status changes
-    kernel_terminations: list[KernelTerminationInfo] = field(default_factory=list)
-
-    def needs_post_processing(self) -> bool:
-        """Check if post-processing is needed based on the result."""
-        return len(self.scheduled_data) > 0
+    failures: list[SessionTransitionInfo] = field(default_factory=list)
+    skipped: list[SessionTransitionInfo] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get the count of successfully processed sessions."""
@@ -127,18 +123,66 @@ class SessionExecutionResult:
         """Get list of successful session IDs."""
         return [s.session_id for s in self.successes]
 
-    def failure_ids(self) -> list[SessionId]:
-        """Get list of failed session IDs."""
-        return [f.session_id for f in self.failures]
+    def has_transitions(self) -> bool:
+        """Check if there are any transitions (successes or failures)."""
+        return bool(self.successes or self.failures)
 
-    def stale_ids(self) -> list[SessionId]:
-        """Get list of stale session IDs."""
-        return [s.session_id for s in self.stales]
 
-    def merge(self, other: SessionExecutionResult) -> None:
-        """Merge another result into this one."""
-        self.successes.extend(other.successes)
-        self.failures.extend(other.failures)
-        self.stales.extend(other.stales)
-        self.scheduled_data.extend(other.scheduled_data)
-        self.kernel_terminations.extend(other.kernel_terminations)
+# ============================================================================
+# Kernel handler types for KernelLifecycleHandler (Phase 3)
+# ============================================================================
+
+
+@dataclass
+class KernelTransitionInfo:
+    """Kernel transition information for history recording.
+
+    Contains kernel_id with its actual from_status at the time of processing.
+    """
+
+    kernel_id: KernelId
+    from_status: KernelStatus
+    reason: Optional[str] = None
+
+
+@dataclass
+class KernelExecutionResult:
+    """Result of a kernel lifecycle handler execution.
+
+    Follows the same pattern as SessionExecutionResult with successes and failures.
+    Handler reports what happened, Coordinator applies the status transitions.
+
+    Fields:
+    - successes: Kernels that completed successfully
+    - failures: Kernels that failed
+    """
+
+    successes: list[KernelTransitionInfo] = field(default_factory=list)
+    failures: list[KernelTransitionInfo] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get the count of successfully processed kernels."""
+        return len(self.successes)
+
+    def success_ids(self) -> list[KernelId]:
+        """Get list of successful kernel IDs."""
+        return [k.kernel_id for k in self.successes]
+
+    def has_transitions(self) -> bool:
+        """Check if there are any transitions (successes or failures)."""
+        return bool(self.successes or self.failures)
+
+
+@dataclass(frozen=True)
+class KernelStatusTransitions:
+    """Defines state transitions for kernel handler outcomes.
+
+    Used by KernelLifecycleHandler for kernel status changes.
+
+    Attributes:
+        success: Target kernel status for success, None means no change
+        failure: Target kernel status for failure (e.g., TERMINATED)
+    """
+
+    success: Optional[KernelStatus] = None
+    failure: Optional[KernelStatus] = None

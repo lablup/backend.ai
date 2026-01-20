@@ -116,6 +116,11 @@ BEP numbers start from 1000.
 | [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Draft |
 | 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
 | [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Draft |
+| [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Draft |
+| [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Draft |
+| [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
+| [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
+| [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

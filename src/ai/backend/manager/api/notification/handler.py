@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from http import HTTPStatus
+from typing import cast
 
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.notification.types import EmailSpec, NotificationRuleType, WebhookSpec
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -25,7 +27,6 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
-    NotificationRuleType,
     NotificationRuleTypeSchemaResponse,
     PaginationInfo,
     SearchNotificationChannelsRequest,
@@ -101,14 +102,14 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can create notification channels.")
 
         # Convert request to creator
-        # config validator in request DTO ensures this is WebhookConfig
-
+        # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
+        validated_spec = cast(WebhookSpec | EmailSpec, body.parsed.spec)
         creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name=body.parsed.name,
                 description=body.parsed.description,
                 channel_type=body.parsed.channel_type,
-                config=body.parsed.config,
+                spec=validated_spec,
                 enabled=body.parsed.enabled,
                 created_by=me.user_id,
             )

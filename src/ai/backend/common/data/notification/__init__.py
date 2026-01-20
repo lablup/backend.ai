@@ -4,14 +4,26 @@ from .messages import (
     SessionStartedMessage,
     SessionTerminatedMessage,
 )
-from .types import NotificationChannelType, NotificationRuleType, WebhookConfig
+from .types import (
+    EmailMessage,
+    EmailSpec,
+    NotificationChannelType,
+    NotificationRuleType,
+    SMTPAuth,
+    SMTPConnection,
+    WebhookSpec,
+)
 
 __all__ = (
     "ArtifactDownloadCompletedMessage",
+    "EmailSpec",
+    "EmailMessage",
     "NotifiableMessage",
     "NotificationChannelType",
     "NotificationRuleType",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
-    "WebhookConfig",
+    "SMTPAuth",
+    "SMTPConnection",
+    "WebhookSpec",
 )

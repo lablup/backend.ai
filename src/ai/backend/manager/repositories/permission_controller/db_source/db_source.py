@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -981,6 +982,48 @@ class PermissionDBSource:
             ]
 
             return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_entities_in_scope(
+        self,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Queries the association_scopes_entities table for entity IDs matching
+        the conditions in the querier (scope_type, scope_id, entity_type).
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            EntityListResult containing entity data
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                AssociationScopesEntitiesRow.entity_type,
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                EntityData(
+                    entity_type=row.entity_type,
+                    entity_id=row.entity_id,
+                )
+                for row in result.rows
+            ]
+
+            return EntityListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

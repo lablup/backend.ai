@@ -1,6 +1,6 @@
 """Fair Share Row models.
 
-Database models for Fair Share state management per scaling group:
+Database models for Fair Share state management per resource group:
 - DomainFairShareRow: Domain-level fair share state
 - ProjectFairShareRow: Project-level fair share state
 - UserFairShareRow: User-level fair share state (per project)
@@ -17,6 +17,14 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.fair_share import (
+    DomainFairShareData,
+    FairShareCalculationSnapshot,
+    FairShareMetadata,
+    FairShareSpec,
+    ProjectFairShareData,
+    UserFairShareData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -51,7 +59,7 @@ class DomainFairShareRow(Base):
     """Per-domain Fair Share state.
 
     Stores weight (configured value) and calculated values together for current state.
-    One row per (scaling_group, domain_name) combination.
+    One row per (resource_group, domain_name) combination.
     """
 
     __tablename__ = "domain_fair_shares"
@@ -59,8 +67,8 @@ class DomainFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
@@ -189,12 +197,40 @@ class DomainFairShareRow(Base):
         primaryjoin=_get_domain_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("scaling_group", "domain_name", name="uq_domain_fair_share"),
-        sa.Index("ix_domain_fair_share_lookup", "scaling_group", "domain_name"),
+        sa.UniqueConstraint("resource_group", "domain_name", name="uq_domain_fair_share"),
+        sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
+
+    def to_data(self) -> DomainFairShareData:
+        """Convert to DomainFairShareData."""
+        return DomainFairShareData(
+            id=self.id,
+            resource_group=self.resource_group,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+        )
 
 
 def _get_project_fair_share_project_join_condition() -> sa.ColumnElement[bool]:
@@ -212,7 +248,7 @@ def _get_project_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
 class ProjectFairShareRow(Base):
     """Per-project Fair Share state.
 
-    One row per (scaling_group, project_id) combination.
+    One row per (resource_group, project_id) combination.
     """
 
     __tablename__ = "project_fair_shares"
@@ -220,8 +256,8 @@ class ProjectFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
     domain_name: Mapped[str] = mapped_column(
@@ -337,18 +373,48 @@ class ProjectFairShareRow(Base):
         primaryjoin=_get_project_fair_share_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_project_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("scaling_group", "project_id", name="uq_project_fair_share"),
-        sa.Index("ix_project_fair_share_lookup", "scaling_group", "project_id"),
+        sa.UniqueConstraint("resource_group", "project_id", name="uq_project_fair_share"),
+        sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
+
+    def to_data(self) -> ProjectFairShareData:
+        """Convert to ProjectFairShareData."""
+        return ProjectFairShareData(
+            id=self.id,
+            resource_group=self.resource_group,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+        )
 
 
 def _get_user_fair_share_user_join_condition() -> sa.ColumnElement[bool]:
@@ -375,7 +441,7 @@ class UserFairShareRow(Base):
     Since a User can belong to multiple Projects, distinguished by
     (user_uuid, project_id) combination.
 
-    One row per (scaling_group, user_uuid, project_id) combination.
+    One row per (resource_group, user_uuid, project_id) combination.
     """
 
     __tablename__ = "user_fair_shares"
@@ -383,8 +449,8 @@ class UserFairShareRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group", sa.String(length=64), nullable=False, index=True
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group", sa.String(length=64), nullable=False, index=True
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
@@ -409,6 +475,14 @@ class UserFairShareRow(Base):
         comment="Calculated priority score from 0.0 to 1.0. "
         "Higher value = less past usage = higher scheduling priority. "
         "Formula: F = 2^(-normalized_usage / weight)",
+    )
+    scheduling_rank: Mapped[int | None] = mapped_column(
+        "scheduling_rank",
+        sa.Integer,
+        nullable=True,
+        comment="Computed scheduling priority rank. "
+        "Lower value = higher priority (1 = highest). "
+        "NULL means rank calculation has not been performed yet.",
     )
     total_decayed_usage: Mapped[ResourceSlot] = mapped_column(
         "total_decayed_usage",
@@ -501,26 +575,59 @@ class UserFairShareRow(Base):
         primaryjoin=_get_user_fair_share_user_join_condition,
         foreign_keys=[user_uuid],
         uselist=False,
+        viewonly=True,
     )
     project: Mapped[GroupRow | None] = relationship(
         "GroupRow",
         primaryjoin=_get_user_fair_share_project_join_condition,
         foreign_keys=[project_id],
         uselist=False,
+        viewonly=True,
     )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_user_fair_share_domain_join_condition,
         foreign_keys=[domain_name],
         uselist=False,
+        viewonly=True,
     )
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "scaling_group",
+            "resource_group",
             "user_uuid",
             "project_id",
             name="uq_user_fair_share",
         ),
-        sa.Index("ix_user_fair_share_lookup", "scaling_group", "user_uuid", "project_id"),
+        sa.Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
+
+    def to_data(self) -> UserFairShareData:
+        """Convert to UserFairShareData."""
+        return UserFairShareData(
+            id=self.id,
+            resource_group=self.resource_group,
+            user_uuid=self.user_uuid,
+            project_id=self.project_id,
+            domain_name=self.domain_name,
+            spec=FairShareSpec(
+                weight=self.weight,
+                half_life_days=self.half_life_days,
+                lookback_days=self.lookback_days,
+                decay_unit_days=self.decay_unit_days,
+                resource_weights=self.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=self.fair_share_factor,
+                total_decayed_usage=self.total_decayed_usage,
+                normalized_usage=self.normalized_usage,
+                lookback_start=self.lookback_start,
+                lookback_end=self.lookback_end,
+                last_calculated_at=self.last_calculated_at,
+            ),
+            metadata=FairShareMetadata(
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+            ),
+            scheduling_rank=self.scheduling_rank,
+        )

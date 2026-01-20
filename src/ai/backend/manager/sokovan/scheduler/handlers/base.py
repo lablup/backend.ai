@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Optional
 
+from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
@@ -19,7 +20,7 @@ class SessionLifecycleHandler(ABC):
     This interface enables the coordinator to:
     1. Query sessions based on target_statuses() and target_kernel_statuses()
     2. Execute handler logic with the queried sessions
-    3. Apply status transitions based on success_status(), failure_status(), stale_status()
+    3. Apply status transitions based on status_transitions() (BEP-1030)
 
     Handlers can:
     - Perform additional data queries if needed (Option B-1)
@@ -44,43 +45,28 @@ class SessionLifecycleHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def target_kernel_statuses(cls) -> list[KernelStatus]:
+    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
         """Get the target kernel statuses for session filtering.
 
         Sessions are included only if ALL their kernels match these statuses.
-        Return empty list [] to include sessions regardless of kernel status.
+        Return None to include sessions regardless of kernel status.
         """
         raise NotImplementedError("Subclasses must implement target_kernel_statuses()")
 
     @classmethod
     @abstractmethod
-    def success_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set on successful execution.
+    def status_transitions(cls) -> StatusTransitions:
+        """Define state transitions for different handler outcomes (BEP-1030).
 
         Returns:
-            SessionStatus to set for successes, or None if coordinator should not update status
+            StatusTransitions defining what session/kernel status to transition to for
+            success, need_retry, expired, and give_up outcomes.
+
+        Note:
+            - None in TransitionStatus: Don't change that entity's status
+            - None in StatusTransitions field: No status change, only record history
         """
-        raise NotImplementedError("Subclasses must implement success_status()")
-
-    @classmethod
-    @abstractmethod
-    def failure_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set on failed execution.
-
-        Returns:
-            SessionStatus to set for failures, or None if coordinator should not update status
-        """
-        raise NotImplementedError("Subclasses must implement failure_status()")
-
-    @classmethod
-    @abstractmethod
-    def stale_status(cls) -> Optional[SessionStatus]:
-        """Get the status to set for stale/timeout sessions.
-
-        Returns:
-            SessionStatus to set for stales, or None if coordinator should not update status
-        """
-        raise NotImplementedError("Subclasses must implement stale_status()")
+        raise NotImplementedError("Subclasses must implement status_transitions()")
 
     @property
     @abstractmethod
@@ -105,20 +91,6 @@ class SessionLifecycleHandler(ABC):
             sessions: Sessions with full SessionInfo and KernelInfo data
 
         Returns:
-            Result containing successes, failures, and stales for status transitions
+            Result containing successes, need_retries, expired, and give_ups for status transitions
         """
         raise NotImplementedError("Subclasses must implement execute()")
-
-    @abstractmethod
-    async def post_process(self, result: SessionExecutionResult) -> None:
-        """Handle post-processing after the operation.
-
-        Typically includes:
-        - Broadcasting events for status transitions
-        - Invalidating caches for affected access keys
-        - Requesting next scheduling phase
-
-        Args:
-            result: The result from execute()
-        """
-        raise NotImplementedError("Subclasses must implement post_process()")

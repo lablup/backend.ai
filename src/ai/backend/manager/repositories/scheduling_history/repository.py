@@ -12,30 +12,20 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.deployment.types import (
-    DeploymentHistoryData,
     DeploymentHistoryListResult,
-    RouteHistoryData,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
-    KernelSchedulingHistoryData,
     KernelSchedulingHistoryListResult,
 )
 from ai.backend.manager.data.session.types import (
-    SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.scheduling_history import (
-        DeploymentHistoryRow,
-        KernelSchedulingHistoryRow,
-        RouteHistoryRow,
-        SessionSchedulingHistoryRow,
-    )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("SchedulingHistoryRepository",)
@@ -58,7 +48,7 @@ scheduling_history_repository_resilience = Resilience(
 
 
 class SchedulingHistoryRepository:
-    """Repository for scheduling history data access."""
+    """Repository for scheduling history data access (read-only)."""
 
     _db_source: SchedulingHistoryDBSource
 
@@ -66,14 +56,6 @@ class SchedulingHistoryRepository:
         self._db_source = SchedulingHistoryDBSource(db)
 
     # ========== Session History ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def record_session_history(
-        self,
-        creator: Creator[SessionSchedulingHistoryRow],
-    ) -> SessionSchedulingHistoryData:
-        """Record session scheduling history with merge logic."""
-        return await self._db_source.record_session_history(creator)
 
     @scheduling_history_repository_resilience.apply()
     async def search_session_history(
@@ -86,14 +68,6 @@ class SchedulingHistoryRepository:
     # ========== Kernel History ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def record_kernel_history(
-        self,
-        creator: Creator[KernelSchedulingHistoryRow],
-    ) -> KernelSchedulingHistoryData:
-        """Record kernel scheduling history with merge logic."""
-        return await self._db_source.record_kernel_history(creator)
-
-    @scheduling_history_repository_resilience.apply()
     async def search_kernel_history(
         self,
         querier: BatchQuerier,
@@ -104,14 +78,6 @@ class SchedulingHistoryRepository:
     # ========== Deployment History ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def record_deployment_history(
-        self,
-        creator: Creator[DeploymentHistoryRow],
-    ) -> DeploymentHistoryData:
-        """Record deployment history with merge logic."""
-        return await self._db_source.record_deployment_history(creator)
-
-    @scheduling_history_repository_resilience.apply()
     async def search_deployment_history(
         self,
         querier: BatchQuerier,
@@ -120,14 +86,6 @@ class SchedulingHistoryRepository:
         return await self._db_source.search_deployment_history(querier)
 
     # ========== Route History ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def record_route_history(
-        self,
-        creator: Creator[RouteHistoryRow],
-    ) -> RouteHistoryData:
-        """Record route history with merge logic."""
-        return await self._db_source.record_route_history(creator)
 
     @scheduling_history_repository_resilience.apply()
     async def search_route_history(

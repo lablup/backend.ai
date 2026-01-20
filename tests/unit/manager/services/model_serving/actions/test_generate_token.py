@@ -31,37 +31,28 @@ def mock_check_requester_access_token(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_token(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_endpoint_token_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "create_endpoint_token_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_token(mocker, mock_repositories):
+def mock_get_endpoint_by_id_token(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_create_endpoint_token_validated(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_token(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "create_endpoint_token_validated",
+        "get_endpoint_access_validation_data",
+        new_callable=AsyncMock,
+    )
+
+
+@pytest.fixture
+def mock_create_endpoint_token(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "create_endpoint_token",
         new_callable=AsyncMock,
     )
 
@@ -165,10 +156,9 @@ class TestGenerateToken:
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_token,
-        mock_get_endpoint_by_id_force_token,
-        mock_create_endpoint_token_force,
-        mock_get_endpoint_by_id_validated_token,
-        mock_create_endpoint_token_validated,
+        mock_get_endpoint_by_id_token,
+        mock_get_endpoint_access_validation_data_token,
+        mock_create_endpoint_token,
         mock_get_scaling_group_info_token,
     ):
         action = scenario.input
@@ -176,6 +166,14 @@ class TestGenerateToken:
 
         # Mock setup based on scenario data
         expected = cast(GenerateTokenActionResult, expected)
+
+        mock_validation_data = MagicMock(
+            session_owner_id=expected.data.session_owner,
+            session_owner_role=action.requester_ctx.user_role,
+            domain=expected.data.domain,
+        )
+        mock_get_endpoint_access_validation_data_token.return_value = mock_validation_data
+
         mock_endpoint = MagicMock(
             id=action.service_id,
             status=EndpointStatus.READY,
@@ -199,14 +197,9 @@ class TestGenerateToken:
             created_at=expected.data.created_at,
         )
 
-        # Setup repository mocks based on user role
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_token.return_value = mock_endpoint
-            mock_create_endpoint_token_force.return_value = mock_token_data
-        else:
-            mock_get_endpoint_by_id_validated_token.return_value = mock_endpoint
-            mock_create_endpoint_token_validated.return_value = mock_token_data
-
+        # Setup repository mocks - now uses single repository for all roles
+        mock_get_endpoint_by_id_token.return_value = mock_endpoint
+        mock_create_endpoint_token.return_value = mock_token_data
         mock_get_scaling_group_info_token.return_value = mock_scaling_group
 
         # TODO: Change using aioresponses to mocking client layer after refactoring service layer

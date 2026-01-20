@@ -12,7 +12,7 @@ from ai.backend.common.exception import (
 
 __all__ = (
     "InvalidNotificationChannelType",
-    "InvalidNotificationConfig",
+    "InvalidNotificationSpec",
     "NotificationChannelConflict",
     "NotificationChannelNotFound",
     "NotificationProcessingFailure",
@@ -106,9 +106,9 @@ class InvalidNotificationChannelType(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidNotificationConfig(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-notification-config"
-    error_title = "Invalid notification configuration."
+class InvalidNotificationSpec(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-notification-spec"
+    error_title = "Invalid notification specification."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

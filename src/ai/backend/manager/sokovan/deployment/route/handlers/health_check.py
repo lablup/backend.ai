@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -57,6 +57,20 @@ class HealthCheckRouteHandler(RouteHandler):
     def stale_status(cls) -> Optional[RouteStatus]:
         """Routes with stale health data become DEGRADED."""
         return RouteStatus.DEGRADED
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for health check route handler (BEP-1030).
+
+        - success: Route → HEALTHY
+        - failure: Route → UNHEALTHY
+        - stale: Route → DEGRADED (stale health data)
+        """
+        return RouteStatusTransitions(
+            success=RouteStatus.HEALTHY,
+            failure=RouteStatus.UNHEALTHY,
+            stale=RouteStatus.DEGRADED,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""

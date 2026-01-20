@@ -282,6 +282,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".deployment",
     ".rbac",
     ".scheduling_history",
+    ".fair_share",
     ".export",
 ]
 
@@ -1208,13 +1209,19 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .sokovan.scheduler.factory import create_default_scheduler_components
+    from .sokovan.scheduler.coordinator import ScheduleCoordinator
+    from .sokovan.scheduler.factory import (
+        CoordinatorHandlersArgs,
+        create_coordinator_handlers,
+        create_default_scheduler_components,
+    )
     from .sokovan.sokovan import SokovanOrchestrator
 
     # Create scheduler components
     scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
+        root_ctx.repositories.fair_share.repository,
         root_ctx.config_provider,
         root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,
@@ -1258,13 +1265,31 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         service_discovery=root_ctx.service_discovery,
     )
 
-    # Create sokovan orchestrator with lock factory for timers
-    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler_components=scheduler_components,
-        event_producer=root_ctx.event_producer,
+    # Create coordinator handlers using factory
+    coordinator_handlers = create_coordinator_handlers(
+        CoordinatorHandlersArgs(
+            provisioner=scheduler_components.provisioner,
+            launcher=scheduler_components.launcher,
+            terminator=scheduler_components.terminator,
+            repository=scheduler_components.repository,
+            valkey_schedule=root_ctx.valkey_schedule,
+            scheduling_controller=root_ctx.scheduling_controller,
+        )
+    )
+
+    # Create schedule coordinator
+    schedule_coordinator = ScheduleCoordinator(
         valkey_schedule=root_ctx.valkey_schedule,
-        lock_factory=root_ctx.distributed_lock_factory,
+        components=scheduler_components,
+        handlers=coordinator_handlers,
         scheduling_controller=root_ctx.scheduling_controller,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+    )
+
+    # Create sokovan orchestrator with all coordinators injected
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        schedule_coordinator=schedule_coordinator,
         deployment_coordinator=deployment_coordinator,
         route_coordinator=route_coordinator,
     )
@@ -1453,9 +1478,6 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
-    from .sweeper.kernel import stale_kernel_sweeper_ctx
-    from .sweeper.session import stale_session_sweeper_ctx
-
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1539,8 +1561,6 @@ def build_root_app(
             leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
-            stale_session_sweeper_ctx,
-            stale_kernel_sweeper_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
             gql_adapters_ctx,

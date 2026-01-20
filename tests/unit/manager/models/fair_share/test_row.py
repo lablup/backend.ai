@@ -57,7 +57,7 @@ class TestDomainFairShareRow:
         """Duplicate (scaling_group, domain_name) should raise IntegrityError."""
         duplicate = DomainFairShareRow(
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -78,7 +78,7 @@ class TestDomainFairShareRow:
         """Weight field should preserve Numeric(10, 4) precision."""
         row = DomainFairShareRow(
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             weight=Decimal("1234.5678"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -124,7 +124,7 @@ class TestProjectFairShareRow:
         duplicate = ProjectFairShareRow(
             project_id=project_id,
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -169,7 +169,7 @@ class TestUserFairShareRow:
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name=domain_name,
-            scaling_group=scaling_group,
+            resource_group=scaling_group,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),

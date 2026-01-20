@@ -237,15 +237,18 @@ class ValkeyScheduleClient:
             return None
 
     @valkey_schedule_resilience.apply()
-    async def mark_schedule_needed(self, schedule_type: str) -> None:
+    async def mark_schedules_needed_batch(self, schedule_types: Sequence[str]) -> None:
         """
-        Mark that scheduling is needed for the given schedule type.
-        Simply sets a flag that will be checked in the next scheduling loop.
+        Batch mark that scheduling is needed for multiple schedule types.
 
-        :param schedule_type: The type of scheduling to mark
+        :param schedule_types: The types of scheduling to mark
         """
-        key = self._get_schedule_key(schedule_type)
-        await self._client.client.set(key, b"1")
+        if not schedule_types:
+            return
+        key_values: Mapping[str | bytes, str | bytes] = {
+            self._get_schedule_key(schedule_type): "1" for schedule_type in schedule_types
+        }
+        await self._client.client.mset(key_values)
 
     @valkey_schedule_resilience.apply()
     async def load_and_delete_schedule_mark(self, schedule_type: str) -> bool:

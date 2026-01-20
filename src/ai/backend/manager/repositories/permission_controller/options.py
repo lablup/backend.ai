@@ -9,6 +9,9 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
     ObjectPermissionRow,
 )
@@ -560,3 +563,28 @@ class UserScopeOrders:
         if ascending:
             return UserRow.created_at.asc()
         return UserRow.created_at.desc()
+
+
+class EntityScopeConditions:
+    """Query conditions for entity scope search."""
+
+    @staticmethod
+    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_type == scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_id == scope_id
+
+        return inner
+
+    @staticmethod
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.entity_type == entity_type
+
+        return inner

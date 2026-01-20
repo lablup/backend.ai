@@ -156,6 +156,12 @@ def mock_repository() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_fair_share_repository() -> MagicMock:
+    """Create mock fair share repository."""
+    return MagicMock()
+
+
+@pytest.fixture
 def mock_validator() -> MagicMock:
     """Create mock validator."""
     validator = MagicMock()
@@ -209,6 +215,7 @@ def mock_selector_pool() -> dict[AgentSelectionStrategy, MagicMock]:
 @pytest.fixture
 def test_provisioner(
     mock_repository: AsyncMock,
+    mock_fair_share_repository: MagicMock,
     mock_validator: MagicMock,
     mock_sequencer: MagicMock,
     mock_agent_selector: MagicMock,
@@ -226,6 +233,7 @@ def test_provisioner(
             default_agent_selector=mock_agent_selector,
             allocator=mock_allocator,
             repository=mock_repository,
+            fair_share_repository=mock_fair_share_repository,
             config_provider=mock_config_provider,
             valkey_schedule=valkey_schedule,
         )

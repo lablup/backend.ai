@@ -23,12 +23,14 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.kernel.types import KernelStatus
     from ai.backend.manager.models.network import NetworkType
 
 
 class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -65,6 +67,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATED,
                 cls.CANCELLED,
             )
@@ -80,6 +83,7 @@ class SessionStatus(CIStrEnum):
             if status
             not in (
                 cls.PENDING,
+                cls.DEPRIORITIZING,
                 cls.TERMINATING,
                 cls.TERMINATED,
                 cls.CANCELLED,
@@ -113,6 +117,18 @@ class SessionStatus(CIStrEnum):
 
     def is_terminal(self) -> bool:
         return self in self.terminal_statuses()
+
+
+class KernelMatchType(StrEnum):
+    """Kernel status matching type for promotion handlers.
+
+    Used by SessionPromotionHandler to define how kernel statuses
+    should be evaluated when determining session promotion eligibility.
+    """
+
+    ALL = "ALL"  # All kernels must match target statuses
+    ANY = "ANY"  # At least one kernel must match target statuses
+    NOT_ANY = "NOT_ANY"  # No kernel should match target statuses
 
 
 # TODO: Add proper types
@@ -259,8 +275,62 @@ class SessionInfo:
 
 class SchedulingResult(StrEnum):
     SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-    STALE = "STALE"
+    FAILURE = "FAILURE"  # Deprecated: use NEED_RETRY or GIVE_UP
+    STALE = "STALE"  # Deprecated: use EXPIRED
+    NEED_RETRY = "NEED_RETRY"  # Failed but will retry
+    EXPIRED = "EXPIRED"  # Gave up due to time elapsed
+    GIVE_UP = "GIVE_UP"  # Gave up due to retry count exceeded
+    SKIPPED = "SKIPPED"  # Not attempted (e.g., resource shortage)
+
+
+@dataclass(frozen=True)
+class TransitionStatus:
+    """Status transition for session and kernel.
+
+    Attributes:
+        session: Target session status, None means no change
+        kernel: Target kernel status, None means no change
+    """
+
+    session: SessionStatus | None = None
+    kernel: KernelStatus | None = None
+
+
+@dataclass(frozen=True)
+class StatusTransitions:
+    """Defines state transitions for different handler outcomes.
+
+    Used by SessionLifecycleHandler for session and kernel status changes.
+
+    Attributes:
+        success: Transition when handler succeeds
+        need_retry: Transition when handler fails but will retry (None = no change)
+        expired: Transition when time elapsed in current state
+        give_up: Transition when retry count exceeded
+
+    Note:
+        - None in TransitionStatus field: Don't change that entity's status
+        - None in StatusTransitions field: No status change at all, only record history
+    """
+
+    success: TransitionStatus | None = None
+    need_retry: TransitionStatus | None = None
+    expired: TransitionStatus | None = None
+    give_up: TransitionStatus | None = None
+
+
+@dataclass(frozen=True)
+class PromotionStatusTransitions:
+    """Defines state transitions for promotion handlers.
+
+    Used by SessionPromotionHandler - only changes session status, not kernel status.
+    Promotion handlers typically only have success transition (no retry/expired/give_up).
+
+    Attributes:
+        success: Target session status when promotion succeeds (None = no change)
+    """
+
+    success: SessionStatus | None = None
 
 
 class SubStepResult(BaseModel):
@@ -301,6 +371,16 @@ class SessionSchedulingHistoryListResult:
     """Search result with pagination for session scheduling history."""
 
     items: list[SessionSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class SessionListResult:
+    """Search result with total count and pagination info for sessions."""
+
+    items: list[SessionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

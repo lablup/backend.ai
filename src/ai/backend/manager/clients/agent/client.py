@@ -177,11 +177,6 @@ class AgentClient(BackendAIClient):
         raw_tuples = [(str(kid), str(sid)) for kid, sid in kernel_tuples]
         return await self._peer.call.sync_kernel_registry(raw_tuples, agent_id=self.agent_id)
 
-    @agent_client_resilience.apply()
-    async def drop_kernel_registry(self, kernel_id_list: list[KernelId]) -> None:
-        """Drop kernel registry entries on the agent."""
-        await self._peer.call.drop_kernel_registry(kernel_id_list, agent_id=self.agent_id)
-
     # Health monitoring methods
     @agent_client_resilience.apply()
     async def check_pulling(self, image_name: str) -> bool:
@@ -197,12 +192,6 @@ class AgentClient(BackendAIClient):
     async def check_running(self, kernel_id: KernelId) -> bool:
         """Check if a kernel is running."""
         return await self._peer.call.check_running(str(kernel_id), agent_id=self.agent_id)
-
-    # Container management methods
-    @agent_client_resilience.apply()
-    async def purge_containers(self, serialized_data: list[tuple[str, str]]) -> None:
-        """Purge containers on the agent."""
-        await self._peer.call.purge_containers(serialized_data, agent_id=self.agent_id)
 
     # Code execution methods
     @agent_client_resilience.apply()

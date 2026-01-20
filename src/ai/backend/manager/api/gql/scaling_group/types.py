@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self, override
+from typing import Any, Optional, Self, override
 
 import strawberry
 from strawberry.relay import Node, NodeID
@@ -34,6 +35,8 @@ from ai.backend.manager.repositories.scaling_group.options import (
 )
 
 __all__ = (
+    "AgentSelectorConfigGQL",
+    "SchedulerConfigGQL",
     "ScalingGroupDriverConfigGQL",
     "ScalingGroupFilterGQL",
     "ScalingGroupMetadataGQL",
@@ -131,7 +134,7 @@ class ScalingGroupNetworkConfigGQL:
 
 @strawberry.type(
     name="ScalingGroupDriverConfig",
-    description="Added in 25.18.0. Driver configuration for resource allocation",
+    description="Added in 26.1.0. Driver configuration for resource allocation",
 )
 class ScalingGroupDriverConfigGQL:
     name: str = strawberry.field(
@@ -149,6 +152,49 @@ class ScalingGroupDriverConfigGQL:
         return cls(
             name=data.name,
             options=data.options,
+        )
+
+
+@strawberry.type(
+    name="SchedulerConfig",
+    description="Added in 26.1.0. Scheduler-specific configuration options",
+)
+class SchedulerConfigGQL:
+    num_retries_to_skip: int = strawberry.field(
+        description=dedent_strip("""
+            Number of scheduling retries to skip before attempting to schedule a session.
+            Used to prevent repeated scheduling attempts for sessions that previously failed.
+        """)
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            num_retries_to_skip=data.get("num_retries_to_skip", 0),
+        )
+
+
+@strawberry.type(
+    name="AgentSelectorConfig",
+    description="Added in 26.1.0. Configuration for the agent selection strategy",
+)
+class AgentSelectorConfigGQL:
+    kernel_counts_at_same_endpoint: int = strawberry.field(
+        description=dedent_strip("""
+            Number of existing kernels already running on the same endpoint.
+            Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
+
+            When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
+            across different agents for improved fault tolerance. This count helps the scheduler
+            avoid placing new replicas on agents that already host replicas for the same endpoint,
+            ensuring better distribution of model serving workloads.
+        """)
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            kernel_counts_at_same_endpoint=data.get("kernel_counts_at_same_endpoint", 0),
         )
 
 
@@ -172,7 +218,7 @@ class ScalingGroupSchedulerOptionsGQL:
             Used to prevent indefinite resource waiting when no agents are available.
         """)
     )
-    config: JSON = strawberry.field(
+    config: SchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Scheduler-specific configuration options.
             Contents depend on the scheduler implementation (fifo/lifo/drf).
@@ -187,7 +233,7 @@ class ScalingGroupSchedulerOptionsGQL:
             'roundrobin' cycles through agents sequentially.
         """)
     )
-    agent_selector_config: JSON = strawberry.field(
+    agent_selector_config: AgentSelectorConfigGQL = strawberry.field(
         description=dedent_strip("""
             Configuration for the agent selection strategy.
             Structure varies by strategy - for example,
@@ -223,9 +269,9 @@ class ScalingGroupSchedulerOptionsGQL:
         return cls(
             allowed_session_types=[st.value for st in data.allowed_session_types],
             pending_timeout=data.pending_timeout.total_seconds(),
-            config=data.config,
+            config=SchedulerConfigGQL.from_mapping(data.config),
             agent_selection_strategy=data.agent_selection_strategy.value,
-            agent_selector_config=data.agent_selector_config,
+            agent_selector_config=AgentSelectorConfigGQL.from_mapping(data.agent_selector_config),
             enforce_spreading_endpoint_replica=data.enforce_spreading_endpoint_replica,
             allow_fractional_resource_fragmentation=data.allow_fractional_resource_fragmentation,
             route_cleanup_target_statuses=data.route_cleanup_target_statuses,
@@ -308,12 +354,6 @@ class ScalingGroupV2GQL(Node):
             (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
         """)
     )
-    driver: ScalingGroupDriverConfigGQL = strawberry.field(
-        description=dedent_strip("""
-            Agent resource management driver determining how compute agents are provisioned
-            and registered to this scaling group (static registration vs dynamic provisioning).
-        """)
-    )
     scheduler: ScalingGroupSchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Session scheduling configuration controlling queue management,
@@ -330,7 +370,6 @@ class ScalingGroupV2GQL(Node):
             status=ScalingGroupStatusGQL.from_dataclass(data.status),
             metadata=ScalingGroupMetadataGQL.from_dataclass(data.metadata),
             network=ScalingGroupNetworkConfigGQL.from_dataclass(data.network),
-            driver=ScalingGroupDriverConfigGQL.from_dataclass(data.driver),
             scheduler=ScalingGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
         )
 
@@ -355,7 +394,6 @@ class ScalingGroupFilterGQL(GQLFilter):
     description: Optional[StringFilter] = None
     is_active: Optional[bool] = None
     is_public: Optional[bool] = None
-    driver: Optional[str] = None
     scheduler: Optional[str] = None
     use_host_network: Optional[bool] = None
 
@@ -402,10 +440,6 @@ class ScalingGroupFilterGQL(GQLFilter):
         # Apply is_public filter
         if self.is_public is not None:
             field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
-
-        # Apply driver filter
-        if self.driver:
-            field_conditions.append(ScalingGroupConditions.by_driver(self.driver))
 
         # Apply scheduler filter
         if self.scheduler:
