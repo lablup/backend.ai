@@ -18,6 +18,7 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler
+from ai.backend.common.contexts.request_id import ensure_request_id
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
@@ -236,6 +237,7 @@ class AgentClientPool:
             await asyncio.sleep(self._spec.health_check_interval)
             await self._check_all_health()
 
+    @ensure_request_id
     async def _check_all_health(self) -> None:
         """Check health of all connections (using asyncio.gather)."""
         async with self._lock:

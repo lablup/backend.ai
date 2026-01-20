@@ -24,7 +24,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import current_request_id, with_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
@@ -528,7 +528,8 @@ class EventDispatcher(EventDispatcherGroup):
                     log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
 
                 # Apply all context variables from metadata if available
-                if metadata:
+                # If metadata exists but request_id is None, generate a new one
+                if metadata and metadata.request_id:
                     with metadata.apply_context():
                         if asyncio.iscoroutinefunction(cb):
                             # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
@@ -542,17 +543,19 @@ class EventDispatcher(EventDispatcherGroup):
                             duration=time.perf_counter() - start,
                         )
                 else:
-                    if asyncio.iscoroutinefunction(cb):
-                        # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                        await cb(evh.context, source, event)  # type: ignore
-                    else:
-                        cb(evh.context, source, event)  # type: ignore
-                    for post_callback in post_callbacks:
-                        await post_callback.done()
-                    self._metric_observer.observe_event_success(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                    )
+                    # Generate a new request_id for event handlers without one
+                    with with_request_id():
+                        if asyncio.iscoroutinefunction(cb):
+                            # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                            await cb(evh.context, source, event)  # type: ignore
+                        else:
+                            cb(evh.context, source, event)  # type: ignore
+                        for post_callback in post_callbacks:
+                            await post_callback.done()
+                        self._metric_observer.observe_event_success(
+                            event_type=event_type,
+                            duration=time.perf_counter() - start,
+                        )
         except Exception as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,

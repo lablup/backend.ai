@@ -35,6 +35,7 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,
     ValkeyBgtaskClient,
 )
+from ai.backend.common.contexts.request_id import ensure_request_id
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -492,6 +493,7 @@ class BackgroundTaskManager:
     ) -> Optional[BaseBackgroundTaskResult]:
         return await self._task_registry.revive_task(task_name.value, task_info.body)
 
+    @ensure_request_id
     async def _execute_new_task(
         self,
         task_name: BgtaskNameBase,
@@ -523,6 +525,7 @@ class BackgroundTaskManager:
                         last_message=last_message,
                     )
 
+    @ensure_request_id
     async def _revive_task(
         self, task_name: BgtaskNameBase, task_info: TaskInfo, task_key: BgTaskKey
     ) -> None:

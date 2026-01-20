@@ -10,6 +10,7 @@ import aiotools
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only, noload
 
+from ai.backend.common.contexts.request_id import ensure_request_id
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -98,6 +99,7 @@ class KernelSweeper(AbstractSweeper):
 
 @actxmgr
 async def stale_kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    @ensure_request_id
     async def _sweep(interval: float) -> None:
         await KernelSweeper(root_ctx.db, root_ctx.registry, root_ctx.metrics.sweeper).sweep()
 

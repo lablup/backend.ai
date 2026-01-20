@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
+from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.types import AbstractAnycastEvent
 from ai.backend.common.leader.tasks.base import PeriodicTask
@@ -48,12 +49,13 @@ class EventProducerTask(PeriodicTask):
 
     async def run(self) -> None:
         """Execute the task - produce an event."""
-        try:
-            event = self._spec.event_factory()
-            await self._event_producer.anycast_event(event)
-            log.debug(f"Event task {self._spec.name} produced event")
-        except Exception:
-            log.exception(f"Failed to produce event for task {self._spec.name}")
+        with with_request_id():
+            try:
+                event = self._spec.event_factory()
+                await self._event_producer.anycast_event(event)
+                log.debug(f"Event task {self._spec.name} produced event")
+            except Exception:
+                log.exception(f"Failed to produce event for task {self._spec.name}")
 
     @property
     def name(self) -> str:
