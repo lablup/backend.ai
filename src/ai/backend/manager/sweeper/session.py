@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 from sqlalchemy import and_
 from sqlalchemy.orm import load_only, noload
 
+from ai.backend.common.contexts.request_id import ensure_request_id
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
@@ -119,6 +120,7 @@ async def stale_session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None
         except ValueError:
             log.warning("sweep(session) - Skipping invalid session status '{}'.", status)
 
+    @ensure_request_id
     async def _sweep(interval: float) -> None:
         await SessionSweeper(
             root_ctx.db,

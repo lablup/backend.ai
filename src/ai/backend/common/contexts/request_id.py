@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import functools
 import logging
 import uuid
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Callable, Coroutine, Iterator, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Final, Optional
+from typing import Any, Final, Optional, ParamSpec, TypeVar
 
 from ai.backend.logging import BraceStyleAdapter
+
+P = ParamSpec("P")
+T = TypeVar("T")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -83,3 +87,28 @@ def receive_request_id(request_id: Optional[str], context_description: str) -> N
         _request_id_var.set(request_id)
     else:
         log.warning("No request_id in context for {}", context_description)
+
+
+def ensure_request_id(
+    func: Callable[P, Coroutine[Any, Any, T]],
+) -> Callable[P, Coroutine[Any, Any, T]]:
+    """
+    Decorator that ensures a request_id exists in the context before executing the function.
+    If no request_id is set, generates a new UUID.
+
+    Use this for background tasks, timer callbacks, and other entry points
+    that don't go through the HTTP middleware.
+
+    Example:
+        @ensure_request_id
+        async def my_background_task():
+            # request_id is guaranteed to exist here
+            ...
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        with with_request_id():
+            return await func(*args, **kwargs)
+
+    return wrapper

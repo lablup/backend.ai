@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import click
 from alembic.config import Config
 
+from ai.backend.common.contexts.request_id import ensure_request_id
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import enforce_debug_logging
@@ -59,6 +60,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.models.utils import create_async_engine
 
+    @ensure_request_id
     async def _impl():
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         manager_public_key, manager_secret_key = load_certificate(
