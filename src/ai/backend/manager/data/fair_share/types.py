@@ -11,6 +11,14 @@ from ai.backend.common.types import ResourceSlot
 
 
 @dataclass(frozen=True)
+class ProjectUserIds:
+    """A project with its associated user IDs for batch fair share lookup."""
+
+    project_id: uuid.UUID
+    user_ids: frozenset[uuid.UUID]
+
+
+@dataclass(frozen=True)
 class FairShareSpec:
     """Specification parameters for fair share calculation.
 
@@ -104,6 +112,9 @@ class UserFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    scheduling_rank: int | None = None
+    """Computed scheduling priority rank. Lower value = higher priority.
+    None means rank calculation has not been performed yet."""
 
 
 @dataclass(frozen=True)

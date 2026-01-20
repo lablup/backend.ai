@@ -1221,6 +1221,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
     scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
+        root_ctx.repositories.fair_share.repository,
         root_ctx.config_provider,
         root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,

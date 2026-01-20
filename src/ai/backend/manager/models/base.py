@@ -438,6 +438,43 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
+class PydanticColumn(TypeDecorator, Generic[TBaseModel]):
+    """
+    A column type for storing a single Pydantic model in JSONB.
+    Handles nullable columns - returns None for null values.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: type[TBaseModel]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def process_bind_param(
+        self,
+        value: TBaseModel | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | None:
+        # JSONB accepts Python objects directly, not JSON strings
+        if value is not None:
+            return value.model_dump(mode="json")
+        return None
+
+    def process_result_value(
+        self,
+        value: dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> TBaseModel | None:
+        # JSONB returns already parsed Python objects, not strings
+        if value is not None:
+            return self._schema.model_validate(value)
+        return None
+
+    def copy(self, **kw) -> Self:
+        return PydanticColumn(self._schema)  # type: ignore[return-value]
+
+
 class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
     """
     A column type for storing a list of Pydantic models in JSONB.

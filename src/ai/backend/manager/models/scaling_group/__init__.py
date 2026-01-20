@@ -14,8 +14,10 @@ from .row import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from .types import FairShareScalingGroupSpec
 
 __all__ = (
+    "FairShareScalingGroupSpec",
     "ScalingGroupForDomainRow",
     "ScalingGroupForKeypairsRow",
     "ScalingGroupForProjectRow",

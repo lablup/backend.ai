@@ -476,6 +476,14 @@ class UserFairShareRow(Base):
         "Higher value = less past usage = higher scheduling priority. "
         "Formula: F = 2^(-normalized_usage / weight)",
     )
+    scheduling_rank: Mapped[int | None] = mapped_column(
+        "scheduling_rank",
+        sa.Integer,
+        nullable=True,
+        comment="Computed scheduling priority rank. "
+        "Lower value = higher priority (1 = highest). "
+        "NULL means rank calculation has not been performed yet.",
+    )
     total_decayed_usage: Mapped[ResourceSlot] = mapped_column(
         "total_decayed_usage",
         ResourceSlotColumn(),
@@ -621,4 +629,5 @@ class UserFairShareRow(Base):
                 created_at=self.created_at,
                 updated_at=self.updated_at,
             ),
+            scheduling_rank=self.scheduling_rank,
         )

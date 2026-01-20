@@ -12,6 +12,7 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 
@@ -93,6 +94,7 @@ from ai.backend.manager.sokovan.scheduler.types import PromotionSpec
 def create_default_scheduler_components(
     repository: SchedulerRepository,
     deployment_repository: DeploymentRepository,
+    fair_share_repository: FairShareRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
@@ -105,6 +107,7 @@ def create_default_scheduler_components(
     Args:
         repository: The repository for accessing system data
         deployment_repository: The deployment repository
+        fair_share_repository: The fair share repository for sequencing
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
@@ -139,6 +142,7 @@ def create_default_scheduler_components(
             default_agent_selector=agent_selector,
             allocator=allocator,
             repository=repository,
+            fair_share_repository=fair_share_repository,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
         )

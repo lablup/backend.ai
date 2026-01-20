@@ -16,6 +16,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
@@ -47,6 +48,7 @@ from .selectors.selector import (
     AgentSelector,
 )
 from .sequencers.drf import DRFSequencer
+from .sequencers.fair_share import FairShareSequencer
 from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
@@ -62,6 +64,7 @@ class SessionProvisionerArgs:
     default_agent_selector: AgentSelector
     allocator: SchedulingAllocator
     repository: SchedulerRepository
+    fair_share_repository: FairShareRepository
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
 
@@ -82,6 +85,7 @@ class SessionProvisioner:
     _default_agent_selector: AgentSelector
     _allocator: SchedulingAllocator
     _repository: SchedulerRepository
+    _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
@@ -94,6 +98,7 @@ class SessionProvisioner:
         self._default_agent_selector = args.default_agent_selector
         self._allocator = args.allocator
         self._repository = args.repository
+        self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._sequencer_pool = self._make_sequencer_pool()
@@ -102,13 +107,13 @@ class SessionProvisioner:
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
-    @classmethod
-    def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
+    def _make_sequencer_pool(self) -> Mapping[str, WorkloadSequencer]:
         """Initialize the sequencer pool with default sequencers."""
         pool: dict[str, WorkloadSequencer] = defaultdict(DRFSequencer)
         pool["fifo"] = FIFOSequencer()
         pool["lifo"] = LIFOSequencer()
         pool["drf"] = DRFSequencer()
+        pool["fairshare"] = FairShareSequencer(self._fair_share_repository)
         return pool
 
     @classmethod
@@ -191,7 +196,9 @@ class SessionProvisioner:
                 sequencer.name, success_detail=sequencer.success_message()
             ),
         ):
-            sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
+            sequenced_workloads = await sequencer.sequence(
+                scaling_group, system_snapshot, workloads
+            )
 
         # Build mutable agents with occupancy data from snapshot
         agent_occupancy = (
