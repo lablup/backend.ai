@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, FieldType
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -51,6 +51,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     ScalingGroupCleanupConfig,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
@@ -106,7 +107,6 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
-    CreatorSpec,
 )
 from ai.backend.manager.repositories.base.purger import (
     Purger,
@@ -132,6 +132,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
 )
+from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,
     RouteServiceDiscoveryInfo,
@@ -151,19 +152,6 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
-
-
-class _LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
-    """Wrapper CreatorSpec for legacy endpoint creation.
-
-    Wraps a pre-built EndpointRow for use with RBACEntityCreator.
-    """
-
-    def __init__(self, *, _row: EndpointRow) -> None:
-        self._row = _row
-
-    def build_row(self) -> EndpointRow:
-        return self._row
 
 
 class DeploymentDBSource:
@@ -279,40 +267,30 @@ class DeploymentDBSource:
 
     async def create_endpoint_legacy(
         self,
-        creator: DeploymentCreator,
+        creator: RBACEntityCreator[EndpointRow],
     ) -> DeploymentInfo:
         """Create a new endpoint using legacy DeploymentCreator.
 
         This is for backward compatibility with legacy deployment creation flow.
 
         Args:
-            creator: Legacy DeploymentCreator with ImageIdentifier
+            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
+                The spec MUST be an instance of LegacyEndpointCreatorSpec.
 
         Returns:
             DeploymentInfo for the created endpoint
         """
+        spec = cast(LegacyEndpointCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
-            await self._check_group_exists(db_sess, creator.domain, creator.project)
-            endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
+            await self._check_group_exists(db_sess, spec.domain, spec.project)
 
             # Create endpoint with RBAC scope association
-            rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
-                spec=_LegacyEndpointCreatorSpec(_row=endpoint),
-                scope_type=ScopeType.USER,
-                scope_id=str(creator.metadata.created_user),
-                entity_type=EntityType.MODEL_DEPLOYMENT,
-            )
-            rbac_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
             # Create deployment policy if provided
-            if creator.policy is not None:
-                policy_row = DeploymentPolicyRow(
-                    endpoint=endpoint.id,
-                    strategy=creator.policy.strategy,
-                    strategy_spec=creator.policy.strategy_spec.model_dump(),
-                    rollback_on_failure=creator.policy.rollback_on_failure,
-                )
+            if spec.policy is not None:
+                policy_row = spec.policy.build_row()
                 db_sess.add(policy_row)
                 await db_sess.flush()
 
@@ -345,6 +323,19 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         if result.first() is None:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
+
+    async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
+        """Get image ID from ImageIdentifier.
+
+        Args:
+            image: ImageIdentifier containing canonical and architecture
+
+        Returns:
+            UUID of the image
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            image_row = await ImageRow.lookup(db_sess, image)
+            return image_row.id
 
     async def get_endpoint(
         self,

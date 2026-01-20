@@ -29,7 +29,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
-from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -55,6 +55,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     ScalingGroupCleanupConfig,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
@@ -163,20 +164,25 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint_legacy(
         self,
-        creator: DeploymentCreator,
-        # RBACEntityCreator
+        creator: RBACEntityCreator[EndpointRow],
     ) -> DeploymentInfo:
         """Create a new endpoint using legacy DeploymentCreator.
 
         This is for backward compatibility with legacy deployment creation flow.
 
         Args:
-            creator: Legacy DeploymentCreator with ImageIdentifier
+            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
+                The spec MUST be an instance of LegacyEndpointCreatorSpec.
 
         Returns:
             DeploymentInfo for the created endpoint
         """
         return await self._db_source.create_endpoint_legacy(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
+        """Get image ID from ImageIdentifier."""
+        return await self._db_source.get_image_id(image)
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
