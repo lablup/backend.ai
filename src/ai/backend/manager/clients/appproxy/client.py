@@ -1,9 +1,9 @@
-from typing import Any, Final
+from typing import Any
 from uuid import UUID
 
 import aiohttp
 
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -11,8 +11,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 
 from .types import CreateEndpointRequestBody
-
-REQUEST_ID_HDR: Final = "X-BackendAI-RequestID"
 
 appproxy_client_resilience = Resilience(
     policies=[
@@ -42,8 +40,7 @@ class AppProxyClient:
     def _get_headers(self) -> dict[str, str]:
         """Get common headers for API requests."""
         headers = {"X-BackendAI-Token": self._token}
-        if request_id := current_request_id():
-            headers[REQUEST_ID_HDR] = request_id
+        bind_request_id(headers, "AppProxy request")
         return headers
 
     @appproxy_client_resilience.apply()

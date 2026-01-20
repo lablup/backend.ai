@@ -18,7 +18,7 @@ from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
@@ -1333,8 +1333,7 @@ class SessionService:
         }
 
         headers: dict[str, str] = {}
-        if request_id := current_request_id():
-            headers["X-BackendAI-RequestID"] = request_id
+        bind_request_id(headers, "wsproxy conf request")
         async with (
             aiohttp.ClientSession() as req,
             req.post(

@@ -60,6 +60,7 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.contexts.request_id import receive_request_id
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -175,6 +176,11 @@ class RPCFunctionRegistry:
             try:
                 if request.body is None:
                     return await meth(self_)
+                request_id = request.body.get("request_id")
+                if request_id:
+                    receive_request_id(request_id)
+                else:
+                    log.warning("No request_id received from manager for RPC call")
                 return await meth(
                     self_,
                     *request.body["args"],
@@ -212,6 +218,11 @@ class RPCFunctionRegistryV2:
             try:
                 if request.body is None:
                     return await meth(self_)
+                request_id = request.body.get("request_id")
+                if request_id:
+                    receive_request_id(request_id)
+                else:
+                    log.warning("No request_id received from manager for RPC call")
                 res = await meth(
                     self_,
                     *request.body["args"],

@@ -7,7 +7,7 @@ import yarl
 from async_timeout import timeout as _timeout
 from dateutil.tz import tzutc
 
-from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
@@ -167,8 +167,7 @@ class AgentService:
             with _timeout(5.0):
                 watcher_url = watcher_info["addr"] / endpoint
                 headers: dict[str, str] = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                if request_id := current_request_id():
-                    headers["X-BackendAI-RequestID"] = request_id
+                bind_request_id(headers, "agent watcher request")
 
                 async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
