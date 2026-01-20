@@ -27,16 +27,23 @@ def current_request_id() -> str | None:
         return None
 
 
-def receive_request_id(request_id: str) -> None:
+def receive_request_id(request_id: Optional[str], context_description: str) -> None:
     """
     Set the request ID in the current context.
     Unlike with_request_id(), this does not auto-generate a UUID if None is passed,
     and does not reset the context when done.
+    Logs a warning if no request_id is provided.
 
     Use this for fire-and-forget scenarios
     like RPC handlers where the context is scoped to the request.
+
+    :param request_id: The request ID to set (from incoming request)
+    :param context_description: A description of the operation for logging
     """
-    _request_id_var.set(request_id)
+    if request_id:
+        _request_id_var.set(request_id)
+    else:
+        log.warning("No request_id in context for {}", context_description)
 
 
 @contextmanager
