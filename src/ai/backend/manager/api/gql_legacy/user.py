@@ -1206,7 +1206,7 @@ class PurgeUser(graphene.Mutation):
 
 
 def _validate_container_uid_gid(value: Any) -> None:
-    if value is not Undefined and value < 0:
+    if value is not Undefined and value is not None and value < 0:
         raise ValueError("UID and GID must be non-negative integers.")
 
 
