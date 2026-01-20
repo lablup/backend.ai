@@ -37,6 +37,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -50,13 +51,11 @@ from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
-    EndpointStatistics,
 )
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
-    KernelStatistics,
     recalc_concurrency_used,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
