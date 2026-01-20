@@ -2361,7 +2361,9 @@ type Mutation {
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
   forget_image(
-    """If not provided, defaults to the server's architecture."""
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
     architecture: String = null
     reference: String!
   ): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
