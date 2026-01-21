@@ -39,11 +39,11 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.user.purgers import (
-    UserErrorLogPurgerSpec,
-    UserGroupAssociationPurgerSpec,
-    UserKeyPairPurgerSpec,
-    UserPurgerSpec,
-    UserVFolderPermissionPurgerSpec,
+    UserBatchPurgerSpec,
+    UserErrorLogBatchPurgerSpec,
+    UserGroupAssociationBatchPurgerSpec,
+    UserKeyPairBatchPurgerSpec,
+    UserVFolderPermissionBatchPurgerSpec,
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
@@ -73,10 +73,10 @@ def create_test_password_info(password: str = "test_password") -> PasswordInfo:
 class TestUserPurgerSpecs:
     """Tests for PurgerSpec classes - verifying build_subquery() generates correct conditions."""
 
-    def test_user_error_log_purger_spec_build_subquery(self) -> None:
-        """Test UserErrorLogPurgerSpec builds correct subquery."""
+    def test_user_error_log_batch_purger_spec_build_subquery(self) -> None:
+        """Test UserErrorLogBatchPurgerSpec builds correct subquery."""
         user_uuid = uuid.uuid4()
-        spec = UserErrorLogPurgerSpec(user_uuid=user_uuid)
+        spec = UserErrorLogBatchPurgerSpec(user_uuid=user_uuid)
 
         subquery = spec.build_subquery()
 
@@ -89,10 +89,10 @@ class TestUserPurgerSpecs:
         # Check the column reference is present (bound parameter will be :user_1 etc.)
         assert '"user"' in sql_str or "error_logs.user" in sql_str.lower()
 
-    def test_user_keypair_purger_spec_build_subquery(self) -> None:
-        """Test UserKeyPairPurgerSpec builds correct subquery."""
+    def test_user_keypair_batch_purger_spec_build_subquery(self) -> None:
+        """Test UserKeyPairBatchPurgerSpec builds correct subquery."""
         user_uuid = uuid.uuid4()
-        spec = UserKeyPairPurgerSpec(user_uuid=user_uuid)
+        spec = UserKeyPairBatchPurgerSpec(user_uuid=user_uuid)
 
         subquery = spec.build_subquery()
         sql_str = str(subquery)
@@ -100,10 +100,10 @@ class TestUserPurgerSpecs:
         assert "keypairs" in sql_str
         assert "keypairs.user" in sql_str.lower() or '"user"' in sql_str
 
-    def test_user_group_association_purger_spec_build_subquery(self) -> None:
-        """Test UserGroupAssociationPurgerSpec builds correct subquery."""
+    def test_user_group_association_batch_purger_spec_build_subquery(self) -> None:
+        """Test UserGroupAssociationBatchPurgerSpec builds correct subquery."""
         user_uuid = uuid.uuid4()
-        spec = UserGroupAssociationPurgerSpec(user_uuid=user_uuid)
+        spec = UserGroupAssociationBatchPurgerSpec(user_uuid=user_uuid)
 
         subquery = spec.build_subquery()
         sql_str = str(subquery)
@@ -111,10 +111,10 @@ class TestUserPurgerSpecs:
         assert "association_groups_users" in sql_str
         assert "user_id" in sql_str.lower()
 
-    def test_user_vfolder_permission_purger_spec_build_subquery(self) -> None:
-        """Test UserVFolderPermissionPurgerSpec builds correct subquery."""
+    def test_user_vfolder_permission_batch_purger_spec_build_subquery(self) -> None:
+        """Test UserVFolderPermissionBatchPurgerSpec builds correct subquery."""
         user_uuid = uuid.uuid4()
-        spec = UserVFolderPermissionPurgerSpec(user_uuid=user_uuid)
+        spec = UserVFolderPermissionBatchPurgerSpec(user_uuid=user_uuid)
 
         subquery = spec.build_subquery()
         sql_str = str(subquery)
@@ -122,10 +122,10 @@ class TestUserPurgerSpecs:
         assert "vfolder_permissions" in sql_str
         assert "vfolder_permissions.user" in sql_str.lower() or '"user"' in sql_str
 
-    def test_user_purger_spec_build_subquery(self) -> None:
-        """Test UserPurgerSpec builds correct subquery."""
+    def test_user_batch_purger_spec_build_subquery(self) -> None:
+        """Test UserBatchPurgerSpec builds correct subquery."""
         user_uuid = uuid.uuid4()
-        spec = UserPurgerSpec(user_uuid=user_uuid)
+        spec = UserBatchPurgerSpec(user_uuid=user_uuid)
 
         subquery = spec.build_subquery()
         sql_str = str(subquery)
@@ -144,7 +144,7 @@ class TestUserPurgerFactoryFunctions:
         purger = create_user_error_log_purger(user_uuid)
 
         assert isinstance(purger, BatchPurger)
-        assert isinstance(purger.spec, UserErrorLogPurgerSpec)
+        assert isinstance(purger.spec, UserErrorLogBatchPurgerSpec)
         assert purger.spec.user_uuid == user_uuid
 
     def test_create_user_keypair_purger(self) -> None:
@@ -154,7 +154,7 @@ class TestUserPurgerFactoryFunctions:
         purger = create_user_keypair_purger(user_uuid)
 
         assert isinstance(purger, BatchPurger)
-        assert isinstance(purger.spec, UserKeyPairPurgerSpec)
+        assert isinstance(purger.spec, UserKeyPairBatchPurgerSpec)
         assert purger.spec.user_uuid == user_uuid
 
     def test_create_user_group_association_purger(self) -> None:
@@ -164,7 +164,7 @@ class TestUserPurgerFactoryFunctions:
         purger = create_user_group_association_purger(user_uuid)
 
         assert isinstance(purger, BatchPurger)
-        assert isinstance(purger.spec, UserGroupAssociationPurgerSpec)
+        assert isinstance(purger.spec, UserGroupAssociationBatchPurgerSpec)
         assert purger.spec.user_uuid == user_uuid
 
     def test_create_user_vfolder_permission_purger(self) -> None:
@@ -174,7 +174,7 @@ class TestUserPurgerFactoryFunctions:
         purger = create_user_vfolder_permission_purger(user_uuid)
 
         assert isinstance(purger, BatchPurger)
-        assert isinstance(purger.spec, UserVFolderPermissionPurgerSpec)
+        assert isinstance(purger.spec, UserVFolderPermissionBatchPurgerSpec)
         assert purger.spec.user_uuid == user_uuid
 
     def test_create_user_purger(self) -> None:
@@ -184,7 +184,7 @@ class TestUserPurgerFactoryFunctions:
         purger = create_user_purger(user_uuid)
 
         assert isinstance(purger, BatchPurger)
-        assert isinstance(purger.spec, UserPurgerSpec)
+        assert isinstance(purger.spec, UserBatchPurgerSpec)
         assert purger.spec.user_uuid == user_uuid
         assert purger.batch_size == 1  # User purger should have batch_size=1
 

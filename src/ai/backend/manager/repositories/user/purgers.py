@@ -15,7 +15,7 @@ from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurger
 
 
 @dataclass
-class UserErrorLogPurgerSpec(BatchPurgerSpec[ErrorLogRow]):
+class UserErrorLogBatchPurgerSpec(BatchPurgerSpec[ErrorLogRow]):
     """PurgerSpec for deleting all error logs belonging to a user."""
 
     user_uuid: UUID
@@ -28,7 +28,7 @@ class UserErrorLogPurgerSpec(BatchPurgerSpec[ErrorLogRow]):
 
 
 @dataclass
-class UserKeyPairPurgerSpec(BatchPurgerSpec[KeyPairRow]):
+class UserKeyPairBatchPurgerSpec(BatchPurgerSpec[KeyPairRow]):
     """PurgerSpec for deleting all keypairs belonging to a user."""
 
     user_uuid: UUID
@@ -39,7 +39,7 @@ class UserKeyPairPurgerSpec(BatchPurgerSpec[KeyPairRow]):
 
 
 @dataclass
-class UserVFolderPermissionPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
+class UserVFolderPermissionBatchPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
     """PurgerSpec for deleting all vfolder permissions belonging to a user."""
 
     user_uuid: UUID
@@ -50,7 +50,7 @@ class UserVFolderPermissionPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
 
 
 @dataclass
-class UserGroupAssociationPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
+class UserGroupAssociationBatchPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
     """PurgerSpec for deleting all group associations belonging to a user."""
 
     user_uuid: UUID
@@ -61,7 +61,7 @@ class UserGroupAssociationPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
 
 
 @dataclass
-class UserPurgerSpec(BatchPurgerSpec[UserRow]):
+class UserBatchPurgerSpec(BatchPurgerSpec[UserRow]):
     """PurgerSpec for deleting a user."""
 
     user_uuid: UUID
@@ -74,34 +74,34 @@ class UserPurgerSpec(BatchPurgerSpec[UserRow]):
 def create_user_error_log_purger(user_uuid: UUID) -> BatchPurger[ErrorLogRow]:
     """Create a BatchPurger for deleting all error logs belonging to a user."""
     return BatchPurger(
-        spec=UserErrorLogPurgerSpec(user_uuid=user_uuid),
+        spec=UserErrorLogBatchPurgerSpec(user_uuid=user_uuid),
     )
 
 
 def create_user_keypair_purger(user_uuid: UUID) -> BatchPurger[KeyPairRow]:
     """Create a BatchPurger for deleting all keypairs belonging to a user."""
     return BatchPurger(
-        spec=UserKeyPairPurgerSpec(user_uuid=user_uuid),
+        spec=UserKeyPairBatchPurgerSpec(user_uuid=user_uuid),
     )
 
 
 def create_user_vfolder_permission_purger(user_uuid: UUID) -> BatchPurger[VFolderPermissionRow]:
     """Create a BatchPurger for deleting all vfolder permissions belonging to a user."""
     return BatchPurger(
-        spec=UserVFolderPermissionPurgerSpec(user_uuid=user_uuid),
+        spec=UserVFolderPermissionBatchPurgerSpec(user_uuid=user_uuid),
     )
 
 
 def create_user_group_association_purger(user_uuid: UUID) -> BatchPurger[AssocGroupUserRow]:
     """Create a BatchPurger for deleting all group associations belonging to a user."""
     return BatchPurger(
-        spec=UserGroupAssociationPurgerSpec(user_uuid=user_uuid),
+        spec=UserGroupAssociationBatchPurgerSpec(user_uuid=user_uuid),
     )
 
 
 def create_user_purger(user_uuid: UUID) -> BatchPurger[UserRow]:
     """Create a BatchPurger for deleting a user."""
     return BatchPurger(
-        spec=UserPurgerSpec(user_uuid=user_uuid),
+        spec=UserBatchPurgerSpec(user_uuid=user_uuid),
         batch_size=1,  # We expect only one row to be deleted
     )
