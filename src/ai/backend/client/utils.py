@@ -4,8 +4,6 @@ import os
 import textwrap
 import uuid
 
-import click
-
 from ai.backend.client.output.types import FieldSet, FieldSpec
 
 
@@ -60,27 +58,6 @@ def flatten_connections_in_data(data: dict) -> dict:
         result[key] = value
 
     return result
-
-
-def validate_key_value(ctx, param, option_value):
-    key_value_pairs = option_value.split(",")
-    if len(key_value_pairs) > 50:
-        raise click.BadParameter("Too many key-value pairs (maximum 50).")
-    for pair in key_value_pairs:
-        if "=" not in pair:
-            raise click.BadParameter(
-                'Invalid format. Each key-value pair should be in the format "key=value".'
-            )
-        key, value = pair.split("=", 1)
-        if not key:
-            raise click.BadParameter("Empty key is not allowed.")
-        if not value:
-            raise click.BadParameter("Empty value is not allowed.")
-        if len(key) > 128:
-            raise click.BadParameter("Key length should be less than 128 characters.")
-        if len(value) > 256:
-            raise click.BadParameter("Value length should be less than 256 characters.")
-    return option_value
 
 
 class ProgressReportingReader(io.BufferedReader):

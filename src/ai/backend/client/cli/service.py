@@ -6,6 +6,7 @@ from uuid import UUID
 
 import click
 
+from ai.backend.cli.params import CommaSeparatedKVListParamType
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import (
     prepare_env_arg,
@@ -17,7 +18,6 @@ from ai.backend.client.exceptions import BackendError
 from ai.backend.client.output.fields import routing_fields, service_fields
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
-from ai.backend.client.utils import validate_key_value
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode, RuntimeVariant
@@ -229,10 +229,9 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
 # extra options
 @click.option(
     "--tag",
-    type=str,
-    callback=validate_key_value,
+    type=CommaSeparatedKVListParamType(),
     default=None,
-    help="User-defined tag string to annotate sessions.",
+    help="User-defined tag string in key=value format, comma-separated (e.g., 'project=ai,env=prod').",
 )
 @click.option(
     "--arch",
@@ -446,7 +445,12 @@ def create(
     help="A user-defined script to execute on startup.",
 )
 # extra options
-@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
+@click.option(
+    "--tag",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="User-defined tag string in key=value format, comma-separated (e.g., 'project=ai,env=prod').",
+)
 @click.option(
     "--arch",
     "--architecture",
