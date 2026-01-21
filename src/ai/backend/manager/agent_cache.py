@@ -17,6 +17,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -46,6 +47,7 @@ class PeerInvoker(Peer):
                     "args": args,
                     "kwargs": kwargs,
                 }
+                bind_request_id(request_body, f"RPC call to agent: {name}", key="request_id")
                 self.peer.last_used = time.monotonic()
                 ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
                 self.peer.last_used = time.monotonic()

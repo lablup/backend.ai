@@ -60,6 +60,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.contexts.request_id import receive_request_id
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -176,11 +177,22 @@ class RPCFunctionRegistry:
             try:
                 if request.body is None:
                     return await meth(self_)
-                return await meth(
+                request_id = request.body.get("request_id")
+                receive_request_id(request_id, f"RPC call from manager: {meth.__name__}")
+                result = await meth(
                     self_,
                     *request.body["args"],
                     **request.body["kwargs"],
                 )
+                if request_id:
+                    if isinstance(result, dict):
+                        result["request_id"] = request_id
+                    else:
+                        log.warning(
+                            "Cannot attach request_id to non-dict RPC response: {}",
+                            type(result).__name__,
+                        )
+                return result
             except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
@@ -213,12 +225,17 @@ class RPCFunctionRegistryV2:
             try:
                 if request.body is None:
                     return await meth(self_)
+                request_id = request.body.get("request_id")
+                receive_request_id(request_id, f"RPC call from manager: {meth.__name__}")
                 res = await meth(
                     self_,
                     *request.body["args"],
                     **request.body["kwargs"],
                 )
-                return res.as_dict()
+                resp_dict = res.as_dict()
+                if request_id:
+                    resp_dict["request_id"] = request_id
+                return resp_dict
             except (TimeoutError, asyncio.CancelledError):
                 raise
             except ResourceError:
