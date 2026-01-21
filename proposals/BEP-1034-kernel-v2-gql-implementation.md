@@ -9,20 +9,13 @@ Implemented-Version:
 
 # BEP-1034: KernelV2 GQL Implementation
 
-## Related Issues
-
-- Parent: BEP-1010 (GraphQL API Migration to Strawberry)
-- Reference PR: https://github.com/lablup/backend.ai/pull/8079
-
 ## Overview
 
-This document defines the implementation plan for `KernelV2GQL` types as part of the Strawberry GraphQL migration. It specifies:
+This document defines the implementation plan for `KernelV2GQL` types as part of the Strawberry GraphQL migration (BEP-1010). It specifies:
 
-1. **Types to Include** - Types that will be implemented in the new PR
-2. **Types to Skip** - Types that are replaced by other designs (do not implement)
+1. **Types to Include** - Types that will be implemented
+2. **Types to Skip** - Types replaced by other designs
 3. **Types to Defer** - Types requiring Node connections (implement later)
-
-Since we're creating a fresh PR, skipped types simply won't be included rather than being removed.
 
 ## Document Structure
 
@@ -126,4 +119,3 @@ Since we're creating a fresh PR, skipped types simply won't be included rather t
 ## References
 
 - [BEP-1010: GraphQL API Migration to Strawberry](BEP-1010-new-gql.md)
-- [PR #8079: Original KernelV2 Implementation](https://github.com/lablup/backend.ai/pull/8079)
