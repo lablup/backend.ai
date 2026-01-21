@@ -22,7 +22,6 @@ from ai.backend.storage.volumes.abc import (
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
-from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -256,7 +255,14 @@ class GPFSVolume(BaseVolume):
             metrics = await self.api_client.get_metric(query)
             latest_metric = metrics["performanceData"]["rows"][-1]["values"]
         except (KeyError, IndexError):
-            raise GPFSNoMetricError
+            return FSPerfMetric(
+                iops_read=0,
+                iops_write=0,
+                io_bytes_read=0,
+                io_bytes_write=0,
+                io_usec_read=0,
+                io_usec_write=0,
+            )
         return FSPerfMetric(
             iops_read=latest_metric[0] or 0,
             iops_write=latest_metric[1] or 0,
