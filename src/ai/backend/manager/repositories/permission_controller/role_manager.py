@@ -156,11 +156,13 @@ class RoleManager:
         if permission_group is None:
             raise ValueError(f"Permission group not found for user_id={user_id}")
         role_id = permission_group.role_id
+        permission_group_id = permission_group.id
 
         creators = [
             Creator(
                 spec=ObjectPermissionCreatorSpec(
                     role_id=role_id,
+                    permission_group_id=permission_group_id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=operation,
