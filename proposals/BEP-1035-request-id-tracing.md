@@ -29,16 +29,15 @@ Without a unified request ID tracing system:
 
 ### Current State
 
-Several components have partial implementations:
-- Manager uses `request_id_middleware` for HTTP requests
-- Agent extracts `request_id` from RPC body but has multiple registry versions
-- Some background tasks generate request IDs, but coverage is incomplete
-- App-Proxy has custom (non-standard) request ID handling
+Request ID tracing is not systematically implemented:
+- Manager has `request_id_middleware` for HTTP requests, but doesn't propagate to other services
+- Agent RPC does not support request_id
+- Background tasks do not have request_id
+- App-Proxy does not have request_id support
 
-This fragmented approach leads to:
-- Inconsistent header names and extraction logic
-- Missing propagation at some service boundaries
-- Duplicate implementations across components
+This leads to:
+- No way to correlate logs across components
+- Cannot trace the full path of a request through the system
 
 ## Design Principles
 
@@ -53,14 +52,14 @@ This fragmented approach leads to:
 
 ### In Scope
 
-| Component | Status | Description |
-|-----------|--------|-------------|
-| Common Infrastructure | Partial | `request_id_middleware`, utilities, ContextVar |
-| Manager | Partial | Hub component, propagates to other services |
-| Agent | Partial | RPCFunctionRegistryV3 needed for proper header handling |
-| Storage-Proxy | ✓ | Uses standard middleware |
-| App-Proxy Coordinator | ✗ | Custom implementation needs standardization |
-| App-Proxy Worker | ✗ | Custom implementation needs standardization |
+| Component | Current | Proposed |
+|-----------|---------|----------|
+| Common Infrastructure | `request_id_middleware` exists | Add utilities, RPC headers model |
+| Manager | HTTP middleware only | Propagate to Agent, Storage-Proxy, App-Proxy |
+| Agent | No request_id support | Add RPC headers support |
+| Storage-Proxy | HTTP middleware only | Add background task support |
+| App-Proxy Coordinator | No request_id support | Add middleware and propagation |
+| App-Proxy Worker | No request_id support | Add middleware and propagation |
 
 ### Out of Scope (Future Work)
 
@@ -113,7 +112,7 @@ Detailed specifications are organized into component-specific documents:
 |----------|-------------|
 | [common.md](./BEP-1035/common.md) | Common infrastructure: ContextVar, middleware, utilities |
 | [manager.md](./BEP-1035/manager.md) | Manager component: entry points, outbound propagation |
-| [agent.md](./BEP-1035/agent.md) | Agent component: RPCFunctionRegistryV3 design |
+| [agent.md](./BEP-1035/agent.md) | Agent component: RPC headers design |
 | [storage-proxy.md](./BEP-1035/storage-proxy.md) | Storage-Proxy component |
 | [app-proxy.md](./BEP-1035/app-proxy.md) | App-Proxy Coordinator and Worker |
 
@@ -145,7 +144,7 @@ For Agent RPC calls via Callosum (which doesn't support separate headers), we em
 }
 ```
 
-See [agent.md](./BEP-1035/agent.md) for complete RPCFunctionRegistryV3 specification.
+See [agent.md](./BEP-1035/agent.md) for complete RPC headers specification.
 
 #### 2. HTTP Header Standard
 
@@ -167,62 +166,60 @@ Generated using `ai.backend.common.logging.new_request_id()`.
 
 | Component | Current State | Target State | Priority |
 |-----------|--------------|--------------|----------|
-| Common | `request_id_middleware` exists | Add `RPCHeaders` model | High |
-| Manager | Middleware active, partial propagation | Full propagation to all services | High |
-| Agent | v1/v2 registries | RPCFunctionRegistryV3 | High |
-| Storage-Proxy | Middleware active | Complete | Low |
-| App-Proxy | Custom implementation | Standardize to common | Medium |
+| Common | `request_id_middleware` only | Add utilities, `RPCHeaders` model | High |
+| Manager | HTTP middleware only | Propagate to all outbound calls | High |
+| Agent | No request_id support | RPC headers support | High |
+| Storage-Proxy | HTTP middleware only | Add background task decorator | Low |
+| App-Proxy | No request_id support | Add middleware | Medium |
 
 ## Migration Plan
 
-### Phase 1: Common Infrastructure (26.1.x)
+### Phase 1: Common Infrastructure
 
 1. Add `RPCHeaders` Pydantic model to common
-2. Add `receive_request_id()` utility for RPC handlers
-3. Ensure `bind_request_id()` is used in all outbound calls
+2. Add `@with_request_id_context` decorator
+3. Add utilities (`bind_request_id`, `current_request_id`, etc.)
 
-### Phase 2: Agent RPCFunctionRegistryV3 (26.2.0)
+### Phase 2: Agent RPC Headers
 
-1. Implement V3 registry with header support
-2. Add version negotiation between Manager and Agent
-3. Maintain V2 compatibility during transition
+1. Add RPC headers support to Agent
+2. Update Manager to send headers in RPC calls
+3. Maintain backward compatibility with legacy Agents
 
-### Phase 3: App-Proxy Standardization (26.2.x)
+### Phase 3: App-Proxy Standardization
 
-1. Replace custom request ID handling with standard middleware
+1. Add `request_id_middleware` to Coordinator and Worker
 2. Ensure Worker ↔ Coordinator propagation
 
-### Phase 4: Cleanup (26.3.0)
+### Phase 4: Full Coverage
 
-1. Remove deprecated V1/V2 registries
-2. Remove compatibility shims
+1. Add `@with_request_id_context` to all background tasks
+2. Add request_id to event system metadata
 
 ## Backward Compatibility
 
 ### Manager → Agent Communication
 
 During migration:
-- Manager sends requests with headers in body
-- V3 Agents extract from headers
-- V2 Agents continue to work (fallback to body.request_id)
+- Manager sends requests with `headers` field in body
+- New Agents extract request_id from headers
+- Legacy Agents ignore the `headers` field (no breaking change)
 
-Version detection via Agent capability advertisement or protocol negotiation.
+Version detection via Agent capability advertisement.
 
 ### HTTP Services
 
-Existing services already use `X-Request-ID` header - no breaking changes.
+HTTP services can adopt `request_id_middleware` incrementally - no breaking changes.
 
 ## Open Questions
 
-1. **Version Negotiation**: How should Manager detect Agent RPC version?
+1. **Capability Advertisement**: How should Manager detect if Agent supports RPC headers?
    - Option A: Agent advertises capabilities during registration
-   - Option B: Try V3 format, fallback to V2 on error
-   - Option C: Configuration-based version selection
+   - Option B: Always send headers (legacy Agents ignore unknown fields)
 
 2. **WebSocket Sessions**: How should long-lived WebSocket connections handle request IDs?
    - Option A: One request_id per connection
    - Option B: New request_id per message
-   - Option C: Client-provided request_id in each message
 
 3. **Event System**: Should event handlers maintain the original request_id or generate new ones?
    - Recommendation: Maintain original for causality tracking

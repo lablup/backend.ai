@@ -27,64 +27,12 @@ Client                    Coordinator                   Worker                  
    │◀──────────────────────────┤                           │                       │
 ```
 
-## Current Issues
+## Current State
 
-### Issue 1: Custom Request ID Extraction
-
-Both Coordinator and Worker have custom implementations instead of using `request_id_middleware`:
-
-```python
-# Current custom implementation (problematic)
-async def handle_request(request: web.Request) -> web.Response:
-    # Custom extraction logic - duplicates middleware behavior
-    request_id = request.headers.get("X-Request-ID")
-    if not request_id:
-        request_id = str(uuid.uuid4())
-    
-    # Manual context binding
-    _request_id_var.set(request_id)
-    
-    # Missing: response header not set
-    return await process_request(request)
-```
-
-**Problems**:
-- Duplicated code across components
-- Inconsistent header names (some use `X-Request-ID`, others `x-request-id`)
-- Response header often missing
-- No integration with `current_request_id()` utility
-
-### Issue 2: Worker ↔ Coordinator Communication
-
-Request ID is not consistently propagated between Coordinator and Worker:
-
-```python
-# Coordinator forwarding to Worker (missing request_id)
-async def forward_to_worker(worker_url: str, request: web.Request) -> web.Response:
-    async with session.request(
-        request.method,
-        worker_url,
-        headers=request.headers,  # May or may not include X-Request-ID
-        data=await request.read(),
-    ) as response:
-        return web.Response(
-            status=response.status,
-            body=await response.read(),
-        )
-```
-
-### Issue 3: Session-Based Connections
-
-Long-lived WebSocket/SSE connections don't have per-message request IDs:
-
-```python
-# WebSocket handler (no request_id per message)
-async def websocket_handler(request: web.Request, ws: web.WebSocketResponse):
-    # Initial connection has request_id
-    async for msg in ws:
-        # Each message has no request_id
-        await process_message(msg)
-```
+App-Proxy (Coordinator and Worker) does not have request_id support:
+- No `request_id_middleware`
+- No request_id propagation between Coordinator and Worker
+- No request_id in WebSocket/SSE connections
 
 ## Proposed Changes
 

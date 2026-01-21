@@ -93,13 +93,12 @@ class PeerInvoker:
 
 #### Legacy Compatibility
 
-For Agents running older versions (V2 registry), the request_id is also placed at the top level:
+Legacy Agents (without headers support) ignore the `headers` field:
 
 ```python
-# Compatibility mode
+# New format - legacy Agents simply ignore the headers field
 request_body = {
-    "headers": {"request_id": request_id},  # V3 format
-    "request_id": request_id,                # V2 fallback
+    "headers": {"request_id": request_id},
     "args": args,
     "kwargs": kwargs,
 }
@@ -258,7 +257,7 @@ Client                    Manager               Storage-Proxy
 ## Implementation Checklist
 
 ### HTTP Entry Points
-- [x] `request_id_middleware` applied to main app
+- [ ] `request_id_middleware` applied to main app
 - [ ] Verify all sub-apps have middleware
 
 ### Background Tasks
@@ -281,8 +280,8 @@ Client                    Manager               Storage-Proxy
 ### Current State
 
 1. `request_id_middleware` is applied to Manager HTTP app
-2. Background tasks partially have request ID generation
-3. Agent RPC calls partially propagate request_id (depends on Agent version)
+2. Background tasks do not have request_id
+3. Agent RPC calls do not propagate request_id
 
 ### Required Changes
 

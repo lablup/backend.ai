@@ -2,9 +2,9 @@
 
 Storage-Proxy handles file storage operations for virtual folders (vfolders). It provides HTTP APIs for file upload, download, and management operations.
 
-## Current Implementation
+## Proposed Implementation
 
-Storage-Proxy already uses the standard `request_id_middleware` for HTTP requests:
+Storage-Proxy should use the standard `request_id_middleware` for HTTP requests:
 
 ```python
 # ai/backend/storage/server.py
@@ -156,16 +156,14 @@ Note: S3/cloud storage APIs typically don't support custom trace headers in the 
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| HTTP middleware | ✓ Implemented | Standard `request_id_middleware` |
-| Response header | ✓ Implemented | `X-Backend-Request-ID` in responses |
-| Background tasks | △ Partial | Some tasks may need `@with_request_id_context` |
-| Internal logging | ✓ Implemented | Uses `current_request_id()` |
+| HTTP middleware | Not implemented | Need to add `request_id_middleware` |
+| Response header | Not implemented | Need to add `X-Backend-Request-ID` |
+| Background tasks | Not implemented | Need `@with_request_id_context` |
 
 ## Implementation Checklist
 
-- [x] `request_id_middleware` applied to main app
-- [x] Response includes `X-Backend-Request-ID`
-- [ ] Audit background tasks for `@with_request_id_context`
+- [ ] Apply `request_id_middleware` to main app
+- [ ] Response includes `X-Backend-Request-ID`
 - [ ] Add `@with_request_id_context` to cleanup tasks
 - [ ] Add `@with_request_id_context` to sync operations
 - [ ] Verify long-running operations preserve request_id

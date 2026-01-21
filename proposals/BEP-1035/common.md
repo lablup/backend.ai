@@ -354,12 +354,12 @@ async def call_storage_proxy(operation: str, params: dict) -> dict:
 
 ## Implementation Checklist
 
-- [x] `_request_id_var` ContextVar
-- [x] `current_request_id()` function
-- [x] `new_request_id()` function  
-- [x] `bind_request_id()` context manager
+- [ ] `_request_id_var` ContextVar
+- [ ] `current_request_id()` function
+- [ ] `new_request_id()` function  
+- [ ] `bind_request_id()` context manager
 - [ ] `@with_request_id_context` decorator
-- [x] `request_id_middleware` for aiohttp
-- [ ] `RPCHeaders` Pydantic model (to be added)
-- [ ] `receive_request_id()` utility (to be added)
-- [ ] `with_request_id()` async context manager (to be added)
+- [ ] `request_id_middleware` for aiohttp
+- [ ] `RPCHeaders` Pydantic model
+- [ ] `receive_request_id()` utility
+- [ ] `with_request_id()` async context manager
