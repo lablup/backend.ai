@@ -2,7 +2,7 @@
 
 This module provides the FairShareAggregator that performs pure computation:
 1. Prepares kernel usage records (resource-seconds) in 5-minute slices
-2. Aggregates usage by user/project/domain (future)
+2. Aggregates usage deltas by user/project/domain for bucket updates
 3. Calculates scheduling ranks for fair share sequencing (future)
 
 The aggregator is stateless and does not interact with databases directly.
@@ -11,9 +11,10 @@ Repository operations are handled by FairShareObserver.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -30,6 +31,55 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelInfo
 
 
+# =============================================================================
+# Bucket Key Types
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class UserUsageBucketKey:
+    """Key for user usage bucket aggregation.
+
+    Uniquely identifies a user's usage bucket within a resource group and time period.
+    """
+
+    user_uuid: UUID
+    project_id: UUID
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+@dataclass(frozen=True)
+class ProjectUsageBucketKey:
+    """Key for project usage bucket aggregation.
+
+    Uniquely identifies a project's usage bucket within a resource group and time period.
+    """
+
+    project_id: UUID
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+@dataclass(frozen=True)
+class DomainUsageBucketKey:
+    """Key for domain usage bucket aggregation.
+
+    Uniquely identifies a domain's usage bucket within a resource group and time period.
+    """
+
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+# =============================================================================
+# Result Types
+# =============================================================================
+
+
 @dataclass
 class KernelUsagePreparationResult:
     """Result of preparing kernel usage records.
@@ -43,6 +93,21 @@ class KernelUsagePreparationResult:
     specs: list[KernelUsageRecordCreatorSpec] = field(default_factory=list)
     kernel_observation_times: dict[UUID, datetime] = field(default_factory=dict)
     observed_count: int = 0
+
+
+@dataclass
+class UsageBucketAggregationResult:
+    """Result of aggregating kernel usage into hourly buckets.
+
+    Attributes:
+        user_usage_deltas: Aggregated usage deltas by user for bucket updates
+        project_usage_deltas: Aggregated usage deltas by project for bucket updates
+        domain_usage_deltas: Aggregated usage deltas by domain for bucket updates
+    """
+
+    user_usage_deltas: dict[UserUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, ResourceSlot] = field(default_factory=dict)
 
 
 class FairShareAggregator:
@@ -93,6 +158,150 @@ class FairShareAggregator:
                 result.observed_count += 1
 
         return result
+
+    def aggregate_kernel_usage_to_buckets(
+        self,
+        specs: Sequence[KernelUsageRecordCreatorSpec],
+    ) -> UsageBucketAggregationResult:
+        """Aggregate kernel usage specs into daily bucket deltas.
+
+        Splits each spec's resource usage across day boundaries and aggregates
+        by user/project/domain. Buckets are aligned to day boundaries (midnight).
+
+        For example, a spec covering 23:57-00:03 will be split:
+        - 23:57-00:00 (3 minutes) -> day 1 bucket
+        - 00:00-00:03 (3 minutes) -> day 2 bucket
+
+        Args:
+            specs: Kernel usage record specs to aggregate
+
+        Returns:
+            UsageBucketAggregationResult with deltas for each bucket
+        """
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+
+        for spec in specs:
+            # Split spec across day boundaries and aggregate
+            daily_splits = self._split_spec_by_day(spec)
+
+            for period_date, resource_usage in daily_splits:
+                self._add_to_bucket_deltas(
+                    spec=spec,
+                    period_date=period_date,
+                    resource_usage=resource_usage,
+                    user_deltas=user_deltas,
+                    project_deltas=project_deltas,
+                    domain_deltas=domain_deltas,
+                )
+
+        return UsageBucketAggregationResult(
+            user_usage_deltas=dict(user_deltas),
+            project_usage_deltas=dict(project_deltas),
+            domain_usage_deltas=dict(domain_deltas),
+        )
+
+    def _split_spec_by_day(
+        self,
+        spec: KernelUsageRecordCreatorSpec,
+    ) -> list[tuple[date, ResourceSlot]]:
+        """Split a spec's resource usage across day boundaries.
+
+        Most 5-minute specs will fit within a single day, but specs crossing
+        midnight (e.g., 23:57-00:02) need to be split.
+
+        Args:
+            spec: Kernel usage record spec to split
+
+        Returns:
+            List of (period_date, resource_usage) tuples
+        """
+        from datetime import timedelta
+
+        result: list[tuple[date, ResourceSlot]] = []
+
+        total_seconds = (spec.period_end - spec.period_start).total_seconds()
+        if total_seconds <= 0:
+            return result
+
+        # Fast path: most specs don't cross midnight
+        if spec.period_start.date() == spec.period_end.date():
+            return [(spec.period_start.date(), spec.resource_usage)]
+
+        # Slow path: split across day boundaries
+        current_start = spec.period_start
+
+        while current_start < spec.period_end:
+            current_date = current_start.date()
+            # Next midnight
+            next_midnight = datetime.combine(
+                current_date + timedelta(days=1),
+                datetime.min.time(),
+                tzinfo=current_start.tzinfo,
+            )
+
+            # Segment ends at next midnight or spec end, whichever is earlier
+            segment_end = min(next_midnight, spec.period_end)
+            segment_seconds = (segment_end - current_start).total_seconds()
+
+            if segment_seconds > 0:
+                # Proportionally allocate resource usage
+                proportion = Decimal(str(segment_seconds)) / Decimal(str(total_seconds))
+                segment_usage = ResourceSlot({
+                    key: value * proportion for key, value in spec.resource_usage.items()
+                })
+                result.append((current_date, segment_usage))
+
+            current_start = segment_end
+
+        return result
+
+    def _add_to_bucket_deltas(
+        self,
+        spec: KernelUsageRecordCreatorSpec,
+        period_date: date,
+        resource_usage: ResourceSlot,
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot],
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot],
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot],
+    ) -> None:
+        """Add resource usage to bucket deltas for a day.
+
+        Args:
+            spec: Original spec (for entity identifiers)
+            period_date: Date of the bucket
+            resource_usage: Resource usage for this day segment
+            user_deltas: User deltas to update (mutated)
+            project_deltas: Project deltas to update (mutated)
+            domain_deltas: Domain deltas to update (mutated)
+        """
+        # User bucket key
+        user_key = UserUsageBucketKey(
+            user_uuid=spec.user_uuid,
+            project_id=spec.project_id,
+            domain_name=spec.domain_name,
+            resource_group=spec.resource_group,
+            period_date=period_date,
+        )
+        user_deltas[user_key] = user_deltas[user_key] + resource_usage
+
+        # Project bucket key
+        project_key = ProjectUsageBucketKey(
+            project_id=spec.project_id,
+            domain_name=spec.domain_name,
+            resource_group=spec.resource_group,
+            period_date=period_date,
+        )
+        project_deltas[project_key] = project_deltas[project_key] + resource_usage
+
+        # Domain bucket key
+        domain_key = DomainUsageBucketKey(
+            domain_name=spec.domain_name,
+            resource_group=spec.resource_group,
+            period_date=period_date,
+        )
+        domain_deltas[domain_key] = domain_deltas[domain_key] + resource_usage
 
     def _prepare_kernel_usage_specs(
         self,

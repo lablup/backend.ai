@@ -11,7 +11,6 @@ Targets:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
 from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.data.kernel.types import KernelInfo
@@ -31,10 +30,13 @@ if TYPE_CHECKING:
 class FairShareObserver(KernelObserver):
     """Observes kernels and updates fair share data.
 
-    This observer performs three main operations:
-    1. Records kernel resource usage (resource-seconds) via _record_kernel_usage()
-    2. Aggregates usage into buckets via _aggregate_usage_buckets() (TODO)
-    3. Calculates fair share ranks via _calculate_fair_share_ranks() (TODO)
+    This observer performs three main operations atomically:
+    1. Records kernel resource usage (resource-seconds)
+    2. Updates last_observed_at for observed kernels
+    3. Aggregates usage into daily buckets (user/project/domain)
+
+    All DB writes are performed in a single transaction to ensure
+    data consistency even if the server crashes mid-operation.
 
     Targets:
     - Running kernels (terminated_at IS NULL, starts_at IS NOT NULL)
@@ -86,6 +88,10 @@ class FairShareObserver(KernelObserver):
     ) -> ObservationResult:
         """Observe kernel usage and update fair share data.
 
+        All operations are performed in two phases:
+        1. Pure computation: prepare usage records and aggregate to buckets
+        2. Atomic DB write: persist all data in a single transaction
+
         Args:
             scaling_group: The scaling group being processed
             kernels: Kernels to observe (running + recently terminated with unobserved periods)
@@ -96,49 +102,31 @@ class FairShareObserver(KernelObserver):
         if not kernels:
             return ObservationResult(observed_count=0)
 
+        # ===== Phase 1: Pure computation (no DB writes) =====
         now = await self._scheduler_repository.get_db_now()
 
-        # Step 1: Record kernel usage (prepare + persist atomically)
-        observed_count = await self._record_kernel_usage(scaling_group, kernels, now)
-
-        # Step 2: Aggregate usage into buckets (TODO)
-        # await self._aggregate_usage_buckets(scaling_group, now)
-
-        # Step 3: Calculate fair share ranks (TODO)
-        # await self._calculate_fair_share_ranks(scaling_group)
-
-        return ObservationResult(observed_count=observed_count)
-
-    async def _record_kernel_usage(
-        self,
-        scaling_group: str,
-        kernels: Sequence[KernelInfo],
-        now: datetime,
-    ) -> int:
-        """Record kernel resource usage and update observation timestamps.
-
-        Prepares kernel usage records (pure computation via aggregator) and
-        persists them atomically with last_observed_at updates.
-
-        Args:
-            scaling_group: The scaling group being processed
-            kernels: Kernels to record usage for
-            now: Current DB time for HA consistency
-
-        Returns:
-            Number of kernels with recorded usage
-        """
+        # Prepare kernel usage records
         preparation_result = self._aggregator.prepare_kernel_usage_records(
             kernels, scaling_group, now
         )
 
         if not preparation_result.specs:
-            return 0
+            return ObservationResult(observed_count=0)
 
-        bulk_creator = BulkCreator(specs=preparation_result.specs)
-        await self._resource_usage_repository.bulk_create_kernel_usage_records_with_observation_update(
-            bulk_creator,
-            preparation_result.kernel_observation_times,
+        # Aggregate to daily buckets (pure computation)
+        aggregation_result = self._aggregator.aggregate_kernel_usage_to_buckets(
+            preparation_result.specs
         )
 
-        return preparation_result.observed_count
+        # ===== Phase 2: Atomic DB write (single transaction) =====
+        bulk_creator = BulkCreator(specs=preparation_result.specs)
+        await self._resource_usage_repository.record_fair_share_observation(
+            bulk_creator,
+            preparation_result.kernel_observation_times,
+            aggregation_result,
+        )
+
+        # Step 3: Calculate fair share ranks (TODO)
+        # await self._calculate_fair_share_ranks(scaling_group)
+
+        return ObservationResult(observed_count=preparation_result.observed_count)
