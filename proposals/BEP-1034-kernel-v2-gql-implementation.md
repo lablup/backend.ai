@@ -1,9 +1,9 @@
 ---
-Author: 
+Author: Gyubong Lee (gbl@lablup.com)
 Status: Draft
 Created: 2025-01-21
-Created-Version: 26.1.0
-Target-Version: 26.1.0
+Created-Version: 26.2.0
+Target-Version: 26.2.0
 Implemented-Version:
 ---
 
