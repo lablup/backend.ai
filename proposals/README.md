@@ -122,6 +122,7 @@ BEP numbers start from 1000.
 | [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
 | [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
+| [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | - | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
