@@ -12,7 +12,7 @@ This document describes the current state and proposed standardization of reques
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  HTTP Request             │                           │                       │
-   │  X-Request-ID: req-123    │                           │                       │
+   │  X-Backend-Request-ID: req-123    │                           │                       │
    ├──────────────────────────▶│                           │                       │
    │                           │                           │                       │
    │                           │  Route to Worker          │                       │
@@ -74,7 +74,7 @@ async def forward_to_worker(
     # Build headers with explicit request_id
     headers = dict(request.headers)
     if request_id:
-        headers["X-Request-ID"] = request_id
+        headers["X-Backend-Request-ID"] = request_id
     
     async with session.request(
         request.method,
@@ -184,7 +184,7 @@ async def proxy_to_app(
     
     # Include request_id in proxied request (if app supports it)
     headers = dict(request.headers)
-    headers["X-Request-ID"] = request_id or ""
+    headers["X-Backend-Request-ID"] = request_id or ""
     
     async with session.http.request(
         request.method,
@@ -206,21 +206,21 @@ async def proxy_to_app(
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  POST /apps/jupyter       │                           │                       │
-   │  X-Request-ID: req-123    │                           │                       │
+   │  X-Backend-Request-ID: req-123    │                           │                       │
    ├──────────────────────────▶│                           │                       │
    │                           │                           │                       │
    │     middleware binds      │                           │                       │
    │     req-123               │                           │                       │
    │                           │                           │                       │
    │                           │  POST /proxy              │                       │
-   │                           │  X-Request-ID: req-123    │                       │
+   │                           │  X-Backend-Request-ID: req-123    │                       │
    │                           ├──────────────────────────▶│                       │
    │                           │                           │                       │
    │                           │     middleware binds      │                       │
    │                           │     req-123               │                       │
    │                           │                           │                       │
    │                           │                           │  GET /api             │
-   │                           │                           │  X-Request-ID:        │
+   │                           │                           │  X-Backend-Request-ID:        │
    │                           │                           │    req-123            │
    │                           │                           ├──────────────────────▶│
    │                           │                           │                       │
@@ -241,7 +241,7 @@ Client                    Coordinator                   Worker                  
 Client                    Coordinator                   Worker
    │                           │                           │
    │  WS Upgrade               │                           │
-   │  X-Request-ID: req-456    │                           │
+   │  X-Backend-Request-ID: req-456    │                           │
    ├──────────────────────────▶│                           │
    │                           │                           │
    │     binds req-456         │                           │
@@ -265,7 +265,7 @@ Client                    Coordinator                   Worker
 
 - [ ] Apply `request_id_middleware` to main app
 - [ ] Remove custom request ID extraction code
-- [ ] Add explicit `X-Request-ID` to Worker-bound requests
+- [ ] Add explicit `X-Backend-Request-ID` to Worker-bound requests
 - [ ] Add `X-Backend-Request-ID` to responses
 - [ ] Store origin_request_id in session info
 - [ ] Handle WebSocket connections with session context
@@ -274,7 +274,7 @@ Client                    Coordinator                   Worker
 
 - [ ] Apply `request_id_middleware` to main app
 - [ ] Remove custom request ID extraction code
-- [ ] Add `X-Request-ID` to application-bound requests
+- [ ] Add `X-Backend-Request-ID` to application-bound requests
 - [ ] Add `X-Backend-Request-ID` to responses
 - [ ] Handle streaming responses with proper context
 

@@ -159,13 +159,13 @@ async def request_id_middleware(
     Middleware that extracts or generates request ID for incoming HTTP requests.
     
     Behavior:
-    1. Check for X-Request-ID header in incoming request
+    1. Check for X-Backend-Request-ID header in incoming request
     2. If not present, generate a new request ID
     3. Bind the request ID to the context
     4. Add X-Backend-Request-ID header to response
     """
     # Extract from header or generate new
-    request_id = request.headers.get("X-Request-ID") or new_request_id()
+    request_id = request.headers.get("X-Backend-Request-ID") or new_request_id()
     
     # Bind to context
     _request_id_var.set(request_id)
@@ -342,7 +342,7 @@ async def handle_kernel_terminated(event: KernelTerminatedEvent) -> None:
 ```python
 async def call_storage_proxy(operation: str, params: dict) -> dict:
     request_id = current_request_id()
-    headers = {"X-Request-ID": request_id} if request_id else {}
+    headers = {"X-Backend-Request-ID": request_id} if request_id else {}
     
     async with session.post(
         f"{storage_url}/{operation}",

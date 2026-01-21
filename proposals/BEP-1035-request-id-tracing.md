@@ -150,8 +150,7 @@ See [agent.md](./BEP-1035/agent.md) for complete RPC headers specification.
 
 | Header Name | Direction | Description |
 |-------------|-----------|-------------|
-| `X-Request-ID` | Request/Response | Primary request identifier |
-| `X-Backend-Request-ID` | Response | Echo back for debugging |
+| `X-Backend-Request-ID` | Request/Response | Primary request identifier, echoed in response |
 
 #### 3. Request ID Format
 
@@ -223,6 +222,32 @@ HTTP services can adopt `request_id_middleware` incrementally - no breaking chan
 
 3. **Event System**: Should event handlers maintain the original request_id or generate new ones?
    - Recommendation: Maintain original for causality tracking
+
+## Ideation
+
+Ideas under consideration for future iterations. These are not part of the current proposal.
+
+### Source-Prefixed Request IDs
+
+Currently, all request IDs follow the format `req-{uuid4}`. Consider adding a source prefix to indicate where the request originated:
+
+| Source | Format | Example |
+|--------|--------|---------|
+| Client SDK | `client-{uuid4}` | `client-550e8400-e29b-41d4-a716-446655440000` |
+| Web UI | `webui-{uuid4}` | `webui-6ba7b810-9dad-11d1-80b4-00c04fd430c8` |
+| Manager (internal) | `mgr-{uuid4}` | `mgr-f47ac10b-58cc-4372-a567-0e02b2c3d479` |
+| Agent (internal) | `agent-{uuid4}` | `agent-7c9e6679-7425-40de-944b-e07fc1f90ae7` |
+| Background task | `bgtask-{uuid4}` | `bgtask-a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11` |
+
+**Benefits:**
+- Quickly identify request origin when debugging
+- Filter logs by source type
+- Understand request flow patterns
+
+**Considerations:**
+- Requires coordination across all entry points
+- Client SDK would need to be updated to use the prefix
+- Backward compatibility with existing `req-` format
 
 ## References
 

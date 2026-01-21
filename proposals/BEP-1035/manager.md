@@ -19,7 +19,7 @@ app = web.Application(middlewares=[
 ```
 
 The middleware automatically:
-1. Extracts `X-Request-ID` header if present
+1. Extracts `X-Backend-Request-ID` header if present
 2. Generates new request ID if not present
 3. Binds request ID to context
 4. Adds `X-Backend-Request-ID` to response headers
@@ -119,7 +119,7 @@ async def call_storage_proxy(
     request_id = current_request_id()
     headers = {}
     if request_id:
-        headers["X-Request-ID"] = request_id
+        headers["X-Backend-Request-ID"] = request_id
     
     async with session.post(
         endpoint,
@@ -141,7 +141,7 @@ async def call_app_proxy(
     data: dict,
 ) -> dict:
     request_id = current_request_id()
-    headers = {"X-Request-ID": request_id} if request_id else {}
+    headers = {"X-Backend-Request-ID": request_id} if request_id else {}
     
     async with session.post(
         f"{coordinator_url}/{operation}",
@@ -160,7 +160,7 @@ async def establish_wsproxy_session(
     session_info: SessionInfo,
 ) -> WSProxySession:
     request_id = current_request_id()
-    headers = {"X-Request-ID": request_id} if request_id else {}
+    headers = {"X-Backend-Request-ID": request_id} if request_id else {}
     
     # Initial HTTP upgrade request carries request_id
     ws = await connect_wsproxy(
@@ -212,7 +212,7 @@ class EventDispatcher:
 Client                    Manager                    Agent
    │                         │                         │
    │  POST /sessions         │                         │
-   │  X-Request-ID: req-123  │                         │
+   │  X-Backend-Request-ID: req-123  │                         │
    ├────────────────────────▶│                         │
    │                         │                         │
    │           middleware binds req-123                │
@@ -239,11 +239,11 @@ Client                    Manager                    Agent
 Client                    Manager               Storage-Proxy
    │                         │                         │
    │  POST /folders/upload   │                         │
-   │  X-Request-ID: req-456  │                         │
+   │  X-Backend-Request-ID: req-456  │                         │
    ├────────────────────────▶│                         │
    │                         │                         │
    │                         │  POST /upload           │
-   │                         │  X-Request-ID: req-456  │
+   │                         │  X-Backend-Request-ID: req-456  │
    │                         ├────────────────────────▶│
    │                         │                         │
    │                         │    Storage-Proxy logs   │
@@ -286,8 +286,8 @@ Client                    Manager               Storage-Proxy
 ### Required Changes
 
 1. **PeerInvoker update**: Ensure all RPC calls include `headers.request_id`
-2. **Storage-Proxy calls**: Add `X-Request-ID` header to all HTTP calls
-3. **App-Proxy calls**: Add `X-Request-ID` header to all HTTP calls
+2. **Storage-Proxy calls**: Add `X-Backend-Request-ID` header to all HTTP calls
+3. **App-Proxy calls**: Add `X-Backend-Request-ID` header to all HTTP calls
 4. **Event system**: Include request_id in event metadata
 
 ### Testing Strategy

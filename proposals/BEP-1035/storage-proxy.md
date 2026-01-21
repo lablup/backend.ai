@@ -24,7 +24,7 @@ app = web.Application(middlewares=[
 Manager                       Storage-Proxy
    │                               │
    │  POST /folders/upload         │
-   │  X-Request-ID: req-123        │
+   │  X-Backend-Request-ID: req-123        │
    ├──────────────────────────────▶│
    │                               │
    │         middleware extracts   │
@@ -48,7 +48,7 @@ Clients may also call Storage-Proxy directly (for presigned URLs, etc.):
 Client                        Storage-Proxy
    │                               │
    │  GET /download/...            │
-   │  (no X-Request-ID)            │
+   │  (no X-Backend-Request-ID)            │
    ├──────────────────────────────▶│
    │                               │
    │         middleware generates  │
@@ -182,7 +182,7 @@ async def test_request_id_propagation():
     async with create_test_client(app) as client:
         response = await client.get(
             "/health",
-            headers={"X-Request-ID": "test-req-123"},
+            headers={"X-Backend-Request-ID": "test-req-123"},
         )
         assert response.headers["X-Backend-Request-ID"] == "test-req-123"
 
