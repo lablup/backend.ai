@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
@@ -44,10 +44,10 @@ def mock_update_endpoint_lifecycle(mocker, mock_repositories):
 
 
 @pytest.fixture
-def mock_check_requester_access(mocker, model_serving_service):
+def mock_check_user_access(mocker, model_serving_service):
     mock = mocker.patch.object(
         model_serving_service,
-        "check_requester_access",
+        "check_user_access",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -59,58 +59,18 @@ class TestDeleteModelService:
         "scenario",
         [
             ScenarioBase.success(
-                "successful model deletion (user request)",
+                "successful model deletion",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                 ),
                 DeleteModelServiceActionResult(
                     success=True,
                 ),
             ),
             ScenarioBase.failure(
-                "non-existent model (user request)",
+                "non-existent model",
                 DeleteModelServiceAction(
                     service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
-                ),
-                ModelServiceNotFound,
-            ),
-            ScenarioBase.success(
-                "successful model deletion (superadmin request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
-                        domain_name="default",
-                    ),
-                ),
-                DeleteModelServiceActionResult(
-                    success=True,
-                ),
-            ),
-            ScenarioBase.failure(
-                "non-existent model (superadmin request)",
-                DeleteModelServiceAction(
-                    service_id=uuid.UUID("dddddddd-eeee-ffff-1111-222222222222"),
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
-                        domain_name="default",
-                    ),
                 ),
                 ModelServiceNotFound,
             ),
@@ -120,17 +80,17 @@ class TestDeleteModelService:
     async def test_delete_model_service(
         self,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
         mock_get_endpoint_by_id,
         mock_get_endpoint_access_validation_data,
         mock_update_endpoint_lifecycle,
-        mock_check_requester_access,
-    ):
-        action = scenario.input
+        mock_check_user_access,
+    ) -> None:
         mock_validation_data = MagicMock(
-            session_owner_id=action.requester_ctx.user_id,
-            session_owner_role=action.requester_ctx.user_role,
-            domain=action.requester_ctx.domain_name,
+            session_owner_id=user_data.user_id,
+            session_owner_role=UserRole(user_data.role),
+            domain=user_data.domain_name,
         )
         mock_endpoint = MagicMock(
             routings=[],

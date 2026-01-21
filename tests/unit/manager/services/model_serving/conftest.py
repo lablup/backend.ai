@@ -6,12 +6,16 @@ Tests verify service layer business logic using mocked repositories.
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -29,6 +33,28 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+
+
+@pytest.fixture
+def user_data() -> UserData:
+    """User data for tests."""
+    from ai.backend.manager.models.user import UserRole
+
+    return UserData(
+        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=UserRole.USER.value,
+        domain_name="default",
+    )
+
+
+@pytest.fixture(autouse=True)
+def set_user_context(user_data: UserData) -> Iterator[None]:
+    """Automatically set user context for all tests."""
+    with with_user(user_data):
+        yield
 
 
 @pytest.fixture

@@ -7,8 +7,9 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
-from ai.backend.manager.data.user.types import UserRole
+from ai.backend.common.data.user.types import UserData
+from ai.backend.manager.data.model_serving.types import EndpointTokenData
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
@@ -20,10 +21,10 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_check_requester_access_token(mocker, model_serving_service):
+def mock_check_user_access_token(mocker, model_serving_service):
     mock = mocker.patch.object(
         model_serving_service,
-        "check_requester_access",
+        "check_user_access",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -73,12 +74,6 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     duration=None,
                     valid_until=None,
@@ -99,12 +94,6 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
                     duration=None,
                     valid_until=None,
@@ -125,12 +114,6 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
                     duration=None,
                     valid_until=None,
@@ -154,13 +137,14 @@ class TestGenerateToken:
     async def test_generate_token(
         self,
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_token,
+        mock_check_user_access_token,
         mock_get_endpoint_by_id_token,
         mock_get_endpoint_access_validation_data_token,
         mock_create_endpoint_token,
         mock_get_scaling_group_info_token,
-    ):
+    ) -> None:
         action = scenario.input
         expected = scenario.expected
 
@@ -169,7 +153,7 @@ class TestGenerateToken:
 
         mock_validation_data = MagicMock(
             session_owner_id=expected.data.session_owner,
-            session_owner_role=action.requester_ctx.user_role,
+            session_owner_role=UserRole(user_data.role),
             domain=expected.data.domain,
         )
         mock_get_endpoint_access_validation_data_token.return_value = mock_validation_data
