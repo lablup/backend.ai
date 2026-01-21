@@ -197,7 +197,7 @@ class DeploymentMetadata:
     session_owner: UUID
     created_at: Optional[datetime]
     revision_history_limit: int
-    tag: Optional[str] = None
+    tag: Optional[dict[str, str]] = None
 
 
 @dataclass

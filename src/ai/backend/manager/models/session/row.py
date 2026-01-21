@@ -111,6 +111,7 @@ from ai.backend.manager.models.base import (
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
+    TagColumn,
     URLColumn,
 )
 from ai.backend.manager.models.group import GroupRow
@@ -757,7 +758,7 @@ class SessionRow(Base):
 
     # `image` column is identical to kernels `image` column.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
-    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
+    tag: Mapped[dict[str, str] | None] = mapped_column("tag", TagColumn(), nullable=True)
 
     # Resource occupation
     # occupied_slots = mapped_column('occupied_slots', ResourceSlotColumn(), nullable=False)

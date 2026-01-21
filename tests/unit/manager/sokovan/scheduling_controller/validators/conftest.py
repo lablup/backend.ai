@@ -44,7 +44,7 @@ def session_spec_factory() -> Callable[..., SessionCreationSpec]:
         kernel_specs: list[KernelEnqueueingConfig] | None = None,
         creation_spec: dict | None = None,
         scaling_group: str | None = None,
-        session_tag: str | None = None,
+        session_tag: dict[str, str] | None = None,
         starts_at: datetime | None = None,
         batch_timeout: timedelta | None = None,
         dependency_sessions: list[SessionId] | None = None,

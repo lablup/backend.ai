@@ -635,7 +635,14 @@ class CreateDeploymentInput:
 
     def to_creator(self) -> NewDeploymentCreator:
         name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
-        tag = ",".join(self.metadata.tags) if self.metadata.tags else None
+        # Parse tags from list of "key=value" strings to dict
+        tag = None
+        if self.metadata.tags:
+            tag = {}
+            for tag_str in self.metadata.tags:
+                if "=" in tag_str:
+                    k, v = tag_str.split("=", 1)
+                    tag[k] = v
         user_data = current_user()
         if user_data is None:
             raise UserNotFound("User not found in context")

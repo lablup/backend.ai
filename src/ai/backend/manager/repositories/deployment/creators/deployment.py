@@ -37,7 +37,7 @@ class DeploymentMetadataFields:
     created_user_id: uuid.UUID
     session_owner_id: uuid.UUID
     revision_history_limit: int = 10
-    tag: Optional[str] = None
+    tag: Optional[dict[str, str]] = None
     created_at: Optional[datetime] = None
 
 

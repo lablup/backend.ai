@@ -448,7 +448,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default="SINGLE_NODE",
         alias="clusterMode",
     )
-    tag: str | None = Field(default=None)
+    tag: dict[str, str] | None = Field(default=None)
     startup_command: str | None = Field(
         default=None,
         alias="startupCommand",

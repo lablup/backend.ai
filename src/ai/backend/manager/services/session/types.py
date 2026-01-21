@@ -22,7 +22,7 @@ class LegacySessionInfo:
     image: str
     architecture: str
     registry: Optional[str]
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     container_id: UUID
     occupied_slots: str  # legacy
     occupying_slots: str

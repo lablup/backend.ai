@@ -156,7 +156,7 @@ def _create_cmd(docs: Optional[str] = None):
         env: Sequence[str],  # click_start_option
         # extra options
         bootstrap_script: Optional[IO],
-        tag: Optional[str],  # click_start_option
+        tag: Optional[dict[str, str]],  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
@@ -448,7 +448,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: Optional[str],  # click_start_option
+        tag: Optional[dict[str, str]],  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,

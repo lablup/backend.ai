@@ -628,6 +628,40 @@ class VFolderHostPermissionColumn(TypeDecorator):
         })
 
 
+class TagColumn(TypeDecorator):
+    """
+    A column type to convert tag dictionary to/from JSON string.
+    Stores dict[str, str] as JSON string in VARCHAR(64) column.
+    """
+
+    impl = Unicode
+    cache_ok = True
+
+    def process_bind_param(
+        self,
+        value: dict[str, str] | None,
+        dialect: Dialect,
+    ) -> str | None:
+        if value is None:
+            return None
+        # Convert dict to JSON string
+        return json.dumps(value, separators=(",", ":"), sort_keys=True)
+
+    def process_result_value(
+        self,
+        value: str | None,
+        dialect: Dialect,
+    ) -> dict[str, str] | None:
+        if value is None:
+            return None
+        # Parse JSON string to dict
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            # For backward compatibility: treat as plain string and wrap in {"value": ...}
+            return {"value": value}
+
+
 class CurrencyTypes(enum.Enum):
     KRW = "KRW"
     USD = "USD"

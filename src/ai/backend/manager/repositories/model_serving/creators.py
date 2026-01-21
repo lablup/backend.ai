@@ -35,7 +35,7 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     resource_slots: Mapping[str, Any]
     replicas: int = 0
     lifecycle_stage: EndpointLifecycle = EndpointLifecycle.CREATED
-    tag: Optional[str] = None
+    tag: Optional[dict[str, str]] = None
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
     callback_url: Optional[yarl.URL] = None
