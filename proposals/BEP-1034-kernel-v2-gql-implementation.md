@@ -12,204 +12,118 @@ Implemented-Version:
 ## Related Issues
 
 - Parent: BEP-1010 (GraphQL API Migration to Strawberry)
+- Reference PR: https://github.com/lablup/backend.ai/pull/8079
 
-## Motivation
+## Overview
 
-As part of the Strawberry GraphQL migration (BEP-1010), we need to implement `KernelV2GQL` types. This document tracks:
+This document defines the implementation plan for `KernelV2GQL` types as part of the Strawberry GraphQL migration. It specifies:
 
-1. **Types to skip** - Types that will be replaced by other designs and should not be implemented
-2. **Types to defer** - Types representing Node connections (Image, User, Group, VFolder) that require corresponding Node implementations first
+1. **Types to Include** - Types that will be implemented in the new PR
+2. **Types to Skip** - Types that are replaced by other designs (do not implement)
+3. **Types to Defer** - Types requiring Node connections (implement later)
 
-Since the PR will be created fresh, we can simply omit these types rather than implementing and then removing them.
+Since we're creating a fresh PR, skipped types simply won't be included rather than being removed.
 
-## Types to Skip (Do Not Implement)
+## Document Structure
 
-The following types from the original `KernelInfoGQL` design have been decided to be replaced by other type designs. **These should be skipped entirely in the new implementation.**
+| Document | Description |
+|----------|-------------|
+| [types-to-include.md](BEP-1034/types-to-include.md) | Detailed specifications of types to implement |
+| [types-to-skip.md](BEP-1034/types-to-skip.md) | Types replaced by other designs |
+| [types-to-defer.md](BEP-1034/types-to-defer.md) | Types requiring Node connections |
 
-### Summary Table
+## Summary
 
-| Type | Reason | Replacement |
-|------|--------|-------------|
-| `SchedulerPredicateGQL` | Replaced by new scheduler info design | New scheduler types in common |
-| `KernelStatusHistoryGQL` | Replaced by new status tracking design | TBD |
-| `KernelStatusHistoryEntryGQL` | Replaced by new status tracking design | TBD |
+### Types to Include
 
-### Details
+#### Enums
+- `KernelStatusGQL` - Kernel status enum
+- `KernelOrderFieldGQL` - Ordering field enum
 
-#### SchedulerPredicateGQL
+#### Input Types (Filter/Order)
+- `KernelStatusFilterGQL` - Status filter input
+- `KernelFilterGQL` - Main filter input
+- `KernelOrderByGQL` - Ordering input
 
-**Original Location**: `src/ai/backend/manager/api/gql/common/types.py`
+#### Status Data Types
+- `KernelStatusErrorInfoGQL` - Error information
+- `KernelStatusDataGQL` - Kernel status data
+- `KernelSessionStatusDataGQL` - Session status data
+- `KernelStatusDataContainerGQL` - Container for status data
 
-```python
-@strawberry.type
-class SchedulerPredicateGQL:
-    name: str
-    msg: str | None
-```
+#### Statistics Types
+- `KernelStatEntryGQL` - Single stat entry
+- `KernelStatGQL` - Collection of stats
 
-**Action**: Skip - will be replaced by new scheduler info types.
+#### Internal Data Types
+- `KernelInternalDataGQL` - Internal kernel data
 
-#### KernelStatusHistoryGQL / KernelStatusHistoryEntryGQL
+#### Sub-Info Types
+- `KernelSessionInfoGQL` - Session info
+- `KernelClusterInfoGQL` - Cluster config
+- `KernelUserPermissionInfoGQL` - User/permission info (partial - see deferred)
+- `KernelDeviceModelInfoGQL` - Device model info
+- `KernelAttachedDeviceEntryGQL` - Device entry
+- `KernelAttachedDevicesGQL` - Attached devices collection
+- `KernelResourceInfoGQL` - Resource allocation
+- `KernelRuntimeInfoGQL` - Runtime config (partial - see deferred)
+- `KernelNetworkInfoGQL` - Network config
+- `KernelLifecycleInfoGQL` - Lifecycle info (partial - see skipped)
+- `KernelMetricsInfoGQL` - Metrics info
+- `KernelMetadataInfoGQL` - Metadata
 
-**Original Location**: `src/ai/backend/manager/api/gql/kernel/types.py`
+#### Main Types
+- `KernelV2GQL` - Main kernel node type
+- `KernelEdgeGQL` - Edge type
+- `KernelConnectionV2GQL` - Connection type
 
-```python
-@strawberry.type
-class KernelStatusHistoryEntryGQL:
-    status: str
-    timestamp: datetime
+#### Common Types (from common/types.py)
+- `SessionTypesGQL`, `SessionResultGQL` - Session enums
+- `MountPermissionGQL`, `VFolderUsageModeGQL` - VFolder enums
+- `ServicePortProtocolGQL` - Service port protocol enum
+- `ResourceOptsEntryGQL`, `ResourceOptsGQL` - Resource options
+- `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options input
+- `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports
+- `MetricStatGQL`, `MetricValueGQL` - Metric types
+- `DotfileInfoGQL`, `SSHKeypairGQL` - Internal data types
 
-@strawberry.type
-class KernelStatusHistoryGQL:
-    entries: list[KernelStatusHistoryEntryGQL]
-```
+### Types to Skip (Do Not Implement)
 
-**Action**: Skip - the status history design will be revisited with a new approach.
+| Type | Reason |
+|------|--------|
+| `SchedulerPredicateGQL` | Replaced by new scheduler design |
+| `SchedulerInfoGQL` | Replaced by new scheduler design |
+| `KernelStatusHistoryEntryGQL` | Replaced by new status tracking design |
+| `KernelStatusHistoryGQL` | Replaced by new status tracking design |
 
----
+### Types to Defer (Node Connections)
 
-## Types to Defer (Node Connections)
-
-The following types reference entities (Image, User, Group, VFolder) that should be represented as proper Relay Node connections. Since the corresponding Node types are not yet implemented, **these should be deferred to a later PR**.
-
-### Summary Table
-
-| Type | Field(s) | Future Node | Action |
-|------|----------|-------------|--------|
-| `KernelImageInfoGQL` | entire type | `ImageNode` | Do not include; add when ImageNode is ready |
-| `KernelUserPermissionInfoGQL` | `user_uuid` | `UserNode` | Omit field; add when UserNode is ready |
-| `KernelUserPermissionInfoGQL` | `group_id` | `GroupNode` | Omit field; add when GroupNode is ready |
-| `VFolderMountGQL` | `vfid` | `VFolderNode` | Do not include vfolder_mounts; add when VFolderNode is ready |
-
-### Details
-
-#### KernelImageInfoGQL → ImageNode
-
-**Original Design**:
-```python
-@strawberry.type
-class KernelImageInfoGQL:
-    reference: str | None
-    registry: str | None
-    tag: str | None
-    architecture: str | None
-```
-
-**Future Design**:
-```python
-@strawberry.type
-class KernelV2GQL(Node):
-    @strawberry.field
-    async def image(self, info: Info) -> ImageNode | None:
-        return await info.context.loaders.image.load(self.image_ref)
-```
-
-**Action**: Do not include `image` field in `KernelV2GQL`. Will be added when `ImageNode` is implemented.
-
-#### KernelUserPermissionInfoGQL.user_uuid → UserNode
-
-**Original Design**:
-```python
-@strawberry.type
-class KernelUserPermissionInfoGQL:
-    user_uuid: UUID  # ← Should be UserNode connection
-    access_key: str
-    domain_name: str
-    group_id: UUID   # ← Should be GroupNode connection
-    # ... other fields
-```
-
-**Future Design**:
-```python
-@strawberry.type
-class KernelV2GQL(Node):
-    @strawberry.field
-    async def owner(self, info: Info) -> UserNode | None:
-        return await info.context.loaders.user.load(self.user_uuid)
-```
-
-**Action**: 
-- Omit `user_uuid` field from `KernelUserPermissionInfoGQL`
-- Keep other primitive fields (`access_key`, `domain_name`, `uid`, `main_gid`, `gids`)
-- Add `owner` connection when `UserNode` is implemented
-
-#### KernelUserPermissionInfoGQL.group_id → GroupNode
-
-**Future Design**:
-```python
-@strawberry.type
-class KernelV2GQL(Node):
-    @strawberry.field
-    async def project(self, info: Info) -> GroupNode | None:
-        return await info.context.loaders.group.load(self.group_id)
-```
-
-**Action**:
-- Omit `group_id` field from `KernelUserPermissionInfoGQL`
-- Add `project` connection when `GroupNode` is implemented
-
-#### VFolderMountGQL → VFolderNode
-
-**Original Design** (in `KernelRuntimeInfoGQL`):
-```python
-@strawberry.type
-class KernelRuntimeInfoGQL:
-    vfolder_mounts: list[VFolderMountGQL] | None
-    # ... other fields
-```
-
-**Future Design**:
-```python
-@strawberry.type
-class VFolderMountEdge(Edge[VFolderNode]):
-    mount_path: str
-    mount_perm: MountPermissionGQL
-    subpath: str
-
-@strawberry.type
-class KernelV2GQL(Node):
-    @strawberry.field
-    async def mounted_vfolders(self, info: Info) -> Connection[VFolderNode]:
-        ...
-```
-
-**Action**:
-- Do not include `vfolder_mounts` field in `KernelRuntimeInfoGQL`
-- Add `mounted_vfolders` connection when `VFolderNode` is implemented
-
----
+| Type/Field | Future Node | Action |
+|------------|-------------|--------|
+| `KernelImageInfoGQL` | `ImageNode` | Do not include |
+| `KernelUserPermissionInfoGQL.user_uuid` | `UserNode` | Omit field |
+| `KernelUserPermissionInfoGQL.group_id` | `GroupNode` | Omit field |
+| `KernelRuntimeInfoGQL.vfolder_mounts` | `VFolderNode` | Omit field |
 
 ## Implementation Checklist
 
-### Current PR (Fresh Implementation)
+### PR Scope
 
-**Skip these types entirely:**
-- [ ] `SchedulerPredicateGQL` - do not implement
-- [ ] `KernelStatusHistoryGQL` - do not implement
-- [ ] `KernelStatusHistoryEntryGQL` - do not implement
+- [ ] Implement all types listed in "Types to Include"
+- [ ] Skip all types listed in "Types to Skip"
+- [ ] Omit fields listed in "Types to Defer"
+- [ ] Update `KernelLifecycleInfoGQL` to remove `status_history` field
+- [ ] Update `KernelStatusDataContainerGQL` to remove `scheduler` field
+- [ ] Update `from_kernel_info()` method to match new type structure
 
-**Omit these fields/types (defer to later):**
-- [ ] `KernelImageInfoGQL` - do not include
-- [ ] `KernelUserPermissionInfoGQL.user_uuid` - omit field
-- [ ] `KernelUserPermissionInfoGQL.group_id` - omit field
-- [ ] `KernelRuntimeInfoGQL.vfolder_mounts` - omit field
+### Future PRs
 
-### Future PRs (When Node Types Are Ready)
-
-1. **ImageNode PR**: Add `image` connection to `KernelV2GQL`
-2. **UserNode PR**: Add `owner` connection to `KernelV2GQL`
-3. **GroupNode PR**: Add `project` connection to `KernelV2GQL`
-4. **VFolderNode PR**: Add `mounted_vfolders` connection to `KernelV2GQL`
-
----
-
-## Open Questions
-
-- Should `domain_name` in `KernelUserPermissionInfoGQL` also become a `DomainNode` connection?
-- What is the new design for status history tracking?
+- [ ] ImageNode PR: Add `image` connection
+- [ ] UserNode PR: Add `owner` connection  
+- [ ] GroupNode PR: Add `project` connection
+- [ ] VFolderNode PR: Add `mounted_vfolders` connection
 
 ## References
 
 - [BEP-1010: GraphQL API Migration to Strawberry](BEP-1010-new-gql.md)
-- [Relay Connection Specification](https://relay.dev/graphql/connections.htm)
-- [Strawberry Relay Documentation](https://strawberry.rocks/docs/guides/relay)
+- [PR #8079: Original KernelV2 Implementation](https://github.com/lablup/backend.ai/pull/8079)
