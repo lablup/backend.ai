@@ -121,7 +121,7 @@ BEP numbers start from 1000.
 | [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
 | [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
 | [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
-| [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation ([detail](BEP-1034/)) | Gyubong Lee | Draft |
+| [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
