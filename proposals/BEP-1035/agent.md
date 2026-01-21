@@ -59,7 +59,7 @@ Wire format:
 ```json
 {
     "headers": {
-        "request_id": "req-550e8400-e29b-41d4-a716-446655440000",
+        "request_id": "550e8400-e29b-41d4-a716-446655440000",
         "correlation_id": null,
         "trace_id": null,
         "span_id": null
@@ -86,7 +86,7 @@ Success response:
 ```json
 {
     "headers": {
-        "request_id": "req-550e8400-e29b-41d4-a716-446655440000"
+        "request_id": "550e8400-e29b-41d4-a716-446655440000"
     },
     "result": {
         "kernel_id": "kernel-abc",
@@ -100,7 +100,7 @@ Error response:
 ```json
 {
     "headers": {
-        "request_id": "req-550e8400-e29b-41d4-a716-446655440000"
+        "request_id": "550e8400-e29b-41d4-a716-446655440000"
     },
     "error": {
         "type": "KernelNotFoundError",
@@ -319,3 +319,7 @@ Manager detects response format by presence of `headers` field:
 - [ ] Add version detection in Manager
 - [ ] Add integration tests for format compatibility
 - [ ] Add metrics for protocol version usage
+
+## References
+
+- [Callosum](https://github.com/lablup/callosum) - An RPC Transport Library for asyncio

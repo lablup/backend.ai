@@ -212,24 +212,24 @@ class EventDispatcher:
 Client                    Manager                    Agent
    │                         │                         │
    │  POST /sessions         │                         │
-   │  X-Backend-Request-ID: req-123  │                         │
+   │  X-Backend-Request-ID: 550e8400...  │                         │
    ├────────────────────────▶│                         │
    │                         │                         │
-   │           middleware binds req-123                │
+   │           middleware binds 550e8400...                │
    │                         │                         │
    │                         │  RPC: create_kernel     │
    │                         │  headers.request_id:    │
-   │                         │    req-123              │
+   │                         │    550e8400...              │
    │                         ├────────────────────────▶│
    │                         │                         │
    │                         │    Agent logs with      │
-   │                         │    request_id: req-123  │
+   │                         │    request_id: 550e8400...  │
    │                         │                         │
    │                         │◀────────────────────────┤
    │                         │                         │
    │  201 Created            │                         │
    │  X-Backend-Request-ID:  │                         │
-   │    req-123              │                         │
+   │    550e8400...              │                         │
    │◀────────────────────────┤                         │
 ```
 
@@ -239,15 +239,15 @@ Client                    Manager                    Agent
 Client                    Manager               Storage-Proxy
    │                         │                         │
    │  POST /folders/upload   │                         │
-   │  X-Backend-Request-ID: req-456  │                         │
+   │  X-Backend-Request-ID: 6ba7b810...  │                         │
    ├────────────────────────▶│                         │
    │                         │                         │
    │                         │  POST /upload           │
-   │                         │  X-Backend-Request-ID: req-456  │
+   │                         │  X-Backend-Request-ID: 6ba7b810...  │
    │                         ├────────────────────────▶│
    │                         │                         │
    │                         │    Storage-Proxy logs   │
-   │                         │    with req-456         │
+   │                         │    with 6ba7b810...         │
    │                         │                         │
    │                         │◀────────────────────────┤
    │                         │                         │

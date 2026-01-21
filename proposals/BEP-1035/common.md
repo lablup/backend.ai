@@ -42,10 +42,9 @@ import uuid
 
 def new_request_id() -> str:
     """
-    Generates a new request ID in the standard format.
-    Format: "req-{uuid4}"
+    Generates a new request ID.
     """
-    return f"req-{uuid.uuid4()}"
+    return str(uuid.uuid4())
 ```
 
 ### `bind_request_id()`
@@ -294,7 +293,7 @@ With request ID tracing, log entries include the request ID:
     "level": "INFO",
     "logger": "ai.backend.manager.api.session",
     "message": "Session created",
-    "request_id": "req-550e8400-e29b-41d4-a716-446655440000",
+    "request_id": "550e8400-e29b-41d4-a716-446655440000",
     "session_id": "sess-abc123"
 }
 ```

@@ -24,19 +24,19 @@ app = web.Application(middlewares=[
 Manager                       Storage-Proxy
    │                               │
    │  POST /folders/upload         │
-   │  X-Backend-Request-ID: req-123        │
+   │  X-Backend-Request-ID: 550e8400...        │
    ├──────────────────────────────▶│
    │                               │
    │         middleware extracts   │
-   │         req-123 and binds     │
+   │         550e8400... and binds     │
    │         to context            │
    │                               │
    │         All logs include      │
-   │         request_id: req-123   │
+   │         request_id: 550e8400...   │
    │                               │
    │  200 OK                       │
    │  X-Backend-Request-ID:        │
-   │    req-123                    │
+   │    550e8400...                    │
    │◀──────────────────────────────┤
 ```
 
@@ -56,7 +56,7 @@ Client                        Storage-Proxy
    │                               │
    │  200 OK                       │
    │  X-Backend-Request-ID:        │
-   │    req-{generated}            │
+   │    {generated-uuid}            │
    │◀──────────────────────────────┤
 ```
 
@@ -172,42 +172,4 @@ Note: S3/cloud storage APIs typically don't support custom trace headers in the 
 
 No special configuration required. Storage-Proxy inherits the standard request ID handling from common infrastructure.
 
-## Testing
 
-### Unit Tests
-
-```python
-async def test_request_id_propagation():
-    """Verify request ID is extracted from header."""
-    async with create_test_client(app) as client:
-        response = await client.get(
-            "/health",
-            headers={"X-Backend-Request-ID": "test-req-123"},
-        )
-        assert response.headers["X-Backend-Request-ID"] == "test-req-123"
-
-async def test_request_id_generation():
-    """Verify request ID is generated if not provided."""
-    async with create_test_client(app) as client:
-        response = await client.get("/health")
-        assert "X-Backend-Request-ID" in response.headers
-        assert response.headers["X-Backend-Request-ID"].startswith("req-")
-```
-
-### Integration Tests
-
-```python
-async def test_manager_storage_tracing():
-    """Verify request ID flows from Manager to Storage-Proxy."""
-    request_id = "req-integration-test"
-    
-    # Manager makes call to Storage-Proxy
-    async with manager_client.session() as session:
-        with bind_request_id(request_id):
-            response = await call_storage_proxy(session, "/folders/list", {})
-    
-    # Verify Storage-Proxy received and echoed request ID
-    assert response.headers["X-Backend-Request-ID"] == request_id
-    
-    # Verify logs contain request_id (check log output)
-```

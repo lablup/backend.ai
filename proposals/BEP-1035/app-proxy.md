@@ -12,7 +12,7 @@ This document describes the current state and proposed standardization of reques
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  HTTP Request             │                           │                       │
-   │  X-Backend-Request-ID: req-123    │                           │                       │
+   │  X-Backend-Request-ID: 550e8400...    │                           │                       │
    ├──────────────────────────▶│                           │                       │
    │                           │                           │                       │
    │                           │  Route to Worker          │                       │
@@ -206,32 +206,32 @@ async def proxy_to_app(
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  POST /apps/jupyter       │                           │                       │
-   │  X-Backend-Request-ID: req-123    │                           │                       │
+   │  X-Backend-Request-ID: 550e8400...    │                           │                       │
    ├──────────────────────────▶│                           │                       │
    │                           │                           │                       │
    │     middleware binds      │                           │                       │
-   │     req-123               │                           │                       │
+   │     550e8400...               │                           │                       │
    │                           │                           │                       │
    │                           │  POST /proxy              │                       │
-   │                           │  X-Backend-Request-ID: req-123    │                       │
+   │                           │  X-Backend-Request-ID: 550e8400...    │                       │
    │                           ├──────────────────────────▶│                       │
    │                           │                           │                       │
    │                           │     middleware binds      │                       │
-   │                           │     req-123               │                       │
+   │                           │     550e8400...               │                       │
    │                           │                           │                       │
    │                           │                           │  GET /api             │
    │                           │                           │  X-Backend-Request-ID:        │
-   │                           │                           │    req-123            │
+   │                           │                           │    550e8400...            │
    │                           │                           ├──────────────────────▶│
    │                           │                           │                       │
    │                           │                           │◀──────────────────────┤
    │                           │                           │                       │
    │                           │  X-Backend-Request-ID:    │                       │
-   │                           │    req-123                │                       │
+   │                           │    550e8400...                │                       │
    │                           │◀──────────────────────────┤                       │
    │                           │                           │                       │
    │  X-Backend-Request-ID:    │                           │                       │
-   │    req-123                │                           │                       │
+   │    550e8400...                │                           │                       │
    │◀──────────────────────────┤                           │                       │
 ```
 
@@ -241,10 +241,10 @@ Client                    Coordinator                   Worker                  
 Client                    Coordinator                   Worker
    │                           │                           │
    │  WS Upgrade               │                           │
-   │  X-Backend-Request-ID: req-456    │                           │
+   │  X-Backend-Request-ID: 6ba7b810...    │                           │
    ├──────────────────────────▶│                           │
    │                           │                           │
-   │     binds req-456         │                           │
+   │     binds 6ba7b810...         │                           │
    │     stores in session     │                           │
    │                           │                           │
    │  WS Established           │                           │
@@ -253,7 +253,7 @@ Client                    Coordinator                   Worker
    │  WS Message 1             │                           │
    ├──────────────────────────▶│                           │
    │                           │                           │
-   │     binds req-456         │                           │
+   │     binds 6ba7b810...         │                           │
    │     (from session)        │                           │
    │                           ├──────────────────────────▶│
    │                           │                           │

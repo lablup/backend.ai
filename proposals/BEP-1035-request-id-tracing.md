@@ -126,7 +126,7 @@ For Agent RPC calls via Callosum (which doesn't support separate headers), we em
 # Request Structure
 {
     "headers": {
-        "request_id": "req-abc123",
+        "request_id": "550e8400-e29b-41d4-a716-446655440000",
         "correlation_id": "...",    # Optional, future
         "trace_id": "...",          # Optional, OpenTelemetry
         "span_id": "...",           # Optional, OpenTelemetry
@@ -138,7 +138,7 @@ For Agent RPC calls via Callosum (which doesn't support separate headers), we em
 # Response Structure
 {
     "headers": {
-        "request_id": "req-abc123",
+        "request_id": "550e8400-e29b-41d4-a716-446655440000",
     },
     "result": {...}  # or "error": {...}
 }
@@ -155,11 +155,11 @@ See [agent.md](./BEP-1035/agent.md) for complete RPC headers specification.
 #### 3. Request ID Format
 
 ```
-Format: "req-{uuid4}"
-Example: "req-550e8400-e29b-41d4-a716-446655440000"
+Format: "{uuid4}"
+Example: "550e8400-e29b-41d4-a716-446655440000"
 ```
 
-Generated using `ai.backend.common.logging.new_request_id()`.
+Generated using `uuid.uuid4()`.
 
 ## Implementation Status
 
@@ -229,7 +229,7 @@ Ideas under consideration for future iterations. These are not part of the curre
 
 ### Source-Prefixed Request IDs
 
-Currently, all request IDs follow the format `req-{uuid4}`. Consider adding a source prefix to indicate where the request originated:
+Currently, all request IDs are plain UUIDs (e.g., `550e8400-e29b-41d4-a716-446655440000`). Consider adding a source prefix to indicate where the request originated:
 
 | Source | Format | Example |
 |--------|--------|---------|
@@ -247,7 +247,7 @@ Currently, all request IDs follow the format `req-{uuid4}`. Consider adding a so
 **Considerations:**
 - Requires coordination across all entry points
 - Client SDK would need to be updated to use the prefix
-- Backward compatibility with existing `req-` format
+- Backward compatibility with existing plain UUID format
 
 ## References
 
