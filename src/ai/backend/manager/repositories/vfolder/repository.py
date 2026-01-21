@@ -151,7 +151,7 @@ class VfolderRepository:
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
 
-                return group_row.allowed_vfolder_hosts
+                return VFolderHostPermissionMap(group_row.allowed_vfolder_hosts)
 
             user_row: Optional[UserRow] = await db_session.scalar(
                 sa.select(UserRow)

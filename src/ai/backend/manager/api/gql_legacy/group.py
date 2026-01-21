@@ -154,7 +154,7 @@ class GroupNode(graphene.ObjectType):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
