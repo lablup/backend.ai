@@ -23,6 +23,7 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareSearchResult,
     ProjectUserIds,
     UserFairShareData,
+    UserFairShareFactors,
     UserFairShareSearchResult,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
@@ -249,3 +250,27 @@ class FairShareRepository:
             Tuple of (domain_fair_shares, project_fair_shares, user_fair_shares)
         """
         return await self._db_source.get_all_fair_shares_for_resource_group(resource_group)
+
+    @fair_share_repository_resilience.apply()
+    async def get_user_fair_share_factors_batch(
+        self,
+        resource_group: str,
+        project_user_ids: Sequence[ProjectUserIds],
+    ) -> dict[uuid.UUID, UserFairShareFactors]:
+        """Get combined fair share factors for multiple users with 3-way JOIN.
+
+        Fetches domain, project, and user fair share factors in a single query
+        by joining the three fair share tables. Used for factor-based workload
+        sequencing in FairShareSequencer.
+
+        Args:
+            resource_group: The resource group (scaling group) name.
+            project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
+
+        Returns:
+            A mapping from user_uuid to UserFairShareFactors containing all three factor levels.
+            Users not found in any of the fair share tables are omitted.
+        """
+        return await self._db_source.get_user_fair_share_factors_batch(
+            resource_group, project_user_ids
+        )

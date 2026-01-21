@@ -8,6 +8,7 @@ from .types import (
     ProjectFairShareSearchResult,
     ProjectUserIds,
     UserFairShareData,
+    UserFairShareFactors,
     UserFairShareSearchResult,
 )
 
@@ -17,6 +18,7 @@ __all__ = (
     "FairShareCalculationSnapshot",
     "FairShareMetadata",
     "ProjectUserIds",
+    "UserFairShareFactors",
     # Domain-level
     "DomainFairShareData",
     "DomainFairShareSearchResult",

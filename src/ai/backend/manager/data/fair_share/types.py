@@ -118,6 +118,29 @@ class UserFairShareData:
 
 
 @dataclass(frozen=True)
+class UserFairShareFactors:
+    """Combined fair share factors for a user across all hierarchy levels.
+
+    Used for sorting workloads by fair share priority.
+    Higher factors = higher priority.
+    """
+
+    user_uuid: uuid.UUID
+    project_id: uuid.UUID
+    domain_name: str
+    domain_factor: Decimal
+    project_factor: Decimal
+    user_factor: Decimal
+
+    def sort_key(self) -> tuple[Decimal, Decimal, Decimal]:
+        """Return a tuple for sorting (higher factor = higher priority).
+
+        Returns negated values since Python sorts ascending by default.
+        """
+        return (-self.domain_factor, -self.project_factor, -self.user_factor)
+
+
+@dataclass(frozen=True)
 class DomainFairShareSearchResult:
     """Search result with pagination info for domain fair shares."""
 

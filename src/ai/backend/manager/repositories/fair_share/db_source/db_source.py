@@ -16,6 +16,7 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareSearchResult,
     ProjectUserIds,
     UserFairShareData,
+    UserFairShareFactors,
     UserFairShareSearchResult,
 )
 from ai.backend.manager.errors.fair_share import FairShareNotFoundError
@@ -422,3 +423,84 @@ class FairShareDBSource:
             }
 
             return domain_fair_shares, project_fair_shares, user_fair_shares
+
+    async def get_user_fair_share_factors_batch(
+        self,
+        resource_group: str,
+        project_user_ids: Sequence[ProjectUserIds],
+    ) -> dict[uuid.UUID, UserFairShareFactors]:
+        """Get combined fair share factors for multiple users with 3-way JOIN.
+
+        Fetches domain, project, and user fair share factors in a single query
+        by joining the three fair share tables.
+
+        Args:
+            resource_group: The resource group (scaling group) name.
+            project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
+
+        Returns:
+            A mapping from user_uuid to UserFairShareFactors containing all three factor levels.
+            Users not found in any of the fair share tables are omitted.
+        """
+        if not project_user_ids:
+            return {}
+
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Build OR conditions for each project-users group
+            conditions = [
+                sa.and_(
+                    UserFairShareRow.project_id == pu.project_id,
+                    UserFairShareRow.user_uuid.in_(pu.user_ids),
+                )
+                for pu in project_user_ids
+                if pu.user_ids
+            ]
+
+            if not conditions:
+                return {}
+
+            # 3-way JOIN query: user -> project -> domain
+            query = (
+                sa.select(
+                    UserFairShareRow.user_uuid,
+                    UserFairShareRow.project_id,
+                    UserFairShareRow.domain_name,
+                    UserFairShareRow.fair_share_factor.label("user_factor"),
+                    ProjectFairShareRow.fair_share_factor.label("project_factor"),
+                    DomainFairShareRow.fair_share_factor.label("domain_factor"),
+                )
+                .select_from(UserFairShareRow)
+                .join(
+                    ProjectFairShareRow,
+                    sa.and_(
+                        ProjectFairShareRow.resource_group == UserFairShareRow.resource_group,
+                        ProjectFairShareRow.project_id == UserFairShareRow.project_id,
+                    ),
+                )
+                .join(
+                    DomainFairShareRow,
+                    sa.and_(
+                        DomainFairShareRow.resource_group == UserFairShareRow.resource_group,
+                        DomainFairShareRow.domain_name == UserFairShareRow.domain_name,
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        UserFairShareRow.resource_group == resource_group,
+                        sa.or_(*conditions),
+                    )
+                )
+            )
+
+            result = await db_sess.execute(query)
+            return {
+                row.user_uuid: UserFairShareFactors(
+                    user_uuid=row.user_uuid,
+                    project_id=row.project_id,
+                    domain_name=row.domain_name,
+                    domain_factor=row.domain_factor,
+                    project_factor=row.project_factor,
+                    user_factor=row.user_factor,
+                )
+                for row in result
+            }
