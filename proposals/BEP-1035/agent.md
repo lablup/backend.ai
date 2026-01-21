@@ -1,6 +1,6 @@
 # Agent Component
 
-The Agent component handles compute kernel management and communicates with the Manager via Callosum RPC. This document describes the request ID tracing implementation for the Agent, including the proposed RPCFunctionRegistryV3.
+The Agent component handles compute kernel management and communicates with the Manager via Callosum RPC. This document describes the request ID tracing implementation for the Agent.
 
 ## Callosum Constraints
 
@@ -12,73 +12,20 @@ Callosum is the RPC library used for Manager ↔ Agent communication. Key constr
 
 **Implication**: Request metadata (including request_id) must be embedded within the message body structure.
 
-## Current Implementation
+## Current Issues
 
-### RPCFunctionRegistry (V1)
+- `request_id` is mixed with business data (`args`, `kwargs`) at the same level
+- No extensible structure for future tracing needs (correlation_id, trace_id, etc.)
+- Metadata and payload are not separated in request/response
 
-The original registry returns dict-based responses:
-
-```python
-class RPCFunctionRegistry:
-    """Legacy registry with dict responses."""
-    
-    _functions: dict[str, Callable]
-    
-    async def dispatch(self, method: str, body: dict) -> dict:
-        # Extract request_id if present
-        request_id = body.get("request_id")
-        if request_id:
-            _request_id_var.set(request_id)
-        
-        func = self._functions[method]
-        result = await func(*body.get("args", []), **body.get("kwargs", {}))
-        return result  # Returns arbitrary dict
-```
-
-**Issues**:
-- No structured response format
-- request_id extraction is ad-hoc
-- No type safety
-
-### RPCFunctionRegistryV2
-
-Introduced DTO-based responses:
-
-```python
-class RPCFunctionRegistryV2:
-    """Registry with structured DTO responses."""
-    
-    _functions: dict[str, Callable[..., AbstractAgentResp]]
-    
-    async def dispatch(self, method: str, body: dict) -> dict:
-        request_id = body.get("request_id")
-        if request_id:
-            _request_id_var.set(request_id)
-        
-        func = self._functions[method]
-        response: AbstractAgentResp = await func(
-            *body.get("args", []),
-            **body.get("kwargs", {}),
-        )
-        return response.to_response()
-```
-
-**Improvements over V1**:
-- Structured response via `AbstractAgentResp`
-- Still extracts request_id from body root
-
-**Remaining Issues**:
-- request_id mixed with business data
-- No extensible header structure for future tracing needs
-
-## Proposed: RPCFunctionRegistryV3
+## Proposed Design
 
 ### Design Goals
 
 1. **Separate concerns**: Headers (metadata) separated from args/kwargs (business data)
 2. **Extensibility**: Header structure supports future additions (correlation_id, trace_id)
 3. **Type safety**: Pydantic models for validation
-4. **Backward compatibility**: Graceful handling of V2 requests
+4. **Backward compatibility**: Graceful handling of legacy requests without headers
 
 ### Request Structure
 
@@ -166,9 +113,9 @@ Error response:
 ### Implementation
 
 ```python
-class RPCFunctionRegistryV3:
+class RPCDispatcher:
     """
-    V3 registry with structured headers and extensible tracing.
+    RPC dispatcher with structured headers and extensible tracing.
     """
     
     _functions: dict[str, Callable[..., Awaitable[AbstractAgentResp]]]
@@ -181,8 +128,8 @@ class RPCFunctionRegistryV3:
     
     async def dispatch(self, method: str, raw_body: dict) -> dict:
         """
-        Dispatch RPC call with V3 protocol.
-        Falls back to V2 format detection for compatibility.
+        Dispatch RPC call.
+        Automatically detects and handles both new and legacy formats.
         """
         # Parse request
         request = self._parse_request(raw_body)
@@ -213,13 +160,13 @@ class RPCFunctionRegistryV3:
     
     def _parse_request(self, raw_body: dict) -> RPCRequest:
         """
-        Parse request with V3/V2 format detection.
+        Parse request with automatic format detection.
         """
         if "headers" in raw_body:
-            # V3 format
+            # New format with headers
             return RPCRequest.model_validate(raw_body)
         else:
-            # V2 fallback: extract request_id from body root
+            # Legacy format: extract request_id from body root
             return RPCRequest(
                 headers=RPCHeaders(request_id=raw_body.get("request_id")),
                 args=raw_body.get("args", []),
@@ -254,9 +201,9 @@ class RPCFunctionRegistryV3:
 ### Usage Example
 
 ```python
-registry = RPCFunctionRegistryV3()
+dispatcher = RPCDispatcher()
 
-@registry.register("create_kernel")
+@dispatcher.register("create_kernel")
 async def create_kernel(
     kernel_id: str,
     config: KernelConfig,
@@ -285,21 +232,20 @@ Agent advertises capabilities during heartbeat/registration:
 heartbeat_data = {
     "agent_id": agent_id,
     "capabilities": {
-        "rpc_version": 3,  # Supports V3 protocol
+        "rpc_headers": True,  # Supports headers in RPC
         "features": ["request_tracing", "structured_errors"],
     },
 }
 
 # Manager side
-if agent.capabilities.get("rpc_version", 1) >= 3:
-    # Use V3 format
+if agent.capabilities.get("rpc_headers", False):
     request_body = RPCRequest(
         headers=RPCHeaders(request_id=current_request_id()),
         args=args,
         kwargs=kwargs,
     ).model_dump()
 else:
-    # Use V2 format
+    # Legacy format
     request_body = {
         "request_id": current_request_id(),
         "args": args,
@@ -313,65 +259,66 @@ Manager sends both formats during migration:
 
 ```python
 request_body = {
-    "headers": {"request_id": current_request_id()},  # V3
-    "request_id": current_request_id(),                # V2 fallback
+    "headers": {"request_id": current_request_id()},  # New format
+    "request_id": current_request_id(),                # Legacy fallback
     "args": args,
     "kwargs": kwargs,
 }
 ```
 
-V3 Agents use `headers`, V2 Agents use root `request_id`.
+New Agents use `headers`, legacy Agents use root `request_id`.
 
 ## Backward Compatibility
 
-### Agent Receiving Requests
+### Request Format Detection
 
-| Manager Version | Request Format | Agent V2 | Agent V3 |
-|-----------------|----------------|----------|----------|
-| Pre-V3 | V2 (root request_id) | ✓ Works | ✓ Falls back |
-| V3+ | V3 (headers) | ✓ Ignores headers | ✓ Works |
-| V3+ (dual) | Both formats | ✓ Uses root | ✓ Uses headers |
+Agent automatically detects request format:
 
-### Manager Processing Responses
+| Request Format | Detection | Handling |
+|----------------|-----------|----------|
+| With `headers` | `"headers" in body` | Process as new format |
+| Without `headers` | Legacy format | Extract from `body.request_id` |
 
-| Agent Version | Response Format | Manager V2 | Manager V3 |
-|---------------|-----------------|------------|------------|
-| V2 | Dict (no headers) | ✓ Works | ✓ Falls back |
-| V3 | With headers | Ignores | ✓ Works |
+### Response Format
+
+Manager detects response format by presence of `headers` field:
+
+| Response Format | Detection | Handling |
+|-----------------|-----------|----------|
+| With `headers` | `"headers" in response` | Process as new format |
+| Without `headers` | Legacy format | Process as legacy |
 
 ## Migration Strategy
 
-### Phase 1: Add V3 to Agent (Non-breaking)
+### Phase 1: Agent Update (Non-breaking)
 
-1. Implement `RPCFunctionRegistryV3` with V2 fallback
-2. Agent accepts both formats
-3. No Manager changes required
+1. Agent accepts both new format (with `headers`) and legacy format
+2. Can be deployed without Manager changes
 
-### Phase 2: Update Manager to Send V3
+### Phase 2: Manager Update
 
-1. Manager detects Agent version via capabilities
-2. Send V3 format to V3 Agents
-3. Continue V2 format for older Agents
+1. Manager detects Agent capabilities
+2. Send new format to Agents that support it
+3. Continue legacy format for older Agents
 
-### Phase 3: Deprecate V2
+### Phase 3: Deprecation
 
-1. Log warnings when V2 fallback is used
-2. Set timeline for V2 removal
+1. Log warnings when legacy format is used
+2. Announce removal timeline
 
-### Phase 4: Remove V2 (Breaking)
+### Phase 4: Cleanup (Breaking)
 
-1. Remove V2 compatibility code
-2. Require V3 protocol
+1. Remove legacy format support code
+2. Require new format only
 
 ## Implementation Checklist
 
 - [ ] Add `RPCHeaders` model to `ai.backend.common`
 - [ ] Add `RPCRequest` and `RPCResponse` models
-- [ ] Implement `RPCFunctionRegistryV3`
-- [ ] Add V2 fallback detection in V3 registry
-- [ ] Update Agent server to use V3 registry
-- [ ] Add capability advertisement for rpc_version
-- [ ] Update Manager `PeerInvoker` for V3 format
+- [ ] Update Agent RPC dispatcher to support new format
+- [ ] Add legacy format fallback detection
+- [ ] Add capability advertisement for rpc protocol version
+- [ ] Update Manager `PeerInvoker` to send new format
 - [ ] Add version detection in Manager
-- [ ] Add integration tests for V2 ↔ V3 compatibility
+- [ ] Add integration tests for format compatibility
 - [ ] Add metrics for protocol version usage

@@ -69,7 +69,6 @@ This fragmented approach leads to:
 | Account Manager | Separate service, may follow later |
 | Web Server | Frontend proxy, may add middleware |
 | WSProxy | WebSocket proxy, pass-through behavior |
-| Client SDK | May add request_id parameter to API calls |
 
 ## Architecture Overview
 
