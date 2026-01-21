@@ -382,9 +382,16 @@ class CreateDeploymentAdapter:
         if request.metadata.tags:
             tag = {}
             for tag_str in request.metadata.tags:
-                if "=" in tag_str:
-                    k, v = tag_str.split("=", 1)
-                    tag[k] = v
+                if "=" not in tag_str:
+                    raise ValueError(
+                        f"Invalid tag format: '{tag_str}'. Expected 'key=value' format."
+                    )
+                k, v = tag_str.split("=", 1)
+                if not k or not v:
+                    raise ValueError(
+                        f"Invalid tag format: '{tag_str}'. Key and value cannot be empty."
+                    )
+                tag[k] = v
 
         # Build metadata
         metadata = DeploymentMetadata(
