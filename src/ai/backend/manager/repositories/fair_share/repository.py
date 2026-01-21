@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
         UserFairShareRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
 
 __all__ = ("FairShareRepository",)
@@ -201,3 +203,49 @@ class FairShareRepository:
         return await self._db_source.get_user_scheduling_ranks_batch(
             resource_group, project_user_ids
         )
+
+    # ==================== Bulk Factor Updates ====================
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_update_fair_share_factors(
+        self,
+        resource_group: str,
+        calculation_result: FairShareFactorCalculationResult,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> None:
+        """Bulk update fair share factors for all levels.
+
+        Updates domain, project, and user fair share records with calculated
+        factors in a single transaction.
+
+        Args:
+            resource_group: The resource group being updated
+            calculation_result: Calculated factors from FairShareFactorCalculator
+            lookback_start: Start of lookback period used in calculation
+            lookback_end: End of lookback period used in calculation
+        """
+        return await self._db_source.bulk_update_fair_share_factors(
+            resource_group, calculation_result, lookback_start, lookback_end
+        )
+
+    @fair_share_repository_resilience.apply()
+    async def get_all_fair_shares_for_resource_group(
+        self,
+        resource_group: str,
+    ) -> tuple[
+        dict[str, DomainFairShareData],
+        dict[uuid.UUID, ProjectFairShareData],
+        dict[tuple[uuid.UUID, uuid.UUID], UserFairShareData],
+    ]:
+        """Get all fair share records for a resource group.
+
+        Used for factor calculation to get current weights and configurations.
+
+        Args:
+            resource_group: The resource group to query
+
+        Returns:
+            Tuple of (domain_fair_shares, project_fair_shares, user_fair_shares)
+        """
+        return await self._db_source.get_all_fair_shares_for_resource_group(resource_group)

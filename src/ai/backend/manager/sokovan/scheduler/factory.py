@@ -24,7 +24,10 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.sokovan.scheduler.fair_share import FairShareAggregator
+from ai.backend.manager.sokovan.scheduler.fair_share import (
+    FairShareAggregator,
+    FairShareFactorCalculator,
+)
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
@@ -218,7 +221,9 @@ class CoordinatorHandlersArgs:
     valkey_schedule: ValkeyScheduleClient
     scheduling_controller: SchedulingController
     fair_share_aggregator: FairShareAggregator
+    fair_share_calculator: FairShareFactorCalculator
     resource_usage_repository: ResourceUsageHistoryRepository
+    fair_share_repository: FairShareRepository
 
 
 def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
@@ -352,7 +357,9 @@ def _create_kernel_observers(
     return {
         ScheduleType.OBSERVE_FAIR_SHARE: FairShareObserver(
             aggregator=args.fair_share_aggregator,
+            calculator=args.fair_share_calculator,
             resource_usage_repository=args.resource_usage_repository,
+            fair_share_repository=args.fair_share_repository,
             scheduler_repository=args.repository,
         ),
     }

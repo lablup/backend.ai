@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -34,6 +35,7 @@ from ai.backend.manager.repositories.base import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
 
 __all__ = ("FairShareDBSource",)
@@ -290,3 +292,133 @@ class FairShareDBSource:
 
             result = await db_sess.execute(query)
             return {row.user_uuid: row.scheduling_rank for row in result}
+
+    # ==================== Bulk Factor Updates ====================
+
+    async def bulk_update_fair_share_factors(
+        self,
+        resource_group: str,
+        calculation_result: FairShareFactorCalculationResult,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> None:
+        """Bulk update fair share factors for all levels.
+
+        Updates domain, project, and user fair share records with calculated
+        factors in a single transaction.
+
+        Args:
+            resource_group: The resource group being updated
+            calculation_result: Calculated factors from FairShareFactorCalculator
+            lookback_start: Start of lookback period used in calculation
+            lookback_end: End of lookback period used in calculation
+        """
+        async with self._db.begin_session() as db_sess:
+            now = sa.func.now()
+
+            # Update domain fair shares
+            for domain_name, domain_result in calculation_result.domain_results.items():
+                await db_sess.execute(
+                    sa.update(DomainFairShareRow)
+                    .where(
+                        sa.and_(
+                            DomainFairShareRow.resource_group == resource_group,
+                            DomainFairShareRow.domain_name == domain_name,
+                        )
+                    )
+                    .values(
+                        fair_share_factor=domain_result.fair_share_factor,
+                        total_decayed_usage=domain_result.total_decayed_usage,
+                        normalized_usage=domain_result.normalized_usage,
+                        lookback_start=lookback_start,
+                        lookback_end=lookback_end,
+                        last_calculated_at=now,
+                    )
+                )
+
+            # Update project fair shares
+            for project_id, project_result in calculation_result.project_results.items():
+                await db_sess.execute(
+                    sa.update(ProjectFairShareRow)
+                    .where(
+                        sa.and_(
+                            ProjectFairShareRow.resource_group == resource_group,
+                            ProjectFairShareRow.project_id == project_id,
+                        )
+                    )
+                    .values(
+                        fair_share_factor=project_result.fair_share_factor,
+                        total_decayed_usage=project_result.total_decayed_usage,
+                        normalized_usage=project_result.normalized_usage,
+                        lookback_start=lookback_start,
+                        lookback_end=lookback_end,
+                        last_calculated_at=now,
+                    )
+                )
+
+            # Update user fair shares
+            for (user_uuid, project_id), user_result in calculation_result.user_results.items():
+                await db_sess.execute(
+                    sa.update(UserFairShareRow)
+                    .where(
+                        sa.and_(
+                            UserFairShareRow.resource_group == resource_group,
+                            UserFairShareRow.user_uuid == user_uuid,
+                            UserFairShareRow.project_id == project_id,
+                        )
+                    )
+                    .values(
+                        fair_share_factor=user_result.fair_share_factor,
+                        total_decayed_usage=user_result.total_decayed_usage,
+                        normalized_usage=user_result.normalized_usage,
+                        lookback_start=lookback_start,
+                        lookback_end=lookback_end,
+                        last_calculated_at=now,
+                    )
+                )
+
+    async def get_all_fair_shares_for_resource_group(
+        self,
+        resource_group: str,
+    ) -> tuple[
+        dict[str, DomainFairShareData],
+        dict[uuid.UUID, ProjectFairShareData],
+        dict[tuple[uuid.UUID, uuid.UUID], UserFairShareData],
+    ]:
+        """Get all fair share records for a resource group.
+
+        Used for factor calculation to get current weights and configurations.
+
+        Args:
+            resource_group: The resource group to query
+
+        Returns:
+            Tuple of (domain_fair_shares, project_fair_shares, user_fair_shares)
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Get domain fair shares
+            domain_query = sa.select(DomainFairShareRow).where(
+                DomainFairShareRow.resource_group == resource_group
+            )
+            domain_result = await db_sess.execute(domain_query)
+            domain_fair_shares = {row.domain_name: row.to_data() for row in domain_result.scalars()}
+
+            # Get project fair shares
+            project_query = sa.select(ProjectFairShareRow).where(
+                ProjectFairShareRow.resource_group == resource_group
+            )
+            project_result = await db_sess.execute(project_query)
+            project_fair_shares = {
+                row.project_id: row.to_data() for row in project_result.scalars()
+            }
+
+            # Get user fair shares
+            user_query = sa.select(UserFairShareRow).where(
+                UserFairShareRow.resource_group == resource_group
+            )
+            user_result = await db_sess.execute(user_query)
+            user_fair_shares = {
+                (row.user_uuid, row.project_id): row.to_data() for row in user_result.scalars()
+            }
+
+            return domain_fair_shares, project_fair_shares, user_fair_shares

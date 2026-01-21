@@ -1215,7 +1215,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         create_coordinator_handlers,
         create_default_scheduler_components,
     )
-    from .sokovan.scheduler.fair_share import FairShareAggregator
+    from .sokovan.scheduler.fair_share import FairShareAggregator, FairShareFactorCalculator
     from .sokovan.sokovan import SokovanOrchestrator
 
     # Create scheduler components
@@ -1269,6 +1269,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
     # Create fair share aggregator for usage tracking
     # FairShareAggregator is now pure computation (no repositories)
     fair_share_aggregator = FairShareAggregator()
+    fair_share_calculator = FairShareFactorCalculator()
 
     # Create coordinator handlers using factory
     coordinator_handlers = create_coordinator_handlers(
@@ -1280,7 +1281,9 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
             valkey_schedule=root_ctx.valkey_schedule,
             scheduling_controller=root_ctx.scheduling_controller,
             fair_share_aggregator=fair_share_aggregator,
+            fair_share_calculator=fair_share_calculator,
             resource_usage_repository=root_ctx.repositories.resource_usage_history.repository,
+            fair_share_repository=root_ctx.repositories.fair_share.repository,
         )
     )
 

@@ -705,3 +705,178 @@ class ResourceUsageHistoryDBSource:
             (row.domain_name, row.resource_group, row.period_start): row.resource_usage
             for row in result.all()
         }
+
+    # ==================== Decayed Usage Aggregation ====================
+
+    async def get_decayed_usage_by_domain(
+        self,
+        resource_group: str,
+        today: date,
+        half_life_days: int,
+        lookback_days: int,
+    ) -> Mapping[str, ResourceSlot]:
+        """Get aggregated usage by domain with time decay applied.
+
+        Fetches usage buckets within the lookback period and applies exponential
+        decay based on bucket age. Older usage contributes less to the total.
+
+        Decay formula: decayed_usage = usage * 2^(-days_ago / half_life_days)
+
+        Args:
+            resource_group: The resource group to query
+            today: Current date for decay calculation
+            half_life_days: Days for usage to decay to 50%
+            lookback_days: Number of days to look back
+
+        Returns:
+            Mapping of domain_name to total decayed ResourceSlot
+        """
+        from datetime import timedelta
+        from decimal import Decimal
+
+        lookback_start = today - timedelta(days=lookback_days)
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                DomainUsageBucketRow.domain_name,
+                DomainUsageBucketRow.period_start,
+                DomainUsageBucketRow.resource_usage,
+            ).where(
+                sa.and_(
+                    DomainUsageBucketRow.resource_group == resource_group,
+                    DomainUsageBucketRow.period_start >= lookback_start,
+                    DomainUsageBucketRow.period_start <= today,
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Aggregate with decay in Python
+            aggregated: dict[str, ResourceSlot] = {}
+            for row in rows:
+                days_ago = (today - row.period_start).days
+                decay_factor = Decimal("2") ** (
+                    Decimal(str(-days_ago)) / Decimal(str(half_life_days))
+                )
+
+                decayed_usage = ResourceSlot({
+                    k: v * decay_factor for k, v in row.resource_usage.items()
+                })
+
+                if row.domain_name not in aggregated:
+                    aggregated[row.domain_name] = ResourceSlot()
+                aggregated[row.domain_name] = aggregated[row.domain_name] + decayed_usage
+
+            return aggregated
+
+    async def get_decayed_usage_by_project(
+        self,
+        resource_group: str,
+        today: date,
+        half_life_days: int,
+        lookback_days: int,
+    ) -> Mapping[uuid.UUID, ResourceSlot]:
+        """Get aggregated usage by project with time decay applied.
+
+        Args:
+            resource_group: The resource group to query
+            today: Current date for decay calculation
+            half_life_days: Days for usage to decay to 50%
+            lookback_days: Number of days to look back
+
+        Returns:
+            Mapping of project_id to total decayed ResourceSlot
+        """
+        from datetime import timedelta
+        from decimal import Decimal
+
+        lookback_start = today - timedelta(days=lookback_days)
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                ProjectUsageBucketRow.project_id,
+                ProjectUsageBucketRow.period_start,
+                ProjectUsageBucketRow.resource_usage,
+            ).where(
+                sa.and_(
+                    ProjectUsageBucketRow.resource_group == resource_group,
+                    ProjectUsageBucketRow.period_start >= lookback_start,
+                    ProjectUsageBucketRow.period_start <= today,
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            aggregated: dict[uuid.UUID, ResourceSlot] = {}
+            for row in rows:
+                days_ago = (today - row.period_start).days
+                decay_factor = Decimal("2") ** (
+                    Decimal(str(-days_ago)) / Decimal(str(half_life_days))
+                )
+
+                decayed_usage = ResourceSlot({
+                    k: v * decay_factor for k, v in row.resource_usage.items()
+                })
+
+                if row.project_id not in aggregated:
+                    aggregated[row.project_id] = ResourceSlot()
+                aggregated[row.project_id] = aggregated[row.project_id] + decayed_usage
+
+            return aggregated
+
+    async def get_decayed_usage_by_user(
+        self,
+        resource_group: str,
+        today: date,
+        half_life_days: int,
+        lookback_days: int,
+    ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
+        """Get aggregated usage by (user_uuid, project_id) with time decay applied.
+
+        Args:
+            resource_group: The resource group to query
+            today: Current date for decay calculation
+            half_life_days: Days for usage to decay to 50%
+            lookback_days: Number of days to look back
+
+        Returns:
+            Mapping of (user_uuid, project_id) to total decayed ResourceSlot
+        """
+        from datetime import timedelta
+        from decimal import Decimal
+
+        lookback_start = today - timedelta(days=lookback_days)
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                UserUsageBucketRow.user_uuid,
+                UserUsageBucketRow.project_id,
+                UserUsageBucketRow.period_start,
+                UserUsageBucketRow.resource_usage,
+            ).where(
+                sa.and_(
+                    UserUsageBucketRow.resource_group == resource_group,
+                    UserUsageBucketRow.period_start >= lookback_start,
+                    UserUsageBucketRow.period_start <= today,
+                )
+            )
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            aggregated: dict[tuple[uuid.UUID, uuid.UUID], ResourceSlot] = {}
+            for row in rows:
+                days_ago = (today - row.period_start).days
+                decay_factor = Decimal("2") ** (
+                    Decimal(str(-days_ago)) / Decimal(str(half_life_days))
+                )
+
+                decayed_usage = ResourceSlot({
+                    k: v * decay_factor for k, v in row.resource_usage.items()
+                })
+
+                key = (row.user_uuid, row.project_id)
+                if key not in aggregated:
+                    aggregated[key] = ResourceSlot()
+                aggregated[key] = aggregated[key] + decayed_usage
+
+            return aggregated
