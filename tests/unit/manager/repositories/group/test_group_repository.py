@@ -10,7 +10,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -1588,3 +1594,121 @@ class TestGroupRepository:
                 sa.select(GroupRow).where(GroupRow.id == group_with_mounted_vfolders)
             )
             assert group_row is not None
+
+
+class TestGroupRowVFolderHostPermissionMap:
+    """Tests for VFolderHostPermissionMap type handling in GroupRow"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                GroupRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
+            await session.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def project_resource_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a project resource policy."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(policy)
+            await session.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+        project_resource_policy: str,
+    ) -> uuid.UUID:
+        """Create a group with allowed_vfolder_hosts set."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as session:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{group_id.hex[:8]}",
+                description="Test group with vfolder hosts",
+                is_active=True,
+                domain_name=test_domain,
+                total_resource_slots={},
+                allowed_vfolder_hosts={
+                    "local": ["create-vfolder", "mount-in-session"],
+                },
+                integration_id=None,
+                resource_policy=project_resource_policy,
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+            await session.commit()
+
+        return group_id
+
+    async def test_group_row_allowed_vfolder_hosts_is_dict(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupRow.allowed_vfolder_hosts is dict type."""
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+            assert isinstance(group_row.allowed_vfolder_hosts, dict)
+
+    async def test_group_data_allowed_vfolder_hosts_is_vfolder_host_permission_map(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupData.allowed_vfolder_hosts is VFolderHostPermissionMap type."""
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+
+            group_data = group_row.to_data()
+            assert isinstance(group_data.allowed_vfolder_hosts, VFolderHostPermissionMap)
