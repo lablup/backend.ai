@@ -12,11 +12,11 @@ Callosum is the RPC library used for Manager ↔ Agent communication. Key constr
 
 **Implication**: Request metadata (including request_id) must be embedded within the message body structure.
 
-## Current Issues
+## Current State
 
-- `request_id` is mixed with business data (`args`, `kwargs`) at the same level
-- No extensible structure for future tracing needs (correlation_id, trace_id, etc.)
-- Metadata and payload are not separated in request/response
+- Agent RPC does not support request_id propagation
+- No way to trace the origin of Manager → Agent RPC calls
+- No structure for metadata in request/response
 
 ## Proposed Design
 
@@ -166,9 +166,9 @@ class RPCDispatcher:
             # New format with headers
             return RPCRequest.model_validate(raw_body)
         else:
-            # Legacy format: extract request_id from body root
+            # Legacy format: no request_id, will be auto-generated
             return RPCRequest(
-                headers=RPCHeaders(request_id=raw_body.get("request_id")),
+                headers=RPCHeaders(),
                 args=raw_body.get("args", []),
                 kwargs=raw_body.get("kwargs", {}),
             )
@@ -233,40 +233,37 @@ heartbeat_data = {
     "agent_id": agent_id,
     "capabilities": {
         "rpc_headers": True,  # Supports headers in RPC
-        "features": ["request_tracing", "structured_errors"],
     },
 }
 
 # Manager side
 if agent.capabilities.get("rpc_headers", False):
-    request_body = RPCRequest(
-        headers=RPCHeaders(request_id=current_request_id()),
-        args=args,
-        kwargs=kwargs,
-    ).model_dump()
-else:
-    # Legacy format
     request_body = {
-        "request_id": current_request_id(),
+        "headers": {"request_id": current_request_id()},
+        "args": args,
+        "kwargs": kwargs,
+    }
+else:
+    # Legacy format (no request_id support)
+    request_body = {
         "args": args,
         "kwargs": kwargs,
     }
 ```
 
-### Option B: Dual Format (Transition Period)
+### Option B: Always Send Headers
 
-Manager sends both formats during migration:
+Manager always includes headers (simpler approach):
 
 ```python
 request_body = {
-    "headers": {"request_id": current_request_id()},  # New format
-    "request_id": current_request_id(),                # Legacy fallback
+    "headers": {"request_id": current_request_id()},
     "args": args,
     "kwargs": kwargs,
 }
 ```
 
-New Agents use `headers`, legacy Agents use root `request_id`.
+Legacy Agents ignore unknown `headers` field, new Agents use it for tracing.
 
 ## Backward Compatibility
 
@@ -276,8 +273,8 @@ Agent automatically detects request format:
 
 | Request Format | Detection | Handling |
 |----------------|-----------|----------|
-| With `headers` | `"headers" in body` | Process as new format |
-| Without `headers` | Legacy format | Extract from `body.request_id` |
+| With `headers` | `"headers" in body` | Extract request_id from headers |
+| Without `headers` | Legacy format | Auto-generate request_id |
 
 ### Response Format
 
