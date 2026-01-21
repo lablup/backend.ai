@@ -2,13 +2,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, Optional
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import ErrorCode
-from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import (
     BaseAction,
     BaseActionResult,
@@ -17,15 +14,9 @@ from ai.backend.manager.actions.action import (
     ProcessResult,
 )
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.exclusions import AUDIT_LOG_EXCLUDED_ACTIONS
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import ActionSpec
-from ai.backend.manager.repositories.audit_log import AuditLogRepository
-from ai.backend.manager.services.agent.actions.handle_heartbeat import (
-    HandleHeartbeatAction,
-    HandleHeartbeatActionResult,
-)
+from ai.backend.manager.actions.processor.base import ActionProcessorFactory
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -164,180 +155,191 @@ async def test_processor_exception():
         await processor.wait_for_complete(action)
 
 
-class ExclusionAwareMonitor(ActionMonitor):
-    """Monitor that respects excluded action specs, like AuditLogMonitor"""
+class TrackingMonitor(ActionMonitor):
+    """Monitor that tracks whether its methods were called."""
 
-    def __init__(self, excluded_action_specs: frozenset[ActionSpec] | None = None) -> None:
+    def __init__(self) -> None:
         self.prepare_called = False
         self.done_called = False
-        self.log_generated = False
-        self._excluded_action_specs = excluded_action_specs or frozenset()
 
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         self.prepare_called = True
 
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         self.done_called = True
-        # Check exclusion like AuditLogMonitor does
-        if action.spec() not in self._excluded_action_specs:
-            self.log_generated = True
 
 
-@dataclass
-class MockActionTypeA(BaseAction):
-    """Mock action type A for testing exclusion"""
+class AnotherTrackingMonitor(ActionMonitor):
+    """Another monitor type for testing exclusion by type."""
 
-    id: str
+    def __init__(self) -> None:
+        self.prepare_called = False
+        self.done_called = False
 
-    def entity_id(self) -> str | None:
-        return self.id
+    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+        self.prepare_called = True
 
-    @classmethod
-    def entity_type(cls) -> str:
-        return "type_a"
-
-    @classmethod
-    def operation_type(cls) -> str:
-        return "op_a"
+    async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        self.done_called = True
 
 
-@dataclass
-class MockActionTypeB(BaseAction):
-    """Mock action type B for testing exclusion"""
-
-    id: str
-
-    def entity_id(self) -> str | None:
-        return self.id
-
-    @classmethod
-    def entity_type(cls) -> str:
-        return "type_b"
-
-    @classmethod
-    def operation_type(cls) -> str:
-        return "op_b"
-
-
-@dataclass
-class MockActionResultForExclusion(BaseActionResult):
-    """Result for mock actions in exclusion tests"""
-
-    id: str
-
-    def entity_id(self) -> str | None:
-        return self.id
-
-
-async def mock_exclusion_action_func(action: BaseAction) -> MockActionResultForExclusion:
-    """Mock function for processing actions in exclusion tests"""
-    return MockActionResultForExclusion(id=action.entity_id() or "unknown")
-
-
-class TestMonitorExclusionBySpec:
-    """Test monitor exclusion based on action specs configured at registration time"""
+class TestActionProcessorFactory:
+    """Tests for ActionProcessorFactory monitor/validator exclusion at setup time."""
 
     @pytest.fixture
-    def action_type_a(self) -> MockActionTypeA:
-        """Create an action of type A"""
-        return MockActionTypeA(id="a-1")
+    def tracking_monitor(self) -> TrackingMonitor:
+        return TrackingMonitor()
 
     @pytest.fixture
-    def action_type_b(self) -> MockActionTypeB:
-        """Create an action of type B"""
-        return MockActionTypeB(id="b-1")
+    def another_tracking_monitor(self) -> AnotherTrackingMonitor:
+        return AnotherTrackingMonitor()
 
     @pytest.fixture
-    def monitor_excluding_type_a(self) -> ExclusionAwareMonitor:
-        """Create a monitor that excludes type A actions"""
-        return ExclusionAwareMonitor(excluded_action_specs=frozenset({MockActionTypeA.spec()}))
-
-    @pytest.fixture
-    def monitor_excluding_nothing(self) -> ExclusionAwareMonitor:
-        """Create a monitor that excludes no actions"""
-        return ExclusionAwareMonitor()
+    def mock_action(self) -> MockAction:
+        return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
 
     @pytest.mark.asyncio
-    async def test_monitor_skips_excluded_action_spec(
+    async def test_factory_includes_all_monitors_when_no_exclusions(
         self,
-        action_type_a: MockActionTypeA,
-        monitor_excluding_type_a: ExclusionAwareMonitor,
+        tracking_monitor: TrackingMonitor,
+        another_tracking_monitor: AnotherTrackingMonitor,
+        mock_action: MockAction,
     ) -> None:
-        """Monitor should skip logging for actions matching excluded specs"""
-        processor = ActionProcessor(
-            func=mock_exclusion_action_func,
-            monitors=[monitor_excluding_type_a],
+        """Factory should include all monitors when no exclusions are specified."""
+        factory = ActionProcessorFactory(
+            monitors=[tracking_monitor, another_tracking_monitor],
         )
-        await processor.wait_for_complete(action_type_a)
+        processor = factory.build_action_processor(mock_action_processor_func)
 
-        assert monitor_excluding_type_a.prepare_called is True
-        assert monitor_excluding_type_a.done_called is True
-        assert monitor_excluding_type_a.log_generated is False  # Skipped due to exclusion
+        await processor.wait_for_complete(mock_action)
+
+        assert tracking_monitor.prepare_called is True
+        assert tracking_monitor.done_called is True
+        assert another_tracking_monitor.prepare_called is True
+        assert another_tracking_monitor.done_called is True
 
     @pytest.mark.asyncio
-    async def test_monitor_logs_non_excluded_action_spec(
+    async def test_factory_excludes_monitors_by_default_exclusion(
         self,
-        action_type_b: MockActionTypeB,
-        monitor_excluding_type_a: ExclusionAwareMonitor,
+        tracking_monitor: TrackingMonitor,
+        another_tracking_monitor: AnotherTrackingMonitor,
+        mock_action: MockAction,
     ) -> None:
-        """Monitor should log actions not matching excluded specs"""
-        processor = ActionProcessor(
-            func=mock_exclusion_action_func,
-            monitors=[monitor_excluding_type_a],
+        """Factory should exclude monitors specified in default_excluded_monitors."""
+        factory = ActionProcessorFactory(
+            monitors=[tracking_monitor, another_tracking_monitor],
+            default_excluded_monitors={TrackingMonitor},
         )
-        await processor.wait_for_complete(action_type_b)
+        processor = factory.build_action_processor(mock_action_processor_func)
 
-        assert monitor_excluding_type_a.prepare_called is True
-        assert monitor_excluding_type_a.done_called is True
-        assert monitor_excluding_type_a.log_generated is True  # Logged because not excluded
+        await processor.wait_for_complete(mock_action)
+
+        # TrackingMonitor should be excluded
+        assert tracking_monitor.prepare_called is False
+        assert tracking_monitor.done_called is False
+        # AnotherTrackingMonitor should still be called
+        assert another_tracking_monitor.prepare_called is True
+        assert another_tracking_monitor.done_called is True
 
     @pytest.mark.asyncio
-    async def test_monitor_with_no_exclusions_logs_all(
+    async def test_factory_excludes_monitors_by_additional_exclusion(
         self,
-        action_type_a: MockActionTypeA,
-        action_type_b: MockActionTypeB,
-        monitor_excluding_nothing: ExclusionAwareMonitor,
+        tracking_monitor: TrackingMonitor,
+        another_tracking_monitor: AnotherTrackingMonitor,
+        mock_action: MockAction,
     ) -> None:
-        """Monitor with no exclusions should log all actions"""
-        processor = ActionProcessor(
-            func=mock_exclusion_action_func,
-            monitors=[monitor_excluding_nothing],
+        """Factory should exclude monitors specified in additional_excluded_monitors."""
+        factory = ActionProcessorFactory(
+            monitors=[tracking_monitor, another_tracking_monitor],
+        )
+        processor = factory.build_action_processor(
+            mock_action_processor_func,
+            additional_excluded_monitors={AnotherTrackingMonitor},
         )
 
-        await processor.wait_for_complete(action_type_a)
-        assert monitor_excluding_nothing.log_generated is True
+        await processor.wait_for_complete(mock_action)
 
-        # Reset and test type B
-        monitor_excluding_nothing.log_generated = False
-        await processor.wait_for_complete(action_type_b)
-        assert monitor_excluding_nothing.log_generated is True
+        # TrackingMonitor should still be called
+        assert tracking_monitor.prepare_called is True
+        assert tracking_monitor.done_called is True
+        # AnotherTrackingMonitor should be excluded
+        assert another_tracking_monitor.prepare_called is False
+        assert another_tracking_monitor.done_called is False
+
+    @pytest.mark.asyncio
+    async def test_factory_combines_default_and_additional_exclusions(
+        self,
+        mock_action: MockAction,
+    ) -> None:
+        """Factory should combine default and additional exclusions."""
+        monitor1 = TrackingMonitor()
+        monitor2 = AnotherTrackingMonitor()
+
+        factory = ActionProcessorFactory(
+            monitors=[monitor1, monitor2],
+            default_excluded_monitors={TrackingMonitor},
+        )
+        processor = factory.build_action_processor(
+            mock_action_processor_func,
+            additional_excluded_monitors={AnotherTrackingMonitor},
+        )
+
+        await processor.wait_for_complete(mock_action)
+
+        # Both monitors should be excluded
+        assert monitor1.prepare_called is False
+        assert monitor1.done_called is False
+        assert monitor2.prepare_called is False
+        assert monitor2.done_called is False
+
+    @pytest.mark.asyncio
+    async def test_factory_default_exclusion_applies_to_all_processors(
+        self,
+        mock_action: MockAction,
+    ) -> None:
+        """Default exclusions should apply to all processors built by the factory."""
+        monitor1 = TrackingMonitor()
+        monitor2 = AnotherTrackingMonitor()
+
+        factory = ActionProcessorFactory(
+            monitors=[monitor1, monitor2],
+            default_excluded_monitors={TrackingMonitor},
+        )
+
+        # Build two different processors
+        processor1 = factory.build_action_processor(mock_action_processor_func)
+        processor2 = factory.build_action_processor(mock_action_processor_func)
+
+        await processor1.wait_for_complete(mock_action)
+
+        # TrackingMonitor excluded from processor1
+        assert monitor1.prepare_called is False
+
+        # Reset for processor2
+        monitor1.prepare_called = False
+        monitor2.prepare_called = False
+
+        await processor2.wait_for_complete(mock_action)
+
+        # TrackingMonitor still excluded from processor2
+        assert monitor1.prepare_called is False
+        assert monitor2.prepare_called is True
 
 
-class TestHeartbeatExcludedFromAuditLog:
-    """Test that heartbeat action is excluded from audit logging.
+class TestAuditLogMonitorExclusionAtSetupTime:
+    """Test that AuditLogMonitor can be excluded at processor setup time.
 
-    This verifies the production configuration where high-frequency heartbeat
-    actions are excluded to prevent excessive audit log entries.
+    This verifies the design where high-frequency actions like heartbeat
+    have AuditLogMonitor excluded at ActionProcessorFactory.build_action_processor()
+    rather than runtime filtering inside AuditLogMonitor.
     """
-
-    def test_heartbeat_action_spec_is_in_exclusion_list(self) -> None:
-        """HandleHeartbeatAction.spec() should be in AUDIT_LOG_EXCLUDED_ACTIONS."""
-        heartbeat_spec = HandleHeartbeatAction.spec()
-
-        assert heartbeat_spec in AUDIT_LOG_EXCLUDED_ACTIONS
-        assert heartbeat_spec.entity_type == "agent"
-        assert heartbeat_spec.operation_type == "handle_heartbeat"
-
-    @pytest.fixture
-    def mock_heartbeat_action(self) -> HandleHeartbeatAction:
-        return HandleHeartbeatAction(
-            agent_id=AgentId(f"{uuid4()}"), agent_info=MagicMock(spec=AgentInfo)
-        )
 
     @pytest.fixture
     def mock_audit_log_repository(self) -> MagicMock:
         """Mock AuditLogRepository to track create() calls."""
-        return MagicMock(spec=AuditLogRepository)
+        repo = MagicMock()
+        repo.create = MagicMock(return_value=None)
+        return repo
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
@@ -345,31 +347,48 @@ class TestHeartbeatExcludedFromAuditLog:
         return AuditLogMonitor(repository=mock_audit_log_repository)
 
     @pytest.fixture
-    def heartbeat_processor_with_audit_monitor(
+    def mock_action(self) -> MockAction:
+        return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
+
+    @pytest.mark.asyncio
+    async def test_audit_log_monitor_excluded_via_factory(
         self,
         audit_log_monitor: AuditLogMonitor,
-    ) -> ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]:
-        async def _mock_heartbeat_func(
-            action: HandleHeartbeatAction,
-        ) -> HandleHeartbeatActionResult:
-            return HandleHeartbeatActionResult(agent_id=action.agent_id)
-
-        return ActionProcessor(
-            func=_mock_heartbeat_func,
+        mock_audit_log_repository: MagicMock,
+        mock_action: MockAction,
+    ) -> None:
+        """AuditLogMonitor should not be called when excluded via factory."""
+        factory = ActionProcessorFactory(
             monitors=[audit_log_monitor],
         )
 
-    @pytest.mark.asyncio
-    async def test_audit_log_monitor_skips_heartbeat_action(
-        self,
-        mock_heartbeat_action: HandleHeartbeatAction,
-        heartbeat_processor_with_audit_monitor: ActionProcessor[
-            HandleHeartbeatAction, HandleHeartbeatActionResult
-        ],
-        mock_audit_log_repository: MagicMock,
-    ) -> None:
-        """AuditLogMonitor should not call repository.create() for heartbeat actions."""
-        await heartbeat_processor_with_audit_monitor.wait_for_complete(mock_heartbeat_action)
+        # Build processor with AuditLogMonitor excluded (simulating heartbeat processor)
+        processor = factory.build_action_processor(
+            mock_action_processor_func,
+            additional_excluded_monitors={AuditLogMonitor},
+        )
 
-        # Verify that repository.create() was NOT called for heartbeat action
+        await processor.wait_for_complete(mock_action)
+
+        # Verify that repository.create() was NOT called
         mock_audit_log_repository.create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_audit_log_monitor_included_when_not_excluded(
+        self,
+        audit_log_monitor: AuditLogMonitor,
+        mock_audit_log_repository: MagicMock,
+        mock_action: MockAction,
+    ) -> None:
+        """AuditLogMonitor should be called when not excluded."""
+        factory = ActionProcessorFactory(
+            monitors=[audit_log_monitor],
+        )
+
+        # Build processor without excluding AuditLogMonitor
+        processor = factory.build_action_processor(mock_action_processor_func)
+
+        await processor.wait_for_complete(mock_action)
+
+        # Verify that repository.create() WAS called
+        mock_audit_log_repository.create.assert_called_once()
