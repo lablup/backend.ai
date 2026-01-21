@@ -1017,3 +1017,22 @@
   # serving configurations while maintaining automatic defaults.
   # Added in 25.8.0
   enable-model-definition-override = true
+
+# Export API configuration. Controls CSV export functionality including row
+# limits, timeouts, and concurrency limits. These settings prevent resource
+# exhaustion from large export operations.
+# Added in 26.1.0
+[export]
+  # Maximum number of rows per export request. Limits the amount of data that
+  # can be exported in a single request to prevent memory exhaustion and timeout
+  # issues.
+  # Added in 26.1.0
+  max-rows = 100000
+  # Database statement timeout in seconds for export queries. Long-running
+  # export queries will be cancelled after this duration.
+  # Added in 26.1.0
+  statement-timeout-sec = 300
+  # Maximum number of concurrent export requests allowed. Prevents system
+  # overload from too many simultaneous export operations.
+  # Added in 26.1.0
+  max-concurrent-exports = 10
