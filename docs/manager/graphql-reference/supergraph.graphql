@@ -6123,6 +6123,7 @@ enum NotificationRuleType
   SESSION_STARTED @join__enumValue(graph: STRAWBERRY)
   SESSION_TERMINATED @join__enumValue(graph: STRAWBERRY)
   ARTIFACT_DOWNLOAD_COMPLETED @join__enumValue(graph: STRAWBERRY)
+  ENDPOINT_LIFECYCLE_CHANGED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""

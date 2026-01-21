@@ -85,6 +85,7 @@ class NotificationRuleTypeGQL(StrEnum):
     SESSION_STARTED = "session.started"
     SESSION_TERMINATED = "session.terminated"
     ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
+    ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
 
     @classmethod
     def from_internal(cls, internal_type: NotificationRuleType) -> NotificationRuleTypeGQL:
@@ -96,6 +97,8 @@ class NotificationRuleTypeGQL(StrEnum):
                 return cls.SESSION_TERMINATED
             case NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED:
                 return cls.ARTIFACT_DOWNLOAD_COMPLETED
+            case NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED:
+                return cls.ENDPOINT_LIFECYCLE_CHANGED
 
     def to_internal(self) -> NotificationRuleType:
         """Convert GraphQL enum to internal NotificationRuleType."""
@@ -106,6 +109,8 @@ class NotificationRuleTypeGQL(StrEnum):
                 return NotificationRuleType.SESSION_TERMINATED
             case NotificationRuleTypeGQL.ARTIFACT_DOWNLOAD_COMPLETED:
                 return NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED
+            case NotificationRuleTypeGQL.ENDPOINT_LIFECYCLE_CHANGED:
+                return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED
 
 
 # GraphQL object types
