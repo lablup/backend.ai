@@ -433,7 +433,6 @@ class Circuit(Base, BaseMixin):
         payload["user"] = str(created_user)
         payload["exp"] = exp
         # mask unrelated & sensitive information
-        del payload["config"]
         del payload["route_info"]
 
         return jwt.encode(payload, jwt_secret, algorithm="HS256")
