@@ -247,6 +247,7 @@ class LifecycleStatus:
     status_data: Optional[Mapping[str, Any]]
     status_history: Optional[dict[str, Any]]
     last_seen: Optional[datetime]
+    last_observed_at: Optional[datetime]
 
 
 @dataclass

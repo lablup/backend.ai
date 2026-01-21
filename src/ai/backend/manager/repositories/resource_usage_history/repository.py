@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -91,6 +91,31 @@ class ResourceUsageHistoryRepository:
         per-period usage slices for all running kernels.
         """
         return await self._db_source.bulk_create_kernel_usage_records(bulk_creator)
+
+    @resource_usage_history_repository_resilience.apply()
+    async def bulk_create_kernel_usage_records_with_observation_update(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Bulk create kernel usage records and update observation timestamps atomically.
+
+        This method performs both operations in a single transaction for data consistency:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+
+        Used by FairShareObserver to record usage and update observation state atomically.
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        return await self._db_source.bulk_create_kernel_usage_records_with_observation_update(
+            bulk_creator, kernel_observation_times
+        )
 
     @resource_usage_history_repository_resilience.apply()
     async def search_kernel_usage_records(

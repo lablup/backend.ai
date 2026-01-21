@@ -4108,3 +4108,51 @@ class ScheduleDBSource:
                 .values(priority=new_priority)
             )
             await db_sess.execute(update_stmt)
+
+    async def update_kernels_last_observed_at(
+        self,
+        kernel_observation_times: Mapping[UUID, datetime],
+    ) -> int:
+        """
+        Update the last_observed_at timestamp for multiple kernels.
+
+        Used by fair share observer to record when kernels were last observed
+        for resource usage tracking. Each kernel can have a different observation
+        time (e.g., terminated kernels use terminated_at, running kernels use now).
+
+        :param kernel_observation_times: Mapping of kernel ID to observation timestamp
+        :return: Number of kernels updated
+        """
+        if not kernel_observation_times:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # Group by observation time for efficient batch updates
+            time_to_kernels: dict[datetime, list[UUID]] = {}
+            for kernel_id, observed_at in kernel_observation_times.items():
+                time_to_kernels.setdefault(observed_at, []).append(kernel_id)
+
+            for observed_at, kernel_ids in time_to_kernels.items():
+                update_stmt = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id.in_(kernel_ids))
+                    .values(last_observed_at=observed_at)
+                )
+                result = await db_sess.execute(update_stmt)
+                total_updated += cast(CursorResult, result).rowcount
+
+            return total_updated
+
+    async def get_db_now(self) -> datetime:
+        """Get the current timestamp from the database.
+
+        Used for consistent time handling across HA environments
+        where server clocks may differ.
+
+        Returns:
+            Current database timestamp with timezone
+        """
+        async with self._begin_readonly_read_committed() as conn:
+            result = await conn.execute(sa.select(sa.func.now()))
+            return result.scalar_one()

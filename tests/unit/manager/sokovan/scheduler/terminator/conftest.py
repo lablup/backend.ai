@@ -275,6 +275,7 @@ def _create_kernel_info(
             status_data=None,
             status_history=None,
             last_seen=None,
+            last_observed_at=None,
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),

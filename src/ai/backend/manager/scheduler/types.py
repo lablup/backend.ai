@@ -63,6 +63,7 @@ class ScheduleType(StrEnum):
     DETECT_KERNEL_TERMINATION = (
         "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
     )
+    OBSERVE_FAIR_SHARE = "observe_fair_share"  # Observe RUNNING kernels for fair share calculation
 
 
 def merge_resource(

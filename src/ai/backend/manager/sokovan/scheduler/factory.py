@@ -13,6 +13,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.resource_usage_history import (
+    ResourceUsageHistoryRepository,
+)
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.scheduler.types import ScheduleType
 
@@ -21,6 +24,7 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.sokovan.scheduler.fair_share import FairShareAggregator
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
@@ -33,6 +37,10 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
 from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
     KernelLifecycleHandler,
     SweepStaleKernelsKernelHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.observer import (
+    FairShareObserver,
+    KernelObserver,
 )
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
@@ -196,6 +204,7 @@ class CoordinatorHandlers:
     lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
     promotion_specs: Mapping[ScheduleType, PromotionSpec]
     kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
+    kernel_observers: Mapping[ScheduleType, KernelObserver]
 
 
 @dataclass
@@ -208,6 +217,8 @@ class CoordinatorHandlersArgs:
     repository: SchedulerRepository
     valkey_schedule: ValkeyScheduleClient
     scheduling_controller: SchedulingController
+    fair_share_aggregator: FairShareAggregator
+    resource_usage_repository: ResourceUsageHistoryRepository
 
 
 def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
@@ -219,11 +230,13 @@ def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHan
     lifecycle_handlers = _create_lifecycle_handlers(args)
     promotion_specs = _create_promotion_specs()
     kernel_handlers = _create_kernel_handlers(args)
+    kernel_observers = _create_kernel_observers(args)
 
     return CoordinatorHandlers(
         lifecycle_handlers=lifecycle_handlers,
         promotion_specs=promotion_specs,
         kernel_handlers=kernel_handlers,
+        kernel_observers=kernel_observers,
     )
 
 
@@ -324,5 +337,22 @@ def _create_kernel_handlers(
     return {
         ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
             args.terminator,
+        ),
+    }
+
+
+def _create_kernel_observers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, KernelObserver]:
+    """Create kernel observers mapping.
+
+    Observers are read-only operations that collect data without changing
+    kernel state. Used for fair share usage tracking, metrics, etc.
+    """
+    return {
+        ScheduleType.OBSERVE_FAIR_SHARE: FairShareObserver(
+            aggregator=args.fair_share_aggregator,
+            resource_usage_repository=args.resource_usage_repository,
+            scheduler_repository=args.repository,
         ),
     }

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import date
-from typing import TYPE_CHECKING
+from datetime import date, datetime
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -77,6 +79,48 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_session() as db_sess:
             result = await execute_bulk_creator(db_sess, bulk_creator)
             return [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+    async def bulk_create_kernel_usage_records_with_observation_update(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Bulk create kernel usage records and update observation timestamps atomically.
+
+        This method performs both operations in a single transaction for data consistency:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        async with self._db.begin_session() as db_sess:
+            # Step 1: Bulk create kernel usage records
+            result = await execute_bulk_creator(db_sess, bulk_creator)
+            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+            # Step 2: Update last_observed_at for kernels
+            updated_count = 0
+            if kernel_observation_times:
+                # Group by observation time for efficient batch updates
+                time_to_kernels: dict[datetime, list[uuid.UUID]] = {}
+                for kernel_id, observed_at in kernel_observation_times.items():
+                    time_to_kernels.setdefault(observed_at, []).append(kernel_id)
+
+                for observed_at, kernel_ids in time_to_kernels.items():
+                    update_stmt = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id.in_(kernel_ids))
+                        .values(last_observed_at=observed_at)
+                    )
+                    update_result = await db_sess.execute(update_stmt)
+                    updated_count += cast(CursorResult, update_result).rowcount
+
+            return records, updated_count
 
     async def search_kernel_usage_records(
         self,

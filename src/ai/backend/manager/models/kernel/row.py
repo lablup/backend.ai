@@ -608,6 +608,13 @@ class KernelRow(Base):
         default=sa.null(),
         server_default=sa.null(),
     )
+    last_observed_at: Mapped[datetime | None] = mapped_column(
+        "last_observed_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+        default=sa.null(),
+        server_default=sa.null(),
+    )
 
     __table_args__ = (
         # indexing
@@ -1048,6 +1055,7 @@ class KernelRow(Base):
                 status_data=self.status_data,
                 status_history=self.status_history,
                 last_seen=self.last_seen,
+                last_observed_at=self.last_observed_at,
             ),
             metrics=Metrics(
                 num_queries=self.num_queries or 0,
