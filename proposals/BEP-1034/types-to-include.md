@@ -15,7 +15,6 @@ KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus")
 ```python
 class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
-    ID = "id"
 ```
 
 ---
