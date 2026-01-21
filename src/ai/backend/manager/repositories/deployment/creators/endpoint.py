@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, Optional, Self, override
+from dataclasses import dataclass
+from typing import Any, Self, override
 from uuid import UUID
 
 import yarl
@@ -38,40 +38,40 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
     resource_group: str
     created_user: UUID
     session_owner: UUID
-    revision_history_limit: int = 10
-    tag: Optional[str] = None
+    revision_history_limit: int
+    tag: str | None
 
     # Replica fields (from ReplicaSpec)
-    replicas: int = 0
-    desired_replicas: Optional[int] = None
+    replicas: int
+    desired_replicas: int | None
 
     # Network fields (from DeploymentNetworkSpec)
-    open_to_public: bool = False
-    url: Optional[str] = None
+    open_to_public: bool
+    url: str | None
 
     # Model revision fields - image (resolved UUID, not ImageIdentifier)
-    image_id: Optional[UUID] = None
+    image_id: UUID | None
 
     # Model revision fields - resource (from ResourceSpec)
-    cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE
-    cluster_size: int = 1
-    resource_slots: ResourceSlot = field(default_factory=ResourceSlot)
-    resource_opts: Optional[Mapping[str, Any]] = None
+    cluster_mode: ClusterMode
+    cluster_size: int
+    resource_slots: ResourceSlot
+    resource_opts: Mapping[str, Any] | None
 
     # Model revision fields - mounts (from MountMetadata)
-    model: Optional[UUID] = None
-    model_mount_destination: str = "/models"
-    model_definition_path: Optional[str] = None
-    extra_mounts: Sequence[VFolderMount] = field(default_factory=list)
+    model: UUID | None
+    model_mount_destination: str
+    model_definition_path: str | None
+    extra_mounts: Sequence[VFolderMount]
 
     # Model revision fields - execution (from ExecutionSpec)
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    environ: Optional[Mapping[str, str]] = None
-    callback_url: Optional[yarl.URL] = None
+    runtime_variant: RuntimeVariant
+    startup_command: str | None
+    bootstrap_script: str | None
+    environ: Mapping[str, str] | None
+    callback_url: yarl.URL | None
 
-    policy: DeploymentPolicyCreatorSpec | None = None
+    policy: DeploymentPolicyCreatorSpec | None
 
     @classmethod
     def from_deployment_creator(
@@ -122,6 +122,8 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             bootstrap_script=creator.model_revision.execution.bootstrap_script,
             environ=creator.model_revision.execution.environ,
             callback_url=creator.model_revision.execution.callback_url,
+            # Policy
+            policy=None,
         )
 
     @override
