@@ -62,14 +62,15 @@ Client                        Storage-Proxy
 
 ## Background Operations
 
-Storage-Proxy performs background operations that should use `@ensure_request_id`:
+Storage-Proxy performs background operations that need their own request IDs.
+The `@with_request_id_context` decorator automatically generates one if not present:
 
 ### File Cleanup Tasks
 
 ```python
-from ai.backend.common.logging_utils import ensure_request_id
+from ai.backend.common.logging_utils import with_request_id_context
 
-@ensure_request_id
+@with_request_id_context
 async def cleanup_expired_uploads() -> None:
     """
     Periodically clean up incomplete/expired uploads.
@@ -85,7 +86,7 @@ async def cleanup_expired_uploads() -> None:
 ### Storage Sync Operations
 
 ```python
-@ensure_request_id
+@with_request_id_context
 async def sync_vfolder_quota() -> None:
     """
     Sync vfolder quota with actual disk usage.
@@ -157,16 +158,16 @@ Note: S3/cloud storage APIs typically don't support custom trace headers in the 
 |---------|--------|-------|
 | HTTP middleware | ✓ Implemented | Standard `request_id_middleware` |
 | Response header | ✓ Implemented | `X-Backend-Request-ID` in responses |
-| Background tasks | △ Partial | Some tasks may need `@ensure_request_id` |
+| Background tasks | △ Partial | Some tasks may need `@with_request_id_context` |
 | Internal logging | ✓ Implemented | Uses `current_request_id()` |
 
 ## Implementation Checklist
 
 - [x] `request_id_middleware` applied to main app
 - [x] Response includes `X-Backend-Request-ID`
-- [ ] Audit background tasks for `@ensure_request_id`
-- [ ] Add `@ensure_request_id` to cleanup tasks
-- [ ] Add `@ensure_request_id` to sync operations
+- [ ] Audit background tasks for `@with_request_id_context`
+- [ ] Add `@with_request_id_context` to cleanup tasks
+- [ ] Add `@with_request_id_context` to sync operations
 - [ ] Verify long-running operations preserve request_id
 
 ## Configuration

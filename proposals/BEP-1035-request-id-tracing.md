@@ -1,17 +1,13 @@
 ---
-Author: (To be assigned)
+Author: Gyubong Lee (gbl@lablup.com)
 Status: Draft
 Created: 2025-01-21
-Created-Version: 26.1.0
+Created-Version: 26.2.0
 Target-Version: 26.2.0
+Implemented-Version:
 ---
 
 # Distributed Request ID Propagation
-
-## Related Issues
-
-- GitHub: #8001 (Request ID Propagation - Draft)
-- GitHub: #8160 (Non-HTTP Entry Points - Merged)
 
 ## Abstract
 
@@ -36,7 +32,7 @@ Without a unified request ID tracing system:
 Several components have partial implementations:
 - Manager uses `request_id_middleware` for HTTP requests
 - Agent extracts `request_id` from RPC body but has multiple registry versions
-- PR #8160 added `@ensure_request_id` for background tasks
+- Some background tasks generate request IDs, but coverage is incomplete
 - App-Proxy has custom (non-standard) request ID handling
 
 This fragmented approach leads to:
@@ -86,8 +82,8 @@ This fragmented approach leads to:
           │                                │
           ▼                                ▼
     ┌─────────────┐                 ┌─────────────────┐
-    │   Manager   │                 │ @ensure_request │
-    │ middleware  │                 │      _id        │
+    │    HTTP     │                 │   Auto-generate │
+    │ middleware  │                 │   request_id    │
     └──────┬──────┘                 └────────┬────────┘
            │                                 │
            ▼                                 ▼
@@ -234,7 +230,5 @@ Existing services already use `X-Request-ID` header - no breaking changes.
 
 ## References
 
-- [PR #8001: Request ID Propagation](https://github.com/lablup/backend.ai/pull/8001)
-- [PR #8160: Non-HTTP Entry Points](https://github.com/lablup/backend.ai/pull/8160)
 - [OpenTelemetry Trace Context](https://www.w3.org/TR/trace-context/)
 - [BEP-1002: Agent Architecture](./BEP-1002-agent-architecture.md)

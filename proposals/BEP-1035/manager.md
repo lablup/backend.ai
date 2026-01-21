@@ -26,18 +26,19 @@ The middleware automatically:
 
 ### Background Tasks
 
-Background tasks use the `@ensure_request_id` decorator:
+Background tasks that don't originate from HTTP requests need to generate their own request IDs.
+The `@with_request_id_context` decorator automatically generates a request ID if one doesn't exist:
 
 ```python
-from ai.backend.common.logging_utils import ensure_request_id
+from ai.backend.common.logging_utils import with_request_id_context
 
-@ensure_request_id
+@with_request_id_context
 async def cleanup_stale_sessions() -> None:
     """Periodic background task."""
     log.info("Running cleanup")  # Has request_id for tracing
     # ...
 
-@ensure_request_id
+@with_request_id_context
 async def process_pending_operations() -> None:
     """Background worker processing queue."""
     # ...
@@ -261,8 +262,8 @@ Client                    Manager               Storage-Proxy
 - [ ] Verify all sub-apps have middleware
 
 ### Background Tasks
-- [x] `@ensure_request_id` on cleanup tasks (PR #8160)
-- [x] `@ensure_request_id` on background workers (PR #8160)
+- [ ] Apply `@with_request_id_context` to cleanup tasks
+- [ ] Apply `@with_request_id_context` to background workers
 - [ ] Audit all background entry points
 
 ### Outbound Calls
@@ -280,7 +281,7 @@ Client                    Manager               Storage-Proxy
 ### Current State
 
 1. `request_id_middleware` is applied to Manager HTTP app
-2. PR #8160 added `@ensure_request_id` to background tasks
+2. Background tasks partially have request ID generation
 3. Agent RPC calls partially propagate request_id (depends on Agent version)
 
 ### Required Changes

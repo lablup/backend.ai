@@ -109,17 +109,17 @@ def receive_request_id(headers: Mapping[str, Any]) -> str:
     return request_id
 ```
 
-### `@ensure_request_id` Decorator
+### `@with_request_id_context` Decorator
 
-Ensures a request ID exists for non-HTTP entry points:
+Ensures a request ID exists for non-HTTP entry points (background tasks, event handlers, etc.):
 
 ```python
 from functools import wraps
 
-def ensure_request_id(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+def with_request_id_context(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     """
     Decorator that ensures a request ID is present in the context.
-    If no request ID exists, generates a new one.
+    If no request ID exists, generates a new one automatically.
     
     Use this for:
     - Background task handlers
@@ -128,7 +128,7 @@ def ensure_request_id(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaita
     - Any async entry point that doesn't go through HTTP middleware
     
     Example:
-        @ensure_request_id
+        @with_request_id_context
         async def handle_background_task():
             # request_id is guaranteed to be set
             log.info("Processing task")
@@ -258,7 +258,7 @@ async def produce_event(event: Event) -> None:
     await producer.send(event, metadata=metadata)
 
 # When consuming events
-@ensure_request_id
+@with_request_id_context
 async def handle_event(event: Event, metadata: MessageMetadata) -> None:
     if metadata.request_id:
         _request_id_var.set(metadata.request_id)
@@ -318,7 +318,7 @@ async def create_session(request: web.Request) -> web.Response:
 ### Pattern 2: Background Task
 
 ```python
-@ensure_request_id
+@with_request_id_context
 async def cleanup_expired_sessions() -> None:
     """Background task that runs periodically."""
     log.info("Starting cleanup")  # Has request_id for tracing
@@ -358,7 +358,7 @@ async def call_storage_proxy(operation: str, params: dict) -> dict:
 - [x] `current_request_id()` function
 - [x] `new_request_id()` function  
 - [x] `bind_request_id()` context manager
-- [x] `@ensure_request_id` decorator
+- [ ] `@with_request_id_context` decorator
 - [x] `request_id_middleware` for aiohttp
 - [ ] `RPCHeaders` Pydantic model (to be added)
 - [ ] `receive_request_id()` utility (to be added)
