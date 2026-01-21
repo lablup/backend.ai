@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.7 (2026-01-21)
+
+### Fixes
+* Clients can now correctly fetch null quota scopes when a scope does not exist, instead of encountering an error ([#6227](https://github.com/lablup/backend.ai/issues/6227))
+* Fix `unified_config` incorrectly assigned as tuple in `ServiceConfigNode.load` ([#7635](https://github.com/lablup/backend.ai/issues/7635))
+* Fix `modify_keypair_resource_policy` ignores empty JSON for `total_resource_slots` ([#7658](https://github.com/lablup/backend.ai/issues/7658))
+* Add defensive error checker and command validity flag for vfolder rm op. ([#7806](https://github.com/lablup/backend.ai/issues/7806))
+* Add missing `startup_command` field when creating a session. ([#7807](https://github.com/lablup/backend.ai/issues/7807))
+* Fix duplicated status field in vfolder CLI list causing zip strict mode error ([#7826](https://github.com/lablup/backend.ai/issues/7826))
+* Fix incorrect use of `asyncio.create_task()` with `run_in_executor()` in `BaseVolume.add_file` ([#7921](https://github.com/lablup/backend.ai/issues/7921))
+* Fix invalid moving statistics utilization values caused by counter reset ([#8124](https://github.com/lablup/backend.ai/issues/8124))
+* Add None check for optional GraphQL fields to prevent TypeError ([#8142](https://github.com/lablup/backend.ai/issues/8142))
+
+### Documentation Updates
+* Clarify X-Forwarded-URL header configuration in `router.yaml` for Apollo Router (GraphQL Federation) ([#7871](https://github.com/lablup/backend.ai/issues/7871))
+
+
 ## 25.15.6 (2025-12-29)
 
 ### Features
