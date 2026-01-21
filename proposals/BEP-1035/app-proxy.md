@@ -10,8 +10,9 @@ App-Proxy consists of two components:
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  HTTP Request             │                           │                       │
-   │  X-Backend-Request-ID     │                           │                       │
    ├──────────────────────────▶│                           │                       │
+   │                           │                           │                       │
+   │              middleware generates request_id          │                       │
    │                           │                           │                       │
    │                           │  Route to Worker          │                       │
    │                           │  X-Backend-Request-ID     │                       │
@@ -23,6 +24,7 @@ Client                    Coordinator                   Worker                  
    │                           │                           │                       │
    │                           │                           │◀──────────────────────┤
    │                           │◀──────────────────────────┤                       │
+   │  X-Backend-Request-ID     │                           │                       │
    │◀──────────────────────────┤                           │                       │
 ```
 
@@ -62,8 +64,9 @@ For long-lived connections:
 Client                    Coordinator                   Worker                    App
    │                           │                           │                       │
    │  POST /apps/jupyter       │                           │                       │
-   │  X-Backend-Request-ID     │                           │                       │
    ├──────────────────────────▶│                           │                       │
+   │                           │                           │                       │
+   │          middleware generates request_id              │                       │
    │                           │                           │                       │
    │                           │  POST /proxy              │                       │
    │                           │  X-Backend-Request-ID     │                       │
@@ -75,6 +78,7 @@ Client                    Coordinator                   Worker                  
    │                           │                           │                       │
    │                           │                           │◀──────────────────────┤
    │                           │◀──────────────────────────┤                       │
+   │  X-Backend-Request-ID     │                           │                       │
    │◀──────────────────────────┤                           │                       │
 ```
 
@@ -84,10 +88,12 @@ Client                    Coordinator                   Worker                  
 Client                    Coordinator                   Worker
    │                           │                           │
    │  WS Upgrade               │                           │
-   │  X-Backend-Request-ID     │                           │
    ├──────────────────────────▶│                           │
    │                           │                           │
+   │          middleware generates request_id              │
+   │                           │                           │
    │  WS Established           │                           │
+   │  X-Backend-Request-ID     │                           │
    │◀──────────────────────────┤                           │
    │                           │                           │
    │  WS Message               │                           │

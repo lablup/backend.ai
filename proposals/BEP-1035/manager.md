@@ -47,33 +47,15 @@ Include `X-Backend-Request-ID` header in all outbound HTTP requests.
 
 ## Request Flow
 
-```
-Client                    Manager                    Agent
-   │                         │                         │
-   │  POST /sessions         │                         │
-   │  X-Backend-Request-ID   │                         │
-   ├────────────────────────▶│                         │
-   │                         │                         │
-   │                         │  RPC: create_kernel     │
-   │                         │  headers.request_id     │
-   │                         ├────────────────────────▶│
-   │                         │                         │
-   │                         │◀────────────────────────┤
-   │                         │                         │
-   │  X-Backend-Request-ID   │                         │
-   │◀────────────────────────┤                         │
-```
-
-## Request Flow
-
 ### Session Creation
 
 ```
 Client                    Manager                    Agent
    │                         │                         │
    │  POST /sessions         │                         │
-   │  X-Backend-Request-ID   │                         │
    ├────────────────────────▶│                         │
+   │                         │                         │
+   │               middleware generates request_id     │
    │                         │                         │
    │                         │  RPC: create_kernel     │
    │                         │  headers.request_id     │
@@ -91,8 +73,9 @@ Client                    Manager                    Agent
 Client                    Manager               Storage-Proxy
    │                         │                         │
    │  POST /folders/upload   │                         │
-   │  X-Backend-Request-ID   │                         │
    ├────────────────────────▶│                         │
+   │                         │                         │
+   │               middleware generates request_id     │
    │                         │                         │
    │                         │  POST /upload           │
    │                         │  X-Backend-Request-ID   │
@@ -100,6 +83,7 @@ Client                    Manager               Storage-Proxy
    │                         │                         │
    │                         │◀────────────────────────┤
    │                         │                         │
+   │  X-Backend-Request-ID   │                         │
    │◀────────────────────────┤                         │
 ```
 
