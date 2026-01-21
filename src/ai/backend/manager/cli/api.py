@@ -133,6 +133,9 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
     help="Generate strawberry based v2 GraphQL schema (default: False)",
 )
 def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+    """
+    Generates GraphQL schema of Backend.AI API.
+    """
     if v2:
         asyncio.run(generate_strawberry_gql_schema(output))
     else:
