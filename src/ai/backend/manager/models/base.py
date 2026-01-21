@@ -1,58 +1,41 @@
 from __future__ import annotations
 
-import asyncio
-import collections
 import enum
-import functools
+import json
 import logging
-import sys
 import uuid
+from collections.abc import (
+    Callable,
+    Mapping,
+    Sequence,
+)
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
-    Dict,
+    Final,
     Generic,
-    Iterable,
-    List,
-    Mapping,
-    MutableMapping,
-    NamedTuple,
     Optional,
-    Protocol,
     Self,
-    Sequence,
-    Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
 
-import graphene
 import sqlalchemy as sa
 import trafaret as t
 import yarl
-from aiodataloader import DataLoader
-from aiotools import apartial
-from graphene.types import Scalar
-from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql import Undefined
-from graphql.language import ast  # pants: no-infer-dep
+from dateutil.parser import isoparse
+from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
-from sqlalchemy.engine.result import Result
-from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
 
+from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     EndpointId,
@@ -65,28 +48,16 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
-
-from .. import models
-from ..api.exceptions import GenericForbidden, InvalidAPIParameters
-from .gql_relay import (
-    AsyncListConnectionField,
-    AsyncNode,
-    ConnectionPaginationOrder,
-)
-from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.models.hasher.types import PasswordInfo
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
 
-    from .gql import GraphQueryContext
-    from .user import UserRole
-
-SAFE_MIN_INT = -9007199254740991
-SAFE_MAX_INT = 9007199254740991
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -100,6 +71,28 @@ metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
 
+# Subpackages to skip when dynamically importing model modules
+_SKIP_SUBPACKAGES: Final[frozenset[str]] = frozenset({"alembic", "hasher", "minilang", "rbac"})
+
+
+def ensure_all_tables_registered() -> None:
+    """
+    Import all model modules to register their tables with the shared metadata.
+
+    Call this function before using `metadata` for operations that require
+    all tables to be registered (e.g., schema creation, fixture population).
+    """
+    import importlib
+    import pkgutil
+
+    import ai.backend.manager.models
+
+    for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
+        if module_info.name in _SKIP_SUBPACKAGES:
+            continue
+        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+
+
 pgsql_connect_opts = {
     "server_settings": {
         "jit": "off",
@@ -108,6 +101,8 @@ pgsql_connect_opts = {
         "idle_in_transaction_session_timeout": "60000",  # 60 secs
     },
 }
+
+DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 # helper functions
@@ -122,6 +117,7 @@ class FixtureOpModes(enum.StrEnum):
 
 T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
 class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
@@ -152,13 +148,13 @@ class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
     def python_type(self):
@@ -193,17 +189,17 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **kw) -> type[Self]:
-        return EnumValueType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_Enum:
-        return self._enum_class
+    def python_type(self) -> type[T_Enum]:
+        return self._enum_cls
 
 
 class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
@@ -214,9 +210,12 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(
+        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts
+    ) -> None:
         self._opts = opts
-        super().__init__(length=64, **opts)
+        super().__init__(length=length, **opts)
+        self._use_name = use_name
         self._enum_cls = enum_cls
 
     def process_bind_param(
@@ -224,21 +223,29 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         value: Optional[T_StrEnum],
         dialect: Dialect,
     ) -> Optional[str]:
-        return value.value if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return value.name
+        return value.value
 
     def process_result_value(
         self,
-        value: str,
+        value: Optional[str],
         dialect: Dialect,
     ) -> Optional[T_StrEnum]:
-        return self._enum_cls(value) if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return self._enum_cls[value]
+        return self._enum_cls(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_StrEnum:
-        return self._enum_class
+    def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
 
 
 class CurvePublicKeyColumn(TypeDecorator):
@@ -349,9 +356,8 @@ class StructuredJSONColumn(TypeDecorator):
 
     def load_dialect_impl(self, dialect: Dialect):
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON)
-        else:
-            return super().load_dialect_impl(dialect)
+            return dialect.type_descriptor(sa.JSON())
+        return super().load_dialect_impl(dialect)
 
     def process_bind_param(
         self,
@@ -378,8 +384,8 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectColumn(TypeDecorator):
@@ -390,7 +396,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -400,8 +406,8 @@ class StructuredJSONObjectColumn(TypeDecorator):
     def process_result_value(self, value, dialect):
         return self._schema.from_json(value)
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
 class StructuredJSONObjectListColumn(TypeDecorator):
@@ -413,9 +419,12 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
+
+    def coerce_compared_value(self, op, value):
+        return JSONB()
 
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
@@ -425,8 +434,80 @@ class StructuredJSONObjectListColumn(TypeDecorator):
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **kw) -> type[Self]:
-        return StructuredJSONObjectListColumn(self._schema)
+    def copy(self, **kw) -> Self:
+        return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
+
+
+class PydanticColumn(TypeDecorator, Generic[TBaseModel]):
+    """
+    A column type for storing a single Pydantic model in JSONB.
+    Handles nullable columns - returns None for null values.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: type[TBaseModel]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def process_bind_param(
+        self,
+        value: TBaseModel | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | None:
+        # JSONB accepts Python objects directly, not JSON strings
+        if value is not None:
+            return value.model_dump(mode="json")
+        return None
+
+    def process_result_value(
+        self,
+        value: dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> TBaseModel | None:
+        # JSONB returns already parsed Python objects, not strings
+        if value is not None:
+            return self._schema.model_validate(value)
+        return None
+
+    def copy(self, **kw) -> Self:
+        return PydanticColumn(self._schema)  # type: ignore[return-value]
+
+
+class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
+    """
+    A column type for storing a list of Pydantic models in JSONB.
+    Always returns empty list instead of None for null values.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: type[TBaseModel]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def coerce_compared_value(self, op, value):
+        return JSONB()
+
+    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> list:
+        # JSONB accepts Python objects directly, not JSON strings
+        if value is not None:
+            return [item.model_dump(mode="json") for item in value]
+        return []
+
+    def process_result_value(self, value: list | str | None, dialect) -> list[TBaseModel]:
+        # JSONB returns already parsed Python objects, not strings
+        # Handle case where value is stored as JSON string (legacy data)
+        if value is not None:
+            if isinstance(value, str):
+                value = json.loads(value)
+            return [self._schema.model_validate(item) for item in value]
+        return []
+
+    def copy(self, **kw) -> Self:
+        return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
 class URLColumn(TypeDecorator):
@@ -434,7 +515,7 @@ class URLColumn(TypeDecorator):
     A column type for URL strings
     """
 
-    impl = sa.types.UnicodeText
+    impl = UnicodeText
     cache_ok = True
 
     def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
@@ -443,8 +524,7 @@ class URLColumn(TypeDecorator):
     def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
-        if value is not None:
-            return yarl.URL(value)
+        return yarl.URL(value)
 
 
 class IPColumn(TypeDecorator):
@@ -478,26 +558,26 @@ class PermissionListColumn(TypeDecorator):
     impl = ARRAY
     cache_ok = True
 
-    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+    def __init__(self, perm_type: type[AbstractPermission]) -> None:
         super().__init__(sa.String)
         self._perm_type = perm_type
 
     @overload
     def process_bind_param(
         self, value: Sequence[AbstractPermission], dialect: Dialect
-    ) -> List[str]: ...
+    ) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect: Dialect) -> list[str]: ...
 
     def process_bind_param(
         self,
         value: Sequence[AbstractPermission] | Sequence[str] | None,
         dialect: Dialect,
-    ) -> List[str]:
+    ) -> list[str]:
         if value is None:
             return []
         try:
@@ -512,7 +592,7 @@ class PermissionListColumn(TypeDecorator):
     ) -> set[AbstractPermission]:
         if value is None:
             return set()
-        return set(self._perm_type(perm) for perm in value)
+        return {self._perm_type(perm) for perm in value}
 
 
 class VFolderHostPermissionColumn(TypeDecorator):
@@ -532,7 +612,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return {}
         return {
-            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_bind_param(perms, dialect) for host, perms in value.items()
         }
 
     def process_result_value(
@@ -543,7 +623,8 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+            host: self.perm_col.process_result_value(perms, dialect)
+            for host, perms in value.items()
         })
 
 
@@ -552,66 +633,101 @@ class CurrencyTypes(enum.Enum):
     USD = "USD"
 
 
-UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
+TUUIDSubType = TypeVar("TUUIDSubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[UUID_SubType]):
+class GUID(TypeDecorator, Generic[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
     """
 
     impl = CHAR
-    uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
+    uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
-        else:
-            return dialect.type_descriptor(CHAR(16))
+        return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
+    def process_bind_param(self, value: Any | None, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
         if value is None:
             return value
-        elif dialect.name == "postgresql":
+        if dialect.name == "postgresql":
             if isinstance(value, uuid.UUID):
                 return str(value)
-            else:
-                return str(uuid.UUID(value))
-        else:
-            if isinstance(value, uuid.UUID):
-                return value.bytes
-            else:
-                return uuid.UUID(value).bytes
+            return str(uuid.UUID(value))
+        if isinstance(value, uuid.UUID):
+            return value.bytes
+        return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> Optional[UUID_SubType]:
+    def process_result_value(self, value: Any, dialect) -> Optional[TUUIDSubType]:
         if value is None:
             return value
-        else:
-            cls = type(self)
-            if isinstance(value, bytes):
-                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
-            else:
-                return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+        cls = type(self)
+        if isinstance(value, bytes):
+            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+        # Handle asyncpg's UUID type (asyncpg.pgproto.pgproto.UUID) and standard uuid.UUID
+        # Both have a 'bytes' attribute, so we can use it to construct a standard uuid.UUID
+        if hasattr(value, "bytes"):
+            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value.bytes)))
+        return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
+
+
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for slug type string
+    """
+
+    impl = Unicode
+    cache_ok = True
+
+    def __init__(
+        self,
+        *,
+        length: int | None = None,
+        allow_dot: bool = False,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
+    ) -> None:
+        super().__init__(length=length)
+        self._tx_slug = tx.Slug(
+            max_length=length,
+            allow_dot=allow_dot,
+            allow_space=allow_space,
+            allow_unicode=allow_unicode,
+        )
+
+    def coerce_compared_value(self, op, value):
+        return Unicode()
+
+    def process_bind_param(self, value: Any | None, dialect) -> str | None:
+        if value is None:
+            return value
+        try:
+            self._tx_slug.check(value)
+        except t.DataError as e:
+            raise ValueError(e.error, value)
+        return value
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
-    uuid_subtype_func = EndpointId
+    uuid_subtype_func = lambda v: EndpointId(v)
     cache_ok = True
 
 
 class SessionIDColumnType(GUID[SessionId]):
-    uuid_subtype_func = SessionId
+    uuid_subtype_func = lambda v: SessionId(v)
     cache_ok = True
 
 
 class KernelIDColumnType(GUID[KernelId]):
-    uuid_subtype_func = KernelId
+    uuid_subtype_func = lambda v: KernelId(v)
     cache_ok = True
 
 
@@ -641,575 +757,84 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
-class DataLoaderManager:
-    """
-    For every different combination of filtering conditions, we need to make a
-    new DataLoader instance because it "batches" the database queries.
-    This manager get-or-creates dataloaders with fixed conditions (represetned
-    as arguments) like a cache.
-
-    NOTE: Just like DataLoaders, it is recommended to instantiate this manager
-    for every incoming API request.
-    """
-
-    cache: Dict[int, DataLoader]
-
-    def __init__(self) -> None:
-        self.cache = {}
-        self.mod = sys.modules["ai.backend.manager.models"]
-
-    @staticmethod
-    def _get_key(otname: str, args, kwargs) -> int:
-        """
-        Calculate the hash of the all arguments and keyword arguments.
-        """
-        key = (otname,) + args
-        for item in kwargs.items():
-            key += item
-        return hash(key)
-
-    def get_loader(
-        self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
-    ) -> DataLoader:
-        k = self._get_key(objtype_name, args, kwargs)
-        loader = self.cache.get(k)
-        if loader is None:
-            objtype_name, has_variant, variant_name = objtype_name.partition(".")
-            objtype = getattr(self.mod, objtype_name)
-            if has_variant:
-                batch_load_fn = getattr(objtype, "batch_load_" + variant_name)
-            else:
-                batch_load_fn = objtype.batch_load
-            loader = DataLoader(
-                apartial(batch_load_fn, context, *args, **kwargs),
-                max_batch_size=128,
-            )
-            self.cache[k] = loader
-        return loader
-
-
-class ResourceLimit(graphene.ObjectType):
-    key = graphene.String()
-    min = graphene.String()
-    max = graphene.String()
-
-
-class KVPair(graphene.ObjectType):
-    key = graphene.String()
-    value = graphene.String()
-
-
-class ResourceLimitInput(graphene.InputObjectType):
-    key = graphene.String()
-    min = graphene.String()
-    max = graphene.String()
-
-
-class KVPairInput(graphene.InputObjectType):
-    key = graphene.String()
-    value = graphene.String()
-
-
-class BigInt(Scalar):
-    """
-    BigInt is an extension of the regular graphene.Int scalar type
-    to support integers outside the range of a signed 32-bit integer.
-    """
-
-    @staticmethod
-    def coerce_bigint(value):
-        num = int(value)
-        if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-            raise ValueError("Cannot serialize integer out of the safe range.")
-        if not (MIN_INT <= num <= MAX_INT):
-            # treat as float
-            return float(int(num))
-        return num
-
-    serialize = coerce_bigint
-    parse_value = coerce_bigint
-
-    @staticmethod
-    def parse_literal(node):
-        if isinstance(node, ast.IntValue):
-            num = int(node.value)
-            if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-                raise ValueError("Cannot parse integer out of the safe range.")
-            if not (MIN_INT <= num <= MAX_INT):
-                # treat as float
-                return float(int(num))
-            return num
-
-
-class Item(graphene.Interface):
-    id = graphene.ID()
-
-
-class PaginatedList(graphene.Interface):
-    items = graphene.List(Item, required=True)
-    total_count = graphene.Int(required=True)
-
-
-# ref: https://github.com/python/mypy/issues/1212
-_GenericSQLBasedGQLObject = TypeVar("_GenericSQLBasedGQLObject", bound="_SQLBasedGQLObject")
-_Key = TypeVar("_Key")
-
-
-class _SQLBasedGQLObject(Protocol):
-    @classmethod
-    def from_row(
-        cls: Type[_GenericSQLBasedGQLObject],
-        ctx: GraphQueryContext,
-        row: Row,
-    ) -> _GenericSQLBasedGQLObject: ...
-
-
-async def batch_result(
-    graph_ctx: GraphQueryContext,
-    db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
-    """
-    A batched query adaptor for (key -> item) resolving patterns.
-    """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
-    for key in key_list:
-        objs_per_key[key] = None
-    if isinstance(db_conn, SASession):
-        stream_func = db_conn.stream_scalars
-    else:
-        stream_func = db_conn.stream
-    async for row in await stream_func(query):
-        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
-    return [*objs_per_key.values()]
-
-
-async def batch_multiresult(
-    graph_ctx: GraphQueryContext,
-    db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
-    """
-    A batched query adaptor for (key -> [item]) resolving patterns.
-    """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
-    for key in key_list:
-        objs_per_key[key] = list()
-    if isinstance(db_conn, SASession):
-        stream_func = db_conn.stream_scalars
-    else:
-        stream_func = db_conn.stream
-    async for row in await stream_func(query):
-        objs_per_key[key_getter(row)].append(
-            obj_type.from_row(graph_ctx, row),
-        )
-    return [*objs_per_key.values()]
-
-
-async def batch_result_in_session(
-    graph_ctx: GraphQueryContext,
-    db_sess: SASession,
-    query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
-    """
-    A batched query adaptor for (key -> item) resolving patterns.
-    stream the result in async session.
-    """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
-    for key in key_list:
-        objs_per_key[key] = None
-    async for row in await db_sess.stream(query):
-        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
-    return [*objs_per_key.values()]
-
-
-async def batch_multiresult_in_session(
-    graph_ctx: GraphQueryContext,
-    db_sess: SASession,
-    query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
-    """
-    A batched query adaptor for (key -> [item]) resolving patterns.
-    stream the result in async session.
-    """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
-    for key in key_list:
-        objs_per_key[key] = list()
-    async for row in await db_sess.stream(query):
-        objs_per_key[key_getter(row)].append(
-            obj_type.from_row(graph_ctx, row),
-        )
-    return [*objs_per_key.values()]
-
-
-def privileged_query(required_role: UserRole):
-    def wrap(func):
-        @functools.wraps(func)
-        async def wrapped(
-            root: Any,
-            info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
-        ) -> Any:
-            from .user import UserRole
-
-            ctx: GraphQueryContext = info.context
-            if ctx.user["role"] != UserRole.SUPERADMIN:
-                raise GenericForbidden("superadmin privilege required")
-            return await func(root, info, *args, **kwargs)
-
-        return wrapped
-
-    return wrap
-
-
-def scoped_query(
-    *,
-    autofill_user: bool = False,
-    user_key: str = "access_key",
-):
-    """
-    Prepends checks for domain/group/user access rights depending
-    on the client's user and keypair information.
-
-    :param autofill_user: When the *user_key* is not specified,
-        automatically fills out the user data with the current
-        user who is makeing the API request.
-    :param user_key: The key used for storing user identification value
-        in the keyword arguments.
-    """
-
-    def wrap(resolve_func):
-        @functools.wraps(resolve_func)
-        async def wrapped(
-            root: Any,
-            info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
-        ) -> Any:
-            from .user import UserRole
-
-            ctx: GraphQueryContext = info.context
-            client_role = ctx.user["role"]
-            if user_key == "access_key":
-                client_user_id = ctx.access_key
-            elif user_key == "email":
-                client_user_id = ctx.user["email"]
-            else:
-                client_user_id = ctx.user["uuid"]
-            client_domain = ctx.user["domain_name"]
-            domain_name = kwargs.get("domain_name", None)
-            group_id = kwargs.get("group_id", None)
-            user_id = kwargs.get(user_key, None)
-            if client_role == UserRole.SUPERADMIN:
-                if autofill_user:
-                    if user_id is None:
-                        user_id = client_user_id
-            elif client_role == UserRole.ADMIN:
-                if domain_name is not None and domain_name != client_domain:
-                    raise GenericForbidden
-                domain_name = client_domain
-                if group_id is not None:
-                    # TODO: check if the group is a member of the domain
-                    pass
-                if autofill_user:
-                    if user_id is None:
-                        user_id = client_user_id
-            elif client_role == UserRole.USER:
-                if domain_name is not None and domain_name != client_domain:
-                    raise GenericForbidden
-                domain_name = client_domain
-                if group_id is not None:
-                    # TODO: check if the group is a member of the domain
-                    # TODO: check if the client is a member of the group
-                    pass
-                if user_id is not None and user_id != client_user_id:
-                    raise GenericForbidden
-                user_id = client_user_id
-            else:
-                raise InvalidAPIParameters("Unknown client role")
-            kwargs["domain_name"] = domain_name
-            if group_id is not None:
-                kwargs["group_id"] = group_id
-            if kwargs.get("project", None) is not None:
-                kwargs["project"] = group_id
-            kwargs[user_key] = user_id
-            return await resolve_func(root, info, *args, **kwargs)
-
-        return wrapped
-
-    return wrap
-
-
-def privileged_mutation(required_role, target_func=None):
-    def wrap(func):
-        @functools.wraps(func)
-        async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
-            from .group import groups  # , association_groups_users
-            from .user import UserRole
-
-            ctx: GraphQueryContext = info.context
-            permitted = False
-            if required_role == UserRole.SUPERADMIN:
-                if ctx.user["role"] == required_role:
-                    permitted = True
-            elif required_role == UserRole.ADMIN:
-                if ctx.user["role"] == UserRole.SUPERADMIN:
-                    permitted = True
-                elif ctx.user["role"] == UserRole.USER:
-                    permitted = False
-                else:
-                    if target_func is None:
-                        return cls(False, "misconfigured privileged mutation: no target_func", None)
-                    target_domain, target_group = target_func(*args, **kwargs)
-                    if target_domain is None and target_group is None:
-                        return cls(
-                            False,
-                            "misconfigured privileged mutation: "
-                            "both target_domain and target_group missing",
-                            None,
-                        )
-                    permit_chains = []
-                    if target_domain is not None:
-                        if ctx.user["domain_name"] == target_domain:
-                            permit_chains.append(True)
-                    if target_group is not None:
-                        async with ctx.db.begin() as conn:
-                            # check if the group is part of the requester's domain.
-                            query = groups.select().where(
-                                (groups.c.id == target_group)
-                                & (groups.c.domain_name == ctx.user["domain_name"]),
-                            )
-                            result = await conn.execute(query)
-                            if result.rowcount > 0:
-                                permit_chains.append(True)
-                            # TODO: check the group permission if implemented
-                            # query = (
-                            #     association_groups_users.select()
-                            #     .where(association_groups_users.c.group_id == target_group)
-                            # )
-                            # result = await conn.execute(query)
-                            # if result.rowcount > 0:
-                            #     permit_chains.append(True)
-                    permitted = all(permit_chains) if permit_chains else False
-            elif required_role == UserRole.USER:
-                permitted = True
-            # assuming that mutation result objects has 2 or 3 fields:
-            # success(bool), message(str) - usually for delete mutations
-            # success(bool), message(str), item(object)
-            if permitted:
-                return await func(cls, root, info, *args, **kwargs)
-            return cls(False, f"no permission to execute {info.path[0]}")
-
-        return wrapped
-
-    return wrap
-
-
-ResultType = TypeVar("ResultType", bound=graphene.ObjectType)
-ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
-
-
-async def simple_db_mutate(
-    result_cls: Type[ResultType],
-    graph_ctx: GraphQueryContext,
-    mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
-    *,
-    pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[None]] | None = None,
-) -> ResultType:
-    """
-    Performs a database mutation based on the given
-    :class:`sqlalchemy.sql.Update` or :class:`sqlalchemy.sql.Insert` query,
-    and return the wrapped result as the GraphQL object type given as **result_cls**.
-    **result_cls** should have two initialization arguments: success (bool)
-    and message (str).
-
-    See details about the arguments in :func:`simple_db_mutate_returning_item`.
-    """
-    raw_query = "(unknown)"
-
-    async def _do_mutate() -> ResultType:
-        nonlocal raw_query
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            raw_query = str(_query)
-            result = await conn.execute(_query)
-            if post_func:
-                await post_func(conn, result)
-        if result.rowcount > 0:
-            return result_cls(True, "success")
-        else:
-            return result_cls(False, f"no matching {result_cls.__name__.lower()}")
-
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}")
-    except sa.exc.StatementError as e:
-        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate(): other error")
-        return result_cls(False, f"unexpected error: {e}")
-
-
-async def simple_db_mutate_returning_item(
-    result_cls: Type[ResultType],
-    graph_ctx: GraphQueryContext,
-    mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
-    *,
-    item_cls: Type[ItemType],
-    pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[Row]] | None = None,
-) -> ResultType:
-    """
-    Performs a database mutation based on the given
-    :class:`sqlalchemy.sql.Update` or :class:`sqlalchemy.sql.Insert` query,
-    and return the wrapped result as the GraphQL object type given as **result_cls**
-    and the inserted/updated row wrapped as its 3rd argument in **item_cls**.
-
-    If mutation_query uses external variable updated by pre_func, you should wrap the query
-    with lambda so that its parameters are re-evaluated when the transaction is retried.
-
-    :param result_cls: The GraphQL Object Type used to wrap the result.
-        It should have two initialization arguments: success (bool),
-        message (str), and the item (ItemType).
-    :param graph_ctx: The common context that provides the reference to the database engine
-        and other stuffs required to resolve the GraphQL query.
-    :param mutation_query: A SQLAlchemy query object.
-    :param item_cls: The GraphQL Object Type used to wrap the returned row from the mutation query.
-    :param pre_func: An extra function that is executed before the mutation query, where the caller
-        may perform additional database queries.
-    :param post_func: An extra function that is executed after the mutation query, where the caller
-        may perform additional database queries.  Note that it **MUST return the returned row
-        from the given mutation result**, because the result object could be fetched only one
-        time due to its cursor-like nature.
-    """
-    raw_query = "(unknown)"
-
-    async def _do_mutate() -> ResultType:
-        nonlocal raw_query
-        async with graph_ctx.db.begin() as conn:
-            if pre_func:
-                await pre_func(conn)
-            _query = mutation_query() if callable(mutation_query) else mutation_query
-            _query = _query.returning(_query.table)
-            raw_query = str(_query)
-            result = await conn.execute(_query)
-            if post_func:
-                row = await post_func(conn, result)
-            else:
-                row = result.first()
-            if result.rowcount > 0:
-                return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            else:
-                return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
-
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}", None)
-    except sa.exc.StatementError as e:
-        log.warning(
-            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
-        )
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate_returning_item(): other error")
-        return result_cls(False, f"unexpected error: {e}", None)
-
-
-def set_if_set(
-    src: object,
-    target: MutableMapping[str, Any],
-    name: str,
-    *,
-    clean_func=None,
-    target_key: Optional[str] = None,
-) -> None:
-    """
-    Set the target dict with only non-undefined keys and their values
-    from a Graphene's input object.
-    (server-side function)
-    """
-    v = getattr(src, name)
-    # NOTE: unset optional fields are passed as graphql.Undefined.
-    if v is not Undefined:
-        if callable(clean_func):
-            target[target_key or name] = clean_func(v)
-        else:
-            target[target_key or name] = v
-
-
 async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
         if table_name.startswith("__"):
             # skip reserved names like "__mode"
             continue
-        assert not isinstance(rows, str)
-        table: sa.Table = getattr(models, table_name)
-        assert isinstance(table, sa.Table)
+        if isinstance(rows, str):
+            raise DataTransformationFailed(
+                f"Invalid fixture data for table {table_name}: expected sequence, got string"
+            )
+
+        table = metadata.tables.get(table_name)
+
+        if not isinstance(table, sa.Table):
+            raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
             return
-        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
+        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
+        from .hasher.types import PasswordColumn
+
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
+                if isinstance(col.type, sa.sql.sqltypes.DateTime):
+                    for row in rows:
+                        if col.name in row:
+                            if row[col.name] is not None:
+                                row[col.name] = isoparse(row[col.name])
+                            else:
+                                row[col.name] = None
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
-                elif isinstance(col.type, EnumValueType):
+                elif isinstance(col.type, (StrEnumType, EnumValueType)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])
-                elif isinstance(
-                    col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
-                ):
+                elif isinstance(col.type, (StructuredJSONObjectColumn)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._schema.from_json(row[col.name])
+                elif isinstance(col.type, (StructuredJSONObjectListColumn)):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            row[col.name] = [
+                                item
+                                if isinstance(item, col.type._schema)
+                                else col.type._schema.from_json(item)
+                                for item in row[col.name]
+                            ]
+                elif isinstance(col.type, PasswordColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            # Convert raw password string to PasswordInfo
+                            # Using default algorithm and parameters for fixtures
+                            row[col.name] = PasswordInfo(
+                                password=row[col.name],
+                                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                                rounds=600_000,
+                                salt_size=32,
+                            )
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    stmt = sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing()
-                    await conn.execute(stmt)
+                    insert_stmt = (
+                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
+                    )
+                    await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
-                    stmt = sa.update(table)
+                    update_stmt = sa.update(table)
                     pkcols = []
                     for pkidx, pkcol in enumerate(table.primary_key):
-                        stmt = stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
+                        update_stmt = update_stmt.where(pkcol == sa.bindparam(f"_pk_{pkidx}"))
                         pkcols.append(pkcol)
                     update_data = []
                     # Extract the data column names from the FIRST row
@@ -1225,7 +850,7 @@ async def populate_fixture(
                             f"fixture for table {table_name!r} has an invalid column name: "
                             f"{e.args[0]!r}"
                         )
-                    stmt = stmt.values({
+                    update_stmt = update_stmt.values({
                         datacol.name: sa.bindparam(datacol.name) for datacol in datacols
                     })
                     for row in rows:
@@ -1247,247 +872,31 @@ async def populate_fixture(
                                     f"query: {datacol.name!r}"
                                 )
                         update_data.append(update_row)
-                    await conn.execute(stmt, update_data)
+                    await conn.execute(update_stmt, update_data)
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
-        src = graphene.String(required=True)
-        name = graphene.String(required=True)
-        repr = graphene.String(required=True)
-
-    session_id = graphene.UUID()
-
-    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
-
-
-class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type, *args, **kwargs):
-        kwargs.setdefault("filter", graphene.String())
-        kwargs.setdefault("order", graphene.String())
-        kwargs.setdefault("offset", graphene.Int())
-        super().__init__(type, *args, **kwargs)
-
-
-PaginatedConnectionField = AsyncPaginatedConnectionField
-
-
-class ConnectionArgs(NamedTuple):
-    cursor: str | None
-    pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
-
-
-def validate_connection_args(
-    *,
-    after: str | None = None,
-    first: int | None = None,
-    before: str | None = None,
-    last: int | None = None,
-) -> ConnectionArgs:
+class DecimalType(TypeDecorator, Decimal):
     """
-    Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
-    It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
-    """
-    order: ConnectionPaginationOrder | None = None
-    cursor: str | None = None
-    requested_page_size: int | None = None
-
-    if after is not None:
-        order = ConnectionPaginationOrder.FORWARD
-        cursor = after
-    if first is not None:
-        if first < 0:
-            raise ValueError("Argument 'first' must be a non-negative integer.")
-        order = ConnectionPaginationOrder.FORWARD
-        requested_page_size = first
-
-    if before is not None:
-        if order is ConnectionPaginationOrder.FORWARD:
-            raise ValueError(
-                "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
-            )
-        order = ConnectionPaginationOrder.BACKWARD
-        cursor = before
-    if last is not None:
-        if last < 0:
-            raise ValueError("Argument 'last' must be a non-negative integer.")
-        if order is ConnectionPaginationOrder.FORWARD:
-            raise ValueError(
-                "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
-            )
-        order = ConnectionPaginationOrder.BACKWARD
-        requested_page_size = last
-
-    return ConnectionArgs(cursor, order, requested_page_size)
-
-
-def _build_sql_stmt_from_connection_args(
-    info: graphene.ResolveInfo,
-    orm_class,
-    id_column: sa.Column,
-    filter_expr: FilterExprArg | None = None,
-    order_expr: OrderExprArg | None = None,
-    *,
-    connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
-    stmt = sa.select(orm_class)
-    conditions: list[WhereClauseType] = []
-
-    cursor_id, pagination_order, requested_page_size = connection_args
-
-    # Default ordering by id column
-    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
-    ordering_item_list: list[OrderingItem] = []
-    if order_expr is not None:
-        parser = order_expr.parser
-        ordering_item_list = parser.parse_order(orm_class, order_expr.expr)
-
-    # Apply SQL order_by
-    match pagination_order:
-        case ConnectionPaginationOrder.FORWARD | None:
-            set_ordering = lambda col, direction: (
-                col.asc() if direction == OrderDirection.ASC else col.desc()
-            )
-        case ConnectionPaginationOrder.BACKWARD:
-            set_ordering = lambda col, direction: (
-                col.desc() if direction == OrderDirection.ASC else col.asc()
-            )
-    # id column should be applied last
-    for col, direction in [*ordering_item_list, id_ordering_item]:
-        stmt = stmt.order_by(set_ordering(col, direction))
-
-    # Set cursor by comparing scalar values of subquery that queried by cursor id
-    if cursor_id is not None:
-        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
-                conditions.append(id_column > _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
-                )
-            case ConnectionPaginationOrder.BACKWARD:
-                conditions.append(id_column < _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
-                )
-        for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            stmt = stmt.where(set_subquery(col, subq, direction))
-
-    if requested_page_size is not None:
-        # Add 1 to determine has_next_page or has_previous_page
-        stmt = stmt.limit(requested_page_size + 1)
-
-    if filter_expr is not None:
-        condition_parser = filter_expr.parser
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
-
-    for cond in conditions:
-        stmt = stmt.where(cond)
-    return stmt, conditions
-
-
-def _build_sql_stmt_from_sql_arg(
-    info: graphene.ResolveInfo,
-    orm_class,
-    id_column: sa.Column,
-    filter_expr: FilterExprArg | None = None,
-    order_expr: OrderExprArg | None = None,
-    *,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
-    stmt = sa.select(orm_class)
-    conditions: list[WhereClauseType] = []
-
-    if order_expr is not None:
-        parser = order_expr.parser
-        stmt = parser.append_ordering(stmt, order_expr.expr)
-
-    # default order_by id column
-    stmt = stmt.order_by(id_column.asc())
-
-    if filter_expr is not None:
-        condition_parser = filter_expr.parser
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
-
-    if limit is not None:
-        stmt = stmt.limit(limit)
-
-    if offset is not None:
-        stmt = stmt.offset(offset)
-    for cond in conditions:
-        stmt = stmt.where(cond)
-    return stmt, conditions
-
-
-class GraphQLConnectionSQLInfo(NamedTuple):
-    sql_stmt: sa.sql.Select
-    sql_conditions: list[WhereClauseType]
-    cursor: str | None
-    pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
-
-
-class FilterExprArg(NamedTuple):
-    expr: str
-    parser: QueryFilterParser
-
-
-class OrderExprArg(NamedTuple):
-    expr: str
-    parser: QueryOrderParser
-
-
-def generate_sql_info_for_gql_connection(
-    info: graphene.ResolveInfo,
-    orm_class,
-    id_column: sa.Column,
-    filter_expr: FilterExprArg | None = None,
-    order_expr: OrderExprArg | None = None,
-    offset: int | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    before: str | None = None,
-    last: int | None = None,
-) -> GraphQLConnectionSQLInfo:
-    """
-    Get GraphQL arguments and generate SQL query statement, cursor that points an id of a node, pagination order, and page size.
-    If `offset` is None, return SQL query parsed from GraphQL Connection spec arguments.
-    Else, return normally paginated SQL query and `first` is used as SQL limit.
+    Database type adaptor for Decimal
     """
 
-    if offset is None:
-        connection_args = validate_connection_args(
-            after=after, first=first, before=before, last=last
-        )
-        stmt, conditions = _build_sql_stmt_from_connection_args(
-            info,
-            orm_class,
-            id_column,
-            filter_expr,
-            order_expr,
-            connection_args=connection_args,
-        )
-        return GraphQLConnectionSQLInfo(
-            stmt,
-            conditions,
-            connection_args.cursor,
-            connection_args.pagination_order,
-            connection_args.requested_page_size,
-        )
-    else:
-        page_size = first
-        stmt, conditions = _build_sql_stmt_from_sql_arg(
-            info,
-            orm_class,
-            id_column,
-            filter_expr,
-            order_expr,
-            limit=page_size,
-            offset=offset,
-        )
-        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
+    impl = sa.VARCHAR
+    cache_ok = True
+
+    def process_bind_param(
+        self,
+        value: Optional[Decimal],
+        dialect: Dialect,
+    ) -> Optional[str]:
+        return f"{value:f}" if value is not None else None
+
+    def process_result_value(
+        self,
+        value: Any | None,
+        dialect: Dialect,
+    ) -> Optional[Decimal]:
+        return Decimal(value) if value is not None else None
+
+    @property
+    def python_type(self) -> type[Decimal]:
+        return Decimal

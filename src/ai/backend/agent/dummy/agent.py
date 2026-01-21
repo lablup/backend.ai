@@ -1,47 +1,60 @@
 import asyncio
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    FrozenSet,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Tuple,
+    override,
 )
 
-from ai.backend.common.config import read_from_file
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
-    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     ServicePort,
     SessionId,
     SlotName,
     current_resource_slots,
 )
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import UnsupportedResource
-from ..kernel import AbstractKernel
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo
-from .config import DEFAULT_CONFIG_PATH, dummy_local_config
+from .config import read_dummy_config
 from .kernel import DummyKernel
-from .resources import load_resources, scan_available_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -49,23 +62,23 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
+        kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
-        local_config: Mapping[str, Any],
-        computers: MutableMapping[DeviceName, ComputerContext],
+        distro: str,
+        local_config: AgentUnifiedConfig,
+        computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
+            kenrel_image,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -73,16 +86,20 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self.dummy_config = dummy_config
         self.creation_ctx_config = self.dummy_config["kernel-creation-ctx"]
 
+    @override
     async def get_extra_envs(self) -> Mapping[str, str]:
         return {}
 
+    @override
     async def prepare_resource_spec(
         self,
-    ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
-        assert SlotName("cpu") in slots
-        assert SlotName("mem") in slots
+        if SlotName("cpu") not in slots:
+            raise UnsupportedResource("cpu slot is required")
+        if SlotName("mem") not in slots:
+            raise UnsupportedResource("mem slot is required")
         # accept unknown slot type with zero values
         # but reject if they have non-zero values.
         for st, sv in slots.items():
@@ -92,32 +109,47 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
-            slots={**slots},  # copy
+            slots=slots.copy(),
             mounts=[],
             scratch_disk_size=0,  # TODO: implement (#70)
         )
         resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
+    @override
     async def prepare_scratch(self) -> None:
         delay = self.creation_ctx_config["delay"]["prepare-scratch"]
         await asyncio.sleep(delay)
 
+    @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        return ()
+
+    @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return
 
+    @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         delay = self.creation_ctx_config["delay"]["prepare-ssh"]
         await asyncio.sleep(delay)
 
+    @override
     async def process_mounts(self, mounts: Sequence[Mount]):
         return
 
+    @override
     async def apply_accelerator_allocation(
         self,
         computer: AbstractComputePlugin,
@@ -125,6 +157,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> None:
         return
 
+    @override
     async def generate_accelerator_mounts(
         self,
         computer: AbstractComputePlugin,
@@ -132,34 +165,37 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> list[MountInfo]:
         return []
 
+    @override
     def resolve_krunner_filepath(self, filename) -> Path:
         return Path()
 
+    @override
     def get_runner_mount(
         self,
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        perm: MountPermission = MountPermission.READ_ONLY,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    @override
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
         return DummyKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
-            agent_config=self.local_config,
+            agent_config=self.local_config.model_dump(by_alias=True),
             service_ports=service_ports,
             resource_spec=resource_spec,
             environ=environ,
@@ -167,15 +203,17 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             dummy_config=self.dummy_config,
         )
 
+    @override
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
-        container_bind_host = self.local_config["container"]["bind-host"]
-        advertised_kernel_host = self.local_config["container"].get("advertised-host")
+        container_bind_host = self.local_config.container.bind_host
+        advertised_kernel_host = self.local_config.container.advertised_host
         delay = self.creation_ctx_config["delay"]["start-container"]
         await asyncio.sleep(delay)
         return {
@@ -190,6 +228,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             "block_service_ports": self.internal_data.get("block_service_ports", False),
         }
 
+    @override
     async def mount_krunner(
         self,
         resource_spec: KernelResourceSpec,
@@ -210,10 +249,10 @@ class DummyAgent(
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
-        self.dummy_config = dummy_local_config.check(raw_config)
+        self.dummy_config = read_dummy_config()
         self.dummy_agent_cfg = self.dummy_config["agent"]
 
+    @override
     async def execute(
         self,
         session_id: SessionId,
@@ -228,65 +267,119 @@ class DummyAgent(
     ):
         return {"status": "not-implemented"}
 
+    @override
+    async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
+        return {}
+
+    @override
+    async def _write_kernel_registry_to_recovery(
+        self,
+        kernel_registry: Mapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        pass
+
+    @override
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return []
 
+    @override
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
+    @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         return []
 
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config, self.dummy_config)
+    @override
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        return "ubuntu16.04"
 
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
-        )
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        #  Dummy agent does not use cgroups, so we return an empty path.
+        return Path()
 
-    async def scan_images(self) -> Mapping[str, str]:
+    @override
+    def get_cgroup_version(self) -> str:
+        # Dummy agent does not use cgroups, so we return an empty string.
+        return ""
+
+    @override
+    async def extract_image_command(self, image: str) -> str | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return {}
+        return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    @override
+    async def scan_images(self) -> ScanImagesResult:
+        delay = self.dummy_agent_cfg["delay"]["scan-image"]
+        await asyncio.sleep(delay)
+        return ScanImagesResult(scanned_images={}, removed_images={})
+
+    @override
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
+    @override
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
+        delay = self.dummy_agent_cfg["delay"]["push-image"]
+        await asyncio.sleep(delay)
+
+    @override
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
+        delay = self.dummy_agent_cfg["delay"]["purge-images"]
+        await asyncio.sleep(delay)
+        return PurgeImagesResp([])
+
+    @override
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        if (
+        return (
             existing_imgs := self.dummy_agent_cfg["image"]["already-have"]
-        ) is not None and image_ref in existing_imgs:
-            return True
-        return False
+        ) is not None and image_ref in existing_imgs
 
+    @override
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DummyKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
+            kernel_image,
             kernel_config,
+            distro,
             self.local_config,
             self.computers,
             restarting=restarting,
             dummy_config=self.dummy_config,
         )
 
+    @override
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
@@ -295,6 +388,7 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["destroy-kernel"]
         await asyncio.sleep(delay)
 
+    @override
     async def clean_kernel(
         self,
         kernel_id: KernelId,
@@ -304,14 +398,17 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["clean-kernel"]
         await asyncio.sleep(delay)
 
+    @override
     async def create_local_network(self, network_name: str) -> None:
         delay = self.dummy_agent_cfg["delay"]["create-network"]
         await asyncio.sleep(delay)
 
+    @override
     async def destroy_local_network(self, network_name: str) -> None:
         delay = self.dummy_agent_cfg["delay"]["destroy-network"]
         await asyncio.sleep(delay)
 
+    @override
     async def restart_kernel__load_config(
         self,
         kernel_id: KernelId,
@@ -320,6 +417,7 @@ class DummyAgent(
         await asyncio.sleep(0.1)
         return b""
 
+    @override
     async def restart_kernel__store_config(
         self,
         kernel_id: KernelId,

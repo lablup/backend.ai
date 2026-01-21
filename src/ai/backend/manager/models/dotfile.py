@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
@@ -12,9 +13,9 @@ if TYPE_CHECKING:
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderMount
+from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
+from ai.backend.manager.types import UserScope
 
-from ..api.exceptions import BackendError
-from ..types import UserScope
 from .domain import query_domain_dotfiles
 from .group import query_group_dotfiles
 from .keypair import keypairs
@@ -29,24 +30,26 @@ async def prepare_dotfiles(
     vfolder_mounts: Sequence[VFolderMount],
 ) -> Mapping[str, Any]:
     # Feed SSH keypair and dotfiles if exists.
-    internal_data = {}
+    internal_data: dict[str, Any] = {}
     query = (
-        sa.select([
+        sa.select(
             keypairs.c.ssh_public_key,
             keypairs.c.ssh_private_key,
             keypairs.c.dotfiles,
-        ])
+        )
         .select_from(keypairs)
         .where(keypairs.c.access_key == access_key)
     )
     result = await conn.execute(query)
     row = result.first()
-    dotfiles = msgpack.unpackb(row["dotfiles"])
+    if row is None:
+        return internal_data
+    dotfiles = msgpack.unpackb(row.dotfiles)
     internal_data.update({"dotfiles": dotfiles})
-    if row["ssh_public_key"] and row["ssh_private_key"]:
+    if row.ssh_public_key and row.ssh_private_key:
         internal_data["ssh_keypair"] = {
-            "public_key": row["ssh_public_key"],
-            "private_key": row["ssh_private_key"],
+            "public_key": row.ssh_public_key,
+            "private_key": row.ssh_private_key,
         }
     # use dotfiles in the priority of keypair > group > domain
     dotfile_paths = set(map(lambda x: x["path"], dotfiles))
@@ -75,8 +78,8 @@ async def prepare_dotfiles(
         if not dotfile_path.is_absolute():
             dotfile_path = PurePosixPath("/home/work", dotfile["path"])
         if dotfile_path in vfolder_kernel_paths:
-            raise BackendError(
-                "There is a kernel-side path from vfolders that conflicts with "
+            raise DotfileVFolderPathConflict(
+                f"There is a kernel-side path from vfolders that conflicts with "
                 f"a dotfile '{dotfile['path']}'.",
             )
 

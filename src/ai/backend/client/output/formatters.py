@@ -4,7 +4,8 @@ import decimal
 import json
 import textwrap
 from collections import defaultdict
-from typing import Any, Callable, Mapping, Optional
+from collections.abc import Callable, Mapping
+from typing import Any, Optional
 
 import humanize
 
@@ -80,13 +81,13 @@ class OutputFormatter(AbstractOutputFormatter):
             return "(null)"
         if isinstance(value, (dict, list, set)) and not value:
             return "(empty)"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return (
                 "{"
                 + ", ".join(f"{k}: {self.format_console(v, field)}" for k, v in value.items())
                 + "}"
             )
-        elif isinstance(value, (list, tuple, set)):
+        if isinstance(value, (list, tuple, set)):
             return "[" + ", ".join(self.format_console(v, field) for v in value) + "]"
         return str(value)
 
@@ -95,9 +96,9 @@ class OutputFormatter(AbstractOutputFormatter):
             return None
         if isinstance(value, decimal.Decimal):
             return str(value)
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return {k: self.format_json(v, field) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             return [self.format_json(v, field) for v in value]
         return value
 
@@ -150,13 +151,19 @@ class SubFieldOutputFormatter(OutputFormatter):
         return super().format_json(value[self._subfield_name], field)
 
 
-class CustomizedImageNameOutputFormatter(OutputFormatter):
+class CustomizedImageOutputFormatter(OutputFormatter):
     def _get_name(self, labels: Any) -> str:
         customized_name = [
             label["value"] for label in labels if label["key"] == "ai.backend.customized-image.name"
         ]
         assert len(customized_name) == 1
-        return customized_name[0]
+        owner_email = [
+            label["value"]
+            for label in labels
+            if label["key"] == "ai.backend.customized-image.user.email"
+        ]
+        assert len(owner_email) == 1
+        return f"{customized_name[0]} (Owner: {owner_email[0]})"
 
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return super().format_console(self._get_name(value), field)
@@ -304,8 +311,7 @@ class NestedObjectFormatter(OutputFormatter):
 def _fit_multiline_in_cell(text: str, indent: str) -> str:
     if "\n" in text:
         return "\n" + textwrap.indent(text, indent)
-    else:
-        return text
+    return text
 
 
 class ContainerListFormatter(NestedObjectFormatter):
@@ -319,7 +325,7 @@ class ContainerListFormatter(NestedObjectFormatter):
                 text += f"+ {item['id']}\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"
                     for f in field.subfields.values()
                     if f.field_name != "id"
                 )
@@ -337,8 +343,20 @@ class DependencyListFormatter(NestedObjectFormatter):
                 text += f"+ {item['name']} ({item['id']})\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"
                     for f in field.subfields.values()
                     if f.field_name not in ("id", "name")
                 )
         return textwrap.indent(text, indent)
+
+
+class ImageObjectFormatter(OutputFormatter):
+    """Formatter for nested image_object field, extracting the name."""
+
+    def format_console(self, value: Any, field: FieldSpec) -> str:
+        if value is None:
+            return "(none)"
+        return value.get("name") or "(unknown)"
+
+    def format_json(self, value: Any, field: FieldSpec) -> Any:
+        return value

@@ -1,4 +1,5 @@
-from typing import Any, Dict, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 import attrs
 
@@ -52,9 +53,9 @@ class KubernetesHostPathVolume(KubernetesAbstractVolume):
 
 
 class ConfigMap(AbstractAPIObject):
-    items: Dict[str, str] = {}
+    items: dict[str, str] = {}
 
-    def __init__(self, kernel_id, name: str):
+    def __init__(self, kernel_id, name: str) -> None:
         self.name = name
         self.labels = {"backend.ai/kernel-id": kernel_id}
 
@@ -74,7 +75,9 @@ class ConfigMap(AbstractAPIObject):
 
 
 class Service(AbstractAPIObject):
-    def __init__(self, kernel_id: str, name: str, container_port: list, service_type="NodePort"):
+    def __init__(
+        self, kernel_id: str, name: str, container_port: list, service_type="NodePort"
+    ) -> None:
         self.name = name
         self.deployment_name = f"kernel-{kernel_id}"
         self.container_port = container_port
@@ -82,7 +85,7 @@ class Service(AbstractAPIObject):
         self.labels = {"run": self.name, "backend.ai/kernel-id": kernel_id}
 
     def to_dict(self) -> dict:
-        base: Dict[str, Any] = {
+        base: dict[str, Any] = {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
@@ -105,13 +108,13 @@ class Service(AbstractAPIObject):
 
 
 class NFSPersistentVolume(AbstractAPIObject):
-    def __init__(self, server, name, capacity, path="/"):
+    def __init__(self, server, name, capacity, path="/") -> None:
         self.server = server
         self.path = path
         self.name = name
         self.capacity = capacity
-        self.labels = {}
-        self.options = []
+        self.labels: dict[str, str] = {}
+        self.options: list[str] = []
 
     def label(self, k, v):
         self.labels[k] = v
@@ -139,12 +142,12 @@ class NFSPersistentVolume(AbstractAPIObject):
 
 
 class HostPathPersistentVolume(AbstractAPIObject):
-    def __init__(self, path, name, capacity):
+    def __init__(self, path, name, capacity) -> None:
         self.path = path
         self.name = name
         self.capacity = capacity
-        self.labels = {}
-        self.options = []
+        self.labels: dict[str, str] = {}
+        self.options: list[str] = []
 
     def label(self, k, v):
         self.labels[k] = v
@@ -171,17 +174,17 @@ class HostPathPersistentVolume(AbstractAPIObject):
 
 
 class PersistentVolumeClaim(AbstractAPIObject):
-    def __init__(self, name, pv_name, capacity):
+    def __init__(self, name, pv_name, capacity) -> None:
         self.name = name
         self.pv_name = pv_name
         self.capacity = capacity
-        self.labels = {}
+        self.labels: dict[str, str] = {}
 
     def label(self, k, v):
         self.labels[k] = v
 
     def to_dict(self) -> dict:
-        base = {
+        return {
             "apiVersion": "v1",
             "kind": "PersistentVolumeClaim",
             "metadata": {
@@ -198,4 +201,3 @@ class PersistentVolumeClaim(AbstractAPIObject):
                 "storageClassName": "",
             },
         }
-        return base

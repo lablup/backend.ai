@@ -19,7 +19,7 @@ LG="\033[0;37m"
 NC="\033[0m"
 
 readlinkf() {
-  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  scripts/python.sh -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 usage() {
@@ -58,28 +58,29 @@ show_note() {
   echo "${BLUE}[NOTE]${NC} $1"
 }
 
-has_python() {
-  "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 0 ]; then
-    echo 0  # ok
-  else
-    echo 1  # missing
-  fi
-}
-
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 docker compose version >/dev/null 2>&1
@@ -89,20 +90,13 @@ else
   DOCKER_COMPOSE="docker-compose"
 fi
 
-show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.12.2"
-STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
-if [ $(has_python "$bpython") -ne 0 ]; then
-  show_error "Python for bootstrapping is not available!"
-  echo "Check if you have installed using the 'install-dev.sh' script."
-  exit 1
-fi
-
 INSTALL_PATH="./backend.ai-dev"
 REMOVE_VENVS=1
 REMOVE_CONTAINERS=1
 REMOVE_DB=1
+
+FORCE_YES=0
+FORCE_NO=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -110,6 +104,7 @@ while [ $# -gt 0 ]; do
     --skip-venvs)          REMOVE_VENVS=0 ;;
     --skip-containers)     REMOVE_CONTAINERS=0 ;;
     --skip-db)             REMOVE_DB=0 ;;
+    -y | --yes)            FORCE_YES=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -117,6 +112,20 @@ while [ $# -gt 0 ]; do
   esac
   shift 1
 done
+
+# Confirm before deleting all resources
+if [ $FORCE_YES -eq 1 ]; then
+  show_info "Proceeding without confirmation (--yes flag)."
+else
+  echo ""
+  echo -n "Are you sure you want to delete all development resources? [y/N]: "
+  read -r confirm
+  confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+  if [ "$confirm" != "y" ] && [ "$confirm" != "yes" ]; then
+    show_warning "Deletion cancelled."
+    exit 0
+  fi
+fi
 
 if [ $REMOVE_VENVS -eq 1 ]; then
   show_info "Removing the unified and temporary venvs..."
@@ -141,6 +150,7 @@ fi
 if [ $REMOVE_DB -eq 1 ]; then
   show_info "Removing data volumes..."
   rm -rf volumes
+  docker volume rm $(docker volume ls -q --filter 'label=com.docker.compose.project=backendai')
 fi
 
 echo ""
@@ -148,7 +158,7 @@ show_note "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
 echo "  $ rm -rf .pants.d ~/.cache/pants"
 if [ -f .pants.rc ]; then
-  echo "  \$ rm -rf $($bpython scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
+  echo "  \$ rm -rf $(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
 fi
 
 echo ""

@@ -1,0 +1,16 @@
+{
+    "container_registries": [
+        {
+            "id": "abc42a05-4471-41fa-8772-10bf6452c7d1",
+            "registry_name": "ghcr.io",
+            "url": "https://ghcr.io",
+            "type": "github",
+            "username": "<username>",
+            "password": "<github_pat>",
+            "project": "<username>",
+            "extra": {
+                "entity_type": "users"
+            }
+        }
+    ]
+}

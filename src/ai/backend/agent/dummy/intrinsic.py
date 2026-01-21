@@ -1,9 +1,25 @@
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Mapping, Sequence
+from typing import Any, Optional
 
 import aiodocker
 
+from ai.backend.agent import __version__
+from ai.backend.agent.alloc_map import AllocationStrategy
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+)
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -14,21 +30,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from .. import __version__
-from ..alloc_map import AllocationStrategy
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-)
 from .agent import Container
 
 
@@ -59,7 +60,7 @@ class CPUPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -79,7 +80,7 @@ class CPUPlugin(AbstractComputePlugin):
         }
 
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        cores = self.resource_config["cpu"]["core-indexes"]
+        num_core: int = self.resource_config["cpu"]["num-core"]
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
@@ -88,7 +89,7 @@ class CPUPlugin(AbstractComputePlugin):
                 memory_size=0,
                 processing_units=1,
             )
-            for core_idx in sorted(cores)
+            for core_idx in range(num_core)
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
@@ -210,7 +211,7 @@ class MemoryPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:

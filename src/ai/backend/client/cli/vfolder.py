@@ -16,15 +16,15 @@ from ai.backend.cli.params import (
     OptionalType,
 )
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.session import AsyncSession, Session
+from ai.backend.common.bgtask.types import BgtaskStatus
 
-from ..compat import asyncio_run
-from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .pretty import (
-    ProgressViewer,
+    ProgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -81,7 +81,19 @@ def list_allowed_types():
     "host_path",
     is_flag=True,
     help=(
+        "Deprecated since 25.4.0. Use `--unmanaged-path` instead. "
         "Treats HOST as a mount point of unmanaged virtual folder. "
+        "This option can only be used by Admin or Superadmin."
+    ),
+)
+@click.option(
+    "--unmanaged-path",
+    "unmanaged_path",
+    metavar="UNMANAGED_PATH",
+    type=str,
+    default=None,
+    help=(
+        "Map a given host path to a virtual folder. "
         "This option can only be used by Admin or Superadmin."
     ),
 )
@@ -115,7 +127,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, cloneable):
+def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -124,24 +136,15 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
     """
     with Session() as session:
         try:
-            if host_path:
-                result = session.VFolder.create(
-                    name=name,
-                    unmanaged_path=host,
-                    group=group,
-                    usage_mode=usage_mode,
-                    permission=permission,
-                    cloneable=cloneable,
-                )
-            else:
-                result = session.VFolder.create(
-                    name=name,
-                    host=host,
-                    group=group,
-                    usage_mode=usage_mode,
-                    permission=permission,
-                    cloneable=cloneable,
-                )
+            result = session.VFolder.create(
+                name=name,
+                host=host,
+                unmanaged_path=unmanaged_path,
+                group=group,
+                usage_mode=usage_mode,
+                permission=permission,
+                cloneable=cloneable,
+            )
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:
             print_error(e)
@@ -426,7 +429,7 @@ def request_download(name, filename):
     with Session() as session:
         try:
             response = json.loads(session.VFolder(name).request_download(filename))
-            print_done(f'Download token: {response["token"]}')
+            print_done(f"Download token: {response['token']}")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -538,7 +541,7 @@ def mv(name, src, dst):
 
 @vfolder.command(aliases=["delete-file"])
 @click.argument("name", type=str)
-@click.argument("filenames", nargs=-1)
+@click.argument("filenames", nargs=-1, required=True)
 @click.option("-r", "--recursive", is_flag=True, help="Enable recursive deletion of directories.")
 def rm(name, filenames, recursive):
     """
@@ -550,7 +553,7 @@ def rm(name, filenames, recursive):
 
     \b
     NAME: Name of a virtual folder.
-    FILENAMES: Paths of the files to delete.
+    FILENAMES: Paths of the files to delete (at least one required).
     """
     with Session() as session:
         try:
@@ -577,18 +580,18 @@ def ls(name, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             result = session.VFolder(name).list_files(path)
-            if "error_msg" in result and result["error_msg"]:
+            if result.get("error_msg"):
                 print_fail(result["error_msg"])
                 return
-            files = json.loads(result["files"])
+            files = result["items"]
             table = []
             headers = ["file name", "size", "modified", "mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromisoformat(file["modified"])
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
-                row = [file["filename"], file["size"], mtime, file["mode"]]
+                row = [file["name"], file["size"], mtime, file["mode"]]
                 table.append(row)
             print_done("Retrieved.")
             print(tabulate(table, headers=headers))
@@ -616,7 +619,7 @@ def invite(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
             if invited_ids:
@@ -648,7 +651,11 @@ def invitations():
                     perm = "read-only"
                 else:
                     perm = inv["perm"]
-                print("[{}] {}, {}, {}".format(cnt + 1, inv["inviter"], inv["vfolder_id"], perm))
+                print(
+                    "[{}] {}, {}, {}".format(
+                        cnt + 1, inv["inviter_user_email"], inv["vfolder_id"], perm
+                    )
+                )
 
             selection = input("Choose invitation number to manage: ")
             if selection.isdigit():
@@ -701,11 +708,11 @@ def share(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
             if shared_emails:
-                print("Shared with {} permission to:".format(perm))
+                print(f"Shared with {perm} permission to:")
                 for _email in shared_emails:
                     print("\t- " + _email)
             else:
@@ -766,7 +773,7 @@ def leave(name, shared_user_uuid):
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
             session.VFolder(name).leave(shared_user_uuid)
-            print('Left the shared virtual folder "{}".'.format(name))
+            print(f'Left the shared virtual folder "{name}".')
 
         except Exception as e:
             print_error(e)
@@ -829,30 +836,36 @@ def clone(name, target_name, target_host, usage_mode, permission):
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer(
+                    ProgressBarWithSpinner(
                         "Cloning the vfolder... "
                         "(This may take a while depending on its size and number of files!)",
-                    ) as viewer,
+                    ) as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm()
-                            else:
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
                                 pbar.total = data["total_progress"]
                                 pbar.write(data["message"])
                                 pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(
-                                f"Error during the operation: {error_msg}",
-                            )
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "The operation has been cancelled in the middle. "
-                                "(This may be due to server shutdown.)",
-                            )
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error during the operation: {error_msg}",
+                                )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "The operation has been cancelled in the middle. "
+                                    "(This may be due to server shutdown.)",
+                                )
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Task finished with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 

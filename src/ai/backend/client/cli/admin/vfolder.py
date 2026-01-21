@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import sys
+from typing import Optional
 
 import click
 import humanize
 from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_error
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.cli.vfolder import vfolder as user_vfolder
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_error
-from ..types import CLIContext
-from ..vfolder import vfolder as user_vfolder
 from . import admin
 
 
@@ -24,7 +23,7 @@ def vfolder() -> None:
     """
 
 
-def _list_cmd(docs: str = None):
+def _list_cmd(docs: Optional[str] = None):
     @pass_ctx_obj
     @click.option(
         "-g",
@@ -100,6 +99,9 @@ def _list_cmd(docs: str = None):
         """
         List virtual folders.
         """
+        from ai.backend.client.func.vfolder import _default_list_fields
+        from ai.backend.client.session import Session
+
         try:
             with Session() as session:
                 fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_list(
@@ -134,6 +136,8 @@ def list_hosts():
     List all mounted hosts from virtual folder root.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_all_hosts()
@@ -154,6 +158,8 @@ def perf_metric(vfolder_host):
     A vfolder host consists of a string of the storage proxy name and the volume name
     separated by a colon. (e.g., "local:volume1")
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.get_performance_metric(vfolder_host)
@@ -182,6 +188,8 @@ def get_fstab_contents(agent_id):
 
     If agent-id is not specified, manager's fstab contents will be returned.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.get_fstab_contents(agent_id)
@@ -197,6 +205,8 @@ def list_mounts():
     List all mounted hosts in virtual folder root.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_mounts()
@@ -227,6 +237,8 @@ def mount_host(fs_location, name, options, edit_fstab):
     FS-LOCATION: Location of file system to be mounted.
     NAME: Name of mounted host.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.mount_host(name, fs_location, options, edit_fstab)
@@ -254,6 +266,8 @@ def umount_host(name, edit_fstab):
     \b
     NAME: Name of mounted host.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.umount_host(name, edit_fstab)
@@ -276,6 +290,8 @@ def list_shared_vfolders():
     List all shared vfolder.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_shared_vfolders()
@@ -294,7 +310,7 @@ def list_shared_vfolders():
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -308,6 +324,8 @@ def shared_vfolder_info(vfolder_id):
     \b
     VFOLDER_ID: ID of a virtual folder.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.shared_vfolder_info(vfolder_id)
@@ -327,7 +345,7 @@ def shared_vfolder_info(vfolder_id):
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -348,6 +366,8 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
     USER_ID: ID of user who have been granted access to shared vFolder.
     PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
@@ -369,6 +389,8 @@ def remove_shared_vf_permission(vfolder_id, user_id):
     VFOLDER_ID: ID of a virtual folder.
     USER_ID: ID of user who have been granted access to shared vFolder.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
@@ -390,6 +412,8 @@ def change_vfolder_ownership(vfolder_id, user_email):
     VFOLDER_ID: ID of a virtual folder.
     USER_EMAIL:  user email to have the ownership of current vfolder
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             session.VFolder.change_vfolder_ownership(vfolder_id, user_email)

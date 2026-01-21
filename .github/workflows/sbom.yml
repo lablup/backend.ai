@@ -3,33 +3,109 @@ name: SBOM report
 on: [workflow_dispatch, workflow_call]
 
 jobs:
-  sbom:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+  sbom-python:
+    name: Generate Python SBOM
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v6
       with:
-        fetch-depth: 2
-    - name: Extract Python version from pants.toml
+        lfs: false
+    - name: Install SBOM tool
+      run: pipx install cyclonedx-bom
+    - name: Create Python SBOM
+      # see for usage: https://pypi.org/project/cyclonedx-bom/
+      run: cyclonedx-py requirements -o bom-python.json
+    - name: Upload Python SBOM
+      uses: actions/upload-artifact@v5
+      with:
+        name: SBOM-Python
+        path: ./bom-python.json
+
+  prepare-matrix:
+    name: Discover Dockerfiles
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - name: Checkout the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+
+    - name: Find all Dockerfiles and create matrix
+      id: set-matrix
       run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v5
+        # Find all Dockerfiles in docker/ directory
+        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
+
+        # Build JSON array for matrix
+        MATRIX_JSON='{"include":['
+        FIRST=true
+
+        for dockerfile in $DOCKERFILES; do
+          # Get image name from filename (e.g., krunner-extractor.dockerfile -> krunner-extractor)
+          BASENAME=$(basename "$dockerfile" .dockerfile)
+
+          if [ "$FIRST" = true ]; then
+            FIRST=false
+          else
+            MATRIX_JSON="${MATRIX_JSON},"
+          fi
+
+          MATRIX_JSON="${MATRIX_JSON}{\"name\":\"${BASENAME}\",\"dockerfile\":\"${dockerfile}\",\"context\":\"docker\"}"
+        done
+
+        MATRIX_JSON="${MATRIX_JSON}]}"
+
+        echo "Found Dockerfiles matrix:"
+        echo "$MATRIX_JSON" | jq .
+
+        echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  sbom-containers:
+    name: Generate Container SBOMs
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    if: needs.prepare-matrix.outputs.matrix != '{"include":[]}'
+    strategy:
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    steps:
+    - name: Checkout the revision
+      uses: actions/checkout@v6
       with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+        lfs: false
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v6
       with:
-        gha-cache-key: pants-cache-main-1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - uses: CycloneDX/gh-python-generate-sbom@v2
-    - name: Upload SBOM report
-      uses: actions/upload-artifact@v3
+        context: ${{ matrix.context }}
+        file: ${{ matrix.dockerfile }}
+        platforms: linux/amd64
+        tags: backendai-${{ matrix.name }}:sbom
+        load: true
+
+    - name: Generate SBOM with Syft
+      uses: anchore/sbom-action@v0
       with:
-        name: SBOM report
-        path: ./bom.xml
+        image: backendai-${{ matrix.name }}:sbom
+        format: cyclonedx-json
+        output-file: bom-${{ matrix.name }}.json
+
+    - name: Attest SBOM
+      uses: actions/attest-sbom@v2
+      with:
+        subject-name: backendai-${{ matrix.name }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        sbom-path: bom-${{ matrix.name }}.json
+        push-to-registry: false
+
+    - name: Upload Container SBOM
+      uses: actions/upload-artifact@v5
+      with:
+        name: SBOM-${{ matrix.name }}
+        path: ./bom-${{ matrix.name }}.json

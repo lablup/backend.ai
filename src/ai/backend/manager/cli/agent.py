@@ -7,14 +7,15 @@ from typing import TYPE_CHECKING
 import click
 from alembic.config import Config
 
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.logging_utils import enforce_debug_logging
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.utils import enforce_debug_logging
+from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -55,15 +56,16 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from zmq.auth.certs import load_certificate
 
     from ai.backend.common.auth import PublicKey, SecretKey
-
-    from ..agent_cache import AgentRPCCache
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.models.utils import create_async_engine
 
     async def _impl():
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
         manager_public_key, manager_secret_key = load_certificate(
-            cli_ctx.local_config["manager"]["rpc-auth-manager-keypair"]
+            bootstrap_config.manager.rpc_auth_manager_keypair
         )
-        assert manager_secret_key is not None
+        if manager_secret_key is None:
+            raise ConfigurationLoadFailed("Manager secret key is not available in the keypair")
         alembic_cfg = Config(alembic_config)
         sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
         db = create_async_engine(sa_url)
@@ -85,7 +87,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 # result = await rpc.call.gather_hwinfo()
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.error("Timeout occurred while reading the response from ag:{}", agent_id)
         except Exception:
             log.exception("Exception occurred while reading the response from ag:{}", agent_id)

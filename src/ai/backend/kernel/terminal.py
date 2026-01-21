@@ -25,8 +25,8 @@ class Terminal:
     A wrapper for a terminal-based app.
     """
 
-    def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None):
-        self._sorna_media = []
+    def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None) -> None:
+        self._sorna_media: list = []
         self.zctx = sock_out.context
 
         self.ev_term = ev_term
@@ -84,11 +84,9 @@ class Terminal:
                 args = self.cmdparser.parse_args(shlex.split(code_txt[1:], comments=True))
                 if asyncio.iscoroutine(args.func) or asyncio.iscoroutinefunction(args.func):
                     return await args.func(args)
-                else:
-                    return args.func(args)
-            else:
-                await self.sock_out.send_multipart([b"stderr", b"Invalid command."])
-                return 127
+                return args.func(args)
+            await self.sock_out.send_multipart([b"stderr", b"Invalid command."])
+            return 127
         except Exception:
             exc_type, exc_val, tb = sys.exc_info()
             traces = traceback.format_exception(exc_type, exc_val, tb)
@@ -155,7 +153,7 @@ class Terminal:
                     try:
                         term_writer.write(data[0])
                         await term_writer.drain()
-                    except IOError:
+                    except OSError:
                         break
         except asyncio.CancelledError:
             pass
@@ -167,7 +165,7 @@ class Terminal:
             while not term_reader.at_eof():
                 try:
                     data = await term_reader.read(4096)
-                except IOError:
+                except OSError:
                     # In docker containers, this path is taken.
                     break
                 if not data:

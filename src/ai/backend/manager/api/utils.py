@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
@@ -11,22 +13,18 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Hashable, Mapping, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     Concatenate,
-    Hashable,
-    Mapping,
-    MutableMapping,
+    Generic,
     Optional,
     ParamSpec,
-    Tuple,
+    Protocol,
     TypeAlias,
     TypeVar,
-    Union,
 )
 
 import sqlalchemy as sa
@@ -34,26 +32,28 @@ import trafaret as t
 import yaml
 from aiohttp import web
 from aiohttp.typedefs import Handler
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
-
-from ..models import UserRole, users
-from ..utils import (
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import (
+    DeprecatedAPI,
+    InvalidAPIParameters,
+    NotImplementedAPI,
+)
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.utils import (
     check_if_requester_is_eligible_to_act_as_target_access_key,
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
-)
-from .exceptions import (
-    GenericForbidden,
-    InvalidAPIParameters,
-    QueryNotImplemented,
 )
 
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
@@ -66,8 +66,8 @@ def method_placeholder(orig_method):
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Any = None
-) -> Tuple[AccessKey, AccessKey]:
+    request: web.Request, params: Optional[Any] = None
+) -> tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -90,8 +90,8 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Any = None
-) -> Tuple[uuid.UUID, uuid.UUID]:
+    request: web.Request, params: Optional[Any] = None
+) -> tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
@@ -125,7 +125,7 @@ async def get_user_scopes(
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
         async with root_ctx.db.begin_readonly() as conn:
             user_query = (
-                sa.select([users.c.uuid, users.c.role, users.c.domain_name])
+                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
                 .select_from(users)
                 .where(
                     (users.c.email == owner_user_email),
@@ -135,9 +135,9 @@ async def get_user_scopes(
             row = result.first()
             if row is None:
                 raise InvalidAPIParameters("Cannot delegate an unknown user")
-            owner_user_uuid = row["uuid"]
-            owner_user_role = row["role"]
-            owner_user_domain = row["domain_name"]
+            owner_user_uuid = row.uuid
+            owner_user_role = row.role
+            owner_user_domain = row.domain_name
         if request["is_superadmin"]:
             pass
         elif request["is_admin"]:
@@ -162,15 +162,13 @@ async def get_user_scopes(
 
 
 P = ParamSpec("P")
-TParamTrafaret = TypeVar("TParamTrafaret", bound=t.Trafaret)
-TQueryTrafaret = TypeVar("TQueryTrafaret", bound=t.Trafaret)
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)
 
 
 def check_api_params(
-    checker: TParamTrafaret,
+    checker: t.Trafaret,
     loads: Callable[[str], Any] | None = None,
-    query_param_checker: TQueryTrafaret | None = None,
+    query_param_checker: t.Trafaret | None = None,
     request_examples: list[Any] | None = None,
 ) -> Callable[
     # We mark the arg for the validated param as Any because we cannot define a generic type of
@@ -185,7 +183,7 @@ def check_api_params(
             body: str = ""
             try:
                 body_exists = request.can_read_body
-                if body_exists:
+                if body_exists and request.method not in ("GET", "HEAD"):
                     body = await request.text()
                     if request.content_type == "text/yaml":
                         orig_params = yaml.load(body, Loader=yaml.BaseLoader)
@@ -196,7 +194,7 @@ def check_api_params(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.check(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
@@ -213,41 +211,60 @@ def check_api_params(
     return wrap
 
 
-class BaseResponseModel(BaseModel):
+LegacyBaseRequestModel: TypeAlias = BaseRequestModel
+
+
+class LegacyBaseResponseModel(BaseResponseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=BaseModel)
-TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+TParamModel = TypeVar("TParamModel", bound=LegacyBaseRequestModel, contravariant=True)
+TQueryModel = TypeVar("TQueryModel", bound=LegacyBaseRequestModel)
+TResponseModel = TypeVar("TResponseModel", bound=LegacyBaseResponseModel, covariant=True)
 
-TPydanticResponse: TypeAlias = TResponseModel | list
-THandlerFuncWithoutParam: TypeAlias = Callable[
-    Concatenate[web.Request, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
-THandlerFuncWithParam: TypeAlias = Callable[
-    Concatenate[web.Request, TParamModel, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
+TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
+
+
+class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
+
+
+class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        params: TParamModel,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
+    response: LegacyBaseResponseModel
+    | BaseResponseModel
+    | list[TResponseModel]
+    | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseResponseModel(status=status):
+        case LegacyBaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
-        case BaseModel():
+        case BaseResponseModel():
             return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
             return response
         case _:
-            raise RuntimeError(f"Unsupported response type ({type(response)})")
+            raise RuntimeError(f"Unsupported response type ({type(response).__mro__})")
 
 
 def pydantic_response_api_handler(
-    handler: THandlerFuncWithoutParam,
+    handler: THandlerFuncWithoutParam[P, TResponseModel],
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -269,9 +286,9 @@ def pydantic_params_api_handler(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+) -> Callable[[THandlerFuncWithParam[P, TParamModel, TResponseModel]], Handler]:
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam[P, TParamModel, TResponseModel],
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
@@ -292,13 +309,27 @@ def pydantic_params_api_handler(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.model_validate(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
                 raise InvalidAPIParameters("Malformed body")
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+            except ValidationError as ex:
+                first_error = ex.errors()[0]
+                # Format the first validation error as the message
+                # The client may refer extra_data to access the full validation errors.
+                metadata = {
+                    "input": first_error["input"],
+                }
+                if loc := first_error["loc"]:
+                    metadata["loc"] = loc[0]
+                metadata_formatted_items = [
+                    f"type={first_error['type']}",  # format as symbol
+                    *(f"{k}={v!r}" for k, v in metadata.items()),
+                ]
+                msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
+                # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
+                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
@@ -329,30 +360,29 @@ def mask_sensitive_keys(data: Mapping[str, Any]) -> Mapping[str, Any]:
 def trim_text(value: str, maxlen: int) -> str:
     if len(value) <= maxlen:
         return value
-    value = value[: maxlen - 3] + "..."
-    return value
+    return value[: maxlen - 3] + "..."
 
 
 class _Infinity(numbers.Number):
-    def __lt__(self, o):
+    def __lt__(self, o) -> bool:
         return False
 
-    def __le__(self, o):
+    def __le__(self, o) -> bool:
         return False
 
-    def __gt__(self, o):
+    def __gt__(self, o) -> bool:
         return True
 
-    def __ge__(self, o):
+    def __ge__(self, o) -> bool:
         return False
 
-    def __float__(self):
+    def __float__(self) -> float:
         return float("inf")
 
-    def __int__(self):
+    def __int__(self) -> int:
         return 0xFFFF_FFFF_FFFF_FFFF  # a practical 64-bit maximum
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self)
 
 
@@ -400,7 +430,7 @@ def set_handler_attr(func, key, value):
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs
 
 
 def get_handler_attr(request, key, default=None):
@@ -414,8 +444,15 @@ def get_handler_attr(request, key, default=None):
     return default
 
 
-async def not_impl_stub(request) -> web.Response:
-    raise QueryNotImplemented
+async def not_impl_stub(request: web.Request) -> web.Response:
+    raise NotImplementedAPI
+
+
+def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
+    async def deprecated_stub_impl(request: web.Request) -> web.Response:
+        raise DeprecatedAPI(extra_msg=msg)
+
+    return deprecated_stub_impl
 
 
 def chunked(iterable, n):
@@ -437,7 +474,7 @@ async def call_non_bursty(
     coro: Callable[[], Any],
     *,
     max_bursts: int = 64,
-    max_idle: Union[int, float] = 100.0,
+    max_idle: int | float = 100.0,
 ):
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
@@ -478,16 +515,16 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 class Singleton(type):
     _instances: MutableMapping[Any, Any] = {}
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, *args, **kwargs) -> Any:
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
 
 

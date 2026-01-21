@@ -3,16 +3,16 @@ import ctypes.util
 import logging
 import os
 import sys
-from typing import Iterator
+from collections.abc import Iterator
 
 import aiohttp
 import aiotools
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _numa_supported = False
 
 if sys.platform == "linux":
@@ -50,15 +50,13 @@ class libnuma:
     def node_of_cpu(core) -> int:
         if _numa_supported:
             return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
-        else:
-            return 0
+        return 0
 
     @staticmethod
     def num_nodes() -> int:
         if _numa_supported:
             return int(_libnuma.numa_num_configured_nodes())  # type: ignore
-        else:
-            return 1
+        return 1
 
     @staticmethod
     @aiotools.lru_cache(maxsize=1)
@@ -106,12 +104,12 @@ class libnuma:
                     return None
             docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
             log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
-            cpuset_source = "the docker cgroup (v{})".format(version)
+            cpuset_source = f"the docker cgroup (v{version})"
             try:
                 docker_cpuset = docker_cpuset_path.read_text()
                 cpuset = {*parse_cpuset(docker_cpuset)}
                 return cpuset, cpuset_source
-            except (IOError, ValueError):
+            except (OSError, ValueError):
                 log.warning(
                     "failed to parse cgroup cpuset from {}, falling back to the next cpuset source",
                     docker_cpuset_path,

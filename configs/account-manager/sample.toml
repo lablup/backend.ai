@@ -1,0 +1,113 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = "manager"                            # env: BACKEND_ETCD_USER
+password = "ETCD_PASSWORD"                  # env: BACKEND_ETCD_PASSWORD
+
+
+[db]
+# One of: "postgresql"
+# Currently we only support PostgreSQL.
+type = "postgresql"
+
+# Address to access the database.
+# NOTE: It is RECOMMENDED to use domain names in cloud setups because the IP addresses
+# may change upon automatic upgrade or migration.
+addr = { host = "localhost", port = 8100 }
+
+# Database name.
+name = "backend"
+
+# Database account credentials.
+user = "postgres"
+password = "develove"
+
+# The connection pool's initial size
+# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
+# pool-size = 8
+
+# This setting causes the pool to recycle connections after the given number of seconds has passed.
+# Default is -1, which means infinite. 
+# https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
+# pool-recycle = -1
+
+# This setting eliminates DB error due to stale pooled connections by ping at the start of each connection pool checkout.
+# It adds a small overhead to the connection checkout process.
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic
+# Default is false.
+# pool-pre-ping = false
+
+
+[account-manager]
+# The number of worker processes to handle API requests and event messages.
+# If set zero, it uses the number of CPU cores in the system.
+num-proc = 1
+
+# Set the service hostname/port to accept API requests.
+service-addr = { host = "0.0.0.0", port = 8088 }
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "0.0.0.0", port = 8087 }
+
+# Specify the user/group used for the account-manager daemon,
+# to which the account-manager changes after reading the daemon configuration and SSL certifiactes.
+# If not specified, it uses the file permission of ai/backend/account-manager/server.py
+# This config is effective only when the account-manager daemon is started as the root user.
+# Note that the vfolder (storage) permission must match with this.
+#user = "nobody"
+#group = "nobody"
+
+# Set the SSL certificate chain and the private keys used for serving the API requests.
+ssl-enabled = false
+
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+# ipc-base-path = "/tmp/backend.ai/ipc"
+#id = ""
+pid-file = "./account-manager.pid"             # env: BACKEND_PID_FILE
+
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-account-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "manager.log"
+backup-count = 5
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+[debug]
+enabled = false

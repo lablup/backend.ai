@@ -6,8 +6,6 @@ Create Date: 2022-10-13 18:35:21.955941
 
 """
 
-from typing import Dict, List
-
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -58,12 +56,12 @@ def upgrade() -> None:
     connection = op.get_bind()
     bind_param_pk = "bind_param_pk"
 
-    def get_pk_vfolder_host_maps(query, pk_name) -> List:
+    def get_pk_vfolder_host_maps(query, pk_name) -> list:
         map_list = []
         rows = connection.execute(query).fetchall()
         for row in rows:
-            hosts: List[str] = row["allowed_vfolder_hosts"]
-            all_perms: Dict[str, List[str]] = {host: ALL_HOST_PERMISSIONS for host in hosts}
+            hosts: list[str] = row["allowed_vfolder_hosts"]
+            all_perms: dict[str, list[str]] = dict.fromkeys(hosts, ALL_HOST_PERMISSIONS)
             map_list.append({bind_param_pk: row[pk_name], "allowed_vfolder_hosts": all_perms})
         return map_list
 
@@ -170,11 +168,11 @@ def downgrade() -> None:
     connection = op.get_bind()
     bind_param_pk = "bind_param_pk"
 
-    def get_pk_vfolder_host_maps(query, pk_name) -> List:
+    def get_pk_vfolder_host_maps(query, pk_name) -> list:
         map_list = []
         rows = connection.execute(query).fetchall()
         for row in rows:
-            hosts: Dict[str, List[str]] = row["allowed_vfolder_hosts"]
+            hosts: dict[str, list[str]] = row["allowed_vfolder_hosts"]
             map_list.append({
                 bind_param_pk: row[pk_name],
                 "allowed_vfolder_hosts": list(hosts.keys()),

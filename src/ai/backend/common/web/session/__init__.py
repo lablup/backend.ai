@@ -1,15 +1,22 @@
 import abc
 import json
 import logging
-import logging.config
-import sys
 import time
-from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
+from collections.abc import Awaitable, Callable, Iterator, MutableMapping
+from datetime import UTC, datetime
+from typing import (
+    Any,
+    Final,
+    TypedDict,
+    cast,
+    override,
+)
 
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.common.web.session"))
 
@@ -20,27 +27,29 @@ extra_config_headers = t.Dict({
 }).allow_extra("*")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
-Middleware = Callable[[web.Request, Handler], Awaitable[web.StreamResponse]]
-
-if sys.version_info >= (3, 8):
-    from typing import TypedDict
-else:
-    from typing_extensions import TypedDict
 
 
 class _CookieParams(TypedDict, total=False):
-    domain: Optional[str]
-    max_age: Optional[int]
+    domain: str | None
+    max_age: int | None
     path: str
-    secure: Optional[bool]
+    secure: bool | None
     httponly: bool
-    samesite: Optional[str]
-    expires: str
+    samesite: str | None
+    expires: str | None
 
 
 class SessionData(TypedDict, total=False):
     created: int
-    session: Dict[str, Any]
+    expiration_dt: int
+    session: dict[str, Any]
+
+
+DEFAULT_SESSION_AGE: Final[int] = 3600  # 1hour
+
+
+def get_time() -> int:
+    return int(time.time())
 
 
 class Session(MutableMapping[str, Any]):
@@ -48,62 +57,89 @@ class Session(MutableMapping[str, Any]):
 
     def __init__(
         self,
-        identity: Optional[Any],
+        identity: Any | None,
         *,
-        data: Optional[SessionData],
+        data: SessionData | None,
         new: bool,
-        max_age: Optional[int] = None,
+        max_age: int | None = None,
+        lifespan: int | None = None,
     ) -> None:
         self._changed: bool = False
-        self._mapping: Dict[str, Any] = {}
+        self._mapping: dict[str, Any] = {}
         self._identity = identity if data != {} else None
         self._new = new if data != {} else True
         self._max_age = max_age
         created = data.get("created", None) if data else None
+        expiration_dt = data.get("expiration_dt") if data is not None else None
         session_data = data.get("session", None) if data else None
-        now = int(time.time())
-        age = now - created if created else now
-        if max_age is not None and age > max_age:
-            session_data = None
+        now = get_time()
+        is_expired = False
+        if expiration_dt is not None:
+            self._expiration_dt = expiration_dt
+            if now > expiration_dt:
+                is_expired = True
+        else:
+            age = now - created if created else now
+            if max_age is not None:
+                self._expiration_dt = now + max_age
+                if age > max_age:
+                    is_expired = True
+            else:
+                self._expiration_dt = now + DEFAULT_SESSION_AGE
+
         if self._new or created is None:
             self._created = now
         else:
             self._created = created
 
+        if self._created > self._expiration_dt:
+            self._expiration_dt = now + (lifespan or self.max_age or DEFAULT_SESSION_AGE)
+            is_expired = False
+
+        if is_expired:
+            session_data = None
+
         if session_data is not None:
             self._mapping.update(session_data)
 
     def __repr__(self) -> str:
-        return "<{} [new:{}, changed:{}, created:{}] {!r}>".format(
-            self.__class__.__name__,
-            self.new,
-            self._changed,
-            self.created,
-            self._mapping,
-        )
+        return f"<{self.__class__.__name__} [new:{self.new}, changed:{self._changed}, created:{self.created} expiration:{self.expiration_dt}] {self._mapping!r}>"
 
     @property
     def new(self) -> bool:
         return self._new
 
     @property
-    def identity(self) -> Optional[Any]:  # type: ignore[misc]
+    def identity(self) -> Any | None:  # type: ignore[misc]
         return self._identity
 
     @property
     def created(self) -> int:
         return self._created
 
+    def update_creation_time(self) -> None:
+        self._created = get_time()
+        self._changed = True
+
     @property
     def empty(self) -> bool:
         return not bool(self._mapping)
 
     @property
-    def max_age(self) -> Optional[int]:
+    def expiration_dt(self) -> int:
+        return self._expiration_dt
+
+    @expiration_dt.setter
+    def expiration_dt(self, value: int) -> None:
+        self._expiration_dt = value
+        self._changed = True
+
+    @property
+    def max_age(self) -> int | None:
         return self._max_age
 
     @max_age.setter
-    def max_age(self, value: Optional[int]) -> None:
+    def max_age(self, value: int | None) -> None:
         self._max_age = value
 
     def changed(self) -> None:
@@ -113,7 +149,7 @@ class Session(MutableMapping[str, Any]):
         self._changed = True
         self._mapping = {}
 
-    def set_new_identity(self, identity: Optional[Any]) -> None:
+    def set_new_identity(self, identity: Any | None) -> None:
         if not self._new:
             raise RuntimeError("Can't change identity for a session which is not new")
 
@@ -134,12 +170,12 @@ class Session(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self._mapping[key] = value
         self._changed = True
-        self._created = int(time.time())
+        self._created = get_time()
 
     def __delitem__(self, key: str) -> None:
         del self._mapping[key]
         self._changed = True
-        self._created = int(time.time())
+        self._created = get_time()
 
 
 SESSION_KEY = "aiohttp_session"
@@ -156,8 +192,8 @@ async def get_session(request: web.Request) -> Session:
         session = await storage.load_session(request)
         if not isinstance(session, Session):
             raise RuntimeError(
-                "Installed {!r} storage should return session instance "
-                "on .load_session() call, got {!r}.".format(storage, session)
+                f"Installed {storage!r} storage should return session instance "
+                f"on .load_session() call, got {session!r}."
             )
         request[SESSION_KEY] = session
     return session
@@ -171,8 +207,8 @@ async def new_session(request: web.Request) -> Session:
     session = await storage.new_session()
     if not isinstance(session, Session):
         raise RuntimeError(
-            "Installed {!r} storage should return session instance "
-            "on .load_session() call, got {!r}.".format(storage, session)
+            f"Installed {storage!r} storage should return session instance "
+            f"on .load_session() call, got {session!r}."
         )
     request[SESSION_KEY] = session
     return session
@@ -188,7 +224,7 @@ def session_middleware(storage: "AbstractStorage") -> Middleware:
         raise_response = False
         # TODO aiohttp 4:
         # Remove Union from response, and drop the raise_response variable
-        response: Union[web.StreamResponse, web.HTTPException]
+        response: web.StreamResponse | web.HTTPException
         try:
             response = await handler(request)
         except web.HTTPException as exc:
@@ -202,9 +238,9 @@ def session_middleware(storage: "AbstractStorage") -> Middleware:
         if response.prepared:
             raise RuntimeError("Cannot save session data into prepared response")
         session = request.get(SESSION_KEY)
-        if session is not None:
+        if (session is not None) and (raise_response is False):
             if session._changed:
-                await storage.save_session(request, response, session)
+                await storage.save_session(request=request, response=response, session=session)
         if raise_response:
             raise cast(web.HTTPException, response)
         return response
@@ -223,12 +259,12 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         self,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
-        domain: Optional[str] = None,
-        max_age: Optional[int] = None,
+        domain: str | None = None,
+        max_age: int | None = None,
         path: str = "/",
-        secure: Optional[bool] = None,
+        secure: bool | None = None,
         httponly: bool = True,
-        samesite: Optional[str] = None,
+        samesite: str | None = None,
         encoder: Callable[[object], str] = json.dumps,
         decoder: Callable[[str], Any] = json.loads,
     ) -> None:
@@ -250,7 +286,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         return self._cookie_name
 
     @property
-    def max_age(self) -> Optional[int]:
+    def max_age(self) -> int | None:
         return self._max_age
 
     @property
@@ -260,11 +296,19 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     def _get_session_data(self, session: Session) -> SessionData:
         if session.empty:
             return {}
-
-        return {"created": session.created, "session": session._mapping}
+        return {
+            "created": session.created,
+            "session": session._mapping,
+            "expiration_dt": session.expiration_dt,
+        }
 
     async def new_session(self) -> Session:
-        return Session(None, data=None, new=True, max_age=self.max_age)
+        return Session(
+            None,
+            data=None,
+            new=True,
+            max_age=self.max_age,
+        )
 
     @abc.abstractmethod
     async def load_session(self, request: web.Request) -> Session:
@@ -272,13 +316,17 @@ class AbstractStorage(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def save_session(
-        self, request: web.Request, response: web.StreamResponse, session: Session
+        self,
+        request: web.Request,
+        response: web.StreamResponse,
+        session: Session,
+        session_extension: int | None = None,
     ) -> None:
         pass
 
-    def load_cookie(self, request: web.Request) -> Optional[str]:
+    def load_cookie(self, request: web.Request) -> str | None:
         # TODO: Remove explicit type annotation when aiohttp 3.8 is out
-        cookie: Optional[str] = request.cookies.get(self._cookie_name)
+        cookie: str | None = request.cookies.get(self._cookie_name)
         return cookie
 
     def save_cookie(
@@ -286,18 +334,21 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         response: web.StreamResponse,
         cookie_data: str,
         *,
-        max_age: Optional[int] = None,
+        expiration_dt: float | None = None,
+        max_age: int | None = None,
     ) -> None:
         params = self._cookie_params.copy()
         if max_age is not None:
             params["max_age"] = max_age
-            t = time.gmtime(time.time() + max_age)
-            params["expires"] = time.strftime("%a, %d-%b-%Y %T GMT", t)
+        if expiration_dt is not None:
+            params["expires"] = datetime.fromtimestamp(expiration_dt, tz=UTC).isoformat()
         if not cookie_data:
-            response.del_cookie(self._cookie_name, domain=params["domain"], path=params["path"])
-        else:
             # Ignoring type for params until aiohttp#4238 is released
-            response.set_cookie(self._cookie_name, cookie_data, **params)
+            response.del_cookie(
+                name=self._cookie_name, domain=params["domain"], path=params["path"]
+            )
+        else:
+            response.set_cookie(name=self._cookie_name, value=cookie_data, **params)
 
 
 class SimpleCookieStorage(AbstractStorage):
@@ -309,12 +360,12 @@ class SimpleCookieStorage(AbstractStorage):
         self,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
-        domain: Optional[str] = None,
-        max_age: Optional[int] = None,
+        domain: str | None = None,
+        max_age: int | None = None,
         path: str = "/",
-        secure: Optional[bool] = None,
+        secure: bool | None = None,
         httponly: bool = True,
-        samesite: Optional[str] = None,
+        samesite: str | None = None,
         encoder: Callable[[object], str] = json.dumps,
         decoder: Callable[[str], Any] = json.loads,
     ) -> None:
@@ -338,8 +389,17 @@ class SimpleCookieStorage(AbstractStorage):
         data = self._decoder(cookie)
         return Session(None, data=data, new=False, max_age=self.max_age)
 
+    @override
     async def save_session(
-        self, request: web.Request, response: web.StreamResponse, session: Session
+        self,
+        request: web.Request,
+        response: web.StreamResponse,
+        session: Session,
+        session_extension: int | None = None,
     ) -> None:
         cookie_data = self._encoder(self._get_session_data(session))
-        self.save_cookie(response, cookie_data, max_age=session.max_age)
+        if session_extension is not None:
+            session.expiration_dt = get_time() + session_extension
+        self.save_cookie(
+            response, cookie_data, max_age=session.max_age, expiration_dt=session.expiration_dt
+        )

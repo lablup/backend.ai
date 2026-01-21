@@ -67,10 +67,9 @@ async def pants_export(ctx: Context) -> None:
             """
     pants export \
      --resolve=python-default \
+     --resolve=python-kernel \
      --resolve=towncrier \
-     --resolve=ruff \
-     --resolve=mypy \
-     --resolve=black
+     --resolve=mypy
     """
         )
     )
@@ -81,6 +80,10 @@ async def install_editable_webui(ctx: Context) -> None:
     """
     if ! command -v node &> /dev/null; then
       install_node
+    fi
+    if ! command -v pnpm &> /dev/null; then
+        show_info "Installing pnpm..."
+        npm install -g pnpm
     fi
     show_info "Installing editable version of Web UI..."
     if [ -d "./src/ai/backend/webui" ]; then
@@ -107,7 +110,7 @@ async def install_editable_webui(ctx: Context) -> None:
       echo "PROXYBASEHOST=localhost" >> .env
       echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
     fi
-    npm i
+    pnpm i
     make compile
     make compile_wsproxy
     cd ../../../..

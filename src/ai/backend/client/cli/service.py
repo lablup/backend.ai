@@ -1,30 +1,36 @@
 import json
 import sys
-from typing import Literal, Optional, Sequence
+from collections.abc import Sequence
+from typing import Literal, Optional
 from uuid import UUID
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
-from ai.backend.client.utils import validate_key_value
+from ai.backend.client.cli.session.execute import (
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from ai.backend.client.compat import asyncio_run
+from ai.backend.client.exceptions import BackendError
+from ai.backend.client.output.fields import routing_fields, service_fields
+from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
+from ai.backend.client.utils import validate_key_value
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
-from ..output.fields import routing_fields, service_fields
-from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .pretty import ProgressViewer, print_done, print_fail, print_warn
+from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["url"],
@@ -40,23 +46,22 @@ _default_routing_fields: Sequence[FieldSpec] = (
 )
 
 
-def get_service_id(session: Session, name_or_id: str):
+def get_service_id(session: Session, name_or_id: str) -> UUID:
     try:
         session.Service(name_or_id).info()
-        return name_or_id
-    except Exception:
+    except (ValueError, BackendError):
         services = session.Service.list(name=name_or_id)
         try:
-            return services[0]["id"]
-        except Exception as e:
-            if isinstance(e, KeyError) or isinstance(e, IndexError):
-                raise RuntimeError(f"Service {name_or_id} not found")
-            else:
-                raise e
+            return UUID(services[0]["id"])
+        except (KeyError, IndexError):
+            raise RuntimeError(f"Service {name_or_id!r} not found")
+    else:
+        # When we can fetch the detail directly, it's a valid UUID.
+        return UUID(name_or_id)
 
 
-@main.group()
-def service():
+@click.group()
+def service() -> None:
     """Set of service operations"""
 
 
@@ -66,7 +71,13 @@ def service():
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, filter_, order, offset, limit):
+def list(
+    ctx: CLIContext,
+    filter_: Optional[str],
+    order: Optional[str],
+    offset: int,
+    limit: Optional[int],
+) -> None:
     """
     List the service endpoints.
     """
@@ -92,7 +103,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-def info(ctx: CLIContext, service_name_or_id: str):
+def info(ctx: CLIContext, service_name_or_id: str) -> None:
     """
     Display the detail of a service endpoint with its backing inference session.
 
@@ -137,6 +148,24 @@ def info(ctx: CLIContext, service_name_or_id: str):
     type=str,
     multiple=True,
     help="Environment variable (may appear multiple times)",
+)
+@click.option(
+    "-v",
+    "--volume",
+    "-m",
+    "--mount",
+    "mount",
+    metavar="NAME[=PATH] or NAME[:PATH]",
+    type=str,
+    multiple=True,
+    help=(
+        "Name or ID of virtual folders to mount."
+        "If path is not provided, virtual folder will be mounted under /home/work. "
+        "When the target path is relative, it is placed under /home/work "
+        "with auto-created parent directories if any. "
+        "Absolute paths are mounted as-is, but it is prohibited to "
+        "override the predefined Linux system directories."
+    ),
 )
 # extra options
 @click.option(
@@ -233,12 +262,28 @@ def info(ctx: CLIContext, service_name_or_id: str):
     help="Set the owner of the target session explicitly.",
 )
 @click.option(
+    "--model-definition-path",
+    metavar="PATH",
+    default=None,
+    help="Relative path to model definition file. Defaults to `model-definition.yaml`.",
+)
+@click.option(
     "--public",
     "--expose-to-public",
     is_flag=True,
     help=(
         "Visibility of API Endpoint which serves inference workload."
         "If set to true, no authentication will be required to access the endpoint."
+    ),
+)
+@click.option(
+    "--runtime-variant",
+    metavar="RUNTIME_VARIANT",
+    type=click.Choice([*RuntimeVariant], case_sensitive=False),
+    default=RuntimeVariant.CUSTOM,
+    help=(
+        "Runtime variant of the service. "
+        "Control which runtime environment is used for the service. Default is `custom`."
     ),
 )
 def create(
@@ -251,6 +296,7 @@ def create(
     model_version: Optional[str],
     model_mount_destination: Optional[str],
     env: Sequence[str],
+    mount: Sequence[str],
     startup_command: Optional[str],
     resources: Sequence[str],
     resource_opts: Sequence[str],
@@ -263,8 +309,10 @@ def create(
     architecture: Optional[str],
     scaling_group: Optional[str],
     owner: Optional[str],
+    model_definition_path: Optional[str],
     public: bool,
-):
+    runtime_variant: RuntimeVariant,
+) -> None:
     """
     Create a service endpoint with a backing inference session.
 
@@ -273,12 +321,16 @@ def create(
 
     """
     envs = prepare_env_arg(env)
+    mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
+        "extra_mounts": mount,
+        "extra_mount_map": mount_map,
+        "extra_mount_options": mount_options,
         "startup_command": startup_command,
         "resources": parsed_resources,
         "resource_opts": parsed_resource_opts,
@@ -289,6 +341,8 @@ def create(
         "architecture": architecture,
         "scaling_group": scaling_group,
         "expose_to_public": public,
+        "model_definition_path": model_definition_path,
+        "runtime_variant": runtime_variant,
     }
     if model_mount_destination:
         body["model_mount_destination"] = model_mount_destination
@@ -442,7 +496,7 @@ def try_start(
     resources: Sequence[str],
     resource_opts: Sequence[str],
     cluster_size: int,
-    cluster_mode: Literal["single-node", "multi-node"],
+    cluster_mode: ClusterMode,
     domain: Optional[str],
     project: Optional[str],
     bootstrap_script: Optional[str],
@@ -451,7 +505,7 @@ def try_start(
     scaling_group: Optional[str],
     owner: Optional[str],
     public: bool,
-):
+) -> None:
     """
     Tries to create a model service session and return whether the server has successfully started or not.
 
@@ -503,32 +557,39 @@ def try_start(
 
     async def try_start_tracker(bgtask_id):
         async with AsyncSession() as session:
+            completion_msg_func = lambda: print_done("Model service validation started.")
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Model service validation started.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Starting the session...") as viewer,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            print(data["message"])
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm()
-                            else:
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
+                                print(data["message"])
                                 pbar.total = data["total_progress"]
                                 pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(
-                                f"Error during the operation: {error_msg}",
-                            )
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "The operation has been cancelled in the middle. "
-                                "(This may be due to server shutdown.)",
-                            )
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error during the operation: {error_msg}",
+                                )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "The operation has been cancelled in the middle. "
+                                    "(This may be due to server shutdown.)",
+                                )
+                            # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Task finished with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 
@@ -538,7 +599,7 @@ def try_start(
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-def rm(ctx: CLIContext, service_name_or_id):
+def rm(ctx: CLIContext, service_name_or_id: str) -> None:
     """
     Remove the service endpoint.
 
@@ -557,7 +618,7 @@ def rm(ctx: CLIContext, service_name_or_id):
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-def sync(ctx: CLIContext, service_name_or_id: str):
+def sync(ctx: CLIContext, service_name_or_id: str) -> None:
     """
     Sync route status with AppProxy.
 
@@ -578,7 +639,11 @@ def sync(ctx: CLIContext, service_name_or_id: str):
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("target_count", metavar="COUNT", type=int)
-def scale(ctx: CLIContext, service_name_or_id: str, target_count: int):
+def scale(
+    ctx: CLIContext,
+    service_name_or_id: str,
+    target_count: int,
+) -> None:
     """
     Start or resume the service endpoint to handle the incoming traffic.
 
@@ -601,7 +666,12 @@ def scale(ctx: CLIContext, service_name_or_id: str, target_count: int):
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("duration", metavar="DURATION", type=str)
 @click.option("-q", "--quiet", is_flag=True)
-def generate_token(ctx: CLIContext, service_name_or_id: str, duration: str, quiet: bool):
+def generate_token(
+    ctx: CLIContext,
+    service_name_or_id: str,
+    duration: str,
+    quiet: bool,
+) -> None:
     """
     Generate an API token to communicate with inference endpoint.
 
@@ -626,7 +696,7 @@ def generate_token(ctx: CLIContext, service_name_or_id: str, duration: str, quie
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-def get_endpoint(ctx: CLIContext, service_name_or_id: str):
+def get_endpoint(ctx: CLIContext, service_name_or_id: str) -> None:
     """
     Returns API Endpoint URL of the service.
 
@@ -646,9 +716,14 @@ def get_endpoint(ctx: CLIContext, service_name_or_id: str):
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-@click.argument("route_id", metavar="ROUTE_ID", type=str)
+@click.argument("route_id", metavar="ROUTE_ID", type=click.UUID)
 @click.argument("ratio", metavar="RATIO", type=float)
-def update_traffic_ratio(ctx: CLIContext, service_name_or_id: str, route_id: str, ratio: float):
+def update_traffic_ratio(
+    ctx: CLIContext,
+    service_name_or_id: str,
+    route_id: UUID,
+    ratio: float,
+) -> None:
     """
     Update traffic ratio of single route.
 
@@ -660,7 +735,7 @@ def update_traffic_ratio(ctx: CLIContext, service_name_or_id: str, route_id: str
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).update_traffic_ratio(UUID(route_id), ratio)
+            session.Service(service_id).update_traffic_ratio(route_id, ratio)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -670,9 +745,9 @@ def update_traffic_ratio(ctx: CLIContext, service_name_or_id: str, route_id: str
 @service.command()
 @pass_ctx_obj
 @click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
-@click.argument("route_id", metavar="ROUTE_ID", type=str)
+@click.argument("route_id", metavar="ROUTE_ID", type=click.UUID)
 @click.argument("ratio", metavar="RATIO", type=float)
-def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: str):
+def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: UUID) -> None:
     """
     Destroy route and its associated session and
     decrement desired session count of endpoint
@@ -684,7 +759,7 @@ def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: str):
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).downscale_single_route(UUID(route_id))
+            session.Service(service_id).downscale_single_route(route_id)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)

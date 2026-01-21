@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Callable, Final
+from collections.abc import Callable
+from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
-if TYPE_CHECKING:
-    from .events import AbstractEvent, EventProducer
-    from .lock import AbstractDistributedLock
+from .events.dispatcher import EventProducer
+from .events.types import AbstractAnycastEvent
+from .lock import AbstractDistributedLock
 
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GlobalTimer:
@@ -28,7 +28,7 @@ class GlobalTimer:
         self,
         dist_lock: AbstractDistributedLock,
         event_producer: EventProducer,
-        event_factory: Callable[[], AbstractEvent],
+        event_factory: Callable[[], AbstractAnycastEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
         *,
@@ -53,14 +53,14 @@ class GlobalTimer:
                     async with self._dist_lock:
                         if self._stopped:
                             return
-                        await self._event_producer.produce_event(self._event_factory())
+                        await self._event_producer.anycast_event(self._event_factory())
                         if self._stopped:
                             return
                         await asyncio.sleep(self.interval)
-                except asyncio.TimeoutError:  # timeout raised from etcd lock
+                except Exception:
                     if self._stopped:
                         return
-                    log.warning("timeout raised while trying to acquire lock. retrying...")
+                    log.debug("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass
 

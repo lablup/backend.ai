@@ -2,8 +2,7 @@ import json
 from contextlib import closing
 
 from ai.backend.common.types import AgentSelectionStrategy
-
-from ...utils.cli import EOF, ClientRunnerFunc
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_scaling_group(run_admin: ClientRunnerFunc):
@@ -27,13 +26,13 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
         ])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group not created successfully"
 
     # Check if scaling group is created
     with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
@@ -46,15 +45,15 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
     ) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group info not printed properly"
 
     test_group = get_scaling_group_from_list(scaling_group_list, "test_group1")
-    assert (
-        test_group.get("description") == "Test scaling group"
-    ), "Scaling group description mismatch"
+    assert test_group.get("description") == "Test scaling group", (
+        "Scaling group description mismatch"
+    )
     assert test_group.get("is_active") is False, "Scaling group active status mismatch"
     assert test_group.get("driver") == "static", "Scaling group driver mismatch"
     assert test_group.get("driver_opts") == {"x": 1}, "Scaling group driver options mismatch"
@@ -88,7 +87,7 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
         ])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group not updated successfully"
 
     # Check if scaling group is updated
@@ -96,7 +95,7 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
     ) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
@@ -104,9 +103,9 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
     test_group = get_scaling_group_from_list(scaling_group_list, "test_group1")
 
     assert bool(test_group), "Test scaling group doesn't exist"
-    assert (
-        test_group.get("description") == "Test scaling group updated"
-    ), "Scaling group description mismatch"
+    assert test_group.get("description") == "Test scaling group updated", (
+        "Scaling group description mismatch"
+    )
     assert test_group.get("is_active") is True, "Scaling group active status mismatch"
     assert test_group.get("driver") == "non-static", "Scaling group driver mismatch"
     assert test_group.get("driver_opts") == {"x": 1}, "Scaling group driver options mismatch"
@@ -125,14 +124,14 @@ def test_delete_scaling_group(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "admin", "scaling-group", "delete", "test_group1"])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group deletion unsuccessful"
 
 
 def test_list_scaling_group(run_admin: ClientRunnerFunc):
     with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"

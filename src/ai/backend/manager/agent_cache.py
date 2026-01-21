@@ -3,28 +3,28 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import AsyncIterator, Callable, Optional
+from typing import Optional
 
 import sqlalchemy as sa
 import zmq
+from callosum.exceptions import AuthenticationError
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.rpc import Peer, RPCUserError
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
 
-from .api.exceptions import (
-    AgentError,
-)
+from .exceptions import AgentError, RPCError
 from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PeerInvoker(Peer):
@@ -32,28 +32,27 @@ class PeerInvoker(Peer):
         _cached_funcs: dict[str, Callable]
         order_key: ContextVar[Optional[str]]
 
-        def __init__(self, peer: Peer):
+        def __init__(self, peer: Peer) -> None:
             self._cached_funcs = {}
             self.peer = peer
             self.order_key = ContextVar("order_key", default=None)
 
-        def __getattr__(self, name: str):
+        def __getattr__(self, name: str) -> Callable:
             if f := self._cached_funcs.get(name, None):
                 return f
-            else:
 
-                async def _wrapped(*args, **kwargs):
-                    request_body = {
-                        "args": args,
-                        "kwargs": kwargs,
-                    }
-                    self.peer.last_used = time.monotonic()
-                    ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                    self.peer.last_used = time.monotonic()
-                    return ret
+            async def _wrapped(*args, **kwargs):
+                request_body = {
+                    "args": args,
+                    "kwargs": kwargs,
+                }
+                self.peer.last_used = time.monotonic()
+                ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
+                self.peer.last_used = time.monotonic()
+                return ret
 
-                self._cached_funcs[name] = _wrapped
-                return _wrapped
+            self._cached_funcs[name] = _wrapped
+            return _wrapped
 
     call: _CallStub
     last_used: float
@@ -97,10 +96,10 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row:
+        async def _fetch_agent() -> Row | None:
             async with self.db.begin_readonly() as conn:
                 query = (
-                    sa.select([agents.c.addr, agents.c.public_key])
+                    sa.select(agents.c.addr, agents.c.public_key)
                     .select_from(agents)
                     .where(
                         agents.c.id == agent_id,
@@ -110,7 +109,9 @@ class AgentRPCCache:
                 return result.first()
 
         agent = await execute_with_retry(_fetch_agent)
-        return agent["addr"], agent["public_key"]
+        if agent is None:
+            raise ValueError(f"Agent not found: {agent_id}")
+        return agent.addr, agent.public_key
 
     @actxmgr
     async def rpc_context(
@@ -164,5 +165,16 @@ class AgentRPCCache:
                     peer.call.order_key.reset(okey_token)
         except RPCUserError as orig_exc:
             raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
+        except AuthenticationError as orig_exc:
+            detail = (
+                "Fail to initate RPC connection. "
+                "This could be caused by a connection delay or an attempt to connect to an invalid address. "
+                f"(repr: {orig_exc!r})."
+            )
+            raise RPCError(
+                agent_id,
+                agent_addr,
+                detail,
+            )
         except Exception:
             raise

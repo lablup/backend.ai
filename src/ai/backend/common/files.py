@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
+from typing import Optional
 
 import janus
 
@@ -21,8 +22,8 @@ class AsyncFileWriter:
         self,
         target_filename: str | Path,
         access_mode: str,
-        encode: Callable[[str], bytes] = None,
-        max_chunks: int = None,
+        encode: Optional[Callable[[str], bytes]] = None,
+        max_chunks: Optional[int] = None,
     ) -> None:
         if max_chunks is None:
             max_chunks = 0
@@ -35,7 +36,7 @@ class AsyncFileWriter:
         else:
             self._encode = lambda v: v.encode()  # default encoder
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> AsyncFileWriter:
         loop = current_loop()
         self._fut = loop.run_in_executor(None, self._write)
         return self
@@ -53,7 +54,7 @@ class AsyncFileWriter:
                     f.write(item)
                 self._q.sync_q.task_done()
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         await self._q.async_q.put(Sentinel.TOKEN)
         try:
             await self._fut

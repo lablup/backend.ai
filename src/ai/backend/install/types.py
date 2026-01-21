@@ -4,7 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Optional, cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -19,6 +19,7 @@ class InstallModes(enum.StrEnum):
     DEVELOP = "DEVELOP"
     PACKAGE = "PACKAGE"
     MAINTAIN = "MAINTAIN"
+    CONFIGURE = "CONFIGURE"
 
 
 class PackageSource(enum.StrEnum):
@@ -45,12 +46,30 @@ class Platform(enum.StrEnum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+class FrontendMode(enum.StrEnum):
+    PORT = "port"
+    WILDCARD = "wildcard"
+
+
+class EndpointProtocol(enum.StrEnum):
+    HTTP = "http"
+    HTTPS = "https"
+
+
 @dataclasses.dataclass()
 class CliArgs:
     mode: InstallModes | None
     target_path: str
     show_guide: bool
     non_interactive: bool
+    public_facing_address: str
+    accelerator: Optional[str] = None
+    fqdn_prefix: Optional[str] = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -82,6 +101,13 @@ class DistInfo(BaseModel):
     image_refs: list[str] = Field(default_factory=list)
 
 
+class Accelerator(enum.StrEnum):
+    CUDA = "cuda"
+    CUDA_MOCK = "cuda_mock"
+    CUDA_MIG_MOCK = "cuda_mig_mock"
+    ROCM_MOCK = "rocm_mock"
+
+
 class InstallInfo(BaseModel):
     version: str
     type: InstallType
@@ -89,6 +115,7 @@ class InstallInfo(BaseModel):
     base_path: Path
     halfstack_config: HalfstackConfig
     service_config: ServiceConfig
+    accelerator: Optional[Accelerator] = None
 
 
 @dataclasses.dataclass()
@@ -159,3 +186,48 @@ class ServiceConfig:
     storage_agent_var_base_path: str
     storage_watcher_addr: ServerAddr
     vfolder_relpath: str
+    appproxy_api_secret: str | None = None
+    appproxy_jwt_secret: str | None = None
+    appproxy_permit_hash_secret: str | None = None
+    appproxy_coordinator_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10200))
+    )
+    appproxy_worker_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10201))
+    )
+
+
+@dataclasses.dataclass
+class InstallVariable:
+    public_facing_address: str = "127.0.0.1"
+    accelerator: Optional[Accelerator] = None
+    fqdn_prefix: Optional[str] = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
+
+    @property
+    def apphub_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def app_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.app.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def wildcard_domain(self) -> Optional[str]:
+        if self.fqdn_prefix:
+            return f".{self.fqdn_prefix}.app.backend.ai"
+        return None
+
+    @property
+    def storage_public_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        return self.public_facing_address

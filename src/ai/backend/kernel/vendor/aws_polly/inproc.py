@@ -11,7 +11,7 @@ log = logging.getLogger()
 
 
 class PollyInprocRunner(threading.Thread):
-    def __init__(self, input_queue, output_queue, sentinel, access_key, secret_key):
+    def __init__(self, input_queue, output_queue, sentinel, access_key, secret_key) -> None:
         super().__init__(name="InprocRunner", daemon=True)
 
         # for interoperability with the main asyncio loop

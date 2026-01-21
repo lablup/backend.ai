@@ -1,11 +1,20 @@
-import enum
-from typing import Any, Callable, Mapping, Type, TypeAlias, TypeVar, Union
+from collections.abc import Mapping
+from typing import Any, Optional, TypeAlias, TypeVar
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
-from . import ArrayFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
+from ai.backend.manager.errors.resource import DataTransformationFailed
+
+from . import (
+    ArrayFieldItem,
+    EnumFieldItem,
+    FieldSpecItem,
+    JSONFieldItem,
+    ORMFieldItem,
+    get_col_from_table,
+)
 
 __all__ = (
     "FieldSpecType",
@@ -47,30 +56,14 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
+FilterableSQLQuery: TypeAlias = sa.sql.Select | sa.sql.Update | sa.sql.Delete
+_TQuery = TypeVar("_TQuery", sa.sql.Select, sa.sql.Update, sa.sql.Delete)
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
-T_Enum = TypeVar("T_Enum", bound=enum.Enum)
-
-
-def enum_field_getter(enum_cls: Type[T_Enum]) -> Callable[[str], T_Enum]:
-    def get_enum(value: str) -> T_Enum:
-        for enum_name in (value, value.upper()):
-            try:
-                return enum_cls[enum_name]
-            except KeyError:
-                continue
-        else:
-            enum_names = ", ".join([e.name for e in enum_cls])
-            raise ValueError(f"expected one of `{enum_names}` or lower names; got `{value}`")
-
-    return get_enum
+WhereClauseType: TypeAlias = sa.sql.expression.ColumnElement[bool]
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: FieldSpecType = None) -> None:
+    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
@@ -88,13 +81,13 @@ class QueryFilterTransformer(Transformer):
 
     array = list
 
-    def atom(self, token: list[Token]) -> Type[sa.sql.elements.SingletonConstant]:
+    def atom(self, token: list[Token]) -> sa.sql.elements.ColumnElement[Any]:
         a = token[0]
         if a.value == "null":
             return sa.null()
-        elif a.value == "true":
+        if a.value == "true":
             return sa.true()
-        elif a.value == "false":
+        if a.value == "false":
             return sa.false()
         raise ValueError("Unknown/unsupported atomic token", a.value)
 
@@ -105,8 +98,7 @@ class QueryFilterTransformer(Transformer):
             except KeyError:
                 raise ValueError("Unknown/unsupported field name", col_name)
             return func(value) if func is not None else value
-        else:
-            return value
+        return value
 
     def _transform_val(self, col_name: str, op: str, value: Any) -> Any:
         if isinstance(value, Tree):
@@ -117,13 +109,13 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, op, value)
         return val
 
-    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+    def binary_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any]:
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
         val = self._transform_val(col_name, op, children[2])
 
-        def build_expr(op: str, col, val):
+        def build_expr(op: str, col: Any, val: Any) -> sa.sql.elements.ColumnElement[Any]:
             match op:
                 case "==":
                     expr = col == val
@@ -150,9 +142,10 @@ class QueryFilterTransformer(Transformer):
                 case "ilike":
                     expr = col.ilike(val)
                 case _:
-                    expr = args
+                    raise ValueError(f"Unknown operator: {op}")
             return expr
 
+        expr: sa.sql.elements.ColumnElement[Any]
         try:
             if self._fieldspec is not None:
                 match self._fieldspec[children[0].value][0]:
@@ -161,8 +154,8 @@ class QueryFilterTransformer(Transformer):
                         # and select the row if anyone makes the result true.
                         col = get_col_from_table(self._sa_table, col_name)
                         unnested_col = sa.func.unnest(col).alias("item")
-                        subq = (
-                            sa.select([sa.column("item")])
+                        subq: sa.sql.Select[Any] = (
+                            sa.select(sa.column("item"))
                             .select_from(unnested_col)
                             .where(build_expr(op, sa.column("item"), val))
                         )
@@ -172,6 +165,20 @@ class QueryFilterTransformer(Transformer):
                         # to retrieve the value used in the expression.
                         col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)
                         expr = build_expr(op, col, val)
+                    case EnumFieldItem(col_name, enum_cls):
+                        col = get_col_from_table(self._sa_table, col_name)
+                        # allow both key and value of enum to be specified on variable `val`
+                        # fetch original enum pointer from given `val`
+                        try:
+                            enum_val = enum_cls(val)
+                        except ValueError:
+                            try:
+                                enum_val = enum_cls[val]
+                            except KeyError:
+                                raise ValueError(f"Invalid enum value: {val}")
+                        expr = build_expr(op, col, enum_val)
+                    case ORMFieldItem(column):
+                        expr = build_expr(op, column, val)
                     case str(col_name):
                         col = get_col_from_table(self._sa_table, col_name)
                         expr = build_expr(op, col, val)
@@ -197,7 +204,7 @@ class QueryFilterTransformer(Transformer):
         expr2 = children[2]
         if op == "&":
             return sa.and_(expr1, expr2)
-        elif op == "|":
+        if op == "|":
             return sa.or_(expr1, expr2)
         return args
 
@@ -207,7 +214,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: FieldSpecType = None) -> None:
+    def __init__(self, fieldspec: Optional[FieldSpecType] = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 
@@ -225,22 +232,21 @@ class QueryFilterParser:
 
     def append_filter(
         self,
-        sa_query: FilterableSQLQuery,
+        sa_query: _TQuery,
         filter_expr: str,
-    ) -> FilterableSQLQuery:
+    ) -> _TQuery:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
-        elif isinstance(sa_query, sa.sql.Delete):
-            table = sa_query.table
-        elif isinstance(sa_query, sa.sql.Update):
+        elif isinstance(sa_query, (sa.sql.Delete, sa.sql.Update)):
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")
         where_clause = self.parse_filter(table, filter_expr)
         final_query = sa_query.where(where_clause)
-        assert final_query is not None
+        if final_query is None:
+            raise DataTransformationFailed("Failed to apply filter to query")
         return final_query

@@ -27,11 +27,11 @@ NC="\033[0m"
 REWRITELN="\033[A\r\033[K"
 
 readlinkf() {
-  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  scripts/python.sh -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 relpath() {
-  $bpython -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
+  scripts/python.sh -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
 }
 
 sed_inplace() {
@@ -80,6 +80,16 @@ usage() {
   echo "  ${LWHITE}--enable-cuda-mock${NC}"
   echo "    Install CUDA accelerator mock plugin and pull a"
   echo "    TensorFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-cuda-mig-mock${NC}"
+  echo "    Install CUDA accelerator mock plugin and pull a"
+  echo "    TensorFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-rocm-mock${NC}"
+  echo "    Install ROCm accelerator mock plugin and pull a"
+  echo "    TensorFlow ROCm kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
@@ -175,6 +185,9 @@ show_guide() {
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run Backend.AI app-proxy:"
+  echo "  > ${WHITE}./backend.ai app-proxy-coordinator start-server --debug${NC}"
+  echo "  > ${WHITE}./backend.ai app-proxy-worker start-server --debug${NC}"
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -183,18 +196,16 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
   show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
     echo "(Terminal 1)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run build:d${NC}"
     echo "(Terminal 2)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "(Terminal 3)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run server:d${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
@@ -228,19 +239,29 @@ show_guide() {
   fi
 }
 
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo -E'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo -E'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 # Detect distribution
@@ -268,9 +289,21 @@ else
   exit 1
 fi
 
+show_info "Checking the uv installation..."
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  if [ $SHELL = "/bin/fish" ]; then
+    source $HOME/.local/bin/env.fish
+  else
+    source $HOME/.local/bin/env
+  fi
+  show_info "uv is installed."
+else
+  show_info "uv is already installed."
+fi
+
 show_info "Checking the bootstrapper Python version..."
-source scripts/bootstrap-static-python.sh
-$bpython -c 'import sys;print(sys.version_info)'
+scripts/python.sh -c 'import sys; print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -281,13 +314,17 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
-PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
+PANTS_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
+NODE_VERSION=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+ENABLE_CUDA_MIG_MOCK=0
+ENABLE_ROCM_MOCK=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -295,7 +332,11 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
+ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
+APPPROXY_COORDINATOR_PORT="10200"
+APPPROXY_WORKER_PORT="10201"
+APPPROXY_IMPL="port"  # frontend server mode ("port" or "traefik")
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
@@ -327,6 +368,8 @@ while [ $# -gt 0 ]; do
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
+    --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
+    --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -338,6 +381,12 @@ while [ $# -gt 0 ]; do
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
     --webserver-port)       WEBSERVER_PORT=$2; shift ;;
     --webserver-port=*)     WEBSERVER_PORT="${1#*=}" ;;
+    --app-proxy-coordinator-port)    APPPROXY_COORDINATOR_PORT=$2; shift ;;
+    --app-proxy-coordinator-port=*)  APPPROXY_COORDINATOR_PORT="${1#*=}" ;;
+    --app-proxy-worker-port)         APPPROXY_WORKER_PORT=$2; shift ;;
+    --app-proxy-worker-port=*)       APPPROXY_WORKER_PORT="${1#*=}" ;;
+    --app-proxy-impl)                APPPROXY_IMPL=$2; shift ;;
+    --app-proxy-impl=*)              APPPROXY_IMPL="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -465,10 +514,10 @@ install_node() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
   fi
 
-  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
-  show_info "Installing Node.js v${node_version} via NVM..."
-  nvm install $node_version
-  nvm use node
+
+  show_info "Installing Node.js v${NODE_VERSION} via NVM..."
+  nvm install $NODE_VERSION
+  nvm use $NODE_VERSION
 }
 
 set_brew_python_build_flags() {
@@ -561,9 +610,9 @@ check_python() {
 }
 
 bootstrap_pants() {
-  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  pants_local_exec_root=$($docker_sudo scripts/pyscript.sh scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
-  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
+  scripts/pyscript.sh scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
@@ -592,8 +641,12 @@ bootstrap_pants() {
 }
 
 install_editable_webui() {
-  if ! command -v node &> /dev/null; then
+  if ! command -v node &> /dev/null || [ "$(node -v | awk -F. '{print $1}' | sed 's/v//')" != "$NODE_VERSION" ]; then
     install_node
+  fi
+  if ! command -v pnpm &> /dev/null; then
+    show_info "Installing pnpm..."
+    npm install -g pnpm
   fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
@@ -620,9 +673,9 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
-  npm i
+  pushd ./packages/backend.ai-ui && pnpm install && popd
+  pnpm i
   make compile
-  make compile_wsproxy
   cd ../../../..
 }
 
@@ -639,23 +692,20 @@ fi
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m ensurepip --upgrade
-# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $docker_sudo $bpython scripts/check-docker.py
+  $docker_sudo scripts/pyscript.sh scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
   # checking docker compose v2 -f flag
   if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on ${HOME}/.docker/cli-plugins"
     exit 1
   fi
   if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on /usr/local/lib/docker/cli-plugins"
     exit 1
   fi
   if [ "$DISTRO" = "Darwin" ]; then
@@ -677,9 +727,10 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   fi
 fi
 
-if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  show_error "You can't use both CUDA and CUDA mock plugins at once!"
-  show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
+count=$(( ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK ))
+if [ $count -gt 1 ]; then
+  show_error "You can't use multiple CUDA/ROCm plugins at once!"
+  show_error "Please remove --enable-cuda, --enable-cuda-mock, --enable-cuda-mig-mock, --enable-rocm-mock flag to continue."
   exit 1
 fi
 
@@ -691,30 +742,73 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
-setup_environment() {
-  # Install pyenv
-  if ! type "pyenv" >/dev/null 2>&1; then
-    if [ -d "$HOME/.pyenv" ]; then
-      eval "$pyenv_init_script"
-      pyenv --version
+wait_for_docker() {
+  # Wait for Docker to start
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  until $docker_sudo docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
+}
+
+append_to_profiles() {
+  script_content="$1"
+  PROFILE_FILES=("zshrc" "bashrc" "profile" "bash_profile" "config/fish/config.fish")
+
+  for PROFILE_FILE in "${PROFILE_FILES[@]}"; do
+    FULL_PATH="${HOME}/.${PROFILE_FILE}"
+
+    if [ -e "$FULL_PATH" ] && ! grep -qF "$script_content" "$FULL_PATH"; then
+      echo "$script_content" >>"$FULL_PATH"
     fi
+  done
+}
+
+install_rover_cli() {
+  if command -v rover >/dev/null 2>&1; then
+    echo "✓ Rover CLI is already installed: $(rover --version)"
+    return 0
+  fi
+
+  curl -sSL https://rover.apollo.dev/nix/latest | sh
+
+  rover_settings='# Apollo Rover Settings
+export PATH="$HOME/.rover/bin:$PATH"
+export APOLLO_ELV2_LICENSE=accept'
+
+  append_to_profiles "$rover_settings"
+
+  export PATH="$HOME/.rover/bin:$PATH"
+  export APOLLO_ELV2_LICENSE=accept
+}
+
+setup_environment() {
+  wait_for_docker
+  # Install pyenv
+  if ! type "pyenv" >/dev/null 2>&1 && [ ! -d "$HOME/.pyenv" ]; then
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
-    for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-    do
-      if [ -e "${HOME}/.${PROFILE_FILE}" ]
-      then
-        echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
-      fi
-    done
     set +e
-    eval "$pyenv_init_script"
-    pyenv --version
     _INSTALLED_PYENV=1
-  else
-    eval "$pyenv_init_script"
   fi
+  append_to_profiles "$pyenv_init_script"
+  eval "$pyenv_init_script"
+  pyenv --version
 
   # Install Python and pyenv virtualenvs
   show_info "Checking and installing Python dependencies..."
@@ -729,11 +823,11 @@ setup_environment() {
   show_info "Ensuring checkout of LFS files..."
   git lfs pull
 
-  show_info "Ensuring checkout of submodules..."
-  git submodule update --init --checkout --recursive
-
   show_info "Configuring the standard git hooks..."
   install_git_hooks
+
+  show_info "Installing Rover CLI..."
+  install_rover_cli
 
   show_info "Installing Python..."
   install_python
@@ -754,11 +848,8 @@ setup_environment() {
   pants export \
     --resolve=python-default \
     --resolve=python-kernel \
-    --resolve=pants-plugins \
     --resolve=towncrier \
-    --resolve=ruff \
-    --resolve=mypy \
-    --resolve=black
+    --resolve=mypy
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.
 
@@ -767,18 +858,35 @@ setup_environment() {
   mkdir -p "$HALFSTACK_VOLUME_PATH"
   if [ $CONFIGURE_HA -eq 1 ]; then
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
+    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus-ha.yaml"
+    SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
+    SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
+    SOURCE_OTEL_COLLECTOR_CONFIG_PATH="configs/otel/otel-collector-config.yaml"
+    SOURCE_LOKI_CONFIG_PATH="configs/loki/loki-config.yaml"
+    SOURCE_TEMPO_CONFIG_PATH="configs/tempo/tempo-config.yaml"
+    SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
+    SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
 
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
+    cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
+    cp -r "${SOURCE_GRAFANA_PROVISIONING_PATH}" "grafana-provisioning"
+    cp "${SOURCE_OTEL_COLLECTOR_CONFIG_PATH}" "otel-collector-config.yaml"
+    cp "${SOURCE_LOKI_CONFIG_PATH}" "loki-config.yaml"
+    cp "${SOURCE_TEMPO_CONFIG_PATH}" "tempo-config.yaml"
+    cp "${SOURCE_APOLLO_ROUTER_CONFIG_PATH}" "gateway.config.ts"
+    cp "${SOURCE_SUPERGRAPH_PATH}" "supergraph.graphql"
     sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_MASTER_PORT}/${REDIS_MASTER_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_PORT}/${REDIS_SLAVE1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_PORT}/${REDIS_SLAVE2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL1_PORT}/${REDIS_SENTINEL1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL2_PORT}/${REDIS_SENTINEL2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL3_PORT}/${REDIS_SENTINEL3_PORT}/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -810,11 +918,26 @@ setup_environment() {
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
   else
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-    if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-      SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-    fi
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
+    SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
+    SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
+    SOURCE_OTEL_COLLECTOR_CONFIG_PATH="configs/otel/otel-collector-config.yaml"
+    SOURCE_LOKI_CONFIG_PATH="configs/loki/loki-config.yaml"
+    SOURCE_TEMPO_CONFIG_PATH="configs/tempo/tempo-config.yaml"
+    SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
+    SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
+
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
+    cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
+    cp -r "${SOURCE_GRAFANA_PROVISIONING_PATH}" "grafana-provisioning"
+    cp "${SOURCE_OTEL_COLLECTOR_CONFIG_PATH}" "otel-collector-config.yaml"
+    cp "${SOURCE_LOKI_CONFIG_PATH}" "loki-config.yaml"
+    cp "${SOURCE_TEMPO_CONFIG_PATH}" "tempo-config.yaml"
+    cp "${SOURCE_APOLLO_ROUTER_CONFIG_PATH}" "gateway.config.ts"
+    cp "${SOURCE_SUPERGRAPH_PATH}" "supergraph.graphql"
   fi
 
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
@@ -837,12 +960,28 @@ setup_environment() {
 }
 
 configure_backendai() {
+  wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Install rover cli for Supergraph generation
+  install_rover_cli
+
+  # Configure MinIO using separate configuration script
+  source "$(dirname "$0")/configure-minio.sh"
+  configure_minio "docker-compose.halfstack.current.yml"
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    cp "configs/accelerator/cuda-mock-mig.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    cp "configs/accelerator/rocm-mock.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -871,7 +1010,41 @@ configure_backendai() {
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
-  # configure halfstack ports
+  # configure account-manager
+  show_info "Copy default configuration files to account-manager root..."
+  cp configs/account-manager/halfstack.toml ./account-manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./account-manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
+  sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
+  cp configs/account-manager/halfstack.alembic.ini ./alembic-accountmgr.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-accountmgr.ini
+
+  # configure app-proxy
+  # TODO: traefik mode option
+  # TODO: support ha config
+  show_info "Copy default configuration files to app-proxy root..."
+  APPPROXY_API_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  APPPROXY_JWT_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  APPPROXY_PERMIT_HASH_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(32), end="")')
+  cp configs/app-proxy-coordinator/halfstack.toml ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/port = 10200/port = ${APPPROXY_COORDINATOR_PORT}/" ./app-proxy-coordinator.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/api_secret = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-coordinator.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-coordinator.toml
+  cp configs/app-proxy-coordinator/halfstack.alembic.ini ./alembic-appproxy.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-appproxy.ini
+  cp configs/app-proxy-worker/halfstack.toml ./app-proxy-worker.toml
+  sed_inplace "s/port = 8110/port = ${REDIS_PORT}/" ./app-proxy-worker.toml
+  sed_inplace "s/port = 10201/port = ${APPPROXY_WORKER_PORT}/" ./app-proxy-worker.toml
+  sed_inplace "s/api_secret = \"some_api_secret\"/api_secret = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
+  sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-worker.toml
+
+  # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
   mkdir -p "$VAR_BASE_PATH"
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
@@ -880,7 +1053,7 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
 
-  # configure backend mode
+  # configure agent (container backend)
   if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
     sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
     sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
@@ -893,15 +1066,19 @@ configure_backendai() {
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
 
-  # configure agent
+  # configure agent (dummy backend)
   cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
-  cp configs/storage-proxy/sample.toml ./storage-proxy.toml
+  cp configs/storage-proxy/halfstack.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
@@ -918,6 +1095,9 @@ configure_backendai() {
   sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+
+  # Configure storage-proxy MinIO settings using separate configuration script
+  configure_storage_proxy_minio "./storage-proxy.toml"
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
@@ -941,34 +1121,62 @@ configure_backendai() {
     show_note "The currently embedded webui version: $webui_version"
   fi
 
-  # configure tester
-  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
-  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
-  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user2-api.sh" > ./env-tester-user2.sh
-
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
     $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   fi
 
   # initialize the DB schema
-  show_info "Setting up databases..."
+  POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+
+  show_info "Setting up databases... (core)"
+  echo "(postgres container: ${POSTGRES_CONTAINER_ID})"
   ./backend.ai mgr schema oneshot
+
+  ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
 
-  # Docker registry setup
-  show_info "Configuring the Lablup's official image registry..."
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-  else
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-  fi
+  # Populate artifact registries with substituted MinIO credentials
+  TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
+  cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
+  rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+
+  show_info "Setting up databases... (account-manager)"
+  # TODO: add "schema oneshot" command for account-manager
+  # ./py -m alembic -c alembic-accountmgr.ini upgrade head
+  # TODO: populate fixtures
+
+  show_info "Setting up databases... (app-proxy)"
+  _psql_core="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
+  _psql_appproxy="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
+  $_psql_core -c "\
+    DO \$\$
+    BEGIN
+       IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'appproxy') THEN
+          CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';
+       ELSE
+          ALTER ROLE appproxy WITH LOGIN PASSWORD 'develove';
+       END IF;
+    END
+    \$\$;"
+  $_psql_core -tc "SELECT 1 FROM pg_database WHERE datname = 'appproxy'" | grep -q 1 || $_psql_core -c "CREATE DATABASE appproxy"
+  $_psql_core -c "GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;"
+  $_psql_appproxy -c "GRANT ALL ON SCHEMA public TO appproxy;"
+  # TODO: add "schema oneshot" command for app-proxy
+  ./py -m alembic -c alembic-appproxy.ini upgrade head
+  $_psql_core -c "\
+    UPDATE scaling_groups SET \
+    wsproxy_api_token = '${APPPROXY_API_SECRET}', \
+    wsproxy_addr = 'http://localhost:${APPPROXY_COORDINATOR_PORT}' \
+    WHERE name = 'default';"
 
   # Scan the container image registry
   show_info "Scanning the image registry..."
@@ -987,12 +1195,11 @@ configure_backendai() {
   echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
-  POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
   ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+  $_psql_core -c "UPDATE domains SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE groups SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE keypair_resource_policies SET allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $_psql_core -c "UPDATE vfolders SET host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' WHERE host='${LOCAL_STORAGE_VOLUME}';"
 
   # Client backend endpoint configuration shell script
   CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
@@ -1019,8 +1226,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
   CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
@@ -1046,8 +1253,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
   CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
@@ -1081,15 +1288,9 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
-
-  # TODO: Update tester env script
-  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
-  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
-  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
-  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
 
   show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."
   ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json

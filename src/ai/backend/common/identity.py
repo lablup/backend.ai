@@ -1,32 +1,45 @@
+import asyncio
+import asyncio.staggered
+import base64
+import enum
+import functools
 import json
 import logging
 import os
 import socket
-import sys
+import uuid
+from collections.abc import Awaitable, Callable, Iterable
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
 from pathlib import Path, PosixPath
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Optional
 
 import aiodns
+import aiohttp
 import ifaddr
 import psutil
 
 from .utils import curl
 
 __all__ = (
-    "detect_cloud",
     "current_provider",
+    "detect_cloud",
     "get_instance_id",
     "get_instance_ip",
-    "get_instance_type",
     "get_instance_region",
+    "get_instance_type",
     "get_root_fs_type",
     "get_wsl_version",
 )
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
+
+
+class CloudProvider(enum.StrEnum):
+    AWS = "amazon"
+    GCP = "google"
+    AZURE = "azure"
 
 
 def is_containerized() -> bool:
@@ -35,48 +48,55 @@ def is_containerized() -> bool:
     """
     try:
         cginfo = Path("/proc/self/cgroup").read_text()
-        if "/docker/" in cginfo or "/lxc/" in cginfo:
-            return True
-        return False
-    except IOError:
+        return "/docker/" in cginfo or "/lxc/" in cginfo
+    except OSError:
         return False
 
 
-def detect_cloud() -> Optional[str]:
+async def _detect_aws(session: aiohttp.ClientSession) -> CloudProvider:
+    async with session.get(
+        "http://169.254.169.254/latest/meta-data/",
+    ):
+        return CloudProvider.AWS
+
+
+async def _detect_azure(session: aiohttp.ClientSession) -> CloudProvider:
+    async with session.get(
+        "http://169.254.169.254/metadata/instance/compute",
+        params={"api-version": "2021-02-01"},
+        headers={"Metadata": "true"},
+    ):
+        return CloudProvider.AZURE
+
+
+async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
+    async with session.get(
+        "http://169.254.169.254/computeMetadata/v1/instance/id",
+        headers={"Metadata-Flavor": "Google"},
+    ):
+        return CloudProvider.GCP
+
+
+async def detect_cloud() -> Optional[CloudProvider]:
     """
-    Detect the cloud provider where I am running on.
+    Detect the cloud provider using asyncio.staggered_race()
+    to get the fastest returning result from multiple metadata URL detectors.
     """
-    # NOTE: Contributions are welcome!
-    # Please add other cloud providers such as Rackspace, IBM BlueMix, etc.
-    if sys.platform.startswith("linux"):
-        # Google Cloud Platform or Amazon AWS (hvm)
-        try:
-            # AWS Nitro-based instances
-            mb = Path("/sys/devices/virtual/dmi/id/board_vendor").read_text().lower()
-            if "amazon" in mb:
-                return "amazon"
-        except IOError:
-            pass
-        try:
-            bios = Path("/sys/devices/virtual/dmi/id/bios_version").read_text().lower()
-            if "google" in bios:
-                return "google"
-            if "amazon" in bios:
-                return "amazon"
-        except IOError:
-            pass
-        # Microsoft Azure
-        # https://gallery.technet.microsoft.com/scriptcenter/Detect-Windows-Azure-aed06d51
-        # TODO: this only works with Debian/Ubuntu instances.
-        # TODO: this does not work inside containers.
-        try:
-            dhcp = Path("/var/lib/dhcp/dhclient.eth0.leases").read_text()
-            if "unknown-245" in dhcp:
-                return "azure"
-            # alternative method is to read /var/lib/waagent/GoalState.1.xml
-            # but it requires sudo privilege.
-        except IOError:
-            pass
+    async with aiohttp.ClientSession(
+        raise_for_status=True,
+        timeout=aiohttp.ClientTimeout(connect=0.3),
+    ) as session:
+        detection_tasks = [
+            functools.partial(_detect_aws, session),
+            functools.partial(_detect_azure, session),
+            functools.partial(_detect_gcp, session),
+        ]
+        winner_value, winner_index, exceptions = await asyncio.staggered.staggered_race(
+            detection_tasks,
+            delay=0.001,
+        )
+        if winner_value is not None:
+            return winner_value
     return None
 
 
@@ -123,7 +143,19 @@ def get_wsl_version() -> int:
 
 
 # Detect upon module load.
-current_provider = detect_cloud()
+try:
+    try:
+        asyncio.get_running_loop()
+        # If there's already a running loop, skip detection at module load
+        # to avoid "cannot be called from a running event loop" error
+        current_provider = None
+    except RuntimeError:
+        # No running loop, safe to use asyncio.run()
+        current_provider = asyncio.run(detect_cloud())
+except Exception as e:
+    log.warning(f"Failed to detect cloud provider: {e}")
+    current_provider = None
+
 if current_provider is None:
     log.info("Detected environment: on-premise setup")
     log.info("The agent node ID is set using the hostname.")
@@ -147,137 +179,157 @@ def _define_functions():
     if _defined:
         return
 
-    if current_provider == "amazon":
-        # ref: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
-        _metadata_prefix = "http://169.254.169.254/latest/meta-data/"
-        _dynamic_prefix = "http://169.254.169.254/latest/dynamic/"
+    match current_provider:
+        case CloudProvider.AWS:
+            # ref: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+            _metadata_prefix = "http://169.254.169.254/latest/meta-data/"
+            _dynamic_prefix = "http://169.254.169.254/latest/dynamic/"
 
-        async def _get_instance_id() -> str:
-            return await curl(_metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}")
+            async def _get_instance_id() -> str:
+                return await curl(
+                    _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
+                )
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
-            return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
+            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+                return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
-        async def _get_instance_type() -> str:
-            return await curl(_metadata_prefix + "instance-type", "unknown")
+            async def _get_instance_type() -> str:
+                return await curl(_metadata_prefix + "instance-type", "unknown")
 
-        async def _get_instance_region() -> str:
-            doc = await curl(_dynamic_prefix + "instance-identity/document", None)
-            if doc is None:
-                return "amazon/unknown"
-            region = json.loads(doc)["region"]
-            return f"amazon/{region}"
+            async def _get_instance_region() -> str:
+                doc = await curl(_dynamic_prefix + "instance-identity/document", None)
+                if doc is None:
+                    return "amazon/unknown"
+                region = json.loads(doc)["region"]
+                return f"amazon/{region}"
 
-    elif current_provider == "azure":
-        # ref: https://docs.microsoft.com/azure/virtual-machines/virtual-machines-instancemetadataservice-overview
-        _metadata_prefix = "http://169.254.169.254/metadata/instance"
+        case CloudProvider.AZURE:
+            # ref: https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-serviceb
+            _metadata_prefix = "http://169.254.169.254/metadata/instance"
 
-        async def _get_instance_id() -> str:
-            data = await curl(
-                _metadata_prefix,
-                None,
-                params={"version": "2017-03-01"},
-                headers={"Metadata": "true"},
-            )
-            if data is None:
+            async def _get_instance_id() -> str:
+                data = await curl(
+                    _metadata_prefix,
+                    None,
+                    params={"api-version": "2021-02-01"},
+                    headers={"Metadata": "true"},
+                )
+                if data is None:
+                    return f"i-{socket.gethostname()}"
+                o = json.loads(data)
+                vm_name = o["compute"]["name"]  # unique within the resource group
+                vm_id = uuid.UUID(o["compute"]["vmId"])  # prevent conflicts across resource group
+                vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
+                return f"i-{vm_name}-{vm_id_hash}"
+
+            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+                data = await curl(
+                    _metadata_prefix,
+                    None,
+                    params={"api-version": "2021-02-01"},
+                    headers={"Metadata": "true"},
+                )
+                if data is None:
+                    return "127.0.0.1"
+                o = json.loads(data)
+                return o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+
+            async def _get_instance_type() -> str:
+                data = await curl(
+                    _metadata_prefix,
+                    None,
+                    params={"api-version": "2021-02-01"},
+                    headers={"Metadata": "true"},
+                )
+                if data is None:
+                    return "unknown"
+                o = json.loads(data)
+                return o["compute"]["vmSize"]
+
+            async def _get_instance_region() -> str:
+                data = await curl(
+                    _metadata_prefix,
+                    None,
+                    params={"api-version": "2021-02-01"},
+                    headers={"Metadata": "true"},
+                )
+                if data is None:
+                    return "azure/unknown"
+                o = json.loads(data)
+                region = o["compute"]["location"]
+                return f"azure/{region}"
+
+        case CloudProvider.GCP:
+            # ref: https://cloud.google.com/compute/docs/storing-retrieving-metadata
+            _metadata_prefix = "http://169.254.169.254/computeMetadata/v1/"
+
+            async def _get_instance_id() -> str:
+                vm_id = await curl(
+                    _metadata_prefix + "instance/id",
+                    None,
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                if vm_id is None:
+                    return f"i-{socket.gethostname()}"
+                vm_name = await curl(
+                    _metadata_prefix + "instance/name",
+                    None,
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
+                return f"i-{vm_name}-{vm_id_hash}"
+
+            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+                return await curl(
+                    _metadata_prefix + "instance/network-interfaces/0/ip",
+                    "127.0.0.1",
+                    headers={"Metadata-Flavor": "Google"},
+                )
+
+            async def _get_instance_type() -> str:
+                value = await curl(
+                    _metadata_prefix + "instance/machine-type",
+                    "unknown",
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                return value.rsplit("/")[-1]
+
+            async def _get_instance_region() -> str:
+                value = await curl(
+                    _metadata_prefix + "instance/zone",
+                    "unknown",
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                region = value.rsplit("/")[-1]
+                return f"google/{region}"
+
+        case _:
+            _metadata_prefix = None
+
+            async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
-            o = json.loads(data)
-            return o["compute"]["vmId"]
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
-            data = await curl(
-                _metadata_prefix,
-                None,
-                params={"version": "2017-03-01"},
-                headers={"Metadata": "true"},
-            )
-            if data is None:
-                return "127.0.0.1"
-            o = json.loads(data)
-            return o["network"]["interface"][0]["ipv4"]["ipaddress"][0]["ipaddress"]
+            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+                if subnet_hint is not None and subnet_hint.prefixlen > 0:
+                    local_ipaddrs = [*fetch_local_ipaddrs(subnet_hint)]
+                    if local_ipaddrs:
+                        return str(local_ipaddrs[0])
+                    raise RuntimeError(
+                        f"Could not find my IP address bound to subnet {subnet_hint}"
+                    )
+                try:
+                    myself = socket.gethostname()
+                    resolver = aiodns.DNSResolver()
+                    result = await resolver.gethostbyname(myself, socket.AF_INET)
+                    return result.addresses[0]
+                except aiodns.error.DNSError:
+                    return "127.0.0.1"
 
-        async def _get_instance_type() -> str:
-            data = await curl(
-                _metadata_prefix,
-                None,
-                params={"version": "2017-03-01"},
-                headers={"Metadata": "true"},
-            )
-            if data is None:
-                return "unknown"
-            o = json.loads(data)
-            return o["compute"]["vmSize"]
+            async def _get_instance_type() -> str:
+                return "default"
 
-        async def _get_instance_region() -> str:
-            data = await curl(
-                _metadata_prefix,
-                None,
-                params={"version": "2017-03-01"},
-                headers={"Metadata": "true"},
-            )
-            if data is None:
-                return "azure/unknown"
-            o = json.loads(data)
-            region = o["compute"]["location"]
-            return f"azure/{region}"
-
-    elif current_provider == "google":
-        # ref: https://cloud.google.com/compute/docs/storing-retrieving-metadata
-        _metadata_prefix = "http://metadata.google.internal/computeMetadata/v1/"
-
-        async def _get_instance_id() -> str:
-            return await curl(
-                _metadata_prefix + "instance/id",
-                lambda: f"i-{socket.gethostname()}",
-                headers={"Metadata-Flavor": "Google"},
-            )
-
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
-            return await curl(
-                _metadata_prefix + "instance/network-interfaces/0/ip",
-                "127.0.0.1",
-                headers={"Metadata-Flavor": "Google"},
-            )
-
-        async def _get_instance_type() -> str:
-            return await curl(
-                _metadata_prefix + "instance/machine-type",
-                "unknown",
-                headers={"Metadata-Flavor": "Google"},
-            )
-
-        async def _get_instance_region() -> str:
-            zone = await curl(
-                _metadata_prefix + "instance/zone", "unknown", headers={"Metadata-Flavor": "Google"}
-            )
-            region = zone.rsplit("-", 1)[0]
-            return f"google/{region}"
-
-    else:
-        _metadata_prefix = None
-
-        async def _get_instance_id() -> str:
-            return f"i-{socket.gethostname()}"
-
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
-            if subnet_hint is not None and subnet_hint.prefixlen > 0:
-                local_ipaddrs = [*fetch_local_ipaddrs(subnet_hint)]
-                if local_ipaddrs:
-                    return str(local_ipaddrs[0])
-                raise RuntimeError("Could not find my IP address bound to subnet {}", subnet_hint)
-            try:
-                myself = socket.gethostname()
-                resolver = aiodns.DNSResolver()
-                result = await resolver.gethostbyname(myself, socket.AF_INET)
-                return result.addresses[0]
-            except aiodns.error.DNSError:
-                return "127.0.0.1"
-
-        async def _get_instance_type() -> str:
-            return "default"
-
-        async def _get_instance_region() -> str:
-            return os.environ.get("BACKEND_REGION", "local")
+            async def _get_instance_region() -> str:
+                return os.environ.get("BACKEND_REGION", "local")
 
     get_instance_id = _get_instance_id
     get_instance_ip = _get_instance_ip

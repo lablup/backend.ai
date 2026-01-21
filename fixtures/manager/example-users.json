@@ -24,7 +24,8 @@
         {
             "name": "default",
             "max_vfolder_count": 0,
-            "max_quota_scope_size": -1
+            "max_quota_scope_size": -1,
+            "max_network_count": 3
         }
     ],
     "groups": [
@@ -59,7 +60,9 @@
             "driver": "static",
             "driver_opts": {},
             "scheduler": "fifo",
-            "scheduler_opts": {}
+            "scheduler_opts": {},
+            "wsproxy_addr": "http://127.0.0.1:5050",
+            "wsproxy_api_token": "v625xZLOgbMHhl0s49VuqQ"
         }
     ],
     "sgroups_for_domains": [

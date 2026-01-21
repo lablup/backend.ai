@@ -1,11 +1,10 @@
 import asyncio
 import importlib
 import inspect
-import json
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, get_args, get_type_hints
+from typing import Any, cast, get_args, get_type_hints
 
 import aiohttp_cors
 import click
@@ -16,7 +15,9 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
+from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
@@ -55,13 +56,10 @@ def flatten_or(scheme: t.Trafaret) -> list[t.Trafaret]:
 def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Or):
         trafarets = flatten_or(scheme)
-        valid_trafarets = [
-            x for x in trafarets if not (isinstance(x, t.Null) or isinstance(x, UndefChecker))
-        ]
+        valid_trafarets = [x for x in trafarets if not isinstance(x, (t.Null, UndefChecker))]
         if len(valid_trafarets) >= 2:
-            return {"anyOf": list(_traverse(s) for s in valid_trafarets)}
-        else:
-            scheme = valid_trafarets[0]
+            return {"anyOf": [_traverse(s) for s in valid_trafarets]}
+        scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
         return {"type": "string"}
     if isinstance(scheme, t.Bool):
@@ -74,6 +72,15 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Enum):
         enum_values = scheme.variants  # type: ignore[attr-defined]
         return {"type": "string", "enum": enum_values}
+    if isinstance(scheme, tx.DelimiterSeperatedList):
+        return {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "List of items separated by a delimiter (default: comma). "
+                "Items may contain spaces, but not the delimiter."
+            ),
+        }
     if isinstance(scheme, t.Float):
         resp = {"type": "integer"}
         if gte := scheme.gte:  # type: ignore[attr-defined]
@@ -119,7 +126,13 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, tx.Path):
         return {"type": "string", "description": "POSIX path"}
     if isinstance(scheme, tx.Slug):
-        return {"type": "string", "pattern": str(scheme._rx_slug.pattern)}
+        return {
+            "type": "string",
+            "description": (
+                "String composed of alpha-numeric characters with hyphen and underscores in the middle "
+                "(space and dot may be additionally allowed depending on the used locations)"
+            ),
+        }
     if isinstance(scheme, tx.TimeDuration):
         return {
             "anyOf": [
@@ -158,7 +171,7 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
         and len([
             x
             for x in scheme.trafarets  # type: ignore[attr-defined]
-            if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+            if isinstance(x, (t.Null, UndefChecker))
         ])
         > 0
     )
@@ -188,7 +201,7 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict]:
 
             schema["default"] = default_value
         if hasattr(key, "__openapi_desc__"):
-            schema["description"] = getattr(key, "__openapi_desc__")
+            schema["description"] = key.__openapi_desc__
         resp += [{"name": names[0], "schema": schema, "required": not optional}]
     return resp
 
@@ -220,7 +233,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             },
             "schemas": {},
         },
-        "paths": defaultdict(lambda: {}),
+        "paths": defaultdict(dict),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:
@@ -259,20 +272,21 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 preconds = []
-                handler_attrs = getattr(route.handler, "_backend_attrs")
+                handler_attrs = route.handler._backend_attrs
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"TokenAuth": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):
                     preconds.append(f"{auth_scope.capitalize()} privilege required.")
                 if manager_status := handler_attrs.get("required_server_statuses"):
-                    if len(manager_status) > 0:
+                    manager_status = cast(frozenset[ManagerStatus], manager_status)
+                    if len(manager_status) == 1:
                         preconds.append(
                             f"Manager status required: {list(manager_status)[0].value.upper()}"
                         )
                     else:
                         preconds.append(
                             "Manager status required: one of "
-                            f"{', '.join([e.value.upper() for e in manager_status])}"
+                            f"{', '.join([e.value.upper() for e in sorted(manager_status)])}"
                         )
                 if preconds:
                     description.append("\n**Preconditions:**")
@@ -292,7 +306,9 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                             raw_examples = handler_attrs.get("request_examples") or []
                             examples = {
                                 f"{operation_id}_Example{i}": {"value": e}
-                                for e, i in zip(raw_examples, range(1, len(raw_examples) + 1))
+                                for e, i in zip(
+                                    raw_examples, range(1, len(raw_examples) + 1), strict=True
+                                )
                             }
                             route_def["requestBody"] = {
                                 "content": {
@@ -329,7 +345,12 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
 
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
-            type_hints = get_type_hints(route.handler)
+            try:
+                type_hints = get_type_hints(route.handler)
+            except (NameError, AttributeError):
+                # Skip type hint extraction for handlers with unresolvable forward references
+                # (e.g., GraphQLView subclasses)
+                type_hints = {}
             if (
                 (ret_type := type_hints.get("return"))
                 and (response_cls := getattr(ret_type, "__origin__", ret_type))
@@ -340,7 +361,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                     arg: type[BaseModel]
                     (arg,) = get_args(ret_type)
                     schema_name = f"{arg.__name__}_List"
-                    response_schema = TypeAdapter(List[arg]).json_schema(  # type: ignore[valid-type]
+                    response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]
                         ref_template="#/components/schemas/{model}"
                     )
                 elif issubclass(response_cls, BaseModel):
@@ -369,7 +390,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
     return openapi
 
 
-async def _generate():
+async def generate() -> dict[str, Any]:
     from ai.backend.manager.server import global_subapp_pkgs
 
     cors_options = {
@@ -398,12 +419,12 @@ def main(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
-    openapi = asyncio.run(_generate())
+    openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+        print(pretty_json_str(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+            fw.write(pretty_json_str(openapi))
 
 
 if __name__ == "__main__":

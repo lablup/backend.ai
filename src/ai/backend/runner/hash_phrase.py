@@ -19,10 +19,8 @@ def load_dictionary(dictionary_file=None):
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
-    with open(dictionary_file, "r") as f:
-        dictionary = json.load(f)
-
-    return dictionary
+    with open(dictionary_file) as f:
+        return json.load(f)
 
 
 def default_hasher(data):
@@ -42,8 +40,8 @@ def hash_phrase(
         dictionary = load_dictionary()
 
     dict_len = len(dictionary)
-    entropy_per_word = math.log(dict_len, 2)
-    num_words = int(math.ceil(minimum_entropy / entropy_per_word))
+    entropy_per_word = math.log2(dict_len)
+    num_words = math.ceil(minimum_entropy / entropy_per_word)
 
     # Hash the data and convert to a big integer (converts as Big Endian)
     hash = hashfunc(data)
@@ -53,7 +51,7 @@ def hash_phrase(
     # Check entropy
     if num_words * entropy_per_word > available_entropy:
         raise Exception(
-            "The output entropy of the specified hashfunc (%d) is too small." % available_entropy  # NOQA
+            f"The output entropy of the specified hashfunc ({available_entropy}) is too small."
         )
 
     # Generate phrase

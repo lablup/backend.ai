@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "deviceInfo": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9.-]+$": {
+          "type": "object",
+          "properties": {
+            "slot_name": { "type": "string" },
+            "description": { "type": "string" },
+            "human_readable_name": { "type": "string" },
+            "display_unit": { "type": "string" },
+            "number_format": {
+              "type": "object",
+              "properties": {
+                "binary": { "type": "boolean" },
+                "round_length": { "type": "integer" }
+              },
+              "required": ["binary", "round_length"]
+            },
+            "display_icon": { "type": "string" }
+          },
+          "required": ["slot_name", "description", "human_readable_name", "display_unit", "number_format", "display_icon"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["deviceInfo"]
+}

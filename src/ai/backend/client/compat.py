@@ -5,10 +5,10 @@ A compatibility module for backported codes from Python 3.6+ standard library.
 import asyncio
 
 __all__ = (
-    "current_loop",
     "all_tasks",
     "asyncio_run",
     "asyncio_run_forever",
+    "current_loop",
 )
 
 

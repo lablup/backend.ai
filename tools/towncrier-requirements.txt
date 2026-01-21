@@ -1,1 +1,1 @@
-towncrier~=22.12
+towncrier~=24.8

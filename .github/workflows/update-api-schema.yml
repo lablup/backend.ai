@@ -1,13 +1,17 @@
-name: graphql
+name: update-api-schema
 
 on:
   pull_request:
     paths:
       - 'src/ai/backend/manager/models/**'
+      - 'src/ai/backend/manager/api/**'
+      - 'VERSION'
 
 jobs:
-  graphql-updated:
+  api-updated:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -16,16 +20,20 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v4
+    - name: Checkout the revision with minimal required history
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.OCTODOG }}
+        lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -38,39 +46,56 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./actions/init-pants
+      uses: pantsbuild/actions/init-pants@v10
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
+        gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Pants export
       run: pants export --resolve=python-default
-    - name: Create GraphQL schema dump
+    - name: Install Rover CLI for generating supergraph
       run: |
-        ./backend.ai mgr api dump-gql-schema --output src/ai/backend/manager/api/schema.graphql
-    - name: Extract the author information
-      id: get_author_info
+        curl -sSL https://rover.apollo.dev/nix/latest | sh
+        echo "$HOME/.rover/bin" >> $GITHUB_PATH
+    - name: Create api schema dump
+      env: 
+        APOLLO_ELV2_LICENSE: accept
       run: |
+        ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
+        ./backend.ai mgr api dump-gql-schema --v2 --output docs/manager/graphql-reference/v2-schema.graphql
+        ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o docs/manager/graphql-reference
+        ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
+    - name: Make commit message for changing change log file
+      run: |
+        git add docs/manager/graphql-reference/schema.graphql
+        git add docs/manager/graphql-reference/v2-schema.graphql
+        git add docs/manager/graphql-reference/supergraph.graphql
+        git add docs/manager/rest-reference/openapi.json
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
-        echo "Retrieved author information: $author_name <$author_email>"
-        echo "name=$author_name" >> $GITHUB_OUTPUT
-        echo "email=$author_email" >> $GITHUB_OUTPUT
-    - name: Make commit message for changing change log file
-      uses: stefanzweifel/git-auto-commit-action@v4
-      with:
-        commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
-        commit_message: 'chore: update GraphQL schema dump'
+        git config user.email "$author_email"
+        git config user.name "$author_name"
+        if [ -n "$(git diff --staged)" ]; then
+          git commit \
+            -m "chore: update api schema dump" \
+            --author="$author_name <$author_email>" \
+            --trailer "Co-authored-by: octodog <mu001@lablup.com>"
+          git push
+        fi
 
   graphql-inspector:
-    needs: graphql-updated
-    name: Check Schema
+    needs: api-updated
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: kamilkisiela/graphql-inspector@release-1689086705050
+      - uses: actions/checkout@v6
+      - uses: kamilkisiela/graphql-inspector@release-1717403590269
         with:
-          schema: 'main:src/ai/backend/manager/api/schema.graphql'
+          schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
           rules: |
-            custom-rule.js
+            gql-inspector-checker.js

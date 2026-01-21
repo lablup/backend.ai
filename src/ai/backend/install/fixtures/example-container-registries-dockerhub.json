@@ -1,0 +1,11 @@
+{
+    "container_registries": [
+        {
+            "id": "abc42a05-4471-41fa-8772-10bf6452c7d1",
+            "registry_name": "index.docker.io",
+            "url": "https://registry-1.docker.io",
+            "type": "docker",
+            "username": "lablup"
+        }
+    ]
+}

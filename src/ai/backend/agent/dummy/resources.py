@@ -1,32 +1,27 @@
 import logging
+from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 
-from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DeviceName, SlotName
-
-from ..exception import InitializationError
-from ..resources import (
+from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputePluginContext,
     known_slot_types,
 )
+from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.types import DeviceName, SlotName
+from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+from .config import read_dummy_config
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def load_resources(
-    etcd: AsyncEtcd,
+    etcd: AbstractKVStore,
     local_config: Mapping[str, Any],
-    dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
-    """
-    Detect and load the accelerator plugins.
-
-    limit_cpus, limit_gpus are deprecated.
-    """
-
     compute_device_types: MutableMapping[DeviceName, AbstractComputePlugin] = {}
 
     # Initialize intrinsic plugins by ourselves.
@@ -40,6 +35,7 @@ async def load_resources(
         allowlist=local_config["agent"]["allow-compute-plugins"],
         blocklist=local_config["agent"]["block-compute-plugins"],
     )
+    dummy_config = read_dummy_config()
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
@@ -56,7 +52,7 @@ async def load_resources(
         ):
             raise InitializationError(
                 "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
-                invalid_name,  # noqa: F821
+                invalid_name,
                 plugin_instance.key,
             )
         if plugin_instance.key in compute_device_types:
@@ -70,24 +66,14 @@ async def load_resources(
 
 
 async def scan_available_resources(
-    local_config: Mapping[str, Any],
     compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
 ) -> Mapping[SlotName, Decimal]:
-    """
-    Detect available computing resource of the system.
-    """
-    reserved_slots = {
-        "cpu": local_config["resource"]["reserved-cpu"],
-        "mem": local_config["resource"]["reserved-mem"],
-        "disk": local_config["resource"]["reserved-disk"],
-    }
     slots: MutableMapping[SlotName, Decimal] = {}
-
     for key, computer in compute_device_types.items():
         known_slot_types.update(computer.slot_types)  # type: ignore  # (only updated here!)
         resource_slots = await computer.available_slots()
         for sname, sval in resource_slots.items():
-            slots[sname] = Decimal(max(0, sval - reserved_slots.get(sname, 0)))
+            slots[sname] = Decimal(sval)
             if slots[sname] <= 0 and sname in (SlotName("cpu"), SlotName("mem")):
                 raise InitializationError(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "

@@ -12,22 +12,15 @@ import base64
 import json
 import logging
 import secrets
-import textwrap
 import uuid
 import weakref
 from collections import defaultdict
+from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    DefaultDict,
-    Iterable,
-    List,
-    Mapping,
-    MutableMapping,
-    Tuple,
-    Union,
+    cast,
 )
 from urllib.parse import urlparse
 
@@ -40,36 +33,37 @@ import zmq
 import zmq.asyncio
 from aiohttp import web
 from aiotools import adefer, apartial
-from etcd_client import GRpcStatusCode, GRpcStatusError
+from etcd_client import GRPCStatusCode, GRPCStatusError
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import KernelTerminatingEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingBroadcastEvent
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
-from ai.backend.manager.idle import AppStreamingStatus
-
-from ..defs import DEFAULT_ROLE
-from ..models import KernelLoadingStrategy, KernelRow, SessionRow
-from .auth import auth_required
-from .exceptions import (
-    AppNotFound,
-    BackendError,
-    InternalServerError,
-    InvalidAPIParameters,
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.kernel import (
+    InvalidStreamMode,
     SessionNotFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
+from ai.backend.manager.errors.service import AppServiceStartFailed
+from ai.backend.manager.idle import AppStreamingStatus
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+
+from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
 
 if TYPE_CHECKING:
-    from ..config import SharedConfig
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @server_status_required(READ_ALLOWED)
@@ -105,28 +99,30 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     app_ctx.stream_pty_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_pty_handlers[stream_key].discard(myself))
 
     async def connect_streams(
         compute_session: KernelRow,
-    ) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
+    ) -> tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
         # TODO: refactor as custom row/table method
         if compute_session.kernel_host is None:
-            kernel_host = urlparse(compute_session.agent_addr).hostname
+            hostname = urlparse(compute_session.agent_addr).hostname
+            kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
         else:
             kernel_host = compute_session.kernel_host
-        stdin_addr = f"tcp://{kernel_host}:{compute_session.stdin_port}"
+        stdin_addr = f"tcp://{kernel_host}:{compute_session.repl_in_port}"
         log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
         stdin_sock = app_ctx.zctx.socket(zmq.PUB)
         stdin_sock.connect(stdin_addr)
         stdin_sock.setsockopt(zmq.LINGER, 100)
-        stdout_addr = f"tcp://{kernel_host}:{compute_session.stdout_port}"
+        stdout_addr = f"tcp://{kernel_host}:{compute_session.repl_out_port}"
         log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
         stdout_sock = app_ctx.zctx.socket(zmq.SUB)
         stdout_sock.connect(stdout_addr)
@@ -145,11 +141,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    data = json.loads(msg.data)
+                    data = load_json(msg.data)
                     if data["type"] == "stdin":
                         raw_data = base64.b64decode(data["chars"].encode("ascii"))
                         try:
-                            await socks[0].send_mlutipart([raw_data])
+                            await socks[0].send_multipart([raw_data])
                         except (RuntimeError, zmq.error.ZMQError):
                             # when socks[0] is closed, re-initiate the connection.
                             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
@@ -246,14 +242,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     continue
                 if ws.closed:
                     break
-                await ws.send_str(
-                    json.dumps(
-                        {
-                            "type": "out",
-                            "data": base64.b64encode(data[0]).decode("ascii"),
-                        },
-                        ensure_ascii=False,
-                    )
+                await ws.send_bytes(
+                    dump_json({
+                        "type": "out",
+                        "data": base64.b64encode(data[0]).decode("ascii"),
+                    })
                 )
         except asyncio.CancelledError:
             pass
@@ -292,7 +285,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-    local_config = root_ctx.local_config
+    config = root_ctx.config_provider.config
     registry = root_ctx.registry
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
@@ -307,7 +300,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
                         session_name,
                         access_key,
                         kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                    ),  # noqa
+                    ),
                 ),
             )
     except SessionNotFound:
@@ -319,11 +312,12 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     app_ctx.stream_execute_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_execute_handlers[stream_key].discard(myself))
 
@@ -335,9 +329,11 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             log.debug("STREAM_EXECUTE: client disconnected (cancelled)")
             return ws
         params = await ws.receive_json()
-        assert params.get("mode"), "mode is missing or empty!"
+        if not params.get("mode"):
+            raise InvalidStreamMode("mode is missing or empty!")
         mode = params["mode"]
-        assert mode in {"query", "batch"}, "mode has an invalid value."
+        if mode not in {"query", "batch"}:
+            raise InvalidStreamMode("mode has an invalid value.")
         code = params.get("code", "")
         opts = params.get("options", None) or {}
 
@@ -385,7 +381,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
                 "status": "error",
                 "msg": f"Invalid API parameters: {e!r}",
             })
-    except BackendError as e:
+    except BackendAIError as e:
         log.exception("STREAM_EXECUTE: exception")
         if not ws.closed:
             await ws.send_json({
@@ -437,7 +433,8 @@ async def stream_proxy(
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
-    assert myself is not None
+    if myself is None:
+        raise NoCurrentTaskContext("No current task context")
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
@@ -454,15 +451,19 @@ async def stream_proxy(
         raise
     kernel: KernelRow = session.main_kernel
     kernel_id = kernel.id
+    session_id = SessionId(session.id)
     stream_key = kernel_id
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
     if kernel.kernel_host is None:
-        kernel_host = urlparse(kernel.agent_addr).hostname
+        hostname = urlparse(kernel.agent_addr).hostname
+        kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
     else:
         kernel_host = kernel.kernel_host
-    for sport in kernel.service_ports:
+    service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], kernel.service_ports or [])
+    sport: dict[str, Any] = {}
+    for sport in service_ports:
         if sport["name"] == service:
             if params["port"]:
                 # using one of the primary/secondary ports of the app
@@ -495,60 +496,40 @@ async def stream_proxy(
         proxy_cls = TCPProxy
     elif sport["protocol"] == "pty":
         raise NotImplementedError
-    elif sport["protocol"] == "http":
-        proxy_cls = TCPProxy
-    elif sport["protocol"] == "preopen":
+    elif sport["protocol"] == "http" or sport["protocol"] == "preopen":
         proxy_cls = TCPProxy
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-    redis_live = root_ctx.redis_live
+    valkey_live = root_ctx.valkey_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
-    conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent(
-        """
-        local now = redis.call('TIME')
-        now = now[1] + (now[2] / (10^6))
-        redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """
-    )
+    async def update_connection_tracker() -> None:
+        """Update connection tracker with current timestamp."""
+        await valkey_live.update_app_connection_tracker(str(kernel_id), service, stream_id)
 
-    async def refresh_cb(kernel_id: str, data: bytes) -> None:
+    async def refresh_cb(kernel_id_str: str, data: bytes) -> None:
         await asyncio.shield(
             rpc_ptask_group.create_task(
                 call_non_bursty(
                     conn_tracker_key,
-                    apartial(
-                        redis_helper.execute_script,
-                        redis_live,
-                        "update_conn_tracker",
-                        _conn_tracker_script,
-                        [conn_tracker_key],
-                        [conn_tracker_val],
-                    ),
+                    update_connection_tracker,
                     max_bursts=128,
                     max_idle=5000,
                 ),
             )
         )
 
-    down_cb = apartial(refresh_cb, kernel_id)
-    up_cb = apartial(refresh_cb, kernel_id)
-    ping_cb = apartial(refresh_cb, kernel_id)
+    down_cb = apartial(refresh_cb, str(kernel_id))
+    up_cb = apartial(refresh_cb, str(kernel_id))
+    ping_cb = apartial(refresh_cb, str(kernel_id))
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
             app_ctx.active_session_ids[kernel_id] += 1
-            now = await redis_helper.execute(redis_live, lambda r: r.time())
-            now = now[0] + (now[1] / (10**6))
-            await redis_helper.execute(
-                redis_live,
-                # redis-py's ZADD implementation flattens mapping in value-key order
-                lambda r: r.zadd(conn_tracker_key, {conn_tracker_val: now}),
-            )
+            await valkey_live.update_connection_tracker(str(kernel_id), service, stream_id)
             await root_ctx.idle_checker_host.update_app_streaming_status(
-                kernel_id,
+                session_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
             )
 
@@ -557,20 +538,11 @@ async def stream_proxy(
             app_ctx.active_session_ids[kernel_id] -= 1
             if app_ctx.active_session_ids[kernel_id] <= 0:
                 del app_ctx.active_session_ids[kernel_id]
-            await redis_helper.execute(
-                redis_live, lambda r: r.zrem(conn_tracker_key, conn_tracker_val)
-            )
-            remaining_count = await redis_helper.execute(
-                redis_live,
-                lambda r: r.zcount(
-                    conn_tracker_key,
-                    float("-inf"),
-                    float("+inf"),
-                ),
-            )
+            await valkey_live.remove_connection_tracker(str(kernel_id), service, stream_id)
+            remaining_count = await valkey_live.count_active_connections(str(kernel_id))
             if remaining_count == 0:
                 await root_ctx.idle_checker_host.update_app_streaming_status(
-                    kernel_id,
+                    session_id,
                     AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                 )
 
@@ -586,11 +558,11 @@ async def stream_proxy(
             )
         )
 
-        opts: MutableMapping[str, Union[None, str, List[str]]] = {}
+        opts: MutableMapping[str, None | str | list[str]] = {}
         if params["arguments"] is not None:
-            opts["arguments"] = json.loads(params["arguments"])
+            opts["arguments"] = load_json(params["arguments"])
         if params["envs"] is not None:
-            opts["envs"] = json.loads(params["envs"])
+            opts["envs"] = load_json(params["envs"])
 
         result = await asyncio.shield(
             rpc_ptask_group.create_task(
@@ -598,14 +570,14 @@ async def stream_proxy(
             ),
         )
         if result["status"] == "failed":
-            raise InternalServerError(
+            raise AppServiceStartFailed(
                 "Failed to launch the app service", extra_data=result["error"]
             )
 
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"],
+            max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size,
         )
         await ws.prepare(request)
         proxy = proxy_cls(
@@ -637,12 +609,13 @@ async def get_stream_apps(request: web.Request) -> web.Response:
             access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-    service_ports = compute_session.main_kernel.service_ports
-    if service_ports is None:
+    raw_service_ports = compute_session.main_kernel.service_ports
+    if raw_service_ports is None:
         return web.json_response([])
+    service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], raw_service_ports)
     resp = []
     for item in service_ports:
-        response_dict = {
+        response_dict: dict[str, Any] = {
             "name": item["name"],
             "protocol": item["protocol"],
             "ports": item["container_ports"],
@@ -660,7 +633,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
 async def handle_kernel_terminating(
     app: web.Application,
     source: AgentId,
-    event: KernelTerminatingEvent,
+    event: KernelTerminatingBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["stream.context"]
@@ -691,19 +664,18 @@ async def handle_kernel_terminating(
 
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
-    redis_live = root_ctx.redis_live
-    shared_config: SharedConfig = root_ctx.shared_config
+    valkey_live = root_ctx.valkey_live
     try:
         while True:
             try:
+                # TODO: Use `no_packet_timeout` from the shared config after resolving type issue.
                 no_packet_timeout: timedelta = tx.TimeDuration().check(
-                    await shared_config.etcd.get("config/idle/app-streaming-packet-timeout")
-                    or "5m",
+                    await root_ctx.etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
                 )
-            except GRpcStatusError as e:
+            except GRPCStatusError as e:
                 err_detail = e.args[0]
 
-                if err_detail["code"] == GRpcStatusCode.Unavailable:
+                if err_detail["code"] == GRPCStatusCode.Unavailable:
                     log.warning(
                         "stream_conn_tracker_gc(): error while connecting to Etcd server,"
                         " retrying..."
@@ -711,33 +683,25 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                 else:
                     raise e
             async with app_ctx.conn_tracker_lock:
-                now = await redis_helper.execute(redis_live, lambda r: r.time())
-                now = now[0] + (now[1] / (10**6))
+                now = await valkey_live.get_server_time()
                 for session_id in app_ctx.active_session_ids.keys():
-                    conn_tracker_key = f"session.{session_id}.active_app_connections"
-                    prev_remaining_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
+                    prev_remaining_count = await valkey_live.count_active_connections(
+                        str(session_id)
                     )
-                    removed_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zremrangebyscore(
-                            conn_tracker_key,
-                            float("-inf"),
-                            now - no_packet_timeout.total_seconds(),
-                        ),
+                    removed_count = await valkey_live.remove_stale_connections(
+                        str(session_id),
+                        now - no_packet_timeout.total_seconds(),
                     )
-                    remaining_count = await redis_helper.execute(
-                        redis_live,
-                        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
-                    )
+                    remaining_count = await valkey_live.count_active_connections(str(session_id))
                     log.debug(
                         f"conn_tracker: gc {session_id} "
                         f"removed/remaining = {removed_count}/{remaining_count}",
                     )
                     if prev_remaining_count > 0 and remaining_count == 0:
+                        # Note: kernel_id is used as session_id key here for connection tracking
+                        # The idle checker operates on session granularity
                         await root_ctx.idle_checker_host.update_app_streaming_status(
-                            session_id,
+                            SessionId(session_id),  # type: ignore[arg-type]
                             AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
             await asyncio.sleep(10)
@@ -747,14 +711,14 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    stream_pty_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_execute_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_proxy_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_stdin_socks: DefaultDict[KernelId, weakref.WeakSet[zmq.asyncio.Socket]]
+    stream_pty_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_execute_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_proxy_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_stdin_socks: defaultdict[KernelId, weakref.WeakSet[zmq.asyncio.Socket]]
     zctx: zmq.asyncio.Context
     conn_tracker_lock: asyncio.Lock
     conn_tracker_gc_task: asyncio.Task
-    active_session_ids: DefaultDict[SessionId, int]
+    active_session_ids: defaultdict[KernelId, int]
 
 
 async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
@@ -770,7 +734,9 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.active_session_ids = defaultdict(int)  # multiset[int]
     app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
 
-    root_ctx.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)
+    root_ctx.event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent, app, handle_kernel_terminating
+    )
 
     yield
 
@@ -783,7 +749,7 @@ async def stream_shutdown(app: web.Application) -> None:
     rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
-    cancelled_tasks: List[asyncio.Task] = []
+    cancelled_tasks: list[asyncio.Task] = []
     app_ctx: PrivateContext = app["stream.context"]
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)
@@ -807,7 +773,7 @@ async def stream_shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.cleanup_ctx.append(stream_app_ctx)
     app.on_shutdown.append(stream_shutdown)

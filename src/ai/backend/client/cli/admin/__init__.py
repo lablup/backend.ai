@@ -13,10 +13,11 @@ from . import (  # noqa
     agent,
     domain,
     etcd,
+    export,
     group,
     image,
     keypair,
-    license,
+    license,  # noqa: A004
     manager,
     resource,
     resource_policy,

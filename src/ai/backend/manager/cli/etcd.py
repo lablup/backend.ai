@@ -13,7 +13,8 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.json import pretty_json_str
+from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx
 from .image_impl import alias as alias_impl
@@ -27,7 +28,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -144,7 +145,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
             try:
                 if prefix:
                     data = await etcd.get_prefix(key, scope=scope)
-                    print(json.dumps(dict(data), indent=4))
+                    print(pretty_json_str(dict(data)))
                 else:
                     val = await etcd.get(key, scope=scope)
                     if val is None:
@@ -261,7 +262,7 @@ def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
     log.warning("etcd rescan-images command is deprecated, use image rescan instead")
-    asyncio.run(rescan_images_impl(cli_ctx, registry, False))
+    asyncio.run(rescan_images_impl(cli_ctx, registry))
 
 
 @cli.command()

@@ -1,19 +1,15 @@
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_info
+from ai.backend.client.cli.types import CLIContext
 
-from ...func.domain import _default_detail_fields, _default_list_fields
-from ...session import Session
-from ..extensions import pass_ctx_obj
-from ..pretty import print_info
-from ..types import CLIContext
-
-# from ai.backend.client.output.fields import domain_fields
 from . import admin
 
 
@@ -32,6 +28,9 @@ def info(ctx: CLIContext, name: str) -> None:
     Show the information about the given domain.
     If name is not give, user's own domain information will be retrieved.
     """
+    from ai.backend.client.func.domain import _default_detail_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             item = session.Domain.detail(name=name)
@@ -48,6 +47,9 @@ def list(ctx: CLIContext) -> None:
     List and manage domains.
     (admin privilege required)
     """
+    from ai.backend.client.func.domain import _default_list_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.Domain.list()
@@ -100,6 +102,8 @@ def add(
 
     NAME: Name of new domain.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Domain.create(
@@ -190,6 +194,8 @@ def update(
 
     NAME: Name of new domain.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Domain.update(
@@ -228,10 +234,12 @@ def update(
 @click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name: str) -> None:
     """
-    Inactive an existing domain.
+    Deletes an existing domain. This action only deletes the primary record and might leave behind some associated data or metadata that can be manually cleaned up or ignored. Ideal for removing items that may be re-created or restored.
 
     NAME: Name of a domain to inactive.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.Domain.delete(name)
@@ -262,10 +270,12 @@ def delete(ctx: CLIContext, name: str) -> None:
 @click.argument("name", type=str, metavar="NAME")
 def purge(ctx: CLIContext, name: str) -> None:
     """
-    Delete an existing domain.
+    Purges an existing domain. This action is irreversible and should be used when you need to ensure that no trace of the resource remains.
 
     NAME: Name of a domain to delete.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             if not ask_yn():

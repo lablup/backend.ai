@@ -15,9 +15,66 @@ services:
     volumes:
       - "./tmp/backend.ai-halfstack-ha/postgres-data:/var/lib/postgresql/data:rw"
 
+  backendai-half-db-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: unless-stopped
+    networks:
+      - half
+    environment:
+      - DATA_SOURCE_URI=backendai-half-db:5432/backend?sslmode=disable
+      - DATA_SOURCE_USER=postgres
+      - DATA_SOURCE_PASS=develove
+    ports:
+      - "9187:9187"
+
+  backendai-half-redis-exporter-node01:
+    image: oliver006/redis_exporter:v1.73.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: >
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node01:${REDIS_MASTER_PORT}
+      --include-system-metrics
+      --include-config-metrics
+      --include-modules-metrics
+    ports:
+      - "9121:9121"
+    depends_on:
+      - backendai-half-redis-node01
+
+  backendai-half-redis-exporter-node02:
+    image: oliver006/redis_exporter:v1.73.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: >
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node02:${REDIS_SLAVE1_PORT}
+      --include-system-metrics
+      --include-config-metrics
+      --include-modules-metrics
+    ports:
+      - "9122:9121"
+    depends_on:
+      - backendai-half-redis-node02
+
+  backendai-half-redis-exporter-node03:
+    image: oliver006/redis_exporter:v1.73.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: >
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node03:${REDIS_SLAVE2_PORT}
+      --include-system-metrics
+      --include-config-metrics
+      --include-modules-metrics
+    ports:
+      - "9123:9121"
+    depends_on:
+      - backendai-half-redis-node03
+
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node01
     networks:
     - half
@@ -37,7 +94,7 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node02
     networks:
     - half
@@ -55,7 +112,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
@@ -73,7 +130,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel01
     networks:
     - half
@@ -93,7 +150,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel02
     networks:
     - half
@@ -113,7 +170,7 @@ services:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel03
     networks:
     - half
@@ -222,5 +279,121 @@ services:
       --initial-cluster-token $${TOKEN}
       --initial-cluster-state $${STATE}"
 
+  backendai-half-grafana:
+    image: grafana/grafana-enterprise:11.4.0
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=backend
+      - GF_SECURITY_ADMIN_PASSWORD=develove
+    volumes:
+      - half-grafana:/var/lib/grafana:rw
+      - "./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+      - "./configs/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+      - "./configs/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+
+  backendai-half-pyroscope:
+    image: grafana/pyroscope:1.9.2
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4040:4040"
+    volumes:
+      - half-pyroscope:/var/lib/pyroscope:rw
+
+  backendai-half-prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    networks:
+      - half
+    volumes:
+      - "./prometheus.yaml:/etc/prometheus/prometheus.yaml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+    ports:
+      - "9090:9090"
+
+  backendai-half-otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.126.0
+    networks:
+      - half
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./configs/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  backendai-half-loki:
+    image: grafana/loki:3.5.0
+    networks:
+      - half
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./configs/loki/loki-config.yaml:/etc/loki/local-config.yaml
+
+  backendai-half-tempo:
+    image: grafana/tempo:2.7.2
+    networks:
+      - half
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./configs/tempo/tempo-config.yaml:/etc/tempo.yaml
+      - half-tempo:/var/tempo
+    ports:
+      - "3200" # tempo
+      - "4317" # otlp grpc
+
+  backendai-half-apollo-router:
+    image: ghcr.io/graphql-hive/gateway:2.1.12
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4000:4000"
+    command: ["supergraph"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4000
+    volumes:
+      - ./docs/manager/graphql-reference/supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./configs/graphql/gateway.config.ts:/gateway/gateway.config.ts:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  backendai-half-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - half-minio:/data:rw
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 networks:
   half:
+
+volumes:
+  half-grafana:
+  half-pyroscope:
+  half-tempo:
+  half-minio:

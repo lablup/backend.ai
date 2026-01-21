@@ -1,37 +1,57 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Type
+from typing import TYPE_CHECKING
 
 import yarl
 
+from ai.backend.common.container_registry import ContainerRegistryType
+
 if TYPE_CHECKING:
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
     from .base import BaseContainerRegistry
 
 
-def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
-    registry_url = yarl.URL(registry_info[""])
-    registry_type = registry_info.get("type", "docker")
-    cr_cls: Type[BaseContainerRegistry]
+def get_container_registry_cls(registry_info: ContainerRegistryRow) -> type[BaseContainerRegistry]:
+    registry_url = yarl.URL(registry_info.url)
+    registry_type = registry_info.type
+    cr_cls: type[BaseContainerRegistry]
     if registry_url.host is not None and registry_url.host.endswith(".docker.io"):
         from .docker import DockerHubRegistry
 
         cr_cls = DockerHubRegistry
-    elif registry_type == "docker":
+    elif registry_type == ContainerRegistryType.DOCKER:
         from .docker import DockerRegistry_v2
 
         cr_cls = DockerRegistry_v2
-    elif registry_type == "harbor":
+    elif registry_type == ContainerRegistryType.HARBOR:
         from .harbor import HarborRegistry_v1
 
         cr_cls = HarborRegistry_v1
-    elif registry_type == "harbor2":
+    elif registry_type == ContainerRegistryType.HARBOR2:
         from .harbor import HarborRegistry_v2
 
         cr_cls = HarborRegistry_v2
-    elif registry_type == "local":
+    elif registry_type == ContainerRegistryType.GITHUB:
+        from .github import GitHubRegistry
+
+        cr_cls = GitHubRegistry
+    elif registry_type == ContainerRegistryType.GITLAB:
+        from .gitlab import GitLabRegistry
+
+        cr_cls = GitLabRegistry
+    elif registry_type in [ContainerRegistryType.ECR, ContainerRegistryType.ECR_PUB]:
+        from .aws_ecr import AWSElasticContainerRegistry
+
+        cr_cls = AWSElasticContainerRegistry
+    elif registry_type == ContainerRegistryType.LOCAL:
         from .local import LocalRegistry
 
         cr_cls = LocalRegistry
+    elif registry_type == ContainerRegistryType.OCP:
+        from .ocp import OpenShiftPlatformContainerRegistry
+
+        cr_cls = OpenShiftPlatformContainerRegistry
     else:
         raise RuntimeError(f"Unsupported registry type: {registry_type}")
     return cr_cls

@@ -54,5 +54,8 @@
         "num_retries_to_skip": 3
       }
     }
+  },
+  "metric": {
+    "addr": "127.0.0.1:9090"
   }
 }

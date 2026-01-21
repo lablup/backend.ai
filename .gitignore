@@ -42,6 +42,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # Translations
 *.mo
@@ -74,7 +75,7 @@ celerybeat-schedule
 
 # virtualenv
 venv/
-.venv/
+.venv
 ENV/
 
 # IDE/vim
@@ -83,13 +84,16 @@ ENV/
 .swo
 .*.swp
 .*.swo
-.vscode/
-.vim/
-/.vimrc
-/.nvimrc
-/.exrc
+.vscode
+.vim
+.vimrc
+.nvimrc
+.exrc
 .ripgreprc
 .neoconf.json
+.zed
+.ropeproject
+pyrightconfig.json
 
 # Pants
 /.pants.d/
@@ -100,21 +104,33 @@ ENV/
 /tools/pants-src
 
 # Local configurations
-/manager.toml
-/agent.toml
-/storage-proxy.toml
-/webserver.conf
-/cuda-mock.toml
-/mock-accelerator.toml
+/account-manager*.toml
+/app-proxy*.toml
+/manager*.toml
+/agent*.toml
+/storage-proxy*.toml
+/webserver*.conf
+/cuda-mock*.toml
+/mock-accelerator*.toml
 /.pants.env
 /.pants.bootstrap
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/alembic-*.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
+/wsproxy.toml
+/grafana-dashboards
+/grafana-provisioning
+/prometheus.yaml
+/supergraph.graphql
+/gateway.config.ts
+/otel-collector-config.yaml
+/loki-config.yaml
+/tempo-config.yaml
 
 # Local temp and installer-generated directories
 /.tmp/
@@ -126,6 +142,7 @@ ENV/
 /scratches/
 logs/
 /*.pid
+/.postgres-volume-backup
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -139,6 +156,7 @@ logs/
 
 # Generated files
 docs/manager/rest-reference/openapi.json
-
+backup.*.json
 /DIST-INFO
 /INSTALL-INFO
+.serena/

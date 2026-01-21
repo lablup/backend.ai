@@ -1,16 +1,23 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/account_manager/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
@@ -27,8 +34,8 @@ python_distribution(
     ),
     entry_points={
         "backendai_cli_v10": {
-            "storage": "ai.backend.storage.cli:main",
-            "storage.start-server": "ai.backend.storage.server:main",
+            "storage": "ai.backend.storage.cli.__main__:main",
+            "storage.start-server": "ai.backend.storage.cli.start_server:main",
         },
     },
     generate_setup=True,
@@ -36,8 +43,8 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-storage-proxy",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -45,24 +52,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-storage-proxy",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-storage-proxy-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-storage-proxy-*' -not -name '*.sha256' | xargs -I {} sh -c"
+        "find . -name 'backendai-storage-proxy*' -not -name '*.sha256' | xargs -I {} sh -c"
         " 'sha256sum {} > {}.sha256'"
     ),
     workdir="/dist",

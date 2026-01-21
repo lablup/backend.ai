@@ -1,5 +1,6 @@
 import enum
-from typing import Mapping, NamedTuple, TypeAlias
+from collections.abc import Mapping
+from typing import NamedTuple, Optional, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -36,12 +37,12 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column
+    column: sa.Column | sa.orm.attributes.InstrumentedAttribute
     order_direction: OrderDirection
 
 
 class QueryOrderTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, column_map: ColumnMapType = None) -> None:
+    def __init__(self, sa_table: sa.Table, column_map: Optional[ColumnMapType] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -75,7 +76,7 @@ class QueryOrderTransformer(Transformer):
             col = self._get_col(children[0].value)
         if op == "+":
             return OrderingItem(col, OrderDirection.ASC)
-        elif op == "-":
+        if op == "-":
             return OrderingItem(col, OrderDirection.DESC)
         raise ValueError(f"Invalid operation `{op}`. Please use `+` or `-`")
 
@@ -83,15 +84,14 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: ColumnMapType = None) -> None:
+    def __init__(self, column_map: Optional[ColumnMapType] = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 
     def parse_order(self, table, order_expr: str) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
-            orders = QueryOrderTransformer(table, self._column_map).transform(ast)
-            return orders
+            return QueryOrderTransformer(table, self._column_map).transform(ast)
         except LarkError as e:
             raise ValueError(f"Query ordering parsing error: {e}")
 

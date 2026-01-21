@@ -35,6 +35,11 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 [docker-registry]
 ssl-verify = true
 
+[pyroscope]
+enabled = false
+# app-name = "backendai-half-manager"
+# server-addr = "http://localhost:4040"
+# sample-rate = 100
 
 [logging]
 level = "INFO"

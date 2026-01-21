@@ -1,5 +1,6 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
         "stubs/trafaret:stubs",
@@ -8,19 +9,16 @@ python_sources(
 
 visibility_private_component(
     allowed_dependents=[
-        "//src/ai/backend/manager/**",
-        "//src/ai/backend/agent/**",
-        "//src/ai/backend/client/**",
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/storage/**",
-        "//src/ai/backend/web/**",
-        "//src/ai/backend/accelerator/**",
-        "//src/ai/backend/test/**",
-        "//src/ai/backend/testutils/**",
-        "//src/ai/backend/install/**",
+        "//src/ai/backend/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
     ],
 )
 
@@ -28,9 +26,6 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/common/plugin:src",
-        "src/ai/backend/common/auth:src",
-        "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

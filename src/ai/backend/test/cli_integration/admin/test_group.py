@@ -1,7 +1,7 @@
 import json
 from contextlib import closing
 
-from ...utils.cli import EOF, ClientRunnerFunc
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_group(run_admin: ClientRunnerFunc):
@@ -20,7 +20,7 @@ def test_list_group(run_admin: ClientRunnerFunc):
     print("[ List group ]")
     with closing(run_admin(["--output=json", "admin", "group", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         group_list = loaded.get("items")
         assert isinstance(group_list, list), "Group list not printed properly"

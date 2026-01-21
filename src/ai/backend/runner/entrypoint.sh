@@ -16,13 +16,22 @@ fi
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
 
+# Symlink the scp binary
+if [ ! -f "/usr/bin/scp" ]; then
+  ln -s /opt/kernel/dropbearmulti /usr/bin/scp
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."
   if [ -f /bin/ash ]; then  # for alpine
     export SHELL=/bin/ash
+    addgroup -g 1002 grpread
+    usermod -aG grpread $USER_NAME
   else  # for other distros (ubuntu, centos, etc.)
     export SHELL=/bin/bash
+    addgroup -g 1002 grpread
+    usermod -aG grpread $USER_NAME
     echo "$LD_PRELOAD" | tr ':' '\n' > /etc/ld.so.preload
     unset LD_PRELOAD
   fi
@@ -30,10 +39,14 @@ if [ $USER_ID -eq 0 ]; then
   export HOME="/home/work"
 
   # Invoke image-specific bootstrap hook.
-  if [ -x "/opt/container/bootstrap.sh" ]; then
-    echo 'Executing image bootstrap... '
-    . /opt/container/bootstrap.sh
-    echo 'Image bootstrap executed.'
+  if [ -f "/opt/container/bootstrap.sh" ]; then
+    if [ -x "/opt/container/bootstrap.sh" ]; then
+      echo 'Executing image bootstrap…'
+      . /opt/container/bootstrap.sh
+      echo 'Image bootstrap executed.'
+    else
+      echo 'WARNING: /opt/container/bootstrap.sh exists but is not executable; bootstrap.sh execution was skipped.'
+    fi
   fi
 
   # Extract dotfiles
@@ -50,7 +63,7 @@ if [ $USER_ID -eq 0 ]; then
     /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
-    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd -c SHA512
   fi
 
   echo "Executing the main program..."
@@ -59,7 +72,7 @@ if [ $USER_ID -eq 0 ]; then
 else
 
   echo "Setting up uid and gid: $USER_ID:$GROUP_ID"
-  USER_NAME=$(getent group $USER_ID | cut -d: -f1)
+  USER_NAME=$(getent passwd $USER_ID | cut -d: -f1)
   GROUP_NAME=$(getent group $GROUP_ID | cut -d: -f1)
   if [ -f /bin/ash ]; then  # for alpine (busybox)
     if [ -z "$GROUP_NAME" ]; then
@@ -70,6 +83,8 @@ else
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
       usermod -aG shadow $USER_NAME
+      addgroup --gid 1002 grpread
+      usermod -aG grpread $USER_NAME
     fi
     export SHELL=/bin/ash
   else  # for other distros (ubuntu, centos, etc.)
@@ -83,6 +98,8 @@ else
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
       usermod -aG shadow $USER_NAME
+      addgroup --gid 1002 grpread
+      usermod -aG 1002 $USER_NAME
     else
       # The image has an existing user name for the given uid.
       # Merge the image's existing home directory into the bind-mounted "/home/work" from the scratch space.
@@ -102,12 +119,16 @@ else
   export HOME="/home/$USER_NAME"
 
   # Invoke image-specific bootstrap hook.
-  if [ -x "/opt/container/bootstrap.sh" ]; then
-    echo 'Executing image bootstrap... '
-    export LOCAL_USER_ID=$USER_ID
-    export LOCAL_GROUP_ID=$GROUP_ID
-    . /opt/container/bootstrap.sh
-    echo 'Image bootstrap executed.'
+  if [ -f "/opt/container/bootstrap.sh" ]; then
+    if [ -x "/opt/container/bootstrap.sh" ]; then
+      echo 'Executing image bootstrap... '
+      export LOCAL_USER_ID=$USER_ID
+      export LOCAL_GROUP_ID=$GROUP_ID
+      . /opt/container/bootstrap.sh
+      echo 'Image bootstrap executed.'
+    else
+      echo 'WARNING: /opt/container/bootstrap.sh exists but is not executable; bootstrap.sh execution was skipped.'
+    fi
   fi
 
   # Correct the ownership of agent socket.
@@ -122,22 +143,43 @@ else
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
-  # Enable sudo
-  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
-    echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
-  fi
-
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
-    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd -c SHA512
+  fi
+
+  # Create groups for ADDITIONAL_GIDS if they don't exist
+  if [ ! -z "${ADDITIONAL_GIDS}" ]; then
+    echo "Processing additional GIDs: ${ADDITIONAL_GIDS}"
+
+    # Convert comma-separated list to individual lines and process
+    echo "${ADDITIONAL_GIDS}" | tr ',' '\n' | while read -r gid; do
+      if [ ! -z "$gid" ]; then
+        # Clean whitespace
+        gid=$(echo "$gid" | tr -d ' \t')
+
+        # Check if group exists, create if not
+        if ! getent group "$gid" > /dev/null 2>&1; then
+          echo "Creating group with GID $gid"
+          addgroup --gid "$gid" "group$gid"
+          if usermod -aG "$gid" $USER_NAME 2>/dev/null; then
+            echo "Added $USER_NAME to group$gid"
+          else
+            echo "Failed to add $USER_NAME to group$gid"
+          fi
+        else
+          echo "Group with GID $gid already exists"
+        fi
+      fi
+    done
   fi
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
-  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
-  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
 
 fi

@@ -1,0 +1,34 @@
+{
+    "artifact_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce04",
+            "registry_id": "fe878f09-06cc-4b91-9242-4c71015cce05",
+            "name": "huggingface-hub",
+            "type": "huggingface"
+        }
+    ],
+    "huggingface_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce05",
+            "url": "https://huggingface.co"
+        }
+    ],
+    "object_storages": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce07",
+            "name": "minio-storage",
+            "host": "local",
+            "access_key": "<access_key>",
+            "secret_key": "<secret_key>",
+            "endpoint": "http://127.0.0.1:9000",
+            "region": "us-east-1"
+        }
+    ],
+    "storage_namespace": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce08",
+            "storage_id": "fe878f09-06cc-4b91-9242-4c71015cce07",
+            "namespace": "backendai-storage"
+        }
+    ]
+}

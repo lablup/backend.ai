@@ -4,7 +4,6 @@ from pathlib import Path
 import click
 import humanize
 
-from ai.backend.cli.main import main
 from ai.backend.cli.params import (
     ByteSizeParamCheckType,
     ByteSizeParamType,
@@ -12,17 +11,17 @@ from ai.backend.cli.params import (
 )
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
+from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import vfolder_fields
+from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
-from ..exceptions import BackendAPIError
-from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .pretty import print_done
 from .types import CLIContext
 
 
-@main.group()
+@click.group()
 def model():
     """Set of model operations"""
 

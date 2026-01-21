@@ -1,8 +1,6 @@
 python_sources(
     name="src",
-    sources=[
-        "**/*.py",  # per-lang sources are not auto-inferred
-    ],
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],
@@ -17,11 +15,6 @@ visibility_private_component(
         "//src/ai/backend/helpers/**",
         "//python-kernel.lock",
     ],
-)
-
-pex_binary(
-    name="__main__",
-    entry_point="__main__.py",
 )
 
 python_distribution(

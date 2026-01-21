@@ -1,8 +1,9 @@
-import datetime
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -11,12 +12,19 @@ import yaml
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.json import dump_json, load_json
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.session_template import (
+    TemplateType,
+    check_task_template,
+    session_templates,
+)
+from ai.backend.manager.models.user import users
 
-from ..models import TemplateType, groups, session_templates, users
-from ..models.session_template import check_task_template
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -25,7 +33,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @server_status_required(READ_ALLOWED)
@@ -55,7 +63,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             try:
                 body = yaml.safe_load_all(params["payload"])
@@ -71,7 +79,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 user_uuid = st["user_uuid"]
             query = session_templates.insert().values({
                 "id": template_id,
-                "created_at": datetime.datetime.now(),
+                "created_at": datetime.now(UTC),
                 "domain_name": params["domain"],
                 "group_id": group_id,
                 "user_uuid": user_uuid,
@@ -84,7 +92,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 "id": template_id,
                 "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
             })
-            assert result.rowcount == 1
+            if result.rowcount != 1:
+                raise DBOperationFailed(f"Failed to create session template: {template_id}")
     return web.json_response(resp)
 
 
@@ -104,12 +113,13 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
     log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        entries: List[Mapping[str, Any]]
+        entries: list[Mapping[str, Any]]
         j = session_templates.join(
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
         ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
         query = (
-            sa.select([session_templates, users.c.email, groups.c.name], use_labels=True)
+            sa.select(session_templates, users.c.email, groups.c.name)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (session_templates.c.is_active) & (session_templates.c.type == TemplateType.TASK),
@@ -118,7 +128,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(query)
         entries = []
         for row in result.fetchall():
-            is_owner = True if row.session_templates_user_uuid == user_uuid else False
+            is_owner = row.session_templates_user_uuid == user_uuid
             entries.append({
                 "name": row.session_templates_name,
                 "id": row.session_templates_id,
@@ -166,7 +176,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
 async def get(request: web.Request, params: Any) -> web.Response:
     if params["format"] not in ["yaml", "json"]:
         raise InvalidAPIParameters('format should be "yaml" or "json"')
-    resp: Dict[str, Any] = {}
+    resp: dict[str, Any] = {}
     domain_name = request["user"]["domain_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info(
@@ -178,12 +188,12 @@ async def get(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([
+            sa.select(
                 session_templates.c.template,
                 session_templates.c.name,
                 session_templates.c.user_uuid,
                 session_templates.c.group_id,
-            ])
+            )
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)
@@ -201,9 +211,9 @@ async def get(request: web.Request, params: Any) -> web.Response:
                 "domain_name": domain_name,
             })
         if isinstance(resp, str):
-            resp = json.loads(resp)
+            resp = load_json(resp)
         else:
-            resp = json.loads(json.dumps(resp))
+            resp = load_json(dump_json(resp))
         return web.json_response(resp)
 
 
@@ -231,8 +241,8 @@ async def put(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
-        query = (
-            sa.select([session_templates.c.id])
+        select_query = (
+            sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)
@@ -240,11 +250,11 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.TASK),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             body = yaml.safe_load(params["payload"])
         except (yaml.YAMLError, yaml.MarkedYAMLError):
@@ -256,7 +266,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
                 group_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
-            query = (
+            update_query = (
                 sa.update(session_templates)
                 .values({
                     "group_id": group_id,
@@ -264,10 +274,11 @@ async def put(request: web.Request, params: Any) -> web.Response:
                     "name": name,
                     "template": template_data,
                 })
-                .where((session_templates.c.id == template_id))
+                .where(session_templates.c.id == template_id)
             )
-            result = await conn.execute(query)
-            assert result.rowcount == 1
+            result = await conn.execute(update_query)
+            if result.rowcount != 1:
+                raise DBOperationFailed(f"Failed to update session template: {template_id}")
         return web.json_response({"success": True})
 
 
@@ -288,8 +299,8 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select([session_templates.c.id])
+        select_query = (
+            sa.select(session_templates.c.id)
             .select_from(session_templates)
             .where(
                 (session_templates.c.id == template_id)
@@ -297,16 +308,17 @@ async def delete(request: web.Request, params: Any) -> web.Response:
                 & (session_templates.c.type == TemplateType.TASK),
             )
         )
-        result = await conn.scalar(query)
+        result = await conn.scalar(select_query)
         if not result:
             raise TaskTemplateNotFound
-        query = (
+        update_query = (
             sa.update(session_templates)
             .values(is_active=False)
-            .where((session_templates.c.id == template_id))
+            .where(session_templates.c.id == template_id)
         )
-        result = await conn.execute(query)
-        assert result.rowcount == 1
+        result = await conn.execute(update_query)
+        if result.rowcount != 1:
+            raise DBOperationFailed(f"Failed to delete session template: {template_id}")
 
         return web.json_response({"success": True})
 
@@ -321,7 +333,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

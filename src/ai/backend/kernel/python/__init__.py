@@ -4,28 +4,27 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List
 
 import janus
 
-from .. import BaseRunner
-from ..base import promote_path
+from ai.backend.kernel import BaseRunner
+from ai.backend.kernel.base import promote_path
 
 log = logging.getLogger()
 
-DEFAULT_PYFLAGS: List[str] = []
+DEFAULT_PYFLAGS: list[str] = []
 
 
 class Runner(BaseRunner):
     log_prefix = "python-kernel"
-    default_runtime_path = "/usr/bin/python"
+    default_runtime_path = "/opt/backend.ai/bin/python"
     default_child_env = {
         **BaseRunner.default_child_env,
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
     }
     jupyter_kspec_name = "python"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.input_queue = None
         self.output_queue = None
@@ -70,9 +69,8 @@ class Runner(BaseRunner):
                 ".",
             ]
             return await self.run_subproc(cmd)
-        else:
-            log.warning('skipping the build phase due to missing "setup.py" file')
-            return 0
+        log.warning('skipping the build phase due to missing "setup.py" file')
+        return 0
 
     async def execute_heuristic(self) -> int:
         if Path("main.py").is_file():
@@ -82,9 +80,8 @@ class Runner(BaseRunner):
                 "main.py",
             ]
             return await self.run_subproc(cmd, batch=True)
-        else:
-            log.error('cannot find the main script ("main.py").')
-            return 127
+        log.error('cannot find the main script ("main.py").')
+        return 127
 
     async def start_service(self, service_info):
         if service_info["name"] in ["jupyter", "jupyterlab"]:
@@ -108,19 +105,19 @@ class Runner(BaseRunner):
                 "--config",
                 config.name,
             ], {}
-        elif service_info["name"] == "ipython":
+        if service_info["name"] == "ipython":
             return [
                 self.runtime_path,
                 "-m",
                 "IPython",
             ], {}
-        elif service_info["name"] == "digits":
+        if service_info["name"] == "digits":
             return [
                 self.runtime_path,
                 "-m",
                 "digits",
             ], {}
-        elif service_info["name"] == "tensorboard":
+        if service_info["name"] == "tensorboard":
             Path("/home/work/logs").mkdir(parents=True, exist_ok=True)
             return [
                 self.runtime_path,
@@ -135,7 +132,7 @@ class Runner(BaseRunner):
                 "--debugger_port",
                 "6064",  # used by in-container TensorFlow
             ], {}
-        elif service_info["name"] == "spectravis":
+        if service_info["name"] == "spectravis":
             return (
                 [
                     self.runtime_path,
@@ -146,7 +143,7 @@ class Runner(BaseRunner):
                 {},
                 "/home/work/spectravis",
             )
-        elif service_info["name"] == "sftp":
+        if service_info["name"] == "sftp":
             return [
                 self.runtime_path,
                 "-m",

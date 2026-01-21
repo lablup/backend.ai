@@ -11,7 +11,8 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v6
       with:
         fetch-depth: 2
     - name: Create LFS file hash list
@@ -30,12 +31,12 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v10
       with:
         gha-cache-key: pants-cache-main-1-integration-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -45,12 +46,10 @@ jobs:
       shell: 'script -q -e -c "bash {0}"'
       run: |
         ./scripts/install-dev.sh
-        source env-tester-admin.sh
         ./backend.ai test run-cli admin
-        source env-tester-user.sh
         ./backend.ai test run-cli user
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v5
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log

@@ -20,7 +20,7 @@ def announce(msg: str, only_once: bool = True) -> None:
     try:
         with open(local_state_path / "announcement.json", "rb") as f_current:
             last_state = json.load(f_current)
-    except IOError:
+    except OSError:
         last_state = {"hash": "", "dismissed": False}
 
     hasher = hashlib.sha256()

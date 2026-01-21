@@ -1,18 +1,21 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "./configs:src",
-        "./fixtures:src",
     ],
 )
 
 visibility_private_component(
     allowed_dependents=[],
     allowed_dependencies=[
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/account_manager/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
     ],
 )
 
@@ -37,8 +40,8 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-install",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -46,24 +49,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-install",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-install-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-install-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-install*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",
@@ -80,11 +79,13 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        "./configs:templates",
-        "./fixtures:resources",
     ],
     sources=[
         "**/py.typed",
         "app.tcss",
+        "configs/**/*.toml",
+        "configs/**/*.yaml",
+        "configs/**/*.json",
+        "fixtures/**/*.json",
     ],
 )

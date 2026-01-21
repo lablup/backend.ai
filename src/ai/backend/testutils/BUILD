@@ -1,5 +1,5 @@
 python_test_utils(
-    sources=["*.py"],
+    sources=["**/*.py"],
 )
 
 visibility_private_component(
@@ -7,6 +7,6 @@ visibility_private_component(
         "//src/ai/backend/test/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/common/**",
+        "//src/ai/backend/**",
     ],
 )

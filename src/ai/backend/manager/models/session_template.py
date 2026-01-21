@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, List, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import trafaret as t
@@ -11,17 +12,17 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.exceptions import InvalidArgument
 
-from ..defs import DEFAULT_ROLE
-from ..exceptions import InvalidArgument
 from .base import GUID, EnumType, IDColumn, metadata
 from .user import UserRole
 from .vfolder import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",
-    "session_templates",
     "query_accessible_session_templates",
+    "session_templates",
 )
 
 
@@ -123,7 +124,7 @@ cluster_template_v1 = t.Dict({
 
 def check_cluster_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
     data = cluster_template_v1.check(raw_data)
-    defined_roles: List[str] = []
+    defined_roles: list[str] = []
     for node in data["spec"]["nodes"]:
         node["session_template"] = str(node["session_template"])
         if node["role"] in defined_roles:
@@ -145,27 +146,28 @@ async def query_accessible_session_templates(
     user_uuid: uuid.UUID,
     template_type: TemplateType,
     *,
-    user_role: UserRole = None,
-    domain_name: str = None,
+    user_role: Optional[UserRole] = None,
+    domain_name: Optional[str] = None,
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
-) -> List[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-    from ai.backend.manager.models import groups, users
+) -> list[Mapping[str, Any]]:
+    from .group import association_groups_users as agus
+    from .group import groups
+    from .user import users
 
-    entries: List[Mapping[str, Any]] = []
+    entries: list[Mapping[str, Any]] = []
     if "user" in allowed_types:
         # Query user templates
         j = session_templates.join(users, session_templates.c.user_uuid == users.c.uuid)
         query = (
-            sa.select([
+            sa.select(
                 session_templates.c.name,
                 session_templates.c.id,
                 session_templates.c.created_at,
                 session_templates.c.user_uuid,
                 session_templates.c.group_id,
                 users.c.email,
-            ])
+            )
             .select_from(j)
             .where(
                 (session_templates.c.user_uuid == user_uuid)
@@ -191,7 +193,7 @@ async def query_accessible_session_templates(
         # Query group session_templates
         if user_role == UserRole.ADMIN or user_role == "admin":
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
@@ -200,23 +202,21 @@ async def query_accessible_session_templates(
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = session_templates.join(groups, session_templates.c.group_id == groups.c.id)
         query = (
             sa.select(
-                [
-                    session_templates.c.name,
-                    session_templates.c.id,
-                    session_templates.c.created_at,
-                    session_templates.c.user_uuid,
-                    session_templates.c.group_id,
-                    groups.c.name,
-                ],
-                use_labels=True,
+                session_templates.c.name,
+                session_templates.c.id,
+                session_templates.c.created_at,
+                session_templates.c.user_uuid,
+                session_templates.c.group_id,
+                groups.c.name,
             )
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 session_templates.c.group_id.in_(group_ids)

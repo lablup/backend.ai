@@ -1,245 +1,1038 @@
-[etcd]
-namespace = "local"                         # env: BACKEND_NAMESPACE
-addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
-user = "manager"                            # env: BACKEND_ETCD_USER
-password = "ETCD_PASSWORD"                  # env: BACKEND_ETCD_PASSWORD
+# Backend.AI Manager Configuration (PROD Environment)
+#
+# This is a sample configuration file for the Backend.AI Manager.
+# All configuration options are documented with their descriptions,
+# default values, and environment-specific examples.
+#
+# Generated using BackendAIConfigMeta annotations.
 
 
+# Database configuration for the Backend.AI manager. Defines how the manager
+# connects to its PostgreSQL database including connection parameters,
+# credentials, and connection pool settings. The database stores all persistent
+# state including users, sessions, resources, and audit logs.
+# Added in 25.8.0
 [db]
-# One of: "postgresql"
-# Currently we only support PostgreSQL.
-type = "postgresql"
+  # Type of the database system to use. Currently, only PostgreSQL is supported
+  # as the main database backend for Backend.AI. PostgreSQL provides the ACID
+  # compliance and advanced features required for reliable session and resource
+  # management.
+  # Added in 25.8.0
+  type = "postgresql"
+  # Network address and port of the PostgreSQL database server. Default is the
+  # standard PostgreSQL port (5432) on localhost. In production, point this to
+  # your database server or cluster endpoint.
+  # Added in 25.8.0
+  addr = { host = "db.example.com", port = 5432 }
+  # Name of the PostgreSQL database to use for Backend.AI. This database must
+  # exist and be accessible by the configured user. The database should be
+  # created before starting the manager. Length must be between 2 and 64
+  # characters due to PostgreSQL naming constraints.
+  # Added in 25.8.0
+  name = "backend"
+  # Username for authenticating with the PostgreSQL database. This user must
+  # have sufficient privileges for all database operations including
+  # creating/dropping tables, indexes, and running migrations.
+  # Added in 25.8.0
+  user = "backend_user"
+  # Password for authenticating with the PostgreSQL database. Can be a direct
+  # password string or an environment variable reference. For security, using
+  # environment variables is strongly recommended in production.
+  # Added in 25.8.0
+  ## password = "DB_PASSWORD"
+  # Size of the SQLAlchemy database connection pool. Determines how many
+  # concurrent database connections to maintain. Should be tuned based on
+  # expected load, number of worker processes, and database server capacity.
+  # Higher values improve concurrency but consume more resources.
+  # Added in 25.8.0
+  pool-size = 16
+  # Maximum lifetime of a connection in seconds before it's recycled. Set to -1
+  # to disable connection recycling. Useful for handling database connections
+  # closed by the server after inactivity or by network equipment with idle
+  # timeouts.
+  # Added in 25.8.0
+  pool-recycle = 3600.0
+  # Whether to test connections with a lightweight ping before using them. Helps
+  # detect stale or disconnected connections before they cause application
+  # errors. Adds a small overhead per connection checkout but improves
+  # reliability. Recommended for production environments with network
+  # instability.
+  # Added in 25.8.0
+  pool-pre-ping = true
+  # Maximum number of additional connections to create beyond the pool_size. Set
+  # to -1 for unlimited overflow connections. These temporary connections are
+  # created when pool_size is insufficient and are closed when returned to the
+  # pool.
+  # Added in 25.8.0
+  max-overflow = 128
+  # Timeout in seconds for acquiring a connection from the pool. 0 means wait
+  # indefinitely. If connections cannot be acquired within this time, an
+  # exception is raised. Set a reasonable value in production to prevent
+  # indefinite blocking.
+  # Added in 25.8.0
+  lock-conn-timeout = 30.0
 
-# Address to access the database.
-# NOTE: It is RECOMMENDED to use domain names in cloud setups because the IP addresses
-# may change upon automatic upgrade or migration.
-addr = { host = "localhost", port = 5432 }  # env: BACKEND_DB_ADDR
+# Etcd distributed key-value store configuration. Etcd is used for cluster
+# coordination, service discovery, and shared configuration between manager
+# instances. In multi-manager deployments, etcd ensures consistent state across
+# all manager nodes.
+# Added in 25.8.0
+[etcd]
+  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
+  # keys will be stored under this namespace.
+  # Added in 22.03.0
+  namespace = "backend"
+  # Network address of the etcd server. Default is the standard etcd port on
+  # localhost. In production, should point to one or more etcd instance
+  # endpoint(s).
+  # Added in 22.03.0
+  addr = { host = "etcd-cluster", port = 2379 }
+  # Username for authenticating with etcd. Optional if etcd doesn't require
+  # authentication. Should be set along with password for secure deployments.
+  # Added in 22.03.0
+  ## user = "backend"
+  # Password for authenticating with etcd. Should be kept secret in production
+  # environments. Set together with the user field for authentication.
+  # Added in 22.03.0
+  ## password = "ETCD_PASSWORD"
 
-# Database name.
-name = "backend"                            # env: BACKEND_DB_NAME
-
-# Database account credentials.
-user = "postgres"                           # env: BACKEND_DB_USER
-password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
-
-# The connection pool's initial size
-# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
-# pool-size = 8
-
-# The connections for lock lifetime
-# Distribution locks wait for `lock-conn-timeout` seconds and lock context should finish within this time.
-# Default is 0, which means infinite
-# lock-conn-timeout = 30
-
-# This setting causes the pool to recycle connections after the given number of seconds has passed.
-# Default is -1, which means infinite. 
-# https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
-# https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
-# pool-recycle = -1
-
-# This setting eliminates DB error due to stale pooled connections by ping at the start of each connection pool checkout.
-# It adds a small overhead to the connection checkout process.
-# https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic
-# Default is false.
-# pool-pre-ping = false
-
-# The maximum allowed overflow of the connection pool
-# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.max_overflow)
-# max-overflow = 64
-
-# NOTE: The warning threshold for the number of concurrent transactions in a single manager process
-#       is determined as dividing the addition of the pool-size and max-overflow settings by two
-#       because the threshold applies to both generic and read-only transactions.
-
-# NOTE: Redis settings are configured in etcd as it is shared by both the manager and agents.
-
-
+# Core manager service configuration. Controls fundamental manager behavior
+# including network binding, process management, scaling parameters, and
+# internal service communication. This is the primary configuration block for
+# the manager component itself.
+# Added in 25.8.0
 [manager]
-# The number of worker processes to handle API requests and event messages.
-# If set zero, it uses the number of CPU cores in the system.
-num-proc = 4                                               # env: BACKEND_MANAGER_NPROC
+  # Base directory path for inter-process communication files. Used for Unix
+  # domain sockets and other IPC mechanisms. This directory must be writable by
+  # the manager process. In production, consider using /var/run/backend.ai/ipc
+  # for better security.
+  # Added in 25.8.0
+  ipc-base-path = "/var/run/backend.ai/ipc"
+  # Number of worker processes to spawn for the manager. Defaults to the number
+  # of CPU cores available. For optimal performance, set this to match your CPU
+  # core count. Higher values improve request concurrency but consume more
+  # memory.
+  # Added in 25.8.0
+  num-proc = 8
+  # Unique identifier for this manager instance. Used to distinguish between
+  # multiple manager instances in a cluster. By default, uses the hostname with
+  # an 'i-' prefix. Must be unique across all managers in the same Backend.AI
+  # cluster.
+  # Added in 25.8.0
+  id = "i-manager-01"
+  # User ID (UID) under which the manager process runs. If not specified,
+  # defaults to the UID of the server.py file. Important for proper file
+  # permissions when creating files and sockets. Should match the user that owns
+  # the Backend.AI installation.
+  # Added in 25.8.0
+  ## user = "1000"
+  # Group ID (GID) under which the manager process runs. If not specified,
+  # defaults to the GID of the server.py file. Important for proper file
+  # permissions when creating files and sockets. Should match the group that
+  # owns the Backend.AI installation.
+  # Added in 25.8.0
+  ## group = "1000"
+  # Network address and port where the manager API service will listen. Default
+  # is all interfaces (0.0.0.0) on port 8080. For private deployments behind a
+  # load balancer, consider using 127.0.0.1. This is the main entry point for
+  # client API requests.
+  # Added in 25.8.0
+  service-addr = { host = "0.0.0.0", port = 8080 }
+  # Address and port to announce to other Backend.AI components for service
+  # discovery. This should be the externally reachable address of this manager
+  # instance. Other components use this address to connect to the manager.
+  # Added in 25.8.0
+  announce-addr = { host = "manager.example.com", port = 8080 }
+  # Address and port to announce for internal API requests between Backend.AI
+  # components. Used for service discovery of internal endpoints. Should be
+  # accessible from containers and other internal services.
+  # Added in 25.8.0
+  announce-internal-addr = { host = "manager-internal", port = 18080 }
+  # Network address and port to accept internal API requests from other
+  # Backend.AI components. Internal APIs are used for inter-service
+  # communication and are not exposed to clients. Should be bound to an internal
+  # network interface in production.
+  # Added in 25.8.0
+  internal-addr = { host = "0.0.0.0", port = 18080 }
+  # Path to the keypair file used for RPC authentication between manager
+  # components. This file contains cryptographic key pairs for secure inter-
+  # service communication. In production, should be stored in a secure location
+  # with restricted permissions (0600).
+  # Added in 25.8.0
+  rpc-auth-manager-keypair = "/etc/backend.ai/keys/manager.key_secret"
+  # Timeout in seconds for agent heartbeat checks. If an agent doesn't respond
+  # within this time, it's considered offline. Should be set higher than the
+  # agent's heartbeat interval (default 10s). Increase in environments with high
+  # network latency.
+  # Added in 25.8.0
+  heartbeat-timeout = 60.0
+  # Secret key for manager authentication and signing operations. Used for
+  # securing API tokens and inter-service communication. Should be a strong
+  # random string in production environments. If not provided, one is auto-
+  # generated (not recommended for clustered deployments).
+  # Added in 25.8.0
+  secret = "<generate-secure-random-string>"
+  # Whether to enable SSL/TLS for secure API communication. Strongly recommended
+  # for production deployments exposed to public networks. Requires valid
+  # certificate (ssl_cert) and private key (ssl_privkey) when enabled.
+  # Added in 25.8.0
+  ssl-enabled = true
+  # Path to the SSL/TLS certificate file in PEM format. Required when
+  # ssl_enabled is true. Can be a self-signed certificate for development or a
+  # CA-issued certificate for production.
+  # Added in 25.8.0
+  ## ssl-cert = "/etc/backend.ai/ssl/manager.crt"
+  # Path to the SSL/TLS private key file in PEM format. Required when
+  # ssl_enabled is true. The key file should have restricted permissions (0600)
+  # for security.
+  # Added in 25.8.0
+  ## ssl-privkey = "/etc/backend.ai/ssl/manager.key"
+  # Event loop implementation to use for async operations. 'asyncio' is the
+  # Python standard library implementation (default). 'uvloop' is a faster
+  # alternative based on libuv but may have compatibility issues. Use uvloop for
+  # better performance in high-throughput scenarios.
+  # Added in 25.8.0
+  event-loop = "asyncio"
+  # Distributed lock mechanism to coordinate multiple manager instances.
+  # Options: filelock (single-node), pg_advisory (PostgreSQL, default), redlock
+  # (Redis), etcd (etcd v2), etcetra (etcd v3). Choose based on your
+  # infrastructure and cluster size.
+  # Added in 25.8.0
+  distributed-lock = "pg_advisory"
+  # Configuration for PostgreSQL advisory locks. Used when distributed_lock is
+  # set to pg_advisory. Usually the defaults work well for most deployments.
+  # Added in 25.8.0
+  pg-advisory-config = {}
+  # Configuration for file-based locks. Used when distributed_lock is set to
+  # filelock. Only suitable for single-node deployments.
+  # Added in 25.8.0
+  filelock-config = {}
+  # Configuration for Redis-based distributed locking (Redlock algorithm). Used
+  # when distributed_lock is set to redlock. Recommended for large clusters with
+  # Redis infrastructure.
+  # Added in 25.8.0
+  redlock-config = { lock_retry_interval = 1.0 }
+  # Configuration for etcd-based distributed locking. Used when distributed_lock
+  # is set to etcd or etcetra. Recommended for clusters already using etcd for
+  # coordination.
+  # Added in 25.8.0
+  etcdlock-config = {}
+  # Maximum lifetime in seconds for session scheduling locks. If scheduling
+  # takes longer than this, locks are automatically released. Prevents deadlocks
+  # in case a manager fails during scheduling. Increase if scheduling large
+  # sessions takes longer than 30 seconds.
+  # Added in 25.8.0
+  session_schedule_lock_lifetime = 60.0
+  # Maximum lifetime in seconds for session precondition check locks. Controls
+  # how long the manager can hold a lock while checking session creation
+  # conditions. Should be balanced to prevent both deadlocks and race
+  # conditions.
+  # Added in 25.8.0
+  session_check_precondition_lock_lifetime = 60.0
+  # Maximum lifetime in seconds for session start locks. Controls how long the
+  # manager can hold a lock while starting a session. Longer values are safer
+  # but may block other managers longer on failure.
+  # Added in 25.8.0
+  session_start_lock_lifetime = 60.0
+  # Path to the file where the manager process ID will be written. Useful for
+  # service management, monitoring, and graceful shutdown scripts. Set to
+  # /dev/null by default to disable this feature.
+  # Added in 25.8.0
+  pid-file = "/var/run/backend.ai/manager.pid"
+  # Explicit list of plugins to load (whitelist). If specified, only these
+  # plugins will be loaded even if others are installed. Useful for controlling
+  # exactly which plugins are active in production. Leave as None to load all
+  # available plugins except disabled_plugins.
+  # Added in 25.8.0
+  ## allowed-plugins = "[\"example.plugin.what.you.want\"]"
+  # List of plugins to explicitly disable (blacklist). These plugins won't be
+  # loaded even if they're installed. Useful for disabling problematic or
+  # unwanted plugins without uninstalling.
+  # Added in 25.8.0
+  ## disabled-plugins = "[\"example.plugin.what.you.want\"]"
+  # Whether to hide detailed agent information in API responses. When enabled,
+  # agent details are obscured in user-facing APIs. Recommended for multi-tenant
+  # environments to improve security and privacy.
+  # Added in 25.8.0
+  hide-agents = true
+  # Priority order for resources when selecting agents for compute sessions.
+  # Determines which resources are considered more important during scheduling.
+  # Default prioritizes GPU resources (CUDA, ROCm, TPU) over CPU and memory.
+  # Customize based on your workload patterns.
+  # Added in 25.8.0
+  agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
+  # Maximum WebSocket message size in bytes. Controls the largest message that
+  # can be sent over WebSocket connections. Default is 16 MiB (16777216 bytes),
+  # sufficient for most use cases. Increase for applications that transfer
+  # larger data chunks.
+  # Added in 25.8.0
+  max-wsmsg-size = 33554432
+  # Port for the aiomonitor terminal UI debugging console. Allows connecting via
+  # telnet to inspect running async tasks and debug issues. Should be accessible
+  # only from trusted networks for security.
+  # Added in 25.8.0
+  aiomonitor-termui-port = 38100
+  # Port for the aiomonitor web-based monitoring interface. Provides a browser-
+  # based UI for monitoring async tasks and manager health. Should be accessible
+  # only from trusted networks for security.
+  # Added in 25.8.0
+  aiomonitor-webui-port = 39100
+  # Whether to use the experimental Redis-based event dispatcher. May provide
+  # better performance for event handling in large clusters. Not recommended for
+  # production use unless specifically tested and needed.
+  # Added in 25.8.0
+  use-experimental-redis-event-dispatcher = false
+  # Interval in seconds between manager status updates to the cluster. Controls
+  # how frequently the manager broadcasts its health status. Smaller values
+  # provide more real-time information but increase network overhead.
+  # Added in 25.8.0
+  ## status-update-interval = 30.0
+  # How long in seconds status information is considered valid. Status records
+  # older than this will be ignored or refreshed. Should be greater than
+  # status_update_interval to avoid gaps.
+  # Added in 25.8.0
+  ## status-lifetime = 90
+  # Port for exposing public metrics in Prometheus format. If specified, metrics
+  # endpoint will be available at this port. Leave as None to disable public
+  # metrics exposure.
+  # Added in 25.8.0
+  ## public-metrics-port = 9090
+  # Whether to use the Sokovan orchestrator for session scheduling. Sokovan
+  # provides improved scheduling performance with better resource utilization.
+  # When disabled, falls back to the legacy scheduling system.
+  # Added in 25.8.0
+  use-sokovan = true
 
-# An arbitrary string used to salt when generating secret tokens (e.g., JWT)
-# Currently only some plugins use this configuration in the manager.
-secret = "XXXXXXXXXXXXXX"
-
-# Specify the user/group used for the manager daemon,
-# to which the manager changes after reading the daemon configuration and SSL certifiactes.
-# If not specified, it uses the file permission of ai/backend/manager/server.py
-# This config is effective only when the manager daemon is started as the root user.
-# Note that the vfolder (storage) permission must match with this.
-user = "nobody"
-group = "nobody"
-
-# Set the service hostname/port to accept API requests.
-service-addr = { host = "0.0.0.0", port = 8080 }
-# env: BACKEND_SERVICE_IP, BACKEND_SERVICE_PORT
-
-# Set the SSL certificate chain and the private keys used for serving the API requests.
-ssl-enabled = false
-#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
-#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
-
-# Set the timeout for agent heartbeats in seconds.
-heartbeat-timeout = 40.0
-
-# Override the name of this manager node.
-# If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",
-# like "i-hostname".  The "i-" prefix is not mandatory, though.
-# Explicit configuration may be required if the hostname changes frequently,
-# to handle the event bus messages consistently.
-# This affects the per-node configuration scope.
-# id = ""
-
-# Set the manager's RPC client certificate (public key and secret key).
-# This is a mandatory option even when no agents require authentication.
-# It must be generated for any new setup for security using
-# the `backend.ai mgr generate-rpc-keypair` command.
-# rpc-auth-manager-keypair = "fixtures/manager/manager.key_secret"
-
-# Create a PID file so that daemon managers could keep track of us.
-# If set to an empty string, it does NOT create the PID file.
-# pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
-
-# The base directory to put domain sockets for IPC.
-# Normally you don't have to change it.
-# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
-#       you must change this to a directory under your *home* directory.
-# ipc-base-path = "/tmp/backend.ai/ipc"
-
-# Explicitly set allowed plugins in order to load only selected plugin.
-# If use this feature,
-#   1) Replace '# allowed-plugins = []' with 'allowed-plugins = ["example.plugin.what.you.want"]'
-#   2) Add allowlist parameters when plugin_ctx initiate like 'example_plugin_ctx.init(allowlist=local_config["manager"]["allowed-plugins"])
-# Note: If you set allowed-plugins, they could only be loaded. The others would be blocked.
-# allowed-plugins = []
-
-# The list of black-listed manager plugins.
-disabled-plugins = []
-
-# Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
-hide-agents = false
-
-# The order of agent selection.
-agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
-
-# One of: "asyncio", "uvloop"
-# This changes the event loop backend.
-# uvloop is a fast libuv-based implementation but sometimes has
-# compatibility issues.
-# event-loop = "asyncio"
-
-# One of: "filelock", "pg_advisory", "redlock", "etcd"
-# Choose the implementation of distributed lock.
-# "filelock" is the simplest one when the manager is deployed on only one node.
-# "pg_advisory" uses PostgreSQL's session-level advisory lock.
-# "redlock" uses Redis-based distributed lock (Redlock) -- currently not supported.
-# "etcd" uses etcd-based distributed lock via etcd-client-py.
-# distributed-lock = "pg_advisory"
-
-# The Docker image name that is used for importing external Docker images.
-# You need to change this if your are at offline environments so that the manager
-# uses an importer image from a private registry.
-importer-image = "lablup/importer:manylinux2010"
-
-# The maximum size of websocket messages in bytes.
-# max-wsmsg-size = 16777216  # 16 MiB
-
-# The starting port number for aiomonitor.
-# Since the manager is composed of multiple processes, each process will be exposed
-# via the port number of this base port number + pidx.
-# aiomonitor-termui-port = 48100
-# aiomonitor-webui-port = 49100
-
-
+# Deprecated Docker registry configuration. This legacy configuration controls
+# basic Docker registry connection settings. For new deployments, use the
+# container registry configuration through the API instead. This setting may be
+# removed in future versions.
+# Added in 25.8.0
+# DEPRECATED in 25.10.0: Use container registry configuration through the API instead.
 [docker-registry]
-# Enable or disable SSL certificate verification when accessing Docker registries.
-ssl-verify = false                       # env: BACKEND_SKIP_SSLCERT_VALIDATION
 
-
+# Logging system configuration. Controls how the manager formats, filters, and
+# outputs log messages. Supports multiple log handlers including console, file,
+# and remote logging services. Detailed logging configuration helps with
+# debugging and monitoring.
+# Added in 25.8.0
 [logging]
-# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
-# Set the global logging level.
-level = "INFO"
+  # The version used by logging.dictConfig().
+  # Added in 24.09.0
+  version = 1
+  # The main log level to filter messages from all loggers.
+  # Added in 24.09.0
+  level = "INFO"
+  # Disable the existing loggers when applying the config.
+  # Added in 24.09.0
+  disable-existing-loggers = false
+  # The mapping of log handler configurations.
+  # Added in 24.09.0
+  handlers = {}
+  # The mapping of per-namespace logger configurations.
+  # Added in 24.09.0
+  loggers = {}
+  # The list of log drivers to activate.
+  # Added in 24.09.0
+  drivers = ["console", "file"]
+  # Override default log level for specific scope of package.
+  # Added in 24.09.0
+  pkg-ns = "{ \"\" = \"WARNING\", \"ai.backend\" = \"INFO\" }"
 
-# Multi-choice of: "console", "logstash", "file"
-# For each choice, there must be a "logging.<driver>" section
-# in this config file as exemplified below.
-drivers = ["console", "file"]
+  # Console logging driver configuration.
+  # Added in 24.09.0
+  [logging.console]
+    # Opt to print colorized log.
+    # Added in 24.09.0
+    ## colored = true
+    # Determine verbosity of log.
+    # Added in 24.09.0
+    format = "verbose"
 
+  # File logging driver configuration.
+  # Added in 24.09.0
+  [logging.file]
+    # Path to store log.
+    # Added in 24.09.0
+    path = "/var/log/backend.ai"
+    # Log file name.
+    # Added in 24.09.0
+    filename = "manager.log"
+    # Number of outdated log files to retain.
+    # Added in 24.09.0
+    backup-count = 10
+    # Maximum size for a single log file.
+    # Added in 24.09.0
+    rotation-size = "100MB"
+    # Determine verbosity of log.
+    # Added in 24.09.0
+    format = "verbose"
 
-[logging.console]
-# If set true, use ANSI colors if the console is a terminal.
-# If set false, always disable the colored output in console logs.
-colored = true
+  # Logstash logging driver configuration.
+  # Added in 24.09.0
+  [logging.logstash]
+    # Protocol to communicate with logstash server.
+    # Added in 24.09.0
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    # Added in 24.09.0
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
+    ssl-verify = true
 
-# One of: "simple", "verbose"
-format = "verbose"
+    # Connection information of logstash node.
+    # Added in 24.09.0
+    [logging.logstash.endpoint]
 
+  # Graylog logging driver configuration.
+  # Added in 24.09.0
+  [logging.graylog]
+    # Graylog hostname.
+    # Added in 24.09.0
+    host = "graylog-server"
+    # Graylog server port number.
+    # Added in 24.09.0
+    port = 12201
+    # Log level.
+    # Added in 24.09.0
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    # Added in 24.09.0
+    ## localname = "prod-manager-01"
+    # The fully qualified domain name of the source.
+    # Added in 24.09.0
+    ## fqdn = "manager.backend.ai"
+    # Verify validity of TLS certificate when communicating with Graylog.
+    # Added in 24.09.0
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    # Added in 24.09.0
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    # Added in 24.09.0
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    # Added in 24.09.0
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
 
-[logging.file]
-# The log file path and filename pattern.
-# All messages are wrapped in single-line JSON objects.
-# Rotated logs may have additional suffixes.
-# For production, "/var/log/backend.ai" is recommended.
-path = "./logs"
-filename = "manager.log"
+# Pyroscope continuous profiling configuration. When enabled, sends profiling
+# data to a Pyroscope server for performance analysis and optimization. Useful
+# for identifying bottlenecks and understanding resource usage patterns in
+# production deployments.
+# Added in 25.8.0
+[pyroscope]
+  # Whether to enable Pyroscope profiling. When enabled, performance profiling
+  # data will be sent to a Pyroscope server. Useful for debugging performance
+  # issues, but adds some overhead.
+  # Added in 24.12.1
+  enabled = true
+  # Application name to use in Pyroscope. This name will identify this component
+  # instance in Pyroscope UI. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## app-name = "backendai-manager-prod"
+  # Address of the Pyroscope server. Must include the protocol (http or https)
+  # and port if non-standard. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## server-addr = "http://pyroscope:4040"
+  # Sampling rate for Pyroscope profiling. Higher values collect more data but
+  # increase overhead. Balance based on your performance monitoring needs.
+  # Added in 24.12.1
+  ## sample-rate = 100
 
-# The maximum number of rotated logs.
-backup-count = 5
-
-# The log file size to begin rotation.
-rotation-size = "10M"
-
-
-[logging.logstash]
-# The endpoint to publish logstash records.
-endpoint = { host = "localhost", port = 9300 }
-
-# One of: "zmq.push", "zmq.pub", "tcp", "udp"
-protocol = "tcp"
-
-# SSL configs when protocol = "tcp"
-ssl-enabled = true
-ssl-verify = true
-
-
-[logging.graylog]
-host = "127.0.0.1"
-port = 12201
-
-# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
-ssl-verify = false
-ca-certs = ""
-keyfile = ""
-certfile = ""
-
-# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
-# fqdn = false
-# localname = "manager"
-
-
-# Specify additional package namespaces to include in the logs
-# and their individual log levels.
-# Note that the actual logging level applied is the conjunction of the global logging level and the
-# logging levels specified here for each namespace.
-[logging.pkg-ns]
-"" = "WARNING"
-"aiotools" = "INFO"
-"aiohttp" = "INFO"
-"ai.backend" = "INFO"
-"alembic" = "INFO"
-"sqlalchemy" = "WARNING"
-
-
+# Debugging options configuration. Controls various debugging features that aid
+# in development and troubleshooting. Most debug options should be disabled in
+# production environments as they may impact performance or expose sensitive
+# information.
+# Added in 25.8.0
 [debug]
-enabled = false
+  # Master switch for debug mode in the manager. When enabled, activates various
+  # debugging features and verbose logging. Should always be disabled in
+  # production for security and performance reasons.
+  # Added in 25.8.0
+  enabled = false
+  # Enable Python asyncio debug mode. Helps detect issues like coroutines never
+  # awaited or excessive event loop delays. Adds significant overhead; use only
+  # during development and debugging.
+  # Added in 25.8.0
+  asyncio = false
+  # Enable enhanced task information in aiomonitor. Provides more detailed
+  # information about running asyncio tasks. Useful for debugging complex async
+  # issues but adds monitoring overhead.
+  # Added in 25.8.0
+  enhanced-aiomonitor-task-info = false
+  # Log all internal system events passing through the event bus. Very verbose
+  # output useful for debugging event flow issues. Not recommended for
+  # production due to high log volume.
+  # Added in 25.8.0
+  log-events = false
+  # Log detailed information about scheduler tick operations. Helps diagnose
+  # scheduling issues and timing problems. Generates many log entries; use
+  # sparingly even in development.
+  # Added in 25.8.0
+  log-scheduler-ticks = false
+  # Periodically collect and log system statistics. Helpful for monitoring
+  # system behavior and performance trends over time. Can be enabled in
+  # production for diagnostics when needed.
+  # Added in 25.8.0
+  periodic-sync-stats = false
 
-# Enable or disable the asyncio debug mode.
-asyncio = false
+# Reporter configuration for notifications and alerts. Controls how the manager
+# reports events and sends notifications through various channels including
+# audit logs, action monitors, and SMTP email reporters. Each reporter type can
+# be independently configured.
+# Added in 25.8.0
+[reporter]
 
-# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
-enhanced-aiomonitor-task-info = false
+  # List of SMTP reporter configurations for email notifications. Each SMTP
+  # reporter can be configured with different SMTP servers, templates, and
+  # trigger policies. Multiple reporters enable routing different notification
+  # types to different email destinations.
+  # Added in 25.8.0
+  [reporter.smtp]
 
-# Periodically sync container stat from Redis to the kernels.last_stat column.
-periodic-sync-stats = false
+  # List of action monitor configurations. Action monitors subscribe to specific
+  # Backend.AI events and route them to configured reporters. Enables
+  # customizable alerting based on system events.
+  # Added in 25.8.0
+  [reporter.action-monitors]
+
+# System-wide configuration settings. Controls general Backend.AI system
+# behavior that affects all components. These settings typically apply globally
+# across the entire installation.
+# Added in 25.8.0
+[system]
+  # Default timezone for the manager and all time-related operations. Uses pytz-
+  # compatible timezone names (e.g., 'UTC', 'Asia/Seoul', 'America/New_York').
+  # Affects timestamps displayed in logs, APIs, and scheduled operations.
+  # Added in 25.8.0
+  timezone = "UTC"
+
+# API server configuration. Controls how the manager's REST and GraphQL APIs
+# behave including rate limiting, request size limits, session management, and
+# security settings. These settings affect how clients interact with Backend.AI.
+# Added in 25.8.0
+[api]
+  # CORS (Cross-Origin Resource Sharing) allow-origins header value. Use '*' to
+  # allow all origins (not recommended for production). Specify comma-separated
+  # domain patterns for production security.
+  # Added in 25.8.0
+  allow-origins = "https://console.example.com"
+  # Allow GraphQL schema introspection queries. Enables development tools like
+  # GraphiQL to explore the API schema. Should be disabled in production to
+  # prevent information leakage.
+  # Added in 25.8.0
+  allow-graphql-schema-introspection = false
+  # Allow OpenAPI schema introspection endpoints. Enables Swagger UI and similar
+  # API documentation tools. Should be disabled in production to prevent
+  # information leakage.
+  # Added in 25.8.0
+  allow-openapi-schema-introspection = false
+  # Maximum allowed depth for GraphQL queries. Limits query complexity to
+  # prevent denial-of-service attacks. Set to None to disable depth limiting
+  # (not recommended for production).
+  # Added in 25.8.0
+  ## max-gql-query-depth = 10
+  # Maximum page size for GraphQL connection (pagination) queries. Limits the
+  # number of items returned in a single request. Set to None to use the default
+  # pagination limits.
+  # Added in 25.8.0
+  ## max-gql-connection-page-size = 100
+
+  # Resource visibility and sharing settings for the API. Controls how resource
+  # information is exposed to different user roles.
+  # Added in 25.8.0
+  [api.resources]
+    # Whether to expose group resource usage statistics in check-presets API.
+    # When true, users can see aggregate resource usage for their groups. Useful
+    # for group-level resource monitoring and planning.
+    # Added in 25.8.0
+    group-resource-visibility = true
+
+# Redis configuration for caching and messaging. Redis is used for distributed
+# caching, session state storage, real-time messaging between components, and
+# background task queuing. Configure connection details and authentication here.
+# Added in 25.8.0
+[redis]
+  # Network address and port of the Redis server. Redis is used for distributed
+  # caching and messaging between managers. Set to None when using Sentinel for
+  # high availability.
+  # Added in 25.13.0
+  ## addr = { host = "redis-server", port = 6379 }
+  # Service name for Redis Sentinel. Required when using Redis Sentinel for high
+  # availability. Identifies which service to monitor for failover.
+  # Added in 25.13.0
+  ## service-name = "backend-ai"
+  # Password for authenticating with Redis. Set to None if Redis doesn't require
+  # authentication. Should be kept secret in production environments.
+  # Added in 25.13.0
+  ## password = "REDIS_PASSWORD"
+  # Timeout in milliseconds for Redis requests. Controls how long operations
+  # wait before timing out. If None, uses the default timeout configured in the
+  # Redis client.
+  # Added in 25.13.0
+  ## request-timeout = 5000
+  # Whether to use TLS for Redis connections.
+  # Added in 25.13.0
+  use_tls = true
+  # Whether to skip TLS certificate verification. Set to True for self-signed
+  # certificates or development environments.
+  # Added in 25.13.0
+  tls_skip_verify = false
+
+  # Configuration for the Redis helper library. Controls timeouts and
+  # reconnection behavior. Adjust based on network conditions and reliability
+  # requirements.
+  # Added in 25.13.0
+  [redis.redis-helper-config]
+    # Timeout in seconds for Redis socket operations. Controls how long
+    # operations wait before timing out. Increase for slow or congested
+    # networks.
+    # Added in 25.13.0
+    socket_timeout = 10.0
+    # Timeout in seconds for establishing Redis connections. Controls how long
+    # connection attempts wait before failing. Shorter values fail faster but
+    # may be too aggressive for some networks.
+    # Added in 25.13.0
+    socket_connect_timeout = 5.0
+    # Time in seconds to wait between reconnection attempts. Controls the
+    # polling frequency when trying to reconnect to Redis. Lower values
+    # reconnect faster but may increase network load.
+    # Added in 25.13.0
+    reconnect_poll_timeout = 1.0
+    # Timeout in seconds to wait for a connection from the blocking connection
+    # pool. Used by BlockingConnectionPool for distributed locking scenarios. If
+    # no connection is available within this time, a timeout error is raised.
+    # Added in 25.13.0
+    connection_ready_timeout = 30.0
+
+  # Optional override configurations for specific Redis contexts. Allows
+  # different Redis settings for different services within Backend.AI. Each key
+  # represents a context name, and the value is a complete Redis configuration.
+  # Added in 25.13.0
+  [redis.override-configs]
+
+  # List of Redis Sentinel addresses for high availability. If provided, the
+  # manager will use Redis Sentinel for automatic failover. When using Sentinel,
+  # the addr field is ignored and service_name is required.
+  # Added in 25.13.0
+  [[redis.sentinel]]
+  # Add multiple [[redis.sentinel]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "redis-sentinel"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 26379
+
+# Idle session checker configuration. Controls automatic termination of inactive
+# sessions to free up resources. Multiple checker types can be enabled including
+# network timeout, resource utilization, and session lifetime checkers.
+# Added in 25.8.0
+[idle]
+  # Comma-separated list of enabled idle checker names. Idle checkers
+  # automatically terminate sessions that have been idle for too long, helping
+  # to free up resources. Available checkers include 'network_timeout' (monitors
+  # network activity), 'utilization' (monitors CPU/GPU/memory usage), and
+  # 'session_lifetime' (enforces maximum session duration). Leave empty to
+  # disable idle checking entirely.
+  # Added in 25.8.0
+  enabled = "network_timeout,utilization"
+  # Timeout duration for app-streaming TCP packet activity. When a session runs
+  # an interactive application (web apps, IDEs), this timeout determines how
+  # long to wait for network packets before considering the connection stale.
+  # This helps detect disconnected or abandoned interactive sessions. Format is
+  # a duration string like '5m' for 5 minutes.
+  # Added in 25.8.0
+  app_streaming_packet_timeout = "10m"
+  # Detailed configuration for each idle checker. Each key is a checker name
+  # (matching those in 'enabled'), and the value is checker-specific
+  # configuration. For 'network_timeout', set 'threshold' for the idle duration.
+  # For 'utilization', configure 'resource-thresholds' with CPU/memory/GPU
+  # utilization percentages, 'thresholds-check-operator' (and/or), 'time-window'
+  # for averaging period, and 'initial-grace-period' to skip checking after
+  # session start.
+  # Added in 25.8.0
+  checkers = {}
+
+# Docker container runtime settings. Controls how Docker images are managed and
+# used for compute sessions. Includes image configuration and container runtime
+# defaults.
+# Added in 25.8.0
+[docker]
+
+  # Docker image management configuration. Controls image pulling policies and
+  # registry interactions.
+  # Added in 25.8.0
+  [docker.image]
+    # Policy for automatically pulling Docker images before session creation.
+    # 'digest': Pull when image digest changes (most secure, ensures exact
+    # version). 'tag': Pull when image tag changes (faster, but may get
+    # unexpected updates). 'none': Never auto-pull (requires manual image
+    # management).
+    # Added in 25.8.0
+    auto_pull = "digest"
+
+# Plugin system configuration. Controls behavior of Backend.AI plugins including
+# scheduler plugins, hook plugins, and accelerator plugins. Plugins extend
+# manager functionality for custom scheduling, event handling, and hardware
+# support.
+# Added in 25.8.0
+[plugins]
+  # Accelerator plugin configurations for GPU, TPU, and other devices. Keys are
+  # accelerator types (e.g., 'cuda', 'rocm', 'tpu'). Values contain plugin-
+  # specific settings like allocation modes and memory management.
+  # Added in 25.8.0
+  accelerator = {}
+  # Scheduler plugin configurations for session scheduling strategies. Keys are
+  # scheduler names (e.g., 'fifo', 'lifo', 'drf'). Values contain scheduler-
+  # specific settings like retry counts and priorities.
+  # Added in 25.8.0
+  scheduler = {}
+  # Agent selector plugin configurations for agent selection strategies.
+  # Controls how agents are chosen for session placement. Can implement load-
+  # based, resource-based, or custom selection algorithms.
+  # Added in 25.8.0
+  agent-selector = {}
+  # Network plugin configurations for container networking. Keys are network
+  # driver names (e.g., 'overlay'). Values contain settings like MTU, subnet
+  # ranges, and encryption options.
+  # Added in 25.8.0
+  network = {}
+
+# Network configuration for container networking. Controls how compute session
+# containers connect to networks and communicate with each other. Supports
+# various network modes including overlay networks for multi-host deployments.
+# Added in 25.8.0
+[network]
+
+  # Configuration for networks between containers. Controls how containers in
+  # cluster sessions communicate with each other. Important for distributed
+  # computing workloads.
+  # Added in 25.8.0
+  [network.inter-container]
+    # Default network driver for inter-container communication in cluster
+    # sessions. 'overlay' enables multi-host container networking for
+    # distributed workloads. Container communication performance depends on this
+    # setting.
+    # Added in 25.8.0
+    ## default-driver = "overlay"
+    # Whether to enable inter-container networking for cluster sessions. When
+    # enabled, containers in the same session can communicate directly. Required
+    # for distributed computing frameworks like Horovod or PyTorch distributed.
+    # Added in 25.8.0
+    enabled = true
+    # Network plugin configuration for inter-container communication. Allows
+    # custom network plugin settings for advanced networking scenarios.
+    # Added in 25.8.0
+    ## plugin = "{}"
+
+  # Subnet configurations for Backend.AI network segmentation. Defines IP
+  # address ranges for agents and containers.
+  # Added in 25.8.0
+  [network.subnet]
+    # IP subnet for agent communications. Specifies which network range is
+    # allowed for agent-to-agent and agent-to-manager traffic. Use '0.0.0.0/0'
+    # to allow all IPv4 addresses, or specify a restricted range for security.
+    # Added in 25.8.0
+    agent = "10.0.0.0/8"
+    # IP subnet for container networks. Specifies which network range is
+    # allocated to containers. Use '0.0.0.0/0' to allow all IPv4 addresses, or
+    # '172.17.0.0/16' for Docker default.
+    # Added in 25.8.0
+    container = "172.17.0.0/16"
+
+  # RPC (Remote Procedure Call) network settings for internal service
+  # communication. Controls timeouts and keepalive settings for manager-agent
+  # communication.
+  # Added in 25.8.0
+  [network.rpc]
+    # Timeout in seconds for RPC connection keepalive between manager and
+    # agents. If no activity occurs within this time, the connection is
+    # considered stale. Increase in environments with intermittent network
+    # connectivity.
+    # Added in 25.8.0
+    keepalive-timeout = 120.0
+
+# Watcher service configuration. The watcher monitors compute sessions and agent
+# health. Configure connection settings for communicating with watcher instances
+# deployed alongside agents.
+# Added in 25.8.0
+[watcher]
+  # Authentication token for the watcher service. Used to secure communication
+  # between manager and the agent watcher component. Should be a secure random
+  # string in production environments.
+  # Added in 25.8.0
+  ## token = "WATCHER_TOKEN"
+  # Timeout in seconds for file I/O operations performed by the watcher.
+  # Controls how long the watcher waits for file operations to complete.
+  # Increase for handling large files or when using slow storage systems.
+  # Added in 25.8.0
+  file-io-timeout = 120.0
+
+# Authentication and security settings. Controls password policies, login
+# behavior, and other authentication-related configurations. Ensure strong
+# password requirements in production environments.
+# Added in 25.8.0
+[auth]
+  # Maximum password age before requiring users to change their password. Format
+  # is a duration string like '90d' for 90 days, '6m' for 6 months. Set to None
+  # to disable password expiration. Recommended for compliance with security
+  # policies.
+  # Added in 25.8.0
+  ## max_password_age = "90d"
+  # The password hashing algorithm to use for new passwords. Supported
+  # algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256, pbkdf2_sha3_256.
+  # PBKDF2_SHA256 is recommended for most deployments. Existing passwords with
+  # different algorithms will be gradually migrated on login.
+  # Added in 25.8.0
+  password-hash-algorithm = "pbkdf2_sha256"
+  # The number of iterations for the password hashing algorithm. Higher values
+  # are more secure but slower. For bcrypt: valid range is 4-31 (auto-capped).
+  # For PBKDF2: recommended 100,000+ (default 600,000). The value is
+  # automatically adjusted to fit algorithm constraints.
+  # Added in 25.8.0
+  password-hash-rounds = 600000
+  # The size of the salt in bytes for password hashing. Larger salts provide
+  # better protection against rainbow table attacks. Minimum: 16 bytes (128
+  # bits), Default: 32 bytes (256 bits), Maximum: 256 bytes. Note: bcrypt
+  # manages its own salt internally, so this setting doesn't apply to bcrypt.
+  # Added in 25.8.0
+  password-hash-salt-size = 32
+
+# JWT (JSON Web Token) authentication configuration. Controls JWT token signing
+# and verification settings used for stateless authentication between
+# components. Shared between manager and webserver for consistent token
+# handling.
+# Added in 25.8.0
+[jwt]
+  # Algorithm for JWT token signing. HS256 (HMAC-SHA256) is the default
+  # symmetric algorithm.
+  # Added in 25.16.0
+  algorithm = "HS256"
+  # JWT token expiration time in seconds. Default is 900 seconds (15 minutes).
+  # Range: 60 seconds (1 minute) to 86400 seconds (24 hours). Shorter expiration
+  # times are more secure but may impact user experience.
+  # Added in 25.16.0
+  token-expiration-seconds = 3600
+
+# Compute session configuration. Controls behavior and resource limits for
+# compute sessions including default settings, timeouts, and session lifecycle
+# management parameters.
+# Added in 25.8.0
+[session]
+
+  # Configuration for detecting and handling hung sessions. Controls how the
+  # system identifies sessions stuck in transitional states and what recovery
+  # actions to take. Essential for maintaining system health.
+  # Added in 25.8.0
+  [session.hang-tolerance]
+
+    # Threshold settings for detecting hung sessions in various states. Defines
+    # maximum times sessions can remain in transitional states before the system
+    # considers them hung and takes recovery action.
+    # Added in 25.8.0
+    [session.hang-tolerance.threshold]
+      # Maximum time a session can stay in PREPARING state before considered
+      # hung. Format is a duration string like '10m' for 10 minutes or '1h' for
+      # 1 hour. When exceeded, the system will attempt recovery actions for the
+      # session.
+      # Added in 25.8.0
+      ## PREPARING = "30m"
+      # Maximum time a session can stay in TERMINATING state before considered
+      # hung. Format is a duration string like '10m' for 10 minutes or '1h' for
+      # 1 hour. When exceeded, the system will force-terminate the session.
+      # Added in 25.8.0
+      ## TERMINATING = "30m"
+
+# Metric collection configuration. Controls how the manager collects and queries
+# performance metrics from Prometheus for session monitoring, idle detection,
+# and resource optimization.
+# Added in 25.8.0
+[metric]
+  # Address for the Prometheus metric server used for collecting session
+  # statistics. Backend.AI queries this Prometheus instance to retrieve resource
+  # usage metrics for compute sessions. The metrics are used for monitoring
+  # dashboards, idle session detection, and resource optimization. Ensure the
+  # Prometheus server is accessible from the manager and configured to scrape
+  # agent metrics.
+  # Added in 25.8.0
+  addr = { host = "prometheus.backend.svc", port = 9090 }
+  # Time window for metric range vector queries in PromQL format. This parameter
+  # controls the lookback period when querying Prometheus for resource usage
+  # statistics. For example, '1h' means metrics are averaged over the past 1
+  # hour. Shorter windows provide more responsive metrics but may be noisier;
+  # longer windows smooth out spikes but delay detection of changes.
+  # Added in 25.8.0
+  timewindow = "1h"
+
+# Virtual folder and storage volume configuration. Controls how storage volumes
+# are managed, which folder types are enabled, and configures connections to
+# storage proxy services for file operations.
+# Added in 25.8.0
+[volumes]
+  # Default volume host to use when creating new virtual folders. The format is
+  # 'proxy_name:volume_name' where proxy_name matches a key in the 'proxies'
+  # configuration. When users create folders without specifying a host, this
+  # default is used. If not set, users must explicitly specify the host for each
+  # folder.
+  # Added in 25.8.0
+  ## default_host = "nas-proxy:main-volume"
+  # Comma-separated list of volume information to expose to users. Controls what
+  # storage metrics are visible in the user interface and API responses. Options
+  # include 'percentage' for disk usage percentage. Additional metrics may be
+  # available depending on the storage backend capabilities.
+  # Added in 25.8.0
+  exposed_volume_info = "percentage"
+
+  # Configuration for enabled virtual folder types. Defines which types of
+  # virtual folders can be created in the system. Contains sub-configurations
+  # for user-level and group-level folders. At minimum, user folders are
+  # typically enabled to allow users to store their personal data and session
+  # outputs.
+  # Added in 25.8.0
+  [volumes._types]
+    # Configuration for user-owned virtual folders. When this field is set (even
+    # as an empty dict), users can create personal virtual folders to store and
+    # manage their data. User folders are private by default and only accessible
+    # by the owner. Set to None to disable user-level virtual folder creation
+    # entirely.
+    # Added in 25.8.0
+    ## user = {}
+    # Configuration for group-owned virtual folders. When this field is set
+    # (even as an empty dict), users can create shared virtual folders at the
+    # group level. Group folders allow collaboration by sharing data among team
+    # members within the same group. Access permissions are managed at the group
+    # level. Set to None to disable group-level virtual folder creation.
+    # Added in 25.8.0
+    ## group = {}
+
+  # Mapping of storage proxy configurations by proxy name. Each key is a unique
+  # proxy name used in volume host references (e.g., 'local:volume1' uses the
+  # 'local' proxy). Each value is a VolumeProxyConfig defining the proxy's API
+  # endpoints, authentication, and settings. Multiple proxies can be configured
+  # for different storage backends or locations.
+  # Added in 25.8.0
+  [volumes.proxies]
+
+# Resource slot configuration. Defines available resource types beyond standard
+# CPU and memory. Accelerator plugins add custom resource slots here for GPUs
+# and other specialized hardware.
+# Added in 25.8.0
+[resource-slots]
+
+# OpenTelemetry configuration for distributed tracing. When enabled, sends trace
+# data to an OpenTelemetry collector for request tracking across Backend.AI
+# components. Useful for debugging and performance analysis.
+# Added in 25.8.0
+[otel]
+  # Whether to enable OpenTelemetry for tracing or logging. When enabled, traces
+  # or logs will be collected and sent to the configured OTLP endpoint.
+  # Added in 25.7.0
+  enabled = true
+  # Log level for OpenTelemetry. Controls the verbosity of logs generated by
+  # OpenTelemetry. Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'.
+  # Added in 25.7.0
+  log-level = "INFO"
+  # OTLP endpoint for sending traces. Should include the host and port of the
+  # OTLP receiver.
+  # Added in 25.7.0
+  endpoint = "http://otel-collector:4317"
+
+# Service discovery configuration. Controls how Backend.AI components discover
+# and connect to each other in dynamic environments. Supports multiple discovery
+# mechanisms for different deployment scenarios.
+# Added in 25.8.0
+[service-discovery]
+  # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
+  # Added in 25.9.0
+  type = "redis"
+
+# Default artifact registry configuration. Specifies the default model registry
+# for artifact operations. When configured, enables model artifact management
+# features in Backend.AI.
+# Added in 25.8.0
+[artifact-registry]
+  # Name identifier for the default model registry configuration. This name is
+  # used to reference the registry in API calls and configuration. The actual
+  # registry location and credentials are managed through the reservoir
+  # configuration. This setting establishes which model registry to use for
+  # artifact storage operations.
+  # Added in 25.8.0
+  model-registry = "prod-model-registry"
+
+# Reservoir configuration for model artifact storage. The reservoir system
+# manages binary artifacts like trained models and checkpoints. Configure
+# storage backends and import workflows here.
+# Added in 25.8.0
+[reservoir]
+  # Whether to enable the approval workflow for model artifact uploads. When
+  # enabled, uploaded model artifacts require explicit approval by an
+  # administrator before they become available for use. This provides an
+  # additional review step for security and quality control in production
+  # environments.
+  # Added in 25.8.0
+  enable-approve-process = true
+  # Whether this reservoir uses delegation to upstream reservoirs. In a
+  # hierarchical reservoir setup, leaf reservoirs (use_delegation=True) can
+  # delegate model requests to parent reservoirs. Set to False if this reservoir
+  # is standalone or is itself a delegation target.
+  # Added in 25.8.0
+  use-delegation = false
+  # Name of the default storage backend for reservoir operations. This storage
+  # is used for steps not explicitly specified in storage_step_selection. The
+  # name must match a configured storage in the storage proxy. Examples include
+  # object storage backends like MinIO or VFS storage backends.
+  # Added in 25.8.0
+  storage-name = "prod-s3-storage"
+  # Mapping of artifact import steps to storage backend names. Allows using
+  # different storage backends for different stages of the model import process.
+  # Keys are import steps like 'download' and 'archive'. Steps not specified
+  # here use the storage_name default. This enables optimizing storage for
+  # different workload types.
+  # Added in 25.8.0
+  storage-step-selection = {}
+
+  # Storage-specific configuration for the reservoir. The config type is
+  # determined by the 'storage_type' discriminator field. Use
+  # ReservoirObjectStorageConfig for S3-compatible storage or
+  # ReservoirVFSStorageConfig for virtual filesystem storage backends.
+  # Added in 25.8.0
+  [reservoir.config]
+
+# Deployment and model serving configuration. Controls behavior of the model
+# deployment features in Backend.AI including inference endpoint management and
+# model definition handling.
+# Added in 25.8.0
+[deployment]
+  # Enable custom model definition override from storage for non-CUSTOM runtime
+  # variants. When enabled, after generating the standard model definition
+  # programmatically, the system attempts to fetch a custom definition from
+  # storage if model_definition_path is specified in the model revision. The
+  # custom definition overrides the generated one if found; otherwise, the
+  # generated definition is used as fallback. This allows customizing model
+  # serving configurations while maintaining automatic defaults.
+  # Added in 25.8.0
+  enable-model-definition-override = true
+
+# Export API configuration. Controls CSV export functionality including row
+# limits, timeouts, and concurrency limits. These settings prevent resource
+# exhaustion from large export operations.
+# Added in 26.1.0
+[export]
+  # Maximum number of rows per export request. Limits the amount of data that
+  # can be exported in a single request to prevent memory exhaustion and timeout
+  # issues.
+  # Added in 26.1.0
+  max-rows = 100000
+  # Database statement timeout in seconds for export queries. Long-running
+  # export queries will be cancelled after this duration.
+  # Added in 26.1.0
+  statement-timeout-sec = 300
+  # Maximum number of concurrent export requests allowed. Prevents system
+  # overload from too many simultaneous export operations.
+  # Added in 26.1.0
+  max-concurrent-exports = 10

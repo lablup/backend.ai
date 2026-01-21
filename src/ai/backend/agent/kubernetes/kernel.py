@@ -4,8 +4,9 @@ import lzma
 import os
 import shutil
 import textwrap
-from pathlib import Path
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
+from typing import Any, Optional, override
 
 import pkg_resources
 import zmq
@@ -15,19 +16,19 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
+from ai.backend.agent.errors import KernelRunnerNotInitializedError
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, KernelId, SessionId
+from ai.backend.common.dto.agent.response import CodeCompletionResp
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernel(AbstractKernel):
@@ -35,22 +36,20 @@ class KubernetesKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
+        network_id: str,
         image: ImageRef,
         version: int,
         *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
-        data: Dict[str, Any],
+        data: dict[str, Any],
         environ: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -60,13 +59,15 @@ class KubernetesKernel(AbstractKernel):
             environ=environ,
         )
 
-        self.deployment_name = f"kernel-{kernel_id}"
+        self.deployment_name = f"kernel-{ownership_data.kernel_id}"
 
+    @override
     async def close(self) -> None:
         await self.scale(0)
 
+    @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
@@ -151,20 +152,24 @@ class KubernetesKernel(AbstractKernel):
                 return False
             for container in containers:
                 started = container.get("started")
-                if not container["ready"] or started is not None and not started:
+                if not container["ready"] or (started is not None and not started):
                     return False
         return True
 
-    async def get_completions(self, text: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+    @override
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_completion(text, opts)
-        return {"status": "finished", "completions": result}
+        return CodeCompletionResp(result=result)
 
+    @override
     async def check_status(self):
-        assert self.runner is not None
-        result = await self.runner.feed_and_get_status()
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_and_get_status()
 
+    @override
     async def get_logs(self):
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
@@ -172,13 +177,17 @@ class KubernetesKernel(AbstractKernel):
         result = await core_api.read_namespaced_pod_log(self.kernel_id, "backend-ai")
         return {"logs": result.data.decode("utf-8")}
 
+    @override
     async def interrupt_kernel(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
+    @override
     async def start_service(self, service: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
             return {
                 "status": "failed",
@@ -189,33 +198,38 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service({
+        return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
             "options": opts,
         })
-        return result
 
+    @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        assert self.runner is not None
-        result = await self.runner.feed_start_model_service(model_service)
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_start_model_service(model_service)
 
+    @override
     async def shutdown_service(self, service: str):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
+    @override
     async def get_service_apps(self):
-        assert self.runner is not None
-        result = await self.runner.feed_service_apps()
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_service_apps()
 
+    @override
     async def check_duplicate_commit(self, kernel_id, subdir):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
+    @override
     async def commit(
         self,
         kernel_id,
@@ -223,50 +237,51 @@ class KubernetesKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
         # TODO: Implement container commit on Kubernetes kernel.
+        if extra_labels is None:
+            extra_labels = {}
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def accept_file(self, filename: str, filedata: bytes):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
-        work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
-        try:
-            # create intermediate directories in the path
-            dest_path = (work_dir / filename).resolve(strict=False)
-            parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        )
+        host_abspath = (host_work_dir / container_path).resolve(strict=False)
+        if not host_abspath.is_relative_to(host_work_dir):
+            raise PermissionError("Not allowed to upload files outside /home/work")
 
         def _write_to_disk():
-            parent_path.mkdir(parents=True, exist_ok=True)
-            dest_path.write_bytes(filedata)
+            host_abspath.parent.mkdir(parents=True, exist_ok=True)
+            host_abspath.write_bytes(filedata)
 
         try:
             await loop.run_in_executor(None, _write_to_disk)
-        except FileNotFoundError:
-            log.error(
-                "{0}: writing uploaded file failed: {1} -> {2}", self.kernel_id, filename, dest_path
+        except OSError as e:
+            raise RuntimeError(
+                f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
             )
 
-    async def download_file(self, filepath: str):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
-        home_path = Path("/home/work")
-        try:
-            abspath = (home_path / filepath).resolve()
-            abspath.relative_to(home_path)
-        except ValueError:
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot download files outside /home/work")
 
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,
             self.kernel_id,
             "backend-ai",
-            command=["tar", "cf", "-", abspath.resolve()],
+            command=["tar", "cf", "-", container_abspath],
             stderr=True,
             stdin=True,
             stdout=True,
@@ -275,24 +290,25 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
+        return b""
 
-        return None
-
-    async def download_single(self, filepath: str):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement download single file operations with pure Kubernetes API
         log.error("download_single() in the k8s backend is not supported yet.")
         raise NotImplementedError
 
-    async def list_files(self, container_path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work").resolve()
-        resolved_path = (home_path / container_path).resolve()
-
-        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
@@ -336,9 +352,11 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
+    @override
     async def notify_event(self, evdata: AgentEventData):
         raise NotImplementedError
 
@@ -371,16 +389,18 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
@@ -507,7 +527,7 @@ async def copy_runner_files(scratch_path: Path) -> None:
     shutil.copytree(helpers_path.resolve(), destination_path / "helpers")
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner

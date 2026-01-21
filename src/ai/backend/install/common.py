@@ -41,7 +41,7 @@ async def detect_os() -> OSInfo:
         pass
     try:
         issue_output = Path("/etc/issue").read_bytes().strip()
-    except IOError:
+    except OSError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
     if uname_s_output == b"Darwin":

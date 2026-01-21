@@ -2,41 +2,29 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
-import json
 import logging
 import os
 import secrets
 import socket
-import subprocess
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
+from typing import Final
 
 import pytest
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.minio import MinioContainer
+from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
 
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
-
-def get_free_port():
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
-
-
-def check_if_port_is_clear(host, port):
-    while True:
-        try:
-            s = socket.create_connection((host, port), timeout=0.3)
-        except (ConnectionRefusedError, TimeoutError):
-            break
-        else:
-            time.sleep(0.1)
-            s.close()
-            continue
+PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))
+PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"))
 
 
 @contextlib.contextmanager
@@ -63,112 +51,12 @@ def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
         file.close()
 
 
-def wait_health_check(container_id):
-    while True:
-        proc = subprocess.run(
-            [
-                "docker",
-                "inspect",
-                container_id,
-            ],
-            capture_output=True,
-        )
-        container_info = json.loads(proc.stdout)
-        if not container_info:  # maybe empty if container is not yet initialized
-            time.sleep(0.2)
-            continue
-        health_info = container_info[0]["State"].get("Health")
-        if health_info is not None and health_info["Status"].lower() != "healthy":
-            time.sleep(0.2)
-            continue
-        if health_info is None and (err_info := container_info[0]["State"].get("Error")):
-            raise RuntimeError(f"Container spawn failed: {err_info}")
-        # Give extra grace period to avoid intermittent connection failure.
-        time.sleep(0.2)
-        return container_info
-
-
-@pytest.fixture(scope="session", autouse=False)
-def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
-    # Spawn a single-node etcd container for a testing session.
-    etcd_allocated_port = 9600 + get_parallel_slot() * 8 + 0
-    random_id = secrets.token_hex(8)
-    check_if_port_is_clear("127.0.0.1", etcd_allocated_port)
-    proc = subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            f"test--etcd-slot-{get_parallel_slot()}-{random_id}",
-            "-p",
-            f"0.0.0.0:{etcd_allocated_port}:2379",
-            "-p",
-            "0.0.0.0::4001",
-            "--health-cmd",
-            "etcdctl endpoint health",
-            "--health-interval",
-            "2s",
-            "--health-start-period",
-            "1s",
-            "quay.io/coreos/etcd:v3.5.4",
-            "/usr/local/bin/etcd",
-            "-advertise-client-urls",
-            "http://0.0.0.0:2379",
-            "-listen-client-urls",
-            "http://0.0.0.0:2379",
-        ],
-        capture_output=True,
-    )
-    container_id = proc.stdout.decode().strip()
-    if not container_id:
-        raise RuntimeError("etcd_container: failed to create container", proc.stderr.decode())
-    log.info("spawning etcd container on port %d", etcd_allocated_port)
-    wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", etcd_allocated_port)
-    subprocess.run(
-        [
-            "docker",
-            "rm",
-            "-v",
-            "-f",
-            container_id,
-        ],
-        capture_output=True,
-    )
-
-
-@pytest.fixture(scope="session", autouse=False)
-def redis_container() -> Iterator[tuple[str, HostPortPair]]:
-    # Spawn a single-node etcd container for a testing session.
-    redis_allocated_port = 9600 + get_parallel_slot() * 8 + 1
-    check_if_port_is_clear("127.0.0.1", redis_allocated_port)
-    random_id = secrets.token_hex(8)
-    proc = subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "-u",
-            f"{os.getuid()}:{os.getgid()}",
-            "--name",
-            f"test--redis-slot-{get_parallel_slot()}-{random_id}",
-            "-p",
-            f"0.0.0.0:{redis_allocated_port}:6379",
-            # IMPORTANT: We have intentionally omitted the healthcheck here
-            # to avoid intermittent failures when pausing/unpausing containers.
-            "redis:7-alpine",
-        ],
-        capture_output=True,
-    )
-    container_id = proc.stdout.decode().strip()
-    if not container_id:
-        raise RuntimeError("redis_container: failed to create container", proc.stderr.decode())
-    log.info("spawning redis container on port %d", redis_allocated_port)
+def _wait_redis_health_check(host: str, port: int) -> None:
+    """Custom Redis health check using PING command (matches original implementation)."""
     while True:
         try:
             with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-                s.connect(("127.0.0.1", redis_allocated_port))
+                s.connect((host, port))
                 s.send(b"*2\r\n$4\r\nPING\r\n$5\r\nhello\r\n")
                 reply = s.recv(128, 0)
                 if not reply.startswith(b"$5\r\nhello\r\n"):
@@ -178,62 +66,126 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         except (ConnectionRefusedError, ConnectionResetError):
             time.sleep(0.1)
             continue
+    # Extra grace period to avoid intermittent connection failure
     time.sleep(0.5)
-    yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
-    subprocess.run(
-        [
-            "docker",
-            "rm",
-            "-v",
-            "-f",
-            container_id,
-        ],
-        capture_output=True,
-    )
 
 
 @pytest.fixture(scope="session", autouse=False)
-def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
+def etcd_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node etcd container for a testing session.
-    postgres_allocated_port = 9600 + get_parallel_slot() * 8 + 2
-    check_if_port_is_clear("127.0.0.1", postgres_allocated_port)
     random_id = secrets.token_hex(8)
-    proc = subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            f"test--postgres-slot-{get_parallel_slot()}-{random_id}",
-            "-p",
-            f"0.0.0.0:{postgres_allocated_port}:5432",
-            "-e",
-            "POSTGRES_PASSWORD=develove",
-            "-e",
-            "POSTGRES_DB=testing",
-            "--health-cmd",
-            "pg_isready -U postgres",
-            "--health-interval",
-            "1s",
-            "--health-start-period",
-            "2s",
-            "postgres:13.6-alpine",
-        ],
-        capture_output=True,
+
+    container = (
+        DockerContainer("quay.io/coreos/etcd:v3.5.4")
+        .with_name(f"test--etcd-slot-{get_parallel_slot()}-{random_id}")
+        .with_exposed_ports(2379)
+        .with_kwargs(tmpfs={"/etcd-data": ""})
+        .with_command(
+            "/usr/local/bin/etcd "
+            "-advertise-client-urls http://0.0.0.0:2379 "
+            "-listen-client-urls http://0.0.0.0:2379"
+        )
     )
-    container_id = proc.stdout.decode().strip()
-    if not container_id:
-        raise RuntimeError("postgres_container: failed to create container", proc.stderr.decode())
-    log.info("spawning postgres container on port %d", postgres_allocated_port)
-    wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", postgres_allocated_port)
-    subprocess.run(
-        [
-            "docker",
-            "rm",
-            "-v",
-            "-f",
-            container_id,
-        ],
-        capture_output=True,
+
+    log.info("spawning etcd container (parallel slot: %d)", get_parallel_slot())
+    container.start()
+    published_port = int(container.get_exposed_port(2379))
+
+    try:
+        # Wait for etcd to be ready using log message
+        wait_for_logs(container, "ready to serve client requests")
+        # Extra grace period to avoid intermittent connection failure
+        time.sleep(0.2)
+
+        yield (
+            container.get_container_host_ip(),
+            HostPortPairModel(host="127.0.0.1", port=published_port),
+        )
+    finally:
+        container.stop()
+
+
+@pytest.fixture(scope="session", autouse=False)
+def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node redis container for a testing session.
+    random_id = secrets.token_hex(8)
+    # IMPORTANT: We intentionally use custom health check instead of Docker's
+    # built-in health check to avoid intermittent failures when pausing/unpausing containers.
+    container = (
+        RedisContainer("redis:7-alpine")
+        .with_name(f"test--redis-slot-{get_parallel_slot()}-{random_id}")
+        .with_exposed_ports(6379)
+        .with_kwargs(tmpfs={"/data": ""}, user=f"{os.getuid()}:{os.getgid()}")
     )
+
+    log.info("spawning redis container (parallel slot: %d)", get_parallel_slot())
+    container.start()
+    published_port = int(container.get_exposed_port(6379))
+
+    try:
+        # Use custom PING health check (matches original implementation)
+        _wait_redis_health_check("127.0.0.1", published_port)
+
+        yield (
+            container.get_container_host_ip(),
+            HostPortPairModel(host="127.0.0.1", port=published_port),
+        )
+    finally:
+        container.stop()
+
+
+@pytest.fixture(scope="session", autouse=False)
+def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node PostgreSQL container for a testing session.
+    random_id = secrets.token_hex(8)
+    container = (
+        PostgresContainer(
+            "postgres:13.6-alpine", username="postgres", password="develove", dbname="testing"
+        )
+        .with_name(f"test--postgres-slot-{get_parallel_slot()}-{random_id}")
+        .with_exposed_ports(5432)
+        .with_kwargs(tmpfs={"/var/lib/postgresql/data": ""})
+    )
+
+    log.info("spawning postgres container (parallel slot: %d)", get_parallel_slot())
+    container.start()
+    published_port = int(container.get_exposed_port(5432))
+
+    try:
+        # PostgresContainer automatically waits for pg_isready, but add grace period
+        time.sleep(0.2)
+
+        yield (
+            container.get_container_host_ip(),
+            HostPortPairModel(host="127.0.0.1", port=published_port),
+        )
+    finally:
+        container.stop()
+
+
+@pytest.fixture(scope="session", autouse=False)
+def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node MinIO container for a testing session.
+    random_id = secrets.token_hex(8)
+
+    container = (
+        MinioContainer("minio/minio:latest", access_key="minioadmin", secret_key="minioadmin")
+        .with_name(f"test--minio-slot-{get_parallel_slot()}-{random_id}")
+        .with_exposed_ports(9000)
+        .with_exposed_ports(9090)
+        .with_kwargs(tmpfs={"/data": ""})
+        .with_command("server /data --console-address :9090")
+    )
+
+    log.info("spawning minio container (parallel slot: %d)", get_parallel_slot())
+    container.start()
+    api_port = int(container.get_exposed_port(9000))
+    _ = int(container.get_exposed_port(9090))
+
+    try:
+        # MinioContainer automatically waits for MinIO to be ready, but add grace period
+        time.sleep(0.2)
+
+        yield container.get_container_host_ip(), HostPortPairModel(host="127.0.0.1", port=api_port)
+    finally:
+        container.stop()

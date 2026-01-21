@@ -1,11 +1,16 @@
 import json
-from typing import Optional
+from typing import Optional, cast
 
 from aiohttp import web
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
+from ai.backend.common.jwt.signer import JWTSigner
+from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from . import user_agent
 
@@ -14,8 +19,8 @@ async def get_api_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
     session = await get_session(request)
@@ -45,36 +50,52 @@ async def get_api_session(
             content_type="application/problem+json",
         )
     ak, sk = token["access_key"], token["secret_key"]
+    client_pool: ClientPool = request.app["client_pool"]
+    client_session = client_pool.load_client_session(
+        ClientKey(
+            endpoint=api_endpoint,
+            domain=config.api.domain,
+            access_key=ak,
+        )
+    )
     api_config = APIConfig(
-        domain=config["api"]["domain"],
+        domain=config.api.domain,
         endpoint=api_endpoint,
         endpoint_type="api",
         access_key=ak,
         secret_key=sk,
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=api_config, proxy_mode=True, aiohttp_session=client_session)
 
 
 async def get_anonymous_session(
     request: web.Request,
     override_api_endpoint: Optional[str] = None,
 ) -> APISession:
-    config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    api_endpoint = str(config.api.endpoint[0])
     if override_api_endpoint is not None:
         api_endpoint = override_api_endpoint
+    client_pool: ClientPool = request.app["client_pool"]
+    client_session = client_pool.load_client_session(
+        ClientKey(
+            endpoint=api_endpoint,
+            domain=config.api.domain,
+            access_key="",
+        )
+    )
     api_config = APIConfig(
-        domain=config["api"]["domain"],
+        domain=config.api.domain,
         endpoint=api_endpoint,
         endpoint_type="api",
         access_key="",
         secret_key="",
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config.api.ssl_verify,
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=api_config, proxy_mode=True, aiohttp_session=client_session)
 
 
 def get_client_ip(request: web.Request) -> Optional[str]:
@@ -98,3 +119,73 @@ def fill_forwarding_hdrs_to_api_session(
     if client_ip:
         _headers["X-Forwarded-For"] = client_ip
         api_session.aiohttp_session.headers.update(_headers)
+
+
+async def generate_jwt_token_for_session(
+    request: web.Request,
+) -> str:
+    """
+    Generate JWT token from current web session.
+
+    Reads user information from the web session and generates a JWT token
+    that can be used for authentication with the Backend.AI Manager API.
+
+    Args:
+        request: The web request containing the session information
+
+    Returns:
+        Generated JWT token string
+
+    Raises:
+        web.HTTPUnauthorized: If session is not authenticated or token info is missing
+        web.HTTPBadRequest: If token type is incompatible
+    """
+
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    session = await get_session(request)
+
+    # Validate session authentication
+    if not session.get("authenticated", False):
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
+
+    if "token" not in session:
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
+
+    token = session["token"]
+    if token["type"] != "keypair":
+        raise web.HTTPBadRequest(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/invalid-auth-params",
+                "title": "Incompatible auth token type.",
+            }),
+            content_type="application/problem+json",
+        )
+
+    # Extract user information from session
+    access_key = AccessKey(token["access_key"])
+    secret_key = token["secret_key"]
+    role = session.get("role", "user")
+
+    # Create JWT user context (minimal information)
+    # user_id, domain_name, is_admin, is_superadmin will be retrieved from user table during authentication
+    user_context = JWTUserContext(
+        access_key=access_key,
+        role=role,
+    )
+
+    # Generate JWT token using user's secret key
+    jwt_config = config.jwt.to_jwt_config()
+    jwt_signer = JWTSigner(jwt_config)
+    return jwt_signer.generate_token(user_context, secret_key)

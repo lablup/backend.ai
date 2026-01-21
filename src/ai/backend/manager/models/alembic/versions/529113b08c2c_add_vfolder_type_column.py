@@ -15,8 +15,8 @@ from sqlalchemy.sql import text
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.models import VFolderOwnershipType, VFolderPermission
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, convention
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderPermission
 
 # revision identifiers, used by Alembic.
 revision = "529113b08c2c"

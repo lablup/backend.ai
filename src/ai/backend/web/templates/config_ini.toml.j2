@@ -1,9 +1,13 @@
 [general]
 {% toml_field "apiEndpoint" endpoint_url %}
 {% toml_field "apiEndpointText" config["api"]["text"] %}
-{% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
-{% toml_field "siteDescription" config["ui"]["brand"] %}
+{% toml_field "defaultSessionEnvironment" config["ui"]["default-environment"] %}
+{% toml_field "enableModelFolders" config["ui"]["enable-model-folders"] %}
 connectionMode = "SESSION"
+
+[environments]
+{% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
+{% toml_field "showNonInstalledImages" config["environments"]["show-non-installed-images"] %}
 
 [wsproxy]
 {% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}

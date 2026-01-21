@@ -41,13 +41,13 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
+    async def __aexit__(self, exc_type, exc_value, exc_tb) -> None:
         pass

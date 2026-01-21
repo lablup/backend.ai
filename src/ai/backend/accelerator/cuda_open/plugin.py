@@ -1,20 +1,13 @@
 import logging
 import re
 import uuid
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
 )
 
 import aiodocker
@@ -29,7 +22,7 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
 )
 from ai.backend.agent.utils import update_nested_dict
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -96,16 +89,16 @@ class CUDAPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
     key = DeviceName("cuda")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]] = (
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("cuda.device"), SlotTypes("count")),
     )
 
-    docker_version: Tuple[int, ...] = (0, 0, 0)
+    docker_version: tuple[int, ...] = (0, 0, 0)
 
-    device_mask: Sequence[DeviceId] = []
+    device_mask: Sequence[str] = []
     enabled: bool = True
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
         # Basic docker version & nvidia container runtime check
@@ -135,9 +128,7 @@ class CUDAPlugin(AbstractComputePlugin):
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
-            self.device_mask = [
-                *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(",")),
-            ]
+            self.device_mask = [*raw_device_mask.split(",")]
         try:
             detected_devices = await self.list_devices()
             log.info("detected devices:\n" + pformat(detected_devices))
@@ -166,8 +157,6 @@ class CUDAPlugin(AbstractComputePlugin):
         all_devices = []
         num_devices = libcudart.get_device_count()
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
-            if dev_id in self.device_mask:
-                continue
             raw_info = libcudart.get_device_props(int(dev_id))
             sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: Optional[int]
@@ -180,6 +169,8 @@ class CUDAPlugin(AbstractComputePlugin):
                 dev_uuid = str(uuid.UUID(bytes=raw_dev_uuid))
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
+            if dev_uuid in self.device_mask:
+                continue
             dev_info = CUDADevice(
                 device_id=DeviceId(dev_id),
                 hw_location=raw_info["pciBusID_str"],
@@ -300,7 +291,7 @@ class CUDAPlugin(AbstractComputePlugin):
             for device_id, alloc in per_device_alloc.items():
                 if alloc > 0:
                     assigned_device_ids.append(device_id)
-        docker_config: Dict[str, Any] = {}
+        docker_config: dict[str, Any] = {}
         if self.docker_version >= (19, 3, 0):
             # NOTE: You may put additional Docker container creation API params here.
             if assigned_device_ids:
@@ -346,11 +337,11 @@ class CUDAPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         if SlotName("cuda.devices") in device_alloc:
             device_ids.extend(device_alloc[SlotName("cuda.devices")].keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 proc = device.processing_units
@@ -404,7 +395,7 @@ class CUDAPlugin(AbstractComputePlugin):
         if not self.enabled:
             return data
 
-        active_device_id_set: Set[DeviceId] = set()
+        active_device_id_set: set[DeviceId] = set()
         for slot_type, per_device_alloc in device_alloc.items():
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
@@ -413,21 +404,22 @@ class CUDAPlugin(AbstractComputePlugin):
         data["CUDA_GLOBAL_DEVICE_IDS"] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
+        data["CUDA_RESOURCE_VIRTUALIZED"] = "0"
         return data
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
         return {
-            "slot_name": self.slot_types[0][0],
+            "slot_name": str(self.slot_types[0][0]),
             "human_readable_name": "GPU",
             "description": "CUDA-capable GPU",
             "display_unit": "GPU",

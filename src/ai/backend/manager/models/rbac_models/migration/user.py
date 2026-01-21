@@ -1,0 +1,93 @@
+import enum
+import uuid
+from dataclasses import dataclass
+from typing import Self
+
+from sqlalchemy.engine.row import Row
+
+from .enums import (
+    EntityType,
+    OperationType,
+    RoleSource,
+)
+from .types import (
+    ROLE_NAME_PREFIX,
+    RoleCreateInput,
+)
+
+ENTITY_TYPES_IN_ROLE: set[EntityType] = {EntityType.USER}
+OPERATIONS_IN_ROLE: set[OperationType] = {
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.HARD_DELETE,
+    OperationType.GRANT_ALL,
+    OperationType.GRANT_READ,
+    OperationType.GRANT_UPDATE,
+}
+SUPERADMIN_OPERATIONS = OPERATIONS_IN_ROLE
+MONITOR_OPERATIONS = {OperationType.READ}
+
+
+class UserRole(enum.StrEnum):
+    """
+    User's role.
+    """
+
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+    MONITOR = "monitor"
+
+
+@dataclass
+class UserData:
+    id: uuid.UUID
+    username: str
+    domain: str
+    role: UserRole
+
+    def role_name(self) -> str:
+        return f"{ROLE_NAME_PREFIX}user_{self.username}"
+
+    @classmethod
+    def from_row(cls, user_row: Row) -> Self:
+        return cls(
+            id=user_row.uuid,
+            username=user_row.username,
+            domain=user_row.domain_name,
+            role=user_row.role,
+        )
+
+
+def get_user_self_role_creation_input(user: UserData) -> RoleCreateInput:
+    """
+    Create a self role and permissions for a user.
+    This role allows the user to manage their own data.
+    """
+    return RoleCreateInput(
+        name=user.role_name(),
+        source=RoleSource.SYSTEM,
+    )
+
+
+def get_superadmin_role_creation_input() -> RoleCreateInput:
+    """
+    Create a superadmin role and permissions.
+    This role allows full access to all entities.
+    """
+    return RoleCreateInput(
+        name=f"{ROLE_NAME_PREFIX}superadmin",
+        source=RoleSource.SYSTEM,
+    )
+
+
+def get_monitor_role_creation_input() -> RoleCreateInput:
+    """
+    Create a monitor role and permissions.
+    This role allows read-only access to all entities.
+    """
+    return RoleCreateInput(
+        name=f"{ROLE_NAME_PREFIX}monitor",
+        source=RoleSource.SYSTEM,
+    )

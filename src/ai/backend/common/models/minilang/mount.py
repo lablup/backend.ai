@@ -1,4 +1,5 @@
-from typing import Annotated, Mapping, Sequence, TypeAlias
+from collections.abc import Mapping, Sequence
+from typing import Annotated, TypeAlias
 
 from lark import Lark, Transformer, lexer
 from lark.exceptions import LarkError

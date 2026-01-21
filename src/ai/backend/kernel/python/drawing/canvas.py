@@ -1,6 +1,7 @@
 from six.moves import builtins
 
-from ..types import MediaRecord
+from ai.backend.kernel.python.types import MediaRecord
+
 from .color import Colors
 from .encoding import encode_commands
 from .turtle import Turtle
@@ -9,7 +10,7 @@ _canvas_id_counter = 0
 
 
 class DrawingObject:
-    def __init__(self, canvas, id_, args):
+    def __init__(self, canvas, id_, args) -> None:
         self._canvas = canvas
         self._id = id_
         self._type = args[0]
@@ -52,15 +53,7 @@ class DrawingObject:
         color = color.to_hex()
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "color", color))
-        elif self._type == "circle":
-            self._canvas._cmd_history.append((
-                self._canvas._id,
-                "update",
-                self._id,
-                "border",
-                color,
-            ))
-        elif self._type in ("rect", "triangle"):
+        elif self._type == "circle" or self._type in ("rect", "triangle"):
             self._canvas._cmd_history.append((
                 self._canvas._id,
                 "update",
@@ -71,14 +64,12 @@ class DrawingObject:
 
     def fill(self, color):
         color = color.to_hex()
-        if self._type == "circle":
-            self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "fill", color))
-        elif self._type in ("rect", "triangle"):
+        if self._type == "circle" or self._type in ("rect", "triangle"):
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "fill", color))
 
 
 class Canvas:
-    def __init__(self, width, height, bgcolor=Colors.White, fgcolor=Colors.Black):
+    def __init__(self, width, height, bgcolor=Colors.White, fgcolor=Colors.Black) -> None:
         global _canvas_id_counter
         self._id = _canvas_id_counter
         _canvas_id_counter += 1
@@ -110,8 +101,7 @@ class Canvas:
         self.update()
 
     def create_turtle(self):
-        t = Turtle(self)
-        return t
+        return Turtle(self)
 
     def stop_animation(self):
         self._cmd_history.append((self._id, "stop-anim"))

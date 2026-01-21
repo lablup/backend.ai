@@ -1,0 +1,63 @@
+[runner]
+concurrency = 1
+exclude_tags = [
+    "required_single_node_multi_container_configuration",
+    "required_multi_node_multi_container_configuration",
+    "required_container_registry_configuration",
+    "long_running",
+]
+
+[context.endpoint]
+api-endpoint = "http://127.0.0.1:8091"
+login-endpoint = "http://127.0.0.1:8090"
+
+[context.keypair]
+access-key = "AKIAIOSFODNN7EXAMPLE"
+secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+[context.user-resource-policy]
+name = "default"
+
+[context.login-credential]
+user-id = "admin@lablup.com"
+password = "wJalrXUt"
+
+[context.domain]
+name = "default"
+
+[context.scaling-group]
+name = "default"
+
+[context.group]
+name = "default"
+
+[context.model-service]
+model-vfolder-name = "enter_model_vfolder_name_here"
+runtime-variant = "custom"
+replicas = 1
+group-name = "model-store"
+model-mount-destination = "/models"
+model-definition-path = "./model-definition.yaml"
+
+[context.image]
+name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
+architecture = "x86_64"
+
+[context.session]
+resources = { cpu = 1, mem = "320mb" }
+
+[context.session-imagify]
+new-image-name = "new-customized-image"
+
+[context.batch-session]
+startup-command = "ls -la"
+
+[context.sse]
+timeout = 60.0
+
+[context.vfolder]
+group = "default"
+usage_mode = "general"
+permission = "rw"
+cloneable = true
+share-permission = "ro"

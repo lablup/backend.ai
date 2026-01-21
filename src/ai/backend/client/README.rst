@@ -13,10 +13,6 @@ Backend.AI Client
    :target: https://client-py.docs.backend.ai/en/latest/?badge=latest
    :alt: SDK Documentation
 
-.. image:: https://travis-ci.com/lablup/backend.ai-client-py.svg?branch=master
-   :target: https://travis-ci.com/lablup/backend.ai-client-py
-   :alt: Build Status (Linux)
-
 .. image:: https://ci.appveyor.com/api/projects/status/5h6r1cmbx2965yn1/branch/master?svg=true
    :target: https://ci.appveyor.com/project/lablup/backend.ai-client-py/branch/master
    :alt: Build Status (Windows)

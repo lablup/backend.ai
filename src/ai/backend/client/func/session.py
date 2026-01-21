@@ -5,19 +5,14 @@ import os
 import secrets
 import tarfile
 import tempfile
-from pathlib import Path
-from typing import (
-    Any,
+from collections.abc import (
     AsyncIterator,
-    Dict,
     Iterable,
-    List,
-    Literal,
     Mapping,
-    Optional,
     Sequence,
-    cast,
 )
+from pathlib import Path
+from typing import Any, Optional, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -25,26 +20,33 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
-from ai.backend.client.output.fields import session_fields
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.compat import current_loop
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionTypes
-
-from ...cli.types import Undefined, undefined
-from ..compat import current_loop
-from ..config import DEFAULT_CHUNK_SIZE
-from ..exceptions import BackendClientError
-from ..pagination import fetch_paginated_result
-from ..request import (
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import (
     AttachedFile,
     Request,
     SSEContextManager,
     WebSocketContextManager,
     WebSocketResponse,
 )
-from ..session import api_session
-from ..utils import ProgressReportingReader
-from ..versioning import get_id_or_name, get_naming
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import (
+    ProgressReportingReader,
+    create_connection_field,
+    flatten_connection,
+    to_global_id,
+)
+from ai.backend.client.utils import dedent as _d
+from ai.backend.client.versioning import get_id_or_name, get_naming
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, SessionTypes
+
 from .base import BaseFunction, api_function
 
 __all__ = ("ComputeSession", "InferenceSession")
@@ -60,11 +62,39 @@ _default_list_fields = (
     session_fields["abusing_reports"],
 )
 
+# TODO: Need to add more kernel node fields to the detail fields as not all fields are included
+_default_kernel_node_detail_fields = (
+    kernel_node_fields["row_id"],
+    kernel_node_fields["image_reference"],
+    kernel_node_fields["status"],
+    kernel_node_fields["created_at"],
+    kernel_node_fields["agent_id"],
+)
+
+_default_session_node_detail_fields = (
+    session_node_fields["id"],
+    session_node_fields["tag"],
+    session_node_fields["name"],
+    session_node_fields["type"],
+    session_node_fields["priority"],
+    session_node_fields["cluster_mode"],
+    session_node_fields["domain_name"],
+    session_node_fields["user_id"],
+    session_node_fields["status"],
+    session_node_fields["created_at"],
+    session_node_fields["terminated_at"],
+    session_node_fields["resource_opts"],
+    session_node_fields["scaling_group"],
+    session_node_fields["vfolder_mounts"],
+    session_node_fields["image_references"],
+    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),  # type: ignore
+)
+
 
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
-    modified: Dict[str, Any] = {}
+    modified: dict[str, Any] = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             modified[k] = drop(v, value_to_drop)
         elif v != value_to_drop:
             modified[k] = v
@@ -91,7 +121,7 @@ class ComputeSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
 
@@ -99,21 +129,21 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = None,
-        access_key: str = None,
+        status: Optional[str] = None,
+        access_key: Optional[str] = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of sessions.
 
         :param status: Fetches sessions in a specific status
-                       (PENDING, SCHEDULED, PULLING, PREPARING,
-                        RUNNING, RESTARTING, RUNNING_DEGRADED,
+                       (PENDING, SCHEDULED, PULLING, PREPARED, PREPARING,
+                        CREATING, RUNNING, RESTARTING, RUNNING_DEGRADED,
                         TERMINATING, TERMINATED, ERROR, CANCELLED)
         :param fields: Additional per-session query fields to fetch.
         """
@@ -166,32 +196,37 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: str = None,
+        name: Optional[str] = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        starts_at: str = None,
+        priority: Optional[int] = None,
+        starts_at: Optional[str] = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Sequence[str] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
-        mounts: List[str] = None,
-        mount_map: Mapping[str, str] = None,
+        mounts: Optional[list[str]] = None,
+        mount_map: Optional[Mapping[str, str]] = None,
+        mount_ids: Optional[list[UUID]] = None,
+        mount_id_map: Optional[Mapping[UUID, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        envs: Mapping[str, str] = None,
-        startup_command: str = None,
-        resources: Mapping[str, str | int] = None,
-        resource_opts: Mapping[str, str | int] = None,
+        envs: Optional[Mapping[str, str]] = None,
+        startup_command: Optional[str] = None,
+        batch_timeout: Optional[str | int] = None,
+        resources: Optional[Mapping[str, str | int]] = None,
+        resource_opts: Optional[Mapping[str, str | int]] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: str = None,
-        group_name: str = None,
-        bootstrap_script: str = None,
-        tag: str = None,
+        domain_name: Optional[str] = None,
+        group_name: Optional[str] = None,
+        bootstrap_script: Optional[str] = None,
+        tag: Optional[str] = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: str = None,
-        owner_access_key: str = None,
-        preopen_ports: List[int] = None,
-        assign_agent: List[str] = None,
+        scaling_group: Optional[str] = None,
+        owner_access_key: Optional[str] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
+        attach_network: Optional[str] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -239,6 +274,14 @@ class ComputeSession(BaseFunction):
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
+        :param mount_ids: The list of vfolder ids that belongs to the current API
+            access key.
+        :param mount_id_map: Mapping which contains custom path to mount vfolder.
+            Key and value of this map should be vfolder id and custom path.
+            Default mounts or relative paths are under /home/work.
+            If you want different paths, names should be absolute paths.
+            The target mount path of vFolders should not overlap with the linux system folders.
+            vFolders which has a dot(.) prefix in its name are not affected.
         :param mount_options: Mapping which contains extra options for vfolder.
         :param envs: The environment variables which always bypasses the jail policy.
         :param resources: The resource specification. (TODO: details)
@@ -254,7 +297,9 @@ class ComputeSession(BaseFunction):
         :param tag: An optional string to annotate extra information.
         :param owner: An optional access key that owns the created session. (Only
             available to administrators)
+        :param attach_network: An optional string to select which network to attach to session. Must supply network ID (not name).
 
+            .. versionadded:: 24.09.0
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
@@ -266,6 +311,10 @@ class ComputeSession(BaseFunction):
             mounts = []
         if mount_map is None:
             mount_map = {}
+        if mount_ids is None:
+            mount_ids = []
+        if mount_id_map is None:
+            mount_id_map = {}
         if mount_options is None:
             mount_options = {}
         if resources is None:
@@ -281,17 +330,24 @@ class ComputeSession(BaseFunction):
         mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}")
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "tag": tag,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "config": {
                 "mounts": mounts,
+                "mount_ids": mount_ids,
                 "environ": envs,
                 "resources": resources,
                 "resource_opts": resource_opts,
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            if batch_timeout is not None:
+                params["batch_timeout"] = batch_timeout
+            if priority is not None:
+                params["priority"] = priority
+            params["config"]["attach_network"] = attach_network
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -304,19 +360,14 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (5, "20191215"):
             params["starts_at"] = starts_at
             params["bootstrap_script"] = bootstrap_script
+            params["config"].update({
+                "mount_map": mount_map,
+                "mount_id_map": mount_id_map,
+                "mount_options": mount_options,
+                "preopen_ports": preopen_ports,
+            })
             if assign_agent is not None:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                    "agentList": assign_agent,
-                })
-            else:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                })
+                params["config"]["agentList"] = assign_agent
         if api_session.get().api_version >= (4, "20190615"):
             params.update({
                 "owner_access_key": owner_access_key,
@@ -353,19 +404,21 @@ class ComputeSession(BaseFunction):
         *,
         name: str | Undefined = undefined,
         type_: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
         starts_at: str | None = None,  # not included in templates
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Sequence[str] | None = None,  # cannot be stored in templates
+        dependencies: Sequence[UUID] | None = None,  # cannot be stored in templates
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
+        batch_timeout: str | int | Undefined = undefined,
         resources: Mapping[str, str | int] | Undefined = undefined,
-        resource_opts: Mapping[str, str | int] | Undefined = undefined,
+        resource_opts: Mapping[str, str | int | bool] | Undefined = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: ClusterMode | Undefined = undefined,
         domain_name: str | Undefined = undefined,
@@ -374,6 +427,7 @@ class ComputeSession(BaseFunction):
         tag: str | Undefined = undefined,
         scaling_group: str | Undefined = undefined,
         owner_access_key: str | Undefined = undefined,
+        attach_network: Optional[str] = None,  # TODO: Handle this argument properly
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.
@@ -457,7 +511,7 @@ class ComputeSession(BaseFunction):
             mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}/_/create-from-template")
-        params: Dict[str, Any]
+        params: dict[str, Any]
         params = {
             "template_id": template_id,
             "tag": tag,
@@ -484,12 +538,17 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            if priority is not None:
+                params["priority"] = priority
+            if batch_timeout is not undefined:
+                params["batch_timeout"] = batch_timeout
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
         else:
             params["config"]["clusterSize"] = cluster_size
-        params = cast(Dict[str, Any], drop(params, undefined))
+        params = cast(dict[str, Any], drop(params, undefined))
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -503,13 +562,13 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: str = None) -> None:
+    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
 
     @classmethod
-    def from_session_id(cls, session_id: UUID) -> ComputeSession:
+    def from_session_id(cls, session_id: UUID) -> Self:
         o = cls(None, None)  # type: ignore
         o.id = session_id
         return o
@@ -527,6 +586,53 @@ class ComputeSession(BaseFunction):
             if self.owner_access_key:
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
+
+    @property
+    def session_identifier(self) -> str:
+        """
+        Returns the session identifier, preferring the session ID if available,
+        otherwise falling back to the session name.
+        """
+        if self.id:
+            return str(self.id)
+        if self.name:
+            return self.name
+        raise ValueError("Session must have either an ID or a name.")
+
+    @api_function
+    async def update(
+        self,
+        *,
+        name: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
+    ) -> dict[str, Any]:
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the update() method."
+            )
+        client_mutation_id = secrets.token_urlsafe(16)
+        query = _d("""
+            mutation($input: ModifyComputeSessionInput!) {
+                modify_compute_session(input: $input) {
+                    item {
+                        name
+                        priority
+                    }
+                    clientMutationId
+                }
+            }
+        """)
+        inputs: dict[str, Any] = {
+            "id": str(self.id),
+            "clientMutationId": client_mutation_id,
+        }
+        set_if_set(inputs, "name", name)
+        set_if_set(inputs, "priority", priority)
+        variables = {
+            "input": inputs,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["modify_compute_session"]
 
     @api_function
     async def destroy(self, *, forced: bool = False, recursive: bool = False):
@@ -546,12 +652,13 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "DELETE",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
             if resp.status == 200:
                 return await resp.json()
+        return None
 
     @api_function
     async def restart(self):
@@ -566,24 +673,24 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "PATCH",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch():
             pass
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_name):
         """
         Renames Session ID of running compute session.
         """
-        params = {"name": new_id}
+        params = {"name": new_name}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/rename",
+            f"/{prefix}/{self.session_identifier}/rename",
             params=params,
         )
         async with rqst.fetch():
@@ -600,7 +707,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/commit",
+            f"/{prefix}/{self.session_identifier}/commit",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -618,7 +725,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/imagify",
+            f"/{prefix}/{self.session_identifier}/imagify",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -637,14 +744,14 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/interrupt",
+            f"/{prefix}/{self.session_identifier}/interrupt",
             params=params,
         )
         async with rqst.fetch():
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -666,7 +773,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/complete",
+            f"/{prefix}/{self.session_identifier}/complete",
             params=params,
         )
         rqst.set_json({
@@ -692,24 +799,69 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def get_logs(self):
+    async def detail(
+        self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
+    ) -> dict:
+        """
+        Retrieves a detailed information about the compute session.
+        This is similar to :func:`get_info`, but includes more information
+        such as the information about all kernels in the session,
+        the list of vfolders mounted to the session, and so on.
+        """
+        query = _d("""
+            query($id: GlobalIDField!) {
+                compute_session_node(id: $id) {
+                    $fields
+                }
+            }
+        """)
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the detail() method."
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"id": to_global_id("compute_session_node", self.id)}
+        data = await api_session.get().Admin._query(query, variables)
+        compute_session_data = data["compute_session_node"]
+
+        field_mappings = {
+            "row_id": "id",
+            "kernel_nodes": "kernels",
+        }
+        result = {}
+        for key, value in compute_session_data.items():
+            if key.endswith("_nodes") and isinstance(value, dict):
+                flattened_data = flatten_connection(value)
+                new_key = field_mappings.get(key, key)
+                result[new_key] = flattened_data
+                continue
+
+            new_key = field_mappings.get(key, key)
+            result[new_key] = value
+
+        return result
+
+    @api_function
+    async def get_logs(self, kernel_id: Optional[UUID] = None):
         """
         Retrieves the console log of the compute session container.
         """
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
+        if kernel_id is not None:
+            params["kernel_id"] = str(kernel_id)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/logs",
+            f"/{prefix}/{self.session_identifier}/logs",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -729,7 +881,7 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/dependency-graph",
+            f"/{prefix}/{self.session_identifier}/dependency-graph",
             params=params,
         )
 
@@ -747,7 +899,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/status-history",
+            f"/{prefix}/{self.session_identifier}/status-history",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -755,7 +907,11 @@ class ComputeSession(BaseFunction):
 
     @api_function
     async def execute(
-        self, run_id: str = None, code: str = None, mode: str = "query", opts: dict = None
+        self,
+        run_id: Optional[str] = None,
+        code: Optional[str] = None,
+        mode: str = "query",
+        opts: Optional[dict] = None,
     ):
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -789,7 +945,7 @@ class ComputeSession(BaseFunction):
             assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -800,7 +956,7 @@ class ComputeSession(BaseFunction):
         elif mode == "batch":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -817,7 +973,7 @@ class ComputeSession(BaseFunction):
         elif mode == "complete":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -830,7 +986,7 @@ class ComputeSession(BaseFunction):
                 },
             })
         else:
-            raise BackendClientError("Invalid execution mode: {0}".format(mode))
+            raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
             return (await resp.json())["result"]
 
@@ -887,14 +1043,11 @@ class ComputeSession(BaseFunction):
                         )
                     )
                 except ValueError:
-                    msg = 'File "{0}" is outside of the base directory "{1}".'.format(
-                        file_path, base_path
-                    )
+                    msg = f'File "{file_path}" is outside of the base directory "{base_path}".'
                     raise ValueError(msg) from None
-
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}/upload",
+                f"/{prefix}/{self.session_identifier}/upload",
                 params=params,
             )
             rqst.attach_files(attachments)
@@ -922,8 +1075,8 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            "GET",
-            f"/{prefix}/{self.name}/download",
+            "POST",
+            f"/{prefix}/{self.session_identifier}/download",
             params=params,
         )
         rqst.set_json({
@@ -960,7 +1113,7 @@ class ComputeSession(BaseFunction):
                         pbar.update(len(chunk))
                     fp.close()
                     with tarfile.open(fp.name) as tarf:
-                        tarf.extractall(path=dest)
+                        tarf.extractall(path=dest, filter=tarfile.data_filter)
                         file_names.extend(tarf.getnames())
                     os.unlink(fp.name)
         return {"file_names": file_names}
@@ -979,7 +1132,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/files",
+            f"/{prefix}/{self.session_identifier}/files",
             params=params,
         )
         rqst.set_json({
@@ -989,22 +1142,22 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def stream_app_info(self):
+    async def stream_app_info(self) -> Mapping[str, Any]:
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         id_or_name = get_id_or_name(api_session.get().api_version, self)
-        api_rqst = Request(
+        api_request = Request(
             "GET",
             f"/stream/{prefix}/{id_or_name}/apps",
             params=params,
         )
-        async with api_rqst.fetch() as resp:
+        async with api_request.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def get_abusing_report(self):
+    async def get_abusing_report(self) -> Mapping[str, Any]:
         """
         Retrieves abusing reports of session's sibling kernels.
         """
@@ -1014,7 +1167,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/abusing-report",
+            f"/{prefix}/{self.session_identifier}/abusing-report",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -1047,14 +1200,14 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/start-service",
+            f"/{prefix}/{self.session_identifier}/start-service",
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             return await resp.json()
 
     # only supported in AsyncAPISession
-    def listen_events(self, scope: Literal["*", "session", "kernel"] = "*") -> SSEContextManager:
+    def listen_events(self, scope: str = "*") -> SSEContextManager:
         """
         Opens the stream of the kernel lifecycle events.
         Only the master kernel of each session is monitored.
@@ -1109,7 +1262,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict = None
+        self, code: str = "", *, mode: str = "query", opts: Optional[dict] = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1126,13 +1279,13 @@ class ComputeSession(BaseFunction):
             opts = {}
         elif mode == "batch":
             opts = {
-                "clean": opts.get("clean", None),
-                "build": opts.get("build", None),
+                "clean": opts.get("clean"),
+                "build": opts.get("build"),
                 "buildLog": bool(opts.get("buildLog", False)),
-                "exec": opts.get("exec", None),
+                "exec": opts.get("exec"),
             }
         else:
-            msg = "Invalid stream-execution mode: {0}".format(mode)
+            msg = f"Invalid stream-execution mode: {mode}"
             raise BackendClientError(msg)
         request = Request(
             "GET",
@@ -1160,7 +1313,7 @@ class InferenceSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
     # endpoint: Endpoint
@@ -1175,8 +1328,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.
@@ -1221,15 +1374,17 @@ class InferenceSession(BaseFunction):
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[str]] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
+        mount_ids: Optional[list[UUID]] = None,
+        mount_id_map: Optional[Mapping[UUID, str]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
         resources: Optional[Mapping[str, str]] = None,
-        resource_opts: Optional[Mapping[str, str]] = None,
+        resource_opts: Optional[Mapping[str, str | int | bool]] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         domain_name: Optional[str] = None,
@@ -1239,8 +1394,8 @@ class InferenceSession(BaseFunction):
         architecture: Optional[str] = None,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1258,15 +1413,15 @@ class InferenceSession(BaseFunction):
         starts_at: Optional[str] = None,
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
+        dependencies: Optional[Sequence[UUID]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         resources: Mapping[str, int] | Undefined = undefined,
-        resource_opts: Mapping[str, int] | Undefined = undefined,
+        resource_opts: Mapping[str, str | int | bool] | Undefined = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: ClusterMode | Undefined = undefined,
         domain_name: str | Undefined = undefined,

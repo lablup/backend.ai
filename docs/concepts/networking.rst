@@ -58,3 +58,43 @@ To ease the process, Backend.AI injects the following environment variables into
    * - ``BACKENDAI_CLUSTER_LOCAL_RANK``
      - The zero-based global index of the current container within the entire cluster session.
      - ``0``
+
+
+Network Security and Isolation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. warning::
+
+   **Critical Security Requirement**
+   
+   Backend.AI assumes compute nodes (where Agents run) are deployed in a
+   network-isolated environment with restricted inbound access from untrusted
+   networks. This is a fundamental security requirement for production deployments.
+
+Interactive sessions (notebooks, terminals, web applications) are accessed through
+the AppProxy component, which acts as a secure proxy between users and compute sessions.
+Direct access to compute nodes must be prevented through proper network configuration.
+
+**Expected Traffic Flow:**
+
+* ✓ User → Webserver → Manager → Agent (session management)
+* ✓ User → AppProxy → Agent → Container (interactive sessions)
+* ✗ User → Agent (direct access - **MUST BE BLOCKED**)
+* ✗ User → Container (direct access - **MUST BE BLOCKED**)
+
+**Key Security Measures:**
+
+1. Deploy agents in a private network with no public IP addresses
+2. Configure firewalls to block direct inbound access to compute nodes
+3. Only expose necessary services (webserver) to the Internet
+4. Use network segmentation between management and compute zones
+5. Implement proper firewall rules as documented in the security guide
+
+For detailed network security requirements, architecture diagrams, and configuration
+checklists, see :ref:`concept-security`.
+
+.. seealso::
+
+   :ref:`concept-security`
+
+   :doc:`../install/install-from-package/install-agent`

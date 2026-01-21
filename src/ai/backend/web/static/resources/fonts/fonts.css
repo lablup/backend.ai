@@ -179,7 +179,7 @@
   font-weight: 700;
   font-display: swap;
   src: local('Ubuntu Mono'), local('UbuntuMono-Bold'),
-  url('./ubuntu-mono-v15-regular.woff2') format('woff2');
+  url('./ubuntu-mono-v15-bold.woff2') format('woff2');
 }
 
 /* ubuntu-700 - bold italic */
@@ -189,7 +189,7 @@
   font-weight: 700;
   font-display: swap;
   src: local('Ubuntu Mono Italic'), local('UbuntuMono-BoldItalic'),
-  url('./ubuntu-mono-v15-italic.woff2') format('woff2');
+  url('./ubuntu-mono-v15-bolditalic.woff2') format('woff2');
 }
 
 /* FontAwesome */

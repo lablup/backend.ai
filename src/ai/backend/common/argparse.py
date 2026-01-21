@@ -1,7 +1,7 @@
 import argparse
 import ipaddress
 import pathlib
-from typing import Tuple, cast
+from typing import cast
 
 from .types import HostPortPair
 
@@ -17,7 +17,7 @@ def port_no(s: str) -> int:
     return port
 
 
-def port_range(s: str) -> Tuple[int, int]:
+def port_range(s: str) -> tuple[int, int]:
     try:
         port_range = tuple(map(int, s.split("-")))
     except (TypeError, ValueError):
@@ -35,7 +35,7 @@ def port_range(s: str) -> Tuple[int, int]:
     if not (port_range[0] < port_range[1]):
         msg = f"{port_range[0]} should be less than {port_range[1]}."
         raise argparse.ArgumentTypeError(msg)
-    return cast(Tuple[int, int], port_range)
+    return cast(tuple[int, int], port_range)
 
 
 def positive_int(s: str) -> int:
@@ -58,13 +58,13 @@ def non_negative_int(s: str) -> int:
     return val
 
 
-def host_port_pair(s: str) -> Tuple[ipaddress._BaseAddress, int]:
+def host_port_pair(s: str) -> tuple[ipaddress._BaseAddress, int]:
     host: str | ipaddress._BaseAddress
     pieces = s.rsplit(":", maxsplit=1)
     if len(pieces) == 1:
         msg = f"{s!r} should contain both IP address and port number."
         raise argparse.ArgumentTypeError(msg)
-    elif len(pieces) == 2:
+    if len(pieces) == 2:
         # strip potential brackets in IPv6 hostname-port strings (RFC 3986).
         host = pieces[0].strip("[]")
         try:

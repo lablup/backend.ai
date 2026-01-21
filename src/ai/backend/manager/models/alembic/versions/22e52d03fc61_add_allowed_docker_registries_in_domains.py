@@ -36,7 +36,7 @@ def upgrade():
     else:
         allowed_registries = "{index.docker.io}"
     connection = op.get_bind()
-    query = "UPDATE domains SET allowed_docker_registries = '{}';".format(allowed_registries)
+    query = f"UPDATE domains SET allowed_docker_registries = '{allowed_registries}';"
     connection.execute(text(query))
 
     op.alter_column("domains", column_name="allowed_docker_registries", nullable=False)

@@ -4,21 +4,27 @@ import secrets
 import signal
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Final, Iterator, List
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.pretty import print_fail, print_info
 
-from ..pretty import print_fail, print_info
-
-CLI_EXECUTABLE: Final = (sys.executable, "-m", "ai.backend.cli")
+CLI_EXECUTABLE: tuple[str, ...]
+if pex_path := os.environ.get("PEX", None):
+    CLI_EXECUTABLE = (sys.executable, pex_path)
+else:
+    CLI_EXECUTABLE = (sys.executable, "-m", "ai.backend.cli")
 
 
 @contextlib.contextmanager
 def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     random_id = secrets.token_hex(16)
     key_filename = "id_container"
-    key_path = Path(f"~/.ssh/id_{random_id}").expanduser()
+    # Create ssh directory with recommended permissions if not exists
+    ssh_dir = Path("~/.ssh").expanduser()
+    ssh_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    key_path = ssh_dir / f"id_{random_id}"
     try:
         subprocess.run(
             [*CLI_EXECUTABLE, "session", "download", session_ref, key_filename],
@@ -41,7 +47,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     )
     assert proxy_proc.stdout is not None
     try:
-        lines: List[bytes] = []
+        lines: list[bytes] = []
         while True:
             line = proxy_proc.stdout.readline(1024)
             if not line:

@@ -1,0 +1,282 @@
+name: backport
+
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
+    inputs:
+      commit_hash:
+        description: 'The commit hash to backport'
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  get-backport-commits:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.push.outputs.commits || steps.dispatch.outputs.commits }}
+    steps:
+      - if: ${{ github.event_name == 'push' }}
+        name: Get all commits in the push event
+        id: push
+        env:
+          COMMITS: ${{ toJson(github.event.commits) }}
+        run: |
+          commits_json=$(echo "$COMMITS" | jq -c '[.[].id]')
+          echo "commits=${commits_json}" >> $GITHUB_OUTPUT
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        name: Get the commit from the PR
+        id: dispatch
+        run: |
+          commits=$(echo '${{ github.event.inputs.commit_hash }}' | jq -Rc '[.]')
+          echo "commits=$commits" >> $GITHUB_OUTPUT
+
+
+  get-backport-target-branch:
+    runs-on: ubuntu-latest
+    needs: get-backport-commits
+    strategy:
+      matrix:
+        commits: ${{ fromJson(needs.get-backport-commits.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Checkout the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          ref: ${{ matrix.commits }}
+      - name: Extract pr_number from commit message
+        id: commit
+        run: |
+          target_commit="${{ matrix.commits }}"
+          echo "target_commit=$target_commit" >> $GITHUB_OUTPUT
+          commit_message=$(git show -s --format=%B $target_commit)  # Get messages from commit
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_message" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          pr_number=$(echo $commit_message | (grep -oP "\(#\d+\)" || true) | (grep -oP "\d+" || true))  # Get pr number from commit message
+          echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
+          echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
+          author=$(git show -s --format=%an $target_commit)
+          echo "author=$author" >> $GITHUB_OUTPUT
+          author_email=$(git show -s --format=%ae $target_commit)
+          echo "author_email=$author_email" >> $GITHUB_OUTPUT
+          labels=$(gh pr view $pr_number --json labels | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+          echo "labels=$labels" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Get target branches
+        id: milestones
+        if: ${{ steps.commit.outputs.pr_number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ steps.commit.outputs.commit_message }}
+        run: |
+          target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
+
+          milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
+          echo "Milestones configured in the repo: $milestones"
+
+          # Remove Backlog from the backport target branch
+          milestones=($milestones)
+          for i in "${!milestones[@]}"; do
+            if [[ "${milestones[$i]}" == "Backlog" ]]; then
+              unset 'milestones[$i]'
+            fi
+          done
+
+          for i in "${!milestones[@]}"; do
+            if ! git ls-remote --heads | grep -q "refs/heads/${milestones[$i]}\$"; then
+              unset 'milestones[$i]'
+            fi
+          done
+          echo "Milestones with the corresponding release branch: ${milestones[@]}"
+
+          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -V -r))
+          for i in "${!sort_milestones[@]}"; do
+            if [[ "${sort_milestones[$i]}" == "$target_milestone" ]]; then
+              target_milestones=("${sort_milestones[@]:0:$((i+1))}")
+              break
+            fi
+          done
+          target_branches=("${target_milestones[@]}")
+
+          # Create commit-branch pairs with metadata
+          result="[]"
+          for branch in "${target_branches[@]}"; do
+            if [ -n "$branch" ]; then
+              result=$(echo "$result" | jq -c --arg commit "${{ steps.commit.outputs.target_commit }}" \
+                --arg branch "$branch" \
+                --arg message "$COMMIT_MESSAGE" \
+                --arg pr "${{ steps.commit.outputs.pr_number }}" \
+                --arg release "${{ steps.commit.outputs.latest_release }}" \
+                --arg author "${{ steps.commit.outputs.author }}" \
+                --arg email "${{ steps.commit.outputs.author_email }}" \
+                --arg labels "${{ steps.commit.outputs.labels }}" \
+                '. += [{
+                  commit: $commit,
+                  target_branch: $branch,
+                  commit_message: $message,
+                  pr_number: $pr,
+                  latest_release: $release,
+                  author: $author,
+                  author_email: $email,
+                  labels: $labels
+                }]')
+            fi
+          done
+          echo "result=$result" >> $GITHUB_OUTPUT
+      - name: Save result to file
+        if: ${{ steps.commit.outputs.pr_number }}
+        run: |
+          mkdir -p /tmp/backport-results
+          echo '${{ steps.milestones.outputs.result }}' > /tmp/backport-results/${{ matrix.commits }}.json
+      - name: Upload result artifact
+        if: ${{ steps.commit.outputs.pr_number }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.commits }}
+          path: /tmp/backport-results/${{ matrix.commits }}.json
+          retention-days: 1
+
+  aggregate-backport-data:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: get-backport-target-branch
+    outputs:
+      matrix: ${{ steps.aggregate.outputs.matrix }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/backport-results
+      - name: Aggregate results
+        id: aggregate
+        run: |
+          combined="[]"
+          for file in /tmp/backport-results/result-*/*.json; do
+            if [ -f "$file" ]; then
+              content=$(cat "$file")
+              combined=$(echo "$combined" | jq -c --argjson new "$content" '. + $new')
+            fi
+          done
+          echo "matrix=$combined" >> $GITHUB_OUTPUT
+          echo "Combined matrix: $combined"
+
+
+  backport:
+    if: ${{ needs.aggregate-backport-data.outputs.matrix != '[]' && needs.aggregate-backport-data.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    needs: aggregate-backport-data
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.aggregate-backport-data.outputs.matrix) }}
+      fail-fast: false
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.target_branch }}
+      - name: Cherry-pick
+        env:
+          COMMIT_MESSAGE: ${{ matrix.commit_message }}
+        run: |
+          git config user.name "${{ matrix.author }}"
+          git config user.email "${{ matrix.author_email }}"
+          target_commit="${{ matrix.commit }}"
+          git fetch origin main "$target_commit"
+          git cherry-pick --strategy=recursive --strategy-option=theirs "$target_commit"
+          git commit \
+            --amend -m "${COMMIT_MESSAGE}" \
+            --trailer "Backported-from=main (${{ matrix.latest_release }})" \
+            --trailer "Backported-to=${{ matrix.target_branch }}" \
+            --trailer "Backport-of=${{ matrix.pr_number }}"
+      - name: When cherry-pick is failed
+        if: failure()
+        run: |
+          gh pr comment ${{ matrix.pr_number }} -b "Backport to ${{ matrix.target_branch }} is failed. Please backport manually."
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - id: commit_message
+        env:
+          COMMIT_MESSAGE: ${{ matrix.commit_message }}
+        run: |
+          commit_header=$(echo "${COMMIT_MESSAGE}" | head -n 1)
+          echo "commit_header=$commit_header" >> $GITHUB_OUTPUT
+          commit_body=$(echo "${COMMIT_MESSAGE}" | awk '/^$/{p++;next} p==1')
+          echo "commit_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          commit_footer=$(echo "${COMMIT_MESSAGE}" | awk '/^$/{p++;next} p==2')
+          echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_footer" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Create Backport PR
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.OCTODOG }}
+          author: "${{ matrix.author }} <${{ matrix.author_email }}>"
+          title: "${{ steps.commit_message.outputs.commit_header }}"
+          body: "This is an auto-generated backport PR of #${{ matrix.pr_number }} to the ${{ matrix.target_branch }} release."
+          branch: "backport/${{ matrix.pr_number }}-to-${{ matrix.target_branch }}"
+          base: ${{ matrix.target_branch }}
+          labels: |
+            backport
+            ${{ matrix.labels }}
+          assignees: ${{ matrix.author }}
+      - id: pr_id
+        run: |
+          pr_id=$(gh api graphql -f query='
+            query ($pr_number: Int!, $owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $pr_number) {
+                  id
+                }
+              }
+            }
+          ' -F pr_number=${{ steps.pr.outputs.pull-request-number }} -f owner=${{ github.repository_owner }} -f name=${{ github.event.repository.name }} | jq -r '.data.repository.pullRequest.id')
+          echo "pr_id=$pr_id" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+      - id: commit_footer
+        run: |
+          commit_footer="Co-authored-by: ${{ matrix.author }} <${{ matrix.author_email }}>
+          ${{ steps.commit_message.outputs.commit_footer }}
+          Backported-from: main (${{ matrix.latest_release }})
+          Backported-to: ${{ matrix.target_branch }}
+          Backport-of: ${{ matrix.pr_number }}"
+          commit_footer=$(echo "$commit_footer" | grep '.')  # remove empty lines
+          echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
+          echo "$commit_footer" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Enable auto-merge
+        if: ${{ steps.pr.outputs.pull-request-number }}
+        run: |
+          gh api graphql -f query='
+            mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+              enablePullRequestAutoMerge(input: {
+                pullRequestId: $pullRequestId,
+                mergeMethod: $mergeMethod,
+                commitBody: """
+          ${{ steps.commit_message.outputs.commit_body }}
+
+          ${{ steps.commit_footer.outputs.commit_footer }}
+                """,
+                commitHeadline: "${{ steps.commit_message.outputs.commit_header }} (#${{ steps.pr.outputs.pull-request-number }})"
+              }) {
+                pullRequest {
+                  autoMergeRequest {
+                    enabledAt
+                  }
+                }
+              }
+            }
+          ' -F pullRequestId=${{ steps.pr_id.outputs.pr_id }} -f mergeMethod="SQUASH"
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}

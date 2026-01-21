@@ -1,24 +1,29 @@
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
-
-from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
-from .auth import admin_required, auth_required
-from .exceptions import (
-    DomainNotFound,
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
-    GenericForbidden,
-    InvalidAPIParameters,
 )
+from ai.backend.manager.models.domain import (
+    MAXIMUM_DOTFILE_SIZE,
+    domains,
+    query_domain_dotfiles,
+    verify_dotfile_name,
+)
+
+from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params
@@ -26,7 +31,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @server_status_required(READ_ALLOWED)
@@ -102,17 +107,16 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
                 if dotfile["path"] == params["path"]:
                     return web.json_response(dotfile)
             raise DotfileNotFound
-        else:
-            dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
-            if dotfiles is None:
-                raise DomainNotFound
-            for entry in dotfiles:
-                resp.append({
-                    "path": entry["path"],
-                    "permission": entry["perm"],
-                    "data": entry["data"],
-                })
-            return web.json_response(resp)
+        dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
+        if dotfiles is None:
+            raise DomainNotFound
+        for entry in dotfiles:
+            resp.append({
+                "path": entry["path"],
+                "permission": entry["perm"],
+                "data": entry["data"],
+            })
+        return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)
@@ -199,7 +203,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

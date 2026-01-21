@@ -1,25 +1,30 @@
+from __future__ import annotations
+
 import asyncio
 import enum
 import functools
+import json
 import sys
 import textwrap
 import traceback
-from typing import Sequence
+from collections.abc import Sequence
+from types import TracebackType
+from typing import Optional, Self
 
 from click import echo, style
 from tqdm import tqdm
 
-from ..exceptions import BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError
 
 __all__ = (
     "PrintStatus",
-    "print_pretty",
-    "print_info",
-    "print_wait",
     "print_done",
-    "print_warn",
-    "print_fail",
     "print_error",
+    "print_fail",
+    "print_info",
+    "print_pretty",
+    "print_wait",
+    "print_warn",
     "show_warning",
 )
 
@@ -93,7 +98,7 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
     echo("\x1b[2K", nl=False, file=file)
     text = textwrap.indent(msg, "  ")
     text = style(indicator + text[1:], reset=True)
-    echo("{0}\r".format(text), nl=False, file=file)
+    echo(f"{text}\r", nl=False, file=file)
     file.flush()
     if status != PrintStatus.WAITING:
         echo("", file=file)
@@ -113,14 +118,14 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
             case int():
                 pieces.append(f"[{item}]")
             case _:
-                pieces.append(f".{str(item)}")
+                pieces.append(f".{item!s}")
     return "".join(pieces)[1:]  # strip first dot
 
 
 def format_error(exc: Exception):
     if isinstance(exc, BackendAPIError):
-        yield "{0}: {1} {2}\n".format(exc.__class__.__name__, exc.status, exc.reason)
-        yield "{0[title]}".format(exc.data)
+        yield f"{exc.__class__.__name__}: {exc.status} {exc.reason}\n"
+        yield f"{exc.data['title']}"
         if exc.data["type"].endswith("/too-many-sessions-matched"):
             matches = exc.data["data"].get("matches", [])
             if matches:
@@ -135,12 +140,10 @@ def format_error(exc: Exception):
             general_error_msg = exc.data.get("msg", None)
             if general_error_msg is not None:
                 yield f"\n- {general_error_msg}"
-            per_field_errors = exc.data.get("data", {})
-            if isinstance(per_field_errors, dict):
-                for k, v in per_field_errors.items():
-                    yield f'\n- "{k}": {v}'
-            else:
-                yield f"\n- {per_field_errors}"
+            per_field_errors = exc.data.get("data", None)
+            if per_field_errors:
+                yield "\n"
+                yield json.dumps(per_field_errors, indent=2)
         else:
             if exc.data["type"].endswith("/graphql-error"):
                 yield "\n\u279c Message:\n"
@@ -187,7 +190,7 @@ def print_error(exc: Exception, *, file=None):
     text = "".join(format_error(exc))
     text = textwrap.indent(text, "  ")
     text = style(indicator + text[1:], reset=True)
-    echo("{0}\r".format(text), nl=False, file=file)
+    echo(f"{text}\r", nl=False, file=file)
     echo("", file=file)
     file.flush()
 
@@ -202,71 +205,104 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
     )
 
 
-class Spinner:
-    def __init__(self, msg: str, delay: float = 0.3):
-        self.msg = msg
-        self.task = None
-        self.delay = delay
+class ProgressBarWithSpinner(tqdm):
+    """
+    A simple extension to tqdm adding a spinner.
 
-    async def __aenter__(self):
-        self.run()
-        return self
+    .. code-block::
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.stop()
+       async with ProgressBarWithSpinner("Waiting...") as pbar:
+           # The spinner starts here but no tqdm progress bar is displayed yet.
+           await init_work()
+           # When the user sets the 'total' attribute, the progress bar gets displayed.
+           pbar.total = 10
+           for i in range(10):
+               await piece_of_work()
+               pbar.update(1)
+    """
 
-    def run(self):
-        self.task = asyncio.create_task(self.spin())
+    @staticmethod
+    def alt_format_meter(
+        n,
+        total,
+        elapsed,
+        ncols=None,
+        prefix="",
+        ascii=False,
+        unit="it",
+        unit_scale=False,
+        rate=None,
+        bar_format=None,
+        postfix=None,
+        *args,
+        **kwargs,
+    ) -> str:
+        # Return the prefix string only.
+        return str(prefix) + str(postfix)
 
-    async def spin(self):
+    def __init__(
+        self,
+        spinner_msg: str = "",
+        spinner_delay: float = 0.14,
+        unit: str = "it",
+    ) -> None:
+        self.spinner_msg = spinner_msg
+        self.spinner_delay = spinner_delay
+        prefix = style("", fg="bright_yellow", reset=False)
+        if spinner_msg:
+            initial_desc = f"{prefix}  {spinner_msg} "
+        else:
+            initial_desc = f"{prefix}  "
+        self._orig_format_meter = self.format_meter
+        super().__init__(
+            total=float("inf"),
+            unit=unit,
+        )
+        # Deactivate the progress bar display by default
+        self.format_meter = self.alt_format_meter  # type: ignore
+        self.set_description_str(initial_desc)
+        self.set_postfix_str(style("", reset=True))
+
+    async def spin(self) -> None:
+        prefix = style("", fg="bright_yellow", reset=False)
         try:
             while True:
                 for char in "|/-\\":
-                    print_wait("{} {}".format(self.msg, char))
-                    await asyncio.sleep(self.delay)
+                    if self.spinner_msg:
+                        self.set_description_str(f"{prefix}{char} {self.spinner_msg} ")
+                    else:
+                        self.set_description_str(f"{prefix}{char} ")
+                    await asyncio.sleep(self.spinner_delay)
         except asyncio.CancelledError:
             pass
 
-    async def stop(self):
-        self.task.cancel()
-        await self.task
+    @property
+    def total(self) -> int | float | None:
+        return self._total
 
+    @total.setter
+    def total(self, value: int | float) -> None:
+        self._total = value
+        # Reactivate the progress bar display when total is first set
+        self.format_meter = self._orig_format_meter  # type: ignore
 
-class ProgressViewer:
-    """
-
-    A context manager that displays a spinner and a tqdm progress bar.
-
-    It shows the spinner until it is switched explicitly to the tqdm progress bar.
-
-    Usage:
-
-    ```
-    async with ProgressViewer("Waiting...") as viewer:
-        for i in range(10):
-            await asyncio.sleep(0.2)
-        tqdm = await viewer.to_tqdm()
-        tqdm.total = 10
-        for i in range(10):
-            await asyncio.sleep(0.2)
-            tqdm.update(1)
-    ```
-    """
-
-    def __init__(self, spinner_msg: str = "", delay: float = 0.3) -> None:
-        self.spinner = Spinner(spinner_msg, delay)
-        self.tqdm = None
-
-    async def __aenter__(self):
-        self.spinner.run()
+    async def __aenter__(self) -> Self:
+        self.spinner_task = asyncio.create_task(self.spin())
         return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
-        await self.spinner.stop()
-        if self.tqdm:
-            self.tqdm.close()
-
-    async def to_tqdm(self, unit: str = "it") -> tqdm:
-        await self.spinner.stop()
-        self.tqdm = tqdm(total=0, unit=unit)
-        return self.tqdm
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        if self.spinner_task is not None and not self.spinner_task.done():
+            self.spinner_task.cancel()
+            await self.spinner_task
+        prefix = style("", fg="bright_green", reset=False)
+        if self.spinner_msg:
+            self.set_description_str(f"{prefix}✓ {self.spinner_msg}")
+        else:
+            self.set_description_str(f"{prefix}✓ ")
+        self.close()
+        return None

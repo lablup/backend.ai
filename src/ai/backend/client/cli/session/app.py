@@ -2,28 +2,29 @@ import asyncio
 import json
 import shlex
 import sys
-from typing import Dict, List, MutableMapping, Optional, Sequence, Union
+from collections.abc import MutableMapping, Sequence
+from typing import Optional
 
 import aiohttp
 import click
 
-from ...compat import asyncio_run, asyncio_run_forever
-from ...config import DEFAULT_CHUNK_SIZE
-from ...request import Request
-from ...session import AsyncSession
-from ...versioning import get_naming
-from ..main import main
-from ..pretty import print_error, print_fail, print_info, print_warn
+from ai.backend.client.cli.main import main
+from ai.backend.client.cli.pretty import print_error, print_fail, print_info, print_warn
+from ai.backend.client.compat import asyncio_run, asyncio_run_forever
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.request import Request
+from ai.backend.client.session import AsyncSession
+from ai.backend.client.versioning import get_naming
 
 
 class WSProxy:
     __slots__ = (
         "api_session",
-        "session_name",
         "app_name",
         "args",
         "envs",
         "reader",
+        "session_name",
         "writer",
     )
 
@@ -32,7 +33,7 @@ class WSProxy:
         api_session: AsyncSession,
         session_name: str,
         app_name: str,
-        args: MutableMapping[str, Union[None, str, List[str]]],
+        args: MutableMapping[str, None | str | list[str]],
         envs: MutableMapping[str, str],
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
@@ -55,8 +56,8 @@ class WSProxy:
         if len(self.envs.keys()) > 0:
             params["envs"] = json.dumps(self.envs)
 
-        api_rqst = Request("GET", path, b"", params=params, content_type="application/json")
-        async with api_rqst.connect_websocket() as ws:
+        api_request = Request("GET", path, b"", params=params, content_type="application/json")
+        async with api_request.connect_websocket() as ws:
 
             async def downstream() -> None:
                 try:
@@ -79,7 +80,7 @@ class WSProxy:
                     self.writer.close()
                     try:
                         await self.writer.wait_closed()
-                    except (BrokenPipeError, IOError):
+                    except (OSError, BrokenPipeError):
                         # closed
                         pass
 
@@ -107,7 +108,7 @@ class WSProxy:
         rsp = (
             "HTTP/1.1 503 Service Unavailable\r\n"
             "Connection: Closed\r\n\r\n"
-            "WebSocket reply: {}".format(error_msg)
+            f"WebSocket reply: {error_msg}"
         )
         self.writer.write(rsp.encode())
         await self.writer.drain()
@@ -115,16 +116,16 @@ class WSProxy:
 
 class ProxyRunnerContext:
     __slots__ = (
-        "session_name",
+        "api_session",
         "app_name",
-        "protocol",
-        "host",
-        "port",
         "args",
         "envs",
-        "api_session",
-        "local_server",
         "exit_code",
+        "host",
+        "local_server",
+        "port",
+        "protocol",
+        "session_name",
     )
 
     session_name: str
@@ -132,8 +133,8 @@ class ProxyRunnerContext:
     protocol: str
     host: str
     port: int
-    args: Dict[str, Union[None, str, List[str]]]
-    envs: Dict[str, str]
+    args: dict[str, None | str | list[str]]
+    envs: dict[str, str]
     api_session: Optional[AsyncSession]
     local_server: Optional[asyncio.AbstractServer]
     exit_code: int
@@ -146,8 +147,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Sequence[str] = None,
-        envs: Sequence[str] = None,
+        args: Optional[Sequence[str]] = None,
+        envs: Optional[Sequence[str]] = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -235,9 +236,9 @@ class ProxyRunnerContext:
                 port=self.port,
             )
             print_info(
-                'A local proxy to the application "{0}" '.format(self.app_name)
-                + 'provided by the session "{0}" '.format(self.session_name)
-                + "is available at:\n{0}".format(user_url),
+                f'A local proxy to the application "{self.app_name}" '
+                f'provided by the session "{self.session_name}" '
+                f"is available at:\n{user_url}",
             )
             if self.host == "0.0.0.0":
                 print_warn(
@@ -257,7 +258,7 @@ class ProxyRunnerContext:
         await self.api_session.__aexit__(*exc_info)
         assert self.api_session.closed
         if self.local_server is not None:
-            print_info('The local proxy to "{}" has terminated.'.format(self.app_name))
+            print_info(f'The local proxy to "{self.app_name}" has terminated.')
         self.local_server = None
 
 

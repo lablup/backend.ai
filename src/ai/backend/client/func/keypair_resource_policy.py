@@ -1,10 +1,13 @@
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import keypair_resource_policy_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..types import set_if_set
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import keypair_resource_policy_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("KeypairResourcePolicy",)
@@ -17,6 +20,10 @@ _default_list_fields = (
     keypair_resource_policy_fields["idle_timeout"],
     keypair_resource_policy_fields["max_containers_per_session"],
     keypair_resource_policy_fields["allowed_vfolder_hosts"],
+    keypair_resource_policy_fields["max_session_lifetime"],
+    keypair_resource_policy_fields["max_pending_session_count"],
+    keypair_resource_policy_fields["max_pending_session_resource_slots"],
+    keypair_resource_policy_fields["max_concurrent_sftp_sessions"],
 )
 
 _default_detail_fields = (
@@ -27,6 +34,10 @@ _default_detail_fields = (
     keypair_resource_policy_fields["idle_timeout"],
     keypair_resource_policy_fields["max_containers_per_session"],
     keypair_resource_policy_fields["allowed_vfolder_hosts"],
+    keypair_resource_policy_fields["max_session_lifetime"],
+    keypair_resource_policy_fields["max_pending_session_count"],
+    keypair_resource_policy_fields["max_pending_session_resource_slots"],
+    keypair_resource_policy_fields["max_concurrent_sftp_sessions"],
 )
 
 
@@ -35,7 +46,7 @@ class KeypairResourcePolicy(BaseFunction):
     Provides interactions with keypair resource policy.
     """
 
-    def __init__(self, access_key: str):
+    def __init__(self, access_key: str) -> None:
         self.access_key = access_key
 
     @api_function
@@ -52,19 +63,21 @@ class KeypairResourcePolicy(BaseFunction):
         max_containers_per_session: int,
         idle_timeout: int,
         vfolder_host_perms: str | Undefined = undefined,
+        max_pending_session_count: int | Undefined = undefined,
+        max_pending_session_resource_slots: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
-            + "  create_keypair_resource_policy(name: $name, props: $input) {"
-            "    ok msg resource_policy { $fields }"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {
+                create_keypair_resource_policy(name: $name, props: $input) {
+                    ok msg resource_policy { $fields }
+                }
+            }
+        """)
         resolved_fields = resolve_fields(
             fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
         )
@@ -78,6 +91,8 @@ class KeypairResourcePolicy(BaseFunction):
             "max_containers_per_session": max_containers_per_session,
             "idle_timeout": idle_timeout,
             "allowed_vfolder_hosts": vfolder_host_perms,
+            "max_pending_session_count": max_pending_session_count,
+            "max_pending_session_resource_slots": max_pending_session_resource_slots,
         }
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         variables = {
@@ -101,15 +116,20 @@ class KeypairResourcePolicy(BaseFunction):
         idle_timeout: int | Undefined = undefined,
         total_resource_slots: str | Undefined = undefined,
         vfolder_host_perms: str | Undefined = undefined,
+        max_pending_session_count: int | Undefined = undefined,
+        max_pending_session_resource_slots: str | Undefined = undefined,
     ) -> dict:
         """
         Updates an existing keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!, $input: ModifyKeyPairResourcePolicyInput!) {"
-            + "  modify_keypair_resource_policy(name: $name, props: $input) {    ok msg  }}"
-        )
+        q = _d("""
+            mutation($name: String!, $input: ModifyKeyPairResourcePolicyInput!) {
+                modify_keypair_resource_policy(name: $name, props: $input) {
+                    ok msg
+                }
+            }
+        """)
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "default_for_unspecified", default_for_unspecified)
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
@@ -119,6 +139,8 @@ class KeypairResourcePolicy(BaseFunction):
         set_if_set(inputs, "max_containers_per_session", max_containers_per_session)
         set_if_set(inputs, "idle_timeout", idle_timeout)
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
+        set_if_set(inputs, "max_pending_session_count", max_pending_session_count)
+        set_if_set(inputs, "max_pending_session_resource_slots", max_pending_session_resource_slots)
         variables = {
             "name": name,
             "input": inputs,
@@ -133,10 +155,13 @@ class KeypairResourcePolicy(BaseFunction):
         Deletes an existing keypair resource policy with given name.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!) {"
-            + "  delete_keypair_resource_policy(name: $name) {    ok msg  }}"
-        )
+        q = _d("""
+            mutation($name: String!) {
+                delete_keypair_resource_policy(name: $name) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "name": name,
         }
@@ -153,7 +178,7 @@ class KeypairResourcePolicy(BaseFunction):
         Lists the keypair resource policies.
         You need an admin privilege for this operation.
         """
-        q = "query {  keypair_resource_policies {    $fields  }}"
+        q = "query { keypair_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
         return data["keypair_resource_policies"]
@@ -171,7 +196,11 @@ class KeypairResourcePolicy(BaseFunction):
 
         .. versionadded:: 19.03
         """
-        q = "query($name: String) {  keypair_resource_policy(name: $name) {    $fields  }}"
+        q = _d("""
+            query($name: String) {
+                keypair_resource_policy(name: $name) { $fields }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,

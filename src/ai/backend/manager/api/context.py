@@ -4,21 +4,60 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
-    from ai.backend.common.events import EventDispatcher, EventProducer
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+    from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+        ValkeyArtifactDownloadTrackingClient,
+    )
+    from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+    from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+        ValkeyContainerLogClient,
+    )
+    from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+    from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+    from ai.backend.common.events.fetcher import EventFetcher
+    from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.health_checker.probe import HealthProbe
+    from ai.backend.common.jwt.validator import JWTValidator
+    from ai.backend.common.leader import ValkeyLeaderElection
+    from ai.backend.common.message_queue.queue import AbstractMessageQueue
+    from ai.backend.common.metrics.metric import CommonMetricRegistry
+    from ai.backend.common.plugin.event import EventDispatcherPluginContext
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-    from ai.backend.common.types import RedisConnectionInfo
+    from ai.backend.common.service_discovery.service_discovery import (
+        ServiceDiscovery,
+        ServiceDiscoveryLoop,
+    )
+    from ai.backend.common.types import ValkeyProfileTarget
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.clients.agent import AgentClientPool
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.storage import StorageSessionManager
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.notification import NotificationCenter
+    from ai.backend.manager.plugin.network import NetworkPluginContext
+    from ai.backend.manager.plugin.webapp import WebappPluginContext
+    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.repositories import Repositories
+    from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
+    from ai.backend.manager.service.base import ServicesContext
+    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+    from ai.backend.manager.types import DistributedLockFactory
 
-    from ..agent_cache import AgentRPCCache
-    from ..config import LocalConfig, SharedConfig
-    from ..idle import IdleCheckerHost
-    from ..models.storage import StorageSessionManager
-    from ..models.utils import ExtendedAsyncSAEngine
-    from ..plugin.webapp import WebappPluginContext
-    from ..registry import AgentRegistry
-    from ..types import DistributedLockFactory
+    from .gql.adapter import BaseGQLAdapter
     from .types import CORSOptions
 
 
@@ -32,24 +71,51 @@ class RootContext(BaseContext):
     db: ExtendedAsyncSAEngine
     distributed_lock_factory: DistributedLockFactory
     event_dispatcher: EventDispatcher
+    event_fetcher: EventFetcher
     event_producer: EventProducer
-    redis_live: RedisConnectionInfo
-    redis_stat: RedisConnectionInfo
-    redis_image: RedisConnectionInfo
-    redis_stream: RedisConnectionInfo
-    redis_lock: RedisConnectionInfo
-    shared_config: SharedConfig
-    local_config: LocalConfig
+    etcd: AsyncEtcd
+    valkey_artifact: ValkeyArtifactDownloadTrackingClient
+    valkey_container_log: ValkeyContainerLogClient
+    valkey_live: ValkeyLiveClient
+    valkey_stat: ValkeyStatClient
+    valkey_image: ValkeyImageClient
+    valkey_stream: ValkeyStreamClient
+    valkey_schedule: ValkeyScheduleClient
+    valkey_profile_target: ValkeyProfileTarget
+    valkey_bgtask: ValkeyBgtaskClient
+    config_provider: ManagerConfigProvider
     cors_options: CORSOptions
+    jwt_validator: JWTValidator
 
     webapp_plugin_ctx: WebappPluginContext
     idle_checker_host: IdleCheckerHost
     storage_manager: StorageSessionManager
     hook_plugin_ctx: HookPluginContext
+    network_plugin_ctx: NetworkPluginContext
+    event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    services_ctx: ServicesContext
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
+    agent_client_pool: AgentClientPool
+    scheduler_dispatcher: SchedulerDispatcher
+    sokovan_orchestrator: SokovanOrchestrator
+    scheduling_controller: SchedulingController
+    deployment_controller: DeploymentController
+    route_controller: RouteController
+    leader_election: ValkeyLeaderElection
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    manager_bgtask_registry: BackgroundTaskHandlerRegistry
+    metrics: CommonMetricRegistry
+    repositories: Repositories
+    processors: Processors
+    notification_center: NotificationCenter
+    event_hub: EventHub
+    message_queue: AbstractMessageQueue
+    service_discovery: ServiceDiscovery
+    sd_loop: ServiceDiscoveryLoop
+    gql_adapter: BaseGQLAdapter
+    health_probe: HealthProbe

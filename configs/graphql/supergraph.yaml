@@ -1,0 +1,27 @@
+# Rover Supergraph Composition Configuration
+#
+# This file is used by Apollo Rover CLI to compose multiple subgraph schemas
+# into a unified supergraph schema for GraphQL Federation.
+#
+# Usage:
+#   rover supergraph compose --config configs/graphql/supergraph.yaml > docs/manager/graphql-reference/supergraph.graphql
+#
+# After regenerating the supergraph schema, restart the gateway:
+#   docker compose -f docker-compose.halfstack-main.yml restart backendai-half-apollo-router
+#
+# For more information, see:
+#   - configs/graphql/README.md
+#   - https://www.apollographql.com/docs/rover/commands/supergraphs
+
+subgraphs:
+  # Legacy GraphQL API (Graphene-based)
+  graphene:
+    routing_url: http://host.docker.internal:8091/admin/gql
+    schema:
+      file: ../../docs/manager/graphql-reference/schema.graphql
+
+  # New GraphQL API (Strawberry-based) with WebSocket subscription support
+  strawberry:
+    routing_url: http://host.docker.internal:8091/admin/gql/strawberry
+    schema:
+      file: ../../docs/manager/graphql-reference/v2-schema.graphql

@@ -3,14 +3,13 @@ import sys
 import click
 from tabulate import tabulate
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
 
-from ..session import Session
 from .pretty import print_error, print_info, print_warn
 
 
-@main.group()
+@click.group()
 def dotfile():
     """Provides dotfile operations."""
 
@@ -57,7 +56,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
     """
 
     if dotfile_path:
-        with open(dotfile_path, "r") as fr:
+        with open(dotfile_path) as fr:
             body = fr.read()
     else:
         body = ""
@@ -210,7 +209,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
     """
 
     if dotfile_path:
-        with open(dotfile_path, "r") as fr:
+        with open(dotfile_path) as fr:
             body = fr.read()
     else:
         body = ""

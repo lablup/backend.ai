@@ -1,0 +1,1071 @@
+# ==============================================================================
+# Backend.AI RBAC GraphQL Schema
+# ==============================================================================
+# Author: Sanghun Lee (sanghun@lablup.com)
+# Status: Draft
+# Created: 2025-11-12
+#
+# This schema provides the GraphQL API specification for Backend.AI's
+# Role-Based Access Control (RBAC) system. The API enables fine-grained
+# permission management across all entity types in Backend.AI through a
+# unified and consistent interface.
+#
+# Following BEP-1012 RBAC Feature Specification, this schema provides the
+# GraphQL API definition for managing roles in the RBAC system.
+#
+# Key Features:
+# - Unified Permission Management: Single GraphQL interface for managing
+#   permissions across all entity types
+# - Flexible Role Definition: Create and manage custom roles with
+#   fine-grained permissions
+# - Cross-Scope Collaboration: Share resources and grant permissions
+#   across different scopes
+#
+# References:
+# - BEP-1012 RBAC Feature Specification: ../BEP-1012-main.md
+# - GraphQL Specification: https://spec.graphql.org/
+# ==============================================================================
+
+# ==============================================================================
+# Scalar Types
+# ==============================================================================
+
+"""
+DateTime scalar type represents date and time in ISO 8601 format
+"""
+scalar DateTime
+
+"""
+JSONString scalar type represents arbitrary JSON data
+"""
+scalar JSONString
+
+# ==============================================================================
+# Node Interface
+# ==============================================================================
+
+"""
+Node interface for entities that can be uniquely identified by ID.
+All main entities in the RBAC system implement this interface.
+"""
+interface Node {
+  """The ID of the object"""
+  id: ID!
+}
+
+# ==============================================================================
+# Enums
+# ==============================================================================
+
+"""
+Entity types managed by the RBAC system.
+
+These are all the resource types that can have permissions defined for them.
+Each entity type can be referenced in both ScopedPermissions (for type-level
+access) and ObjectPermissions (for instance-level access).
+"""
+enum EntityType {
+  COMPUTE_SESSION
+  VFOLDER
+  IMAGE
+  MODEL_SERVICE
+  MODEL_ARTIFACT
+  AGENT
+  RESOURCE_GROUP
+  STORAGE_HOST
+  APP_CONFIG
+  NOTIFICATION
+  DOMAIN
+  PROJECT
+  USER
+  ROLE
+  ROLE_ASSIGNMENT
+}
+
+"""
+Operations that can be performed on entities.
+
+All entity types support the same set of operations for consistency:
+- CREATE: Create new entities of this type
+- READ: View entity information and metadata
+- UPDATE: Modify entity properties and settings
+- SOFT_DELETE: Mark entity as deleted without removing data (default deletion)
+- HARD_DELETE: Permanently remove entity data
+
+Note: Soft-delete changes the entity's state without removing underlying data,
+allowing recovery. Hard-delete removes the actual data (though database records
+may be retained for audit purposes).
+"""
+enum OperationType {
+  CREATE
+  READ
+  UPDATE
+  SOFT_DELETE
+  HARD_DELETE
+}
+
+"""
+Scope types in the permission hierarchy.
+
+Backend.AI uses a four-level scope hierarchy:
+- GLOBAL: System-wide resources and permissions
+- DOMAIN: Organizational units within the system
+- PROJECT: Collaborative workspaces within domains
+- USER: Individual user's private resources
+
+Important: Permissions do NOT cascade to child scopes. Each scope is managed
+independently by its respective administrators.
+"""
+enum ScopeType {
+  GLOBAL
+  DOMAIN
+  PROJECT
+  USER
+}
+
+"""
+Role source indicating how the role was created.
+
+SYSTEM roles:
+- Automatically created when a scope is created
+- Cannot be individually deleted (lifecycle tied to scope)
+
+CUSTOM roles:
+- Manually created by administrators
+- Can be freely created, modified, and deleted
+- Tailored to specific organizational requirements
+"""
+enum RoleSource {
+  """System-generated role (Domain Admin, Project Admin, User Owner)"""
+  SYSTEM
+
+  """User-created custom role"""
+  CUSTOM
+}
+
+"""
+Order direction for sorting query results
+"""
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+"""
+Fields available for ordering role queries
+"""
+enum RoleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Fields available for ordering scoped permission queries
+"""
+enum ScopedPermissionOrderField {
+  ENTITY_TYPE
+  OPERATION
+  SCOPE_TYPE
+}
+
+"""
+Fields available for ordering object permission queries
+"""
+enum ObjectPermissionOrderField {
+  ENTITY_TYPE
+  ENTITY_ID
+  OPERATION
+}
+
+"""
+Ordering options for scoped permission queries
+"""
+input ScopedPermissionOrderBy {
+  """Field to order by"""
+  field: ScopedPermissionOrderField!
+
+  """Sort direction"""
+  direction: OrderDirection!
+}
+
+"""
+Ordering options for object permission queries
+"""
+input ObjectPermissionOrderBy {
+  """Field to order by"""
+  field: ObjectPermissionOrderField!
+
+  """Sort direction"""
+  direction: OrderDirection!
+}
+
+# ==============================================================================
+# Permission Types
+# ==============================================================================
+
+"""
+Scoped Permission: Grants permission for an operation on ALL entities
+of a specific type within a scope.
+
+Key Characteristics:
+- Applies to all entities of the specified type within the role's scope
+- Does NOT cascade to child scopes
+- Efficient for broad access patterns
+"""
+type ScopedPermission implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Scope type where this permission applies"""
+  scopeType: ScopeType!
+
+  """Scope ID where this permission applies"""
+  scopeId: ID!
+
+  """Entity type this permission applies to"""
+  entityType: EntityType!
+
+  """Operation allowed by this permission"""
+  operation: OperationType!
+}
+
+"""
+Input type for creating scoped permissions
+"""
+input ScopedPermissionInput {
+  scopeType: ScopeType!
+  scopeId: ID!
+  entityType: EntityType!
+  operation: OperationType!
+}
+
+"""
+Object Permission: Grants permission for an operation on a SPECIFIC entity instance.
+
+Key Characteristics:
+- Applies only to the specific entity instance
+- Can reference entities from different scopes (enables cross-scope sharing)
+- When object permissions reference entities in other scopes, those scopes
+  are automatically added to the role's additionalScopes field
+- Attached directly to a Role, independent of the Role's scope binding
+"""
+type ObjectPermission implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Entity type this permission applies to"""
+  entityType: EntityType!
+
+  """Specific entity ID this permission applies to"""
+  entityId: ID!
+
+  """Operation allowed by this permission"""
+  operation: OperationType!
+}
+
+"""
+Input type for creating object permissions
+"""
+input ObjectPermissionInput {
+  entityType: EntityType!
+  entityId: ID!
+  operation: OperationType!
+}
+
+# ==============================================================================
+# Scope Types
+# ==============================================================================
+
+"""
+Scope represents a level in the permission hierarchy.
+
+Every Role is bound to exactly one scope, which defines where the Role's
+scoped permissions apply. Object permissions can reference entities from
+any scope, enabling cross-scope sharing.
+"""
+type Scope {
+  """Type of scope (GLOBAL, DOMAIN, PROJECT, USER)"""
+  type: ScopeType!
+
+  """
+  ID of the scope entity (null for GLOBAL scope).
+  For DOMAIN, PROJECT, and USER scopes, this references the entity ID.
+  """
+  id: ID
+}
+
+"""
+Input type for specifying a scope in mutations
+"""
+input ScopeInput {
+  type: ScopeType!
+  id: ID
+}
+
+# ==============================================================================
+# Core RBAC Entity: Role
+# ==============================================================================
+
+"""
+Role: Defines a collection of permissions bound to a specific scope.
+
+A Role is the fundamental building block of the RBAC system. It combines:
+1. A scope binding (defines where scoped permissions apply)
+2. Scoped permissions (type-level access within the scope)
+3. Object permissions (instance-level access, can span scopes)
+
+System Sourced Roles (automatically created):
+- Domain Admin: Administrator role for domain scope
+- Project Admin: Administrator role for project scope
+- User Owner: Default role for user scope (for owned and shared resources)
+
+Custom Roles (user-created):
+- Tailored to specific organizational requirements
+- Can be freely created, modified, and deleted
+
+Permission Conflict Resolution:
+When a user has multiple roles, the system uses a union (additive) model:
+- All permissions from all roles are combined
+- If any role grants a permission, the user has that permission
+- There is no "deny" mechanism
+"""
+type Role implements Node {
+  """Unique identifier"""
+  id: ID!
+
+  """
+  Human-readable role name.
+
+  Naming conventions:
+  - Good: "Project-A-Admin", "Domain-X-Viewer", "VFolder-Y-Editor"
+  - Bad: "role1", "temp", "test"
+
+  Must be unique within the scope.
+  """
+  name: String!
+
+  """
+  Optional description of the role's purpose.
+  Helps administrators understand the role's intent and usage.
+  """
+  description: String
+
+  """
+  Scope this role is bound to.
+  Defines where the role's scoped permissions apply.
+  """
+  scope: Scope!
+
+  """
+  Indicates whether the role is system-generated or custom-created.
+  SYSTEM roles cannot be deleted but can be modified.
+  """
+  source: RoleSource!
+
+  """
+  Scoped permissions: entity type + operation.
+  These apply to all entities of the specified type within the role's scope.
+
+  Supports cursor-based pagination following Relay specification.
+  """
+  scopedPermissions(
+    """Ordering specification"""
+    orderBy: [ScopedPermissionOrderBy!]
+
+    """Number of items to return from the start (forward pagination)"""
+    first: Int
+
+    """Cursor to start from (forward pagination)"""
+    after: String
+
+    """Number of items to return from the end (backward pagination)"""
+    last: Int
+
+    """Cursor to start from (backward pagination)"""
+    before: String
+  ): ScopedPermissionConnection!
+
+  """
+  Object permissions: entity type + entity ID + operation.
+  These apply only to specific entity instances and can span scopes.
+
+  Supports cursor-based pagination following Relay specification.
+  """
+  objectPermissions(
+    """Ordering specification"""
+    orderBy: [ObjectPermissionOrderBy!]
+
+    """Number of items to return from the start (forward pagination)"""
+    first: Int
+
+    """Cursor to start from (forward pagination)"""
+    after: String
+
+    """Number of items to return from the end (backward pagination)"""
+    last: Int
+
+    """Cursor to start from (backward pagination)"""
+    before: String
+  ): ObjectPermissionConnection!
+
+  """
+  Additional scopes where this role has object permissions.
+  Automatically populated when object permissions reference entities
+  from different scopes.
+
+  Note: This is metadata only. It does NOT grant scoped permissions in
+  those scopes, only access to the specific objects listed in
+  objectPermissions.
+  """
+  additionalScopes: [Scope!]!
+
+  """User who created this role (null for system-generated roles)"""
+  createdBy: UserNode
+
+  """Timestamp when role was created"""
+  createdAt: DateTime!
+
+  """Timestamp when role was last updated"""
+  updatedAt: DateTime!
+
+  """
+  Timestamp when role was deleted (null if active).
+  Soft-deleted roles can be reactivated by authorized administrators.
+  """
+  deletedAt: DateTime
+
+  """
+  Users assigned to this role.
+  Shows all role assignments for this role with filtering and pagination support.
+  Supports cursor-based pagination following Relay specification.
+  """
+  assignments(
+    """Filter criteria for assignments"""
+    filter: RoleAssignmentFilter
+
+    """Ordering specification"""
+    orderBy: [RoleAssignmentOrderBy!]
+
+    """Number of items to return from the start (forward pagination)"""
+    first: Int
+
+    """Cursor to start from (forward pagination)"""
+    after: String
+
+    """Number of items to return from the end (backward pagination)"""
+    last: Int
+
+    """Cursor to start from (backward pagination)"""
+    before: String
+  ): RoleAssignmentConnection!
+}
+
+# ==============================================================================
+# Connection Types (for Pagination)
+# ==============================================================================
+
+"""
+Connection for paginated role results.
+Implements the Relay cursor-based pagination specification.
+"""
+type RoleConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [RoleEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Edge type for role connections
+"""
+type RoleEdge {
+  """The item at the end of the edge"""
+  node: Role
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""
+Connection for paginated scoped permission results.
+Implements the Relay cursor-based pagination specification.
+"""
+type ScopedPermissionConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScopedPermissionEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Edge type for scoped permission connections
+"""
+type ScopedPermissionEdge {
+  """The item at the end of the edge"""
+  node: ScopedPermission
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""
+Connection for paginated object permission results.
+Implements the Relay cursor-based pagination specification.
+"""
+type ObjectPermissionConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ObjectPermissionEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Edge type for object permission connections
+"""
+type ObjectPermissionEdge {
+  """The item at the end of the edge"""
+  node: ObjectPermission
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""
+Pagination information following Relay specification
+"""
+type PageInfo {
+  """Whether there are more results after this page"""
+  hasNextPage: Boolean!
+
+  """Whether there are results before this page"""
+  hasPreviousPage: Boolean!
+
+  """Cursor of the first item in this page"""
+  startCursor: String
+
+  """Cursor of the last item in this page"""
+  endCursor: String
+}
+
+# ==============================================================================
+# Filter and Order Input Types
+# ==============================================================================
+
+"""
+String filter for text-based fields.
+Supports various matching operations (case-sensitive and case-insensitive).
+"""
+input StringFilter {
+  contains: String = null
+  startsWith: String = null
+  endsWith: String = null
+  equals: String = null
+  notEquals: String = null
+  iContains: String = null
+  iStartsWith: String = null
+  iEndsWith: String = null
+  iEquals: String = null
+  iNotEquals: String = null
+}
+
+"""
+Filter for scope type. Supports exact match or inclusion in a list of scope types.
+"""
+input ScopeTypeFilter {
+  in: [ScopeType!] = null
+  equals: ScopeType = null
+}
+
+"""
+Filter for role source. Supports exact match or inclusion in a list of role sources.
+"""
+input RoleSourceFilter {
+  in: [RoleSource!] = null
+  equals: RoleSource = null
+}
+
+"""
+Input for filtering roles by object permission existence.
+Used to find roles that have any object permission for a specific entity instance.
+"""
+input ObjectPermissionExistsInput {
+  """Entity type to check"""
+  entityType: EntityType!
+
+  """Specific entity ID to check"""
+  entityId: ID!
+}
+
+"""
+Filter options for role queries.
+
+All filters are ANDed together. Omitted filters are not applied.
+"""
+input RoleFilter {
+  """Filter by scope type (GLOBAL, DOMAIN, PROJECT, USER)"""
+  scopeType: ScopeTypeFilter = null
+
+  """Filter by scope ID (must be used with scopeType)"""
+  scopeId: ID
+
+  """Filter by role source (SYSTEM or CUSTOM)"""
+  source: RoleSourceFilter = null
+
+  """Filter by roles whose name matches the given pattern"""
+  name: StringFilter = null
+
+  """
+  Filter by roles that have any permission (scoped or object) for this entity type.
+  Useful for finding all roles that can access a specific resource type.
+  """
+  hasPermissionFor: EntityType
+
+  """
+  Filter by roles that have any object permission for a specific entity instance.
+  Useful for finding all roles that can access a specific resource.
+  Example: Find all roles that have permission for vfolder ID "abc123"
+  """
+  hasObjectPermission: ObjectPermissionExistsInput = null
+}
+
+"""
+Ordering options for role queries
+"""
+input RoleOrderBy {
+  """Field to order by"""
+  field: RoleOrderField!
+
+  """Sort direction"""
+  direction: OrderDirection!
+}
+
+# ==============================================================================
+# Mutation Input Types
+# ==============================================================================
+
+"""
+Input for creating a new custom role.
+
+Best Practices:
+1. Use descriptive names: "Project-A-Viewer" not "role1"
+2. Include a clear description of the role's purpose
+3. Add permissions separately using updateRolePermissions mutation
+"""
+input CreateRoleInput {
+  """Role name (must be unique within scope)"""
+  name: String!
+
+  """Optional description of the role's purpose"""
+  description: String
+
+  """Scope to bind this role to"""
+  scope: ScopeInput!
+}
+
+"""
+Input for updating an existing role.
+
+Notes:
+- All fields except 'id' are optional
+- Only updates name and description
+- To add/remove permissions, use updateRolePermissions
+- System sourced roles can be modified but not deleted
+"""
+input UpdateRoleInput {
+  """Role ID to update"""
+  id: ID!
+
+  """New name (optional)"""
+  name: String
+
+  """New description (optional)"""
+  description: String
+}
+
+"""
+Input for updating role permissions.
+Allows adding and removing permissions in a single operation.
+"""
+input UpdateRolePermissionsInput {
+  """Role ID to update permissions for"""
+  roleId: ID!
+
+  """Scoped permissions to add"""
+  scopedPermissionsToAdd: [ScopedPermissionInput!]
+
+  """Object permissions to add"""
+  objectPermissionsToAdd: [ObjectPermissionInput!]
+
+  """IDs of scoped permissions to remove"""
+  scopedPermissionIdsToDelete: [ID!]
+
+  """IDs of object permissions to remove"""
+  objectPermissionIdsToDelete: [ID!]
+}
+
+# ==============================================================================
+# (No separate payload types - mutations return Role directly)
+# ==============================================================================
+
+# ==============================================================================
+# Root Query Type
+# ==============================================================================
+
+"""
+Root query type for RBAC operations.
+"""
+type Query {
+  """
+  Get a specific role by ID.
+  Returns null if role not found or user lacks permission.
+  """
+  role(id: ID!): Role
+
+  """
+  List roles with optional filtering and pagination.
+  Supports cursor-based pagination following Relay specification.
+
+  Pagination:
+  - Use 'first' and 'after' for forward pagination
+  - Use 'last' and 'before' for backward pagination
+  - Default page size is typically 20-50 items
+
+  Performance considerations:
+  - Always use pagination for large result sets
+  - Specify only needed fields to reduce response size
+  - Use filters to narrow results before fetching
+  """
+  roles(
+    """Filter criteria (all filters are ANDed together)"""
+    filter: RoleFilter
+
+    """Ordering specification"""
+    orderBy: RoleOrderBy
+
+    """Number of items to return from the start (forward pagination)"""
+    first: Int
+
+    """Cursor to start from (forward pagination)"""
+    after: String
+
+    """Number of items to return from the end (backward pagination)"""
+    last: Int
+
+    """Cursor to start from (backward pagination)"""
+    before: String
+  ): RoleConnection!
+
+  """
+  Get a specific role assignment by ID.
+  Returns null if role assignment not found or user lacks permission.
+  """
+  roleAssignment(id: ID!): RoleAssignment
+
+  """
+  List role assignments with optional filtering and pagination.
+  Supports cursor-based pagination following Relay specification.
+
+  Useful for finding assignments across multiple roles or for specific users.
+  For example:
+  - Find all role assignments for a specific user
+  - Find all assignments in a specific scope
+  - Find all active assignments for a role
+
+  Performance considerations:
+  - Always use pagination for large result sets
+  - Use filters to narrow results before fetching
+  """
+  roleAssignments(
+    """Filter criteria (all filters are ANDed together)"""
+    filter: RoleAssignmentFilter
+
+    """Ordering specification"""
+    orderBy: [RoleAssignmentOrderBy!]
+
+    """Number of items to return from the start (forward pagination)"""
+    first: Int
+
+    """Cursor to start from (forward pagination)"""
+    after: String
+
+    """Number of items to return from the end (backward pagination)"""
+    last: Int
+
+    """Cursor to start from (backward pagination)"""
+    before: String
+  ): RoleAssignmentConnection!
+}
+
+# ==============================================================================
+# Root Mutation Type
+# ==============================================================================
+
+"""
+Root mutation type for RBAC operations.
+"""
+type Mutation {
+  """
+  Create a new custom role.
+
+  Requires: CREATE permission for role entity type in the target scope.
+
+  Returns the created Role.
+  """
+  createRole(input: CreateRoleInput!): Role!
+
+  """
+  Update a role's name, description, or permissions.
+
+  Requires: UPDATE permission for role entity type.
+
+  Notes:
+  - System sourced roles can be modified but not deleted
+  - Providing scopedPermissions/objectPermissions replaces existing lists
+  - All fields except 'id' are optional
+
+  Returns the updated Role.
+  """
+  updateRole(input: UpdateRoleInput!): Role!
+
+  """
+  Delete a role.
+
+  Requires: DELETE permission for role entity type.
+
+  Notes:
+  - System sourced roles cannot be deleted
+  - Deletion may be prevented if role is currently assigned to users
+
+  Returns the deleted role.
+  """
+  deleteRole(id: ID!): Role!
+
+  """
+  Update role permissions by adding and/or removing permissions.
+
+  Requires: UPDATE permission for role entity type
+
+  Notes:
+  - Can add and remove permissions in a single operation
+  - All permission fields are optional
+  - Additions are processed before deletions
+  - Can update both scoped and object permissions
+
+  Returns the updated role with all permissions.
+  """
+  updateRolePermissions(input: UpdateRolePermissionsInput!): Role!
+
+  """
+  Assign a role to a user in a specific scope.
+
+  Requires:
+  - CREATE permission for role_assignment entity type
+  - READ permission for the target role (prevents privilege escalation)
+
+  Notes:
+  - Creates a mapping between user and role within the specified scope
+  - User immediately receives all permissions defined in the role
+  - To prevent privilege escalation, you can only assign roles you have read access to
+
+  Returns the created RoleAssignment.
+  """
+  createRoleAssignment(input: CreateRoleAssignmentInput!): RoleAssignment!
+
+  """
+  Revoke a role assignment (remove role from user).
+
+  Requires: DELETE permission for role_assignment entity type
+
+  Notes:
+  - Removes the user's access to all permissions granted by this role
+  - Does not affect other role assignments the user may have
+
+  Returns the deleted role assignment.
+  """
+  deleteRoleAssignment(id: ID!): RoleAssignment!
+}
+
+# ==============================================================================
+# Role Assignment
+# ==============================================================================
+
+"""
+RoleAssignmentState indicates whether the assignment is active or inactive.
+"""
+enum RoleAssignmentState {
+  ACTIVE
+  INACTIVE
+}
+
+extend type UserNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""
+RoleAssignment: Maps a user to a role within a specific scope.
+
+This is a separate entity that creates the connection between users and roles.
+It provides flexible management without modifying the Role itself, and maintains
+a complete audit trail of who granted access and when.
+"""
+type RoleAssignment implements Node {
+  """Unique identifier"""
+  id: ID!
+
+  """User receiving the role"""
+  user: UserNode!
+
+  """The role being assigned"""
+  role: Role!
+
+  """Scope where this assignment applies"""
+  scope: Scope!
+
+  """Assignment state (ACTIVE or INACTIVE)"""
+  state: RoleAssignmentState!
+
+  """User who granted this assignment"""
+  grantedBy: UserNode!
+
+  """Timestamp when assignment was granted"""
+  grantedAt: DateTime!
+
+  """Optional expiration time for temporary access"""
+  expiresAt: DateTime
+}
+
+"""
+Connection for paginated role assignment results.
+Implements the Relay cursor-based pagination specification.
+"""
+type RoleAssignmentConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [RoleAssignmentEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Edge type for role assignment connections
+"""
+type RoleAssignmentEdge {
+  """The item at the end of the edge"""
+  node: RoleAssignment
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""
+Fields available for ordering role assignment queries
+"""
+enum RoleAssignmentOrderField {
+  GRANTED_AT
+  EXPIRES_AT
+  ROLE_NAME
+  ROLE_ID
+  USER_EMAIL
+  USER_NAME
+}
+
+"""
+Ordering options for role assignment queries
+"""
+input RoleAssignmentOrderBy {
+  """Field to order by"""
+  field: RoleAssignmentOrderField!
+
+  """Sort direction"""
+  direction: OrderDirection!
+}
+
+"""
+Filter for user-related fields in role assignments.
+Reusable across different queries that need user filtering.
+"""
+input UserFilterInput {
+  """Filter by user ID (exact match, fastest)"""
+  id: ID
+
+  """Filter by user email"""
+  email: StringFilter = null
+
+  """Filter by username"""
+  username: StringFilter = null
+
+  """Filter by user's full name"""
+  fullName: StringFilter = null
+
+  """Filter by user active status"""
+  isActive: Boolean = null
+}
+
+"""
+Filter for role-related fields in role assignments.
+Reusable across different queries that need role filtering.
+"""
+input RoleFilterInput {
+  """Filter by role ID (exact match, fastest)"""
+  id: ID
+
+  """Filter by role name"""
+  name: StringFilter = null
+
+  """Filter by role source (SYSTEM or CUSTOM)"""
+  source: RoleSourceFilter = null
+}
+
+"""
+Filter options for role assignment queries.
+
+All filters are ANDed together. Omitted filters are not applied.
+Supports nested filtering for users and roles.
+"""
+input RoleAssignmentFilter {
+  """Filter by user criteria"""
+  user: UserFilterInput = null
+
+  """Filter by role criteria"""
+  role: RoleFilterInput = null
+
+  """Filter by assignment state (ACTIVE or INACTIVE)"""
+  state: RoleAssignmentState
+}
+
+"""
+Input for creating a role assignment.
+"""
+input CreateRoleAssignmentInput {
+  """User to assign the role to"""
+  userId: ID!
+
+  """Role to assign"""
+  roleId: ID!
+
+  """Scope where the assignment applies"""
+  scope: ScopeInput!
+
+  """Optional expiration time for temporary access"""
+  expiresAt: DateTime
+}
+
+# ==============================================================================
+# End of Schema
+# ==============================================================================

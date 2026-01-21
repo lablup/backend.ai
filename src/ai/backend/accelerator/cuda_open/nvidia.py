@@ -1,12 +1,21 @@
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
+from collections.abc import MutableMapping, Sequence
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, MutableMapping, NamedTuple, Tuple, TypeAlias
+from typing import Any, NamedTuple, TypeAlias, cast
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
+    (13, 0),
+    (12, 9),
+    (12, 8),
+    (12, 7),
+    (12, 6),
+    (12, 5),
+    (12, 4),
+    (12, 3),
     (12, 2),
     (12, 1),
     (12, 0),
@@ -41,18 +50,116 @@ class LibraryError(RuntimeError):
     func: str
     code: int
 
-    def __init__(self, lib: str, func: str, code: int):
+    def __init__(self, lib: str, func: str, code: int) -> None:
         super().__init__(lib, func, code)
         self.lib = lib
         self.func = func
         self.code = code
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"LibraryError: {self.lib}::{self.func}() returned error {self.code}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         args = ", ".join(map(repr, self.args))
         return f"LibraryError({args})"
+
+
+class cudaDeviceProp_v13(ctypes.Structure):
+    _fields_ = [
+        ("name", ctypes.c_char * 256),
+        ("uuid", ctypes.c_byte * 16),  # cudaUUID_t
+        ("luid", ctypes.c_byte * 8),
+        ("luidDeviceNodeMask", ctypes.c_uint),
+        ("totalGlobalMem", ctypes.c_size_t),
+        ("sharedMemPerBlock", ctypes.c_size_t),
+        ("regsPerBlock", ctypes.c_int),
+        ("warpSize", ctypes.c_int),
+        ("memPitch", ctypes.c_size_t),
+        ("maxThreadsPerBlock", ctypes.c_int),
+        ("maxThreadsDim", ctypes.c_int * 3),
+        ("maxGridSize", ctypes.c_int * 3),
+        ("totalConstMem", ctypes.c_size_t),
+        ("major", ctypes.c_int),
+        ("minor", ctypes.c_int),
+        ("textureAlignment", ctypes.c_size_t),
+        ("texturePitchAlignment", ctypes.c_size_t),
+        ("multiProcessorCount", ctypes.c_int),
+        ("integrated", ctypes.c_int),
+        ("canMapHostMemory", ctypes.c_int),
+        ("maxTexture1D", ctypes.c_int),
+        ("maxTexture1DMipmap", ctypes.c_int),
+        ("maxTexture2D", ctypes.c_int * 2),
+        ("maxTexture2DMipmap", ctypes.c_int * 2),
+        ("maxTexture2DLinear", ctypes.c_int * 3),
+        ("maxTexture2DGather", ctypes.c_int * 2),
+        ("maxTexture3D", ctypes.c_int * 3),
+        ("maxTexture3DAlt", ctypes.c_int * 3),
+        ("maxTextureCubemap", ctypes.c_int),
+        ("maxTexture1DLayered", ctypes.c_int * 2),
+        ("maxTexture2DLayered", ctypes.c_int * 3),
+        ("maxTextureCubemapLayered", ctypes.c_int * 2),
+        ("maxSurface1D", ctypes.c_int),
+        ("maxSurface2D", ctypes.c_int * 2),
+        ("maxSurface3D", ctypes.c_int * 3),
+        ("maxSurface1DLayered", ctypes.c_int * 2),
+        ("maxSurface2DLayered", ctypes.c_int * 3),
+        ("maxSurfaceCubemap", ctypes.c_int),
+        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
+        ("surfaceAlignment", ctypes.c_size_t),
+        ("concurrentKernels", ctypes.c_int),
+        ("ECCEnabled", ctypes.c_int),
+        ("pciBusID", ctypes.c_int),
+        ("pciDeviceID", ctypes.c_int),
+        ("pciDomainID", ctypes.c_int),
+        ("tccDriver", ctypes.c_int),
+        ("asyncEngineCount", ctypes.c_int),
+        ("unifiedAddressing", ctypes.c_int),
+        ("memoryBusWidth", ctypes.c_int),
+        ("l2CacheSize", ctypes.c_int),
+        ("persistingL2CacheMaxSize", ctypes.c_int),
+        ("maxThreadsPerMultiProcessor", ctypes.c_int),
+        ("streamPrioritiesSupported", ctypes.c_int),
+        ("globalL1CacheSupported", ctypes.c_int),
+        ("localL1CacheSupported", ctypes.c_int),
+        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
+        ("regsPerMultiprocessor", ctypes.c_int),
+        ("managedMemory", ctypes.c_int),
+        ("isMultiGpuBoard", ctypes.c_int),
+        ("multiGpuBoardGroupID", ctypes.c_int),
+        ("hostNativeAtomicSupported", ctypes.c_int),
+        ("pageableMemoryAccess", ctypes.c_int),
+        ("concurrentManagedAccess", ctypes.c_int),
+        ("computePreemptionSupported", ctypes.c_int),
+        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
+        ("cooperativeLaunch", ctypes.c_int),
+        ("sharedMemPerBlockOptin", ctypes.c_size_t),
+        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
+        ("directManagedMemAccessFromHost", ctypes.c_int),
+        ("maxBlocksPerMultiProcessor", ctypes.c_int),
+        ("accessPolicyMaxWindowSize", ctypes.c_int),
+        ("reservedSharedMemPerBlock", ctypes.c_size_t),
+        ("hostRegisterSupported", ctypes.c_int),
+        ("sparseCudaArraySupported", ctypes.c_int),
+        ("hostRegisterReadOnlySupported", ctypes.c_int),
+        ("timelineSemaphoreInteropSupported", ctypes.c_int),
+        ("memoryPoolsSupported", ctypes.c_int),
+        ("gpuDirectRDMASupported", ctypes.c_int),
+        ("gpuDirectRDMAFlushWritesOptions", ctypes.c_uint),
+        ("gpuDirectRDMAWritesOrdering", ctypes.c_int),
+        ("memoryPoolSupportedHandleTypes", ctypes.c_uint),
+        ("deferredMappingCudaArraySupported", ctypes.c_int),
+        ("ipcEventSupported", ctypes.c_int),
+        ("clusterLaunch", ctypes.c_int),
+        ("unifiedFunctionPointers", ctypes.c_int),
+        ("deviceNumaConfig", ctypes.c_int),
+        ("deviceNumaId", ctypes.c_int),
+        ("mpsEnabled", ctypes.c_int),
+        ("hostNumaId", ctypes.c_int),
+        ("gpuPciDeviceID", ctypes.c_uint),
+        ("gpuPciSubsystemID", ctypes.c_uint),
+        ("hostNumaMultinodeIpcSupported", ctypes.c_int),
+        ("reserved", ctypes.c_int * 56),
+    ]
 
 
 class cudaDeviceProp_v12(ctypes.Structure):
@@ -403,7 +510,11 @@ class cudaDeviceProp(ctypes.Structure):
 
 
 cudaDeviceProp_t: TypeAlias = (
-    cudaDeviceProp_v12 | cudaDeviceProp_v11 | cudaDeviceProp_v10 | cudaDeviceProp
+    cudaDeviceProp_v13
+    | cudaDeviceProp_v12
+    | cudaDeviceProp_v11
+    | cudaDeviceProp_v10
+    | cudaDeviceProp
 )
 
 
@@ -411,8 +522,7 @@ def _load_library(name):
     try:
         if platform.system() == "Windows":
             return ctypes.windll.LoadLibrary(name)
-        else:
-            return ctypes.cdll.LoadLibrary(name)
+        return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
     return None
@@ -487,7 +597,7 @@ class libcudart(LibraryBase):
         return None
 
     @classmethod
-    def get_version(cls) -> Tuple[int, int]:
+    def get_version(cls) -> tuple[int, int]:
         if cls._version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("cudaRuntimeGetVersion", ctypes.byref(raw_ver))
@@ -503,7 +613,9 @@ class libcudart(LibraryBase):
     @classmethod
     def get_device_props(cls, device_idx: int):
         props_struct: cudaDeviceProp_t
-        if cls.get_version() >= (12, 0):
+        if cls.get_version() >= (13, 0):
+            props_struct = cudaDeviceProp_v13()
+        elif cls.get_version() >= (12, 0):
             props_struct = cudaDeviceProp_v12()
         elif cls.get_version() >= (11, 0):
             props_struct = cudaDeviceProp_v11()
@@ -513,7 +625,9 @@ class libcudart(LibraryBase):
             props_struct = cudaDeviceProp()
         cls.invoke("cudaGetDeviceProperties", ctypes.byref(props_struct), device_idx)
         props: MutableMapping[str, Any] = {
-            k: getattr(props_struct, k) for k, _ in props_struct._fields_
+            # Treat each field as two-tuple assuming that we don't have bit-fields
+            k: getattr(props_struct, k)
+            for k, _ in cast(Sequence[tuple[str, Any]], props_struct._fields_)
         }
         pci_bus_id = b" " * 16
         cls.invoke("cudaDeviceGetPCIBusId", ctypes.c_char_p(pci_bus_id), 16, device_idx)
@@ -535,7 +649,7 @@ class libcudart(LibraryBase):
 
 class nvmlMemoryInfo_t(ctypes.Structure):
     _fields_ = [
-        ("total", ctypes.c_uint),
+        ("total", ctypes.c_ulonglong),
         ("free", ctypes.c_ulonglong),
         ("used", ctypes.c_ulonglong),
     ]
@@ -578,13 +692,12 @@ class libnvml(LibraryBase):
         system_type = platform.system()
         if system_type == "Windows":
             return _load_library("libnvidia-ml.dll")
-        elif system_type == "Darwin":
+        if system_type == "Darwin":
             return _load_library("libnvidia-ml.dylib")
-        else:
-            lib = _load_library("libnvidia-ml.so")
-            if lib is None:
-                lib = _load_library("libnvidia-ml.so.1")
-            return lib
+        lib = _load_library("libnvidia-ml.so")
+        if lib is None:
+            lib = _load_library("libnvidia-ml.so.1")
+        return lib
         return None
 
     @classmethod

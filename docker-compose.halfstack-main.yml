@@ -1,1 +1,214 @@
-docker-compose.halfstack-2303.yml
+services:
+
+  backendai-half-db:
+    image: postgres:16.3-alpine
+    restart: unless-stopped
+    command: postgres -c 'max_connections=256'
+    networks:
+      - half
+    ports:
+      - "8100:5432"
+    environment:
+      - POSTGRES_DB=backend
+      - POSTGRES_PASSWORD=develove
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backendai-half-db-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: unless-stopped
+    networks:
+      - half
+    environment:
+      - DATA_SOURCE_URI=backendai-half-db:5432/backend?sslmode=disable
+      - DATA_SOURCE_USER=postgres
+      - DATA_SOURCE_PASS=develove
+    ports:
+      - "9187:9187"
+
+  backendai-half-redis:
+    image: redis:7.2.11-alpine
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "8110:6379"
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
+    command: >
+      redis-server
+      --appendonly yes
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backendai-half-redis-exporter:
+    image: oliver006/redis_exporter:v1.73.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: >
+      --redis.addr redis://backendai-half-redis:6379
+      --include-system-metrics
+      --include-config-metrics
+      --include-modules-metrics
+    ports:
+      - "9121:9121"
+
+  backendai-half-etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    restart: unless-stopped
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
+    networks:
+      - half
+    ports:
+      - "8120:2379"
+    command: >
+      /usr/local/bin/etcd
+      --name backendai-etcd
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://0.0.0.0:2380
+      --initial-cluster backendai-etcd=http://0.0.0.0:2380
+      --initial-cluster-token backendai-etcd-token
+      --initial-cluster-state new
+      --enable-v2=true
+      --auto-compaction-retention 1
+      --metrics=extensive
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backendai-half-grafana:
+    image: grafana/grafana-enterprise:11.4.0
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=backend
+      - GF_SECURITY_ADMIN_PASSWORD=develove
+    volumes:
+      - half-grafana:/var/lib/grafana:rw
+      - "./grafana-dashboards:/var/lib/grafana/dashboards:ro"
+      - "./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+      - "./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+
+  backendai-half-pyroscope:
+    image: grafana/pyroscope:1.9.2
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4040:4040"
+    volumes:
+      - half-pyroscope:/var/lib/pyroscope:rw
+
+  backendai-half-prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    networks:
+      - half
+    volumes:
+      - "./prometheus.yaml:/etc/prometheus/prometheus.yaml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+    ports:
+      - "9090:9090"
+
+  backendai-half-otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.126.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  backendai-half-loki:
+    image: grafana/loki:3.5.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+
+  backendai-half-tempo:
+    image: grafana/tempo:2.7.2
+    restart: unless-stopped
+    networks:
+      - half
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - half-tempo:/var/tempo
+    ports:
+      - "3200" # tempo
+      - "4317" # otlp grpc
+
+  backendai-half-apollo-router:
+    image: ghcr.io/graphql-hive/gateway:2.1.12
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4000:4000"
+    command: ["supergraph"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4000
+    volumes:
+      - ./supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./gateway.config.ts:/gateway/gateway.config.ts:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  backendai-half-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - half-minio:/data:rw
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  half:
+
+volumes:
+  half-grafana:
+  half-pyroscope:
+  half-tempo:
+  half-minio:

@@ -6,22 +6,17 @@ import io
 import json as modjson
 import logging
 import sys
-from collections import OrderedDict, namedtuple
+import uuid
+from collections import namedtuple
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    List,
-    Mapping,
     Optional,
-    Sequence,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -34,34 +29,29 @@ from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.common.json import dump_json_str
+
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
 from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 __all__ = [
-    "Request",
-    "BaseResponse",
-    "Response",
-    "WebSocketResponse",
-    "SSEResponse",
-    "FetchContextManager",
-    "WebSocketContextManager",
-    "SSEContextManager",
     "AttachedFile",
+    "BaseResponse",
+    "FetchContextManager",
+    "Request",
+    "Response",
+    "SSEContextManager",
+    "SSEResponse",
+    "WebSocketContextManager",
+    "WebSocketResponse",
 ]
 
 
-RequestContent = Union[
-    bytes,
-    bytearray,
-    str,
-    aiohttp.StreamReader,
-    io.IOBase,
-    None,
-]
+RequestContent = bytes | bytearray | str | aiohttp.StreamReader | io.IOBase | None
 """
 The type alias for the set of allowed types for request content.
 """
@@ -91,11 +81,18 @@ async def _coro_return(val: _T) -> _T:
 
 class ExtendedJSONEncoder(modjson.JSONEncoder):
     def default(self, obj: Any) -> Any:
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, Decimal):
             return str(obj)
         return super().default(obj)
+
+
+class SessionMode(StrEnum):
+    CLIENT = "CLIENT"
+    PROXY = "PROXY"
 
 
 class Request:
@@ -104,18 +101,19 @@ class Request:
     """
 
     __slots__ = (
+        "_attached_files",
+        "_content",
+        "_session_mode",
+        "api_version",
         "config",
-        "session",
-        "method",
-        "path",
+        "content_type",
         "date",
         "headers",
+        "method",
         "params",
-        "content_type",
-        "api_version",
-        "_content",
-        "_attached_files",
+        "path",
         "reporthook",
+        "session",
     )
 
     _content: RequestContent
@@ -129,13 +127,14 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: str = None,
-        content: RequestContent = None,
+        path: Optional[str] = None,
+        content: Optional[RequestContent] = None,
         *,
-        content_type: str = None,
-        params: Mapping[str, Union[str, int]] = None,
-        reporthook: Callable = None,
-        override_api_version: str = None,
+        content_type: Optional[str] = None,
+        params: Optional[Mapping[str, str | int]] = None,
+        reporthook: Optional[Callable] = None,
+        override_api_version: Optional[str] = None,
+        session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
         """
         Initialize an API request.
@@ -150,6 +149,9 @@ class Request:
 
         :param str content_type: Explicitly set the content type.  See also
                                  :func:`Request.set_content`.
+
+        :param SessionMode session_mode: The session mode, either CLIENT or PROXY.
+                                      This affects how the response decoding is handled.
         """
         self.session = api_session.get()
         self.config = self.session.config
@@ -172,6 +174,7 @@ class Request:
         self._attached_files = None
         self.set_content(content, content_type=content_type)
         self.reporthook = reporthook
+        self._session_mode = session_mode
 
     @property
     def content(self) -> RequestContent:
@@ -186,14 +189,14 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: str = None,
+        content_type: Optional[str] = None,
     ) -> None:
         """
         Sets the content of the request.
         """
-        assert (
-            self._attached_files is None
-        ), "cannot set content because you already attached files."
+        assert self._attached_files is None, (
+            "cannot set content because you already attached files."
+        )
         guessed_content_type = "application/octet-stream"
         if value is None:
             guessed_content_type = "text/plain"
@@ -225,9 +228,9 @@ class Request:
     def _sign(
         self,
         rel_url: URL,
-        access_key: str = None,
-        secret_key: str = None,
-        hash_type: str = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        hash_type: Optional[str] = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the
@@ -260,12 +263,12 @@ class Request:
             try:
                 cookie_jar = cast(aiohttp.CookieJar, self.session.aiohttp_session.cookie_jar)
                 cookie_jar.load(local_state_path / "cookie.dat")
-            except (IOError, PermissionError):
+            except (OSError, PermissionError):
                 pass
         else:
             raise ValueError("unsupported endpoint type")
 
-    def _pack_content(self) -> Union[RequestContent, aiohttp.FormData]:
+    def _pack_content(self) -> RequestContent | aiohttp.FormData:
         if self._attached_files is not None:
             data = aiohttp.FormData()
             for f in self._attached_files:
@@ -275,16 +278,15 @@ class Request:
             # multipart boundaries.
             self.headers.pop("Content-Type", None)
             return data
-        else:
-            return self._content
+        return self._content
 
     def _build_url(self) -> URL:
         base_url = self.config.endpoint.path.rstrip("/")
         query_path = self.path.lstrip("/") if self.path is not None and len(self.path) > 0 else ""
         if self.config.endpoint_type == "session":
             if not query_path.startswith("server"):
-                query_path = "func/{0}".format(query_path)
-        path = "{0}/{1}".format(base_url, query_path)
+                query_path = f"func/{query_path}"
+        path = f"{base_url}/{query_path}"
         url = self.config.endpoint.with_path(path)
         if self.params:
             url = url.with_query(self.params)
@@ -309,9 +311,7 @@ class Request:
             async with rqst.fetch() as resp:
               print(await resp.text())
         """
-        assert self.method in self._allowed_methods, "Disallowed HTTP method: {}".format(
-            self.method
-        )
+        assert self.method in self._allowed_methods, f"Disallowed HTTP method: {self.method}"
         self.date = datetime.now(tzutc())
         assert self.date is not None
         self.headers["Date"] = self.date.isoformat()
@@ -327,20 +327,27 @@ class Request:
                 sock_read=self.config.read_timeout,
             )
             full_url = self._build_url()
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             if not self.config.is_anonymous and not force_anonymous:
                 self._sign(full_url.relative())
             return self.session.aiohttp_session.request(
                 self.method,
-                str(full_url),
+                str(request_url),
                 data=self._pack_content(),
                 timeout=timeout_config,
                 headers=self.headers,
                 allow_redirects=False,
             )
 
-        return FetchContextManager(self.session, _rqst_ctx_builder, **kwargs)
+        return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
-    def connect_websocket(self, **kwargs) -> WebSocketContextManager:
+    def connect_websocket(
+        self, protocols: Iterable[str] = tuple(), **kwargs
+    ) -> WebSocketContextManager:
         """
         Creates a WebSocket connection.
 
@@ -349,9 +356,9 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(
-            self.session, AsyncSession
-        ), "Cannot use websockets with sessions in the synchronous mode"
+        assert isinstance(self.session, AsyncSession), (
+            "Cannot use websockets with sessions in the synchronous mode"
+        )
         assert self.method == "GET", "Invalid websocket method"
         self.date = datetime.now(tzutc())
         assert self.date is not None
@@ -363,8 +370,17 @@ class Request:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             return self.session.aiohttp_session.ws_connect(
-                str(full_url), autoping=True, heartbeat=30.0, headers=self.headers
+                str(request_url),
+                autoping=True,
+                heartbeat=30.0,
+                headers=self.headers,
+                protocols=protocols,
             )
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)
@@ -378,9 +394,9 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(
-            self.session, AsyncSession
-        ), "Cannot use event streams with sessions in the synchronous mode"
+        assert isinstance(self.session, AsyncSession), (
+            "Cannot use event streams with sessions in the synchronous mode"
+        )
         assert self.method == "GET", "Invalid event stream method"
         self.date = datetime.now(tzutc())
         assert self.date is not None
@@ -397,8 +413,13 @@ class Request:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
+            if self.session.aiohttp_session._base_url is None:
+                # for anonymous requests or API sessions created without using ClientPool
+                request_url = full_url
+            else:
+                request_url = full_url.relative()
             return self.session.aiohttp_session.request(
-                self.method, str(full_url), timeout=timeout_config, headers=self.headers
+                self.method, str(request_url), timeout=timeout_config, headers=self.headers
             )
 
         return SSEContextManager(self.session, _rqst_ctx_builder, **kwargs)
@@ -412,7 +433,7 @@ class AsyncResponseMixin:
         return await self._raw_response.text()
 
     async def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
     async def read(self, n: int = -1) -> bytes:
@@ -433,7 +454,7 @@ class SyncResponseMixin:
         )
 
     def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(
             self._raw_response.json(loads=loads),
@@ -464,9 +485,9 @@ class BaseResponse:
     """
 
     __slots__ = (
-        "_session",
-        "_raw_response",
         "_async_mode",
+        "_raw_response",
+        "_session",
     )
 
     _session: BaseSession
@@ -532,12 +553,13 @@ class FetchContextManager:
     """
 
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "response_cls",
-        "check_status",
         "_async_mode",
         "_rqst_ctx",
+        "_session_mode",
+        "check_status",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]
@@ -546,8 +568,9 @@ class FetchContextManager:
         self,
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
+        session_mode: SessionMode = SessionMode.CLIENT,
         *,
-        response_cls: Type[Response] = Response,
+        response_cls: type[Response] = Response,
         check_status: bool = True,
     ) -> None:
         self.session = session
@@ -556,6 +579,7 @@ class FetchContextManager:
         self.response_cls = response_cls
         self._async_mode = isinstance(session, AsyncSession)
         self._rqst_ctx = None
+        self._session_mode = session_mode
 
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
@@ -568,23 +592,27 @@ class FetchContextManager:
                 assert self._rqst_ctx is not None
                 raw_resp = await self._rqst_ctx.__aenter__()
                 if self.check_status and raw_resp.status // 100 not in [2, 3]:
-                    msg = await raw_resp.text()
-                    await raw_resp.__aexit__(None, None, None)
-                    raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
+                    match self._session_mode:
+                        case SessionMode.CLIENT:
+                            error_data = await raw_resp.json()
+                            msg = dump_json_str(error_data)
+                            await raw_resp.__aexit__(None, None, None)
+                            raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
+                        case SessionMode.PROXY:
+                            pass
                 return self.response_cls(self.session, raw_resp, async_mode=self._async_mode)
             except aiohttp.ClientConnectionError as e:
                 if retry_count == max_retries:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 if raw_resp is not None:
                     await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
@@ -682,11 +710,11 @@ class WebSocketContextManager:
     """
 
     __slots__ = (
+        "_ws_ctx",
+        "on_enter",
+        "response_cls",
         "session",
         "ws_ctx_builder",
-        "response_cls",
-        "on_enter",
-        "_ws_ctx",
     )
 
     _ws_ctx: Optional[_WSRequestContextManager]
@@ -696,8 +724,8 @@ class WebSocketContextManager:
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Callable = None,
-        response_cls: Type[WebSocketResponse] = WebSocketResponse,
+        on_enter: Optional[Callable] = None,
+        response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
         self.ws_ctx_builder = ws_ctx_builder
@@ -719,14 +747,13 @@ class WebSocketContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "Error detail: {!r}".format(e)
+                        f"Error detail: {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             else:
                 break
@@ -756,8 +783,8 @@ class SSEMessage:
 class SSEResponse(BaseResponse):
     __slots__ = (
         "_auto_reconnect",
-        "_retry",
         "_connector",
+        "_retry",
     )
 
     def __init__(
@@ -776,7 +803,7 @@ class SSEResponse(BaseResponse):
         self._connector = connector
 
     async def fetch_events(self) -> AsyncIterator[SSEMessage]:
-        msg_lines: List[str] = []
+        msg_lines: list[str] = []
         server_closed = False
         while True:
             received_line = await self._raw_response.content.readline()
@@ -837,10 +864,10 @@ class SSEResponse(BaseResponse):
 
 class SSEContextManager:
     __slots__ = (
-        "session",
-        "rqst_ctx_builder",
-        "response_cls",
         "_rqst_ctx",
+        "response_cls",
+        "rqst_ctx_builder",
+        "session",
     )
 
     _rqst_ctx: Optional[_RequestContextManager]
@@ -850,7 +877,7 @@ class SSEContextManager:
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
         *,
-        response_cls: Type[SSEResponse] = SSEResponse,
+        response_cls: type[SSEResponse] = SSEResponse,
     ) -> None:
         self.session = session
         self.rqst_ctx_builder = rqst_ctx_builder
@@ -881,14 +908,13 @@ class SSEContextManager:
                     msg = (
                         "Request to the API endpoint has failed.\n"
                         "Check your network connection and/or the server status.\n"
-                        "\u279c {!r}".format(e)
+                        f"\u279c {e!r}"
                     )
                     raise BackendClientError(msg) from e
-                else:
-                    self.session.config.rotate_endpoints()
-                    continue
+                self.session.config.rotate_endpoints()
+                continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n\u279c {!r}".format(e)
+                msg = f"API endpoint response error.\n\u279c {e!r}"
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

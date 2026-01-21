@@ -1,8 +1,18 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 
-from ..common.types import DeviceId, SlotName
+from aiohttp import web
+
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
+from ai.backend.common.types import DeviceId, SlotName
 
 
 class InitializationError(Exception):
@@ -53,7 +63,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple:
         return (
             self.__class__,
             (
@@ -67,6 +77,34 @@ class InsufficientResource(ResourceError):
         )
 
 
+@dataclass
+class FractionalResourceFragmented(ResourceError):
+    msg: str
+    slot_name: SlotName
+    requested_alloc: Decimal
+    dev_allocs: Sequence[tuple[DeviceId, Decimal]]
+    context_tag: Optional[str] = None
+
+    def __str__(self) -> str:
+        return (
+            f"FractionalResourceFragmented: {self.msg} ({self.slot_name}"
+            + (f" (tag: {self.context_tag!r}), " if self.context_tag else ", ")
+            + f"allocating {self.requested_alloc} from {self.dev_allocs})"
+        )
+
+    def __reduce__(self) -> tuple:
+        return (
+            self.__class__,
+            (
+                self.msg,
+                self.slot_name,
+                self.requested_alloc,
+                self.dev_allocs,
+                self.context_tag,
+            ),
+        )
+
+
 class UnsupportedBaseDistroError(RuntimeError):
     pass
 
@@ -74,14 +112,14 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs):
+    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.container_id = container_id
         self.message = message
 
 
 class K8sError(Exception):
-    def __init__(self, message):
+    def __init__(self, message) -> None:
         super().__init__(message)
         self.message = message
 
@@ -95,6 +133,50 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: str = None):
+    def __init__(self, *args, exc_repr: Optional[str] = None) -> None:
         super().__init__(*args)
         self.exc_repr = exc_repr
+
+
+class InvalidSocket(Exception):
+    pass
+
+
+class NetworkPluginNotFound(RuntimeError):
+    pass
+
+
+class ServicePortAlreadyUsedError(RuntimeError):
+    """
+    Raised when a port is already used by another service.
+    """
+
+
+class InvalidModelConfigurationError(RuntimeError):
+    """
+    Raised when a model configuration is invalid.
+    """
+
+
+class KernelRegistryNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://backend.ai/errors/agent/kernel-registry-not-found"
+    error_title = "Kernel Registry Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class KernelRegistryLoadError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://backend.ai/errors/agent/kernel-registry-load-error"
+    error_title = "Kernel Registry Load Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0.dev4"
+pants_version = "2.29.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -7,17 +7,17 @@ backend_packages = [
     "pants.backend.shell",
     "pants.backend.experimental.python",
     "pants.backend.experimental.python.lint.ruff.check",
+    "pants.backend.experimental.python.lint.ruff.format",
     "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
-    # "ruff_preview",  # a vendored backport of the pants 2.20's lint plugin
     "setupgen",
     "platform_resources",
-    "scie",
-    "towncrier_tool",
+    "accelerator_wheels",
 ]
 pants_ignore = [
     ".*/",
     "/dist/",
+    "/docker/",
     "__pycache__",
     "*~",  # vim swap/backup files
     "/scripts/",
@@ -25,6 +25,12 @@ pants_ignore = [
     "/docs/",  # TODO: docs build config
     "*.log",
     "/tools/pants-plugins",
+    "/wheelhouse/*/",
+    "/wheelhouse/*.whl",
+    # Alembic migration files - legacy SQLAlchemy 1.x style, excluded from type checking
+    "/src/ai/backend/manager/models/alembic/versions/",
+    "/src/ai/backend/account_manager/models/alembic/versions/",
+    "/src/ai/backend/appproxy/coordinator/models/alembic/versions/",
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
@@ -36,13 +42,13 @@ root_patterns = [
     "/",
     "/src",
     "/stubs",
-    "/tests",
     "/tools/pants-plugins",
 ]
 
 [test]
 extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 attempts_default = 3
+timeout_default = 180
 
 [python]
 enable_resolves = true
@@ -51,11 +57,11 @@ enable_resolves = true
 #   - Regenerate lockfiles
 #   - pyproject.toml: [tool.mypy].python_executable
 # * Let other developers do:
-#   - Run `./pants export` again
+#   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.12.2"]
+interpreter_constraints = ["CPython==3.13.7"]
 tailor_pex_binary_targets = false
-pip_version = "24.0"
+pip_version = "25.3"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -63,40 +69,55 @@ search_path = ["<PYENV>"]
 [python-infer]
 use_rust_parser = true
 
-[python-repos]
-indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+# This slows down `generate-lockfiles` severely. Enable only when strictly needed.
+# [python-repos]
+# indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+# find_links = ["file://%(buildroot)s/wheelhouse"]
 
 [python.resolves]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
 black = "tools/black.lock"
-ruff = "tools/ruff.lock"
 pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
 mypy = "tools/mypy.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
 
+[export]
+bin = [
+    "ruff",
+]
+
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-version = "v2.3.0"
+# Pin the PEX version to get benefits from a-scie/lift#116.
+version = "v2.77.0"
 known_versions = [
-    "v2.3.0|macos_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|macos_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_arm64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
-    "v2.3.0|linux_x86_64|581f7c2d61b4c24c66ba241f2a37d8f3b552f24ed22543279860f3463ac3db35|4124506",
+    "v2.77.0|macos_arm64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|macos_x86_64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|linux_arm64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
+    "v2.77.0|linux_x86_64|08f3dfcc9f07be2f789d1abb2248fa38e595c2d48093e1d1b29277ae67c1e7a6|4944069",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
-# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# As of PEX v2.18, the GitHub release descriptions include the checksum and size for reference.
 
 [black]
 install_from_resolve = "black"
 
 [ruff]
-install_from_resolve = "ruff"
+version = "0.14.0"
+# take tar.gz files and their checksums from the GitHub release (darwin and linux-musl)
+known_versions = [
+    "0.14.0|macos_arm64|0b7c193d5c45eda02226720eb75239fabeca995d5a0eb3830fd2973caa3030ec|12364514",
+    "0.14.0|macos_x86_64|880ae046b435eb306cd557a7481eed6da463b85f283ba1f2c1e2ad7c139ed6c5|13149751",
+    "0.14.0|linux_arm64|34a25398f03e7d32a4ec406c5c841c6e183fa0a96fbdd40b7e7eec1f177b360e|12465179",
+    "0.14.0|linux_x86_64|ed6d1b8407a1d228dc332fb19057e86e04a6cd3c2beacdb324ad6ff2a3f9071b|13647531",
+]
 
 [pytest]
 install_from_resolve = "pytest"
@@ -109,9 +130,7 @@ report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
-
-[towncrier]
-install_from_resolve = "towncrier"
+config = "pyproject.toml"
 
 [setuptools]
 install_from_resolve = "setuptools"

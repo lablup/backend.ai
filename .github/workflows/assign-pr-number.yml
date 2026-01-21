@@ -1,0 +1,54 @@
+name: assign-pr-number
+on:
+  workflow_call:
+    secrets:
+      WORKFLOW_PAT:
+        required: true
+permissions:
+  contents: write
+
+jobs:
+  update-news-fragments:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 2
+        lfs: false
+        token: ${{ secrets.WORKFLOW_PAT }}
+
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+
+    - name: Check news fragments and assign the PR number
+      id: assign_pr_number
+      run: |
+        pip install tomlkit
+        python scripts/assign-pr-number.py ${{ github.event.pull_request.number }}
+
+    - name: Make commit message for changing change log file
+      if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
+      run: |
+        author_name=$(git show -q --pretty='format:%an')
+        author_email=$(git show -q --pretty='format:%ae')
+        git config user.email "$author_email"
+        git config user.name "$author_name"
+        if [ -n "$(git diff --staged)" ]; then
+          git commit \
+            -m 'docs: Rename the news fragment with the PR number' \
+            -m $'${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}' \
+            --author="$author_name <$author_email>" \
+            --trailer "Co-authored-by: octodog <mu001@lablup.com>"
+          git push
+        fi

@@ -1,4 +1,5 @@
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Optional
 from uuid import UUID
 
 from ai.backend.client.output.fields import vfolder_fields
@@ -21,7 +22,7 @@ _default_list_fields: Sequence[FieldSpec] = (
 class Model(BaseFunction):
     model_name: str
 
-    def __init__(self, model_name: UUID):
+    def __init__(self, model_name: UUID) -> None:
         self.model_name = str(model_name)
 
     @api_function
@@ -37,8 +38,8 @@ class Model(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult:
         if filter:
             composed_filter = f'({filter}) & (usage_mode == "MODEL")'
@@ -57,10 +58,10 @@ class Model(BaseFunction):
 
     @api_function
     async def info(self):
-        rqst = Request("GET", "/folders/{0}".format(self.model_name))
+        rqst = Request("GET", f"/folders/{self.model_name}")
         async with rqst.fetch() as resp:
             info = await resp.json()
-        rqst = Request("GET", "/folders/{}/files".format(self.model_name))
+        rqst = Request("GET", f"/folders/{self.model_name}/files")
         rqst.set_json({
             "path": "versions",
         })
@@ -77,9 +78,9 @@ class Model(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: str = None,
-        unmanaged_path: str = None,
-        group: str = None,
+        host: Optional[str] = None,
+        unmanaged_path: Optional[str] = None,
+        group: Optional[str] = None,
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,
@@ -97,7 +98,7 @@ class Model(BaseFunction):
         })
         async with rqst.fetch() as resp:
             result = await resp.json()
-        rqst = Request("POST", "/folders/{}/mkdir".format(name))
+        rqst = Request("POST", f"/folders/{name}/mkdir")
         rqst.set_json({
             "path": "versions",
             "parents": True,
@@ -109,7 +110,7 @@ class Model(BaseFunction):
 
     @api_function
     async def delete(self):
-        rqst = Request("DELETE", "/folders/{0}".format(self.model_name))
+        rqst = Request("DELETE", f"/folders/{self.model_name}")
         rqst.set_json({"id": self.model_name})
         async with rqst.fetch():
             return {}

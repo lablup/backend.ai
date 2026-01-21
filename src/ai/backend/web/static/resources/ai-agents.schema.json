@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["config", "meta", "endpoint", "endpoint_id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The agent identifier"
+          },
+          "meta": {
+            "type": "object",
+            "required": ["title"],
+            "properties": {
+              "avatar": {
+                "type": "string",
+                "description": "URL of the agent's avatar image"
+              },
+              "background": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Background color (CSS color value) or image URL"
+                  }
+                ]
+              },
+              "title": {
+                "type": "string",
+                "description": "Display title of the agent"
+              },
+              "descriptions": {
+                "type": "string",
+                "description": "Detailed description of the agent's capabilities"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags for categorizing and filtering agents"
+              }
+            }
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "The endpoint name"
+          },
+          "endpoint_id": {
+            "type": "string",
+            "description": "The endpoint identifier"
+          },
+          "config": {
+            "type": "object",
+            "required": ["system_prompt"],
+            "properties": {
+              "system_prompt": {
+                "type": "string",
+                "description": "The system prompt for the agent"
+              }
+            },
+            "additionalProperties": true
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "default": 1,
+                "description": "Controls randomness in the output. Higher values mean more random completions."
+              },
+              "max_tokens": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of tokens to generate"
+              },
+              "top_p": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 1,
+                "description": "Controls diversity via nucleus sampling"
+              },
+              "frequency_penalty": {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2,
+                "default": 0,
+                "description": "How much to penalize new tokens based on their existing frequency"
+              },
+              "presence_penalty": {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2,
+                "default": 0,
+                "description": "How much to penalize new tokens based on whether they appear in the text so far"
+              },
+              "stop": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                ],
+                "description": "Sequences where the API will stop generating further tokens"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  },
+  "required": ["agents"]
+}

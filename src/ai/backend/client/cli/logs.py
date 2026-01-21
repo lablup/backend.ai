@@ -4,9 +4,9 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run
+from ai.backend.client.session import AsyncSession
 
-from ..compat import asyncio_run
-from ..session import AsyncSession
 from .pretty import print_error
 
 

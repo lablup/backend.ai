@@ -1,4 +1,3 @@
-import json
 import sys
 
 import click
@@ -6,16 +5,9 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.common.types import VFolderHostPermission
-
-from ...func.keypair_resource_policy import (
-    _default_detail_fields,
-    _default_list_fields,
-)
-from ...session import Session
-from ..extensions import pass_ctx_obj
-from ..pretty import print_info
-from ..types import CLIContext
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_info
+from ai.backend.client.cli.types import CLIContext
 
 # from ai.backend.client.output.fields import keypair_resource_policy_fields
 from . import admin
@@ -36,6 +28,9 @@ def info(ctx: CLIContext, name: str) -> None:
     Show details about a keypair resource policy. When `name` option is omitted, the
     resource policy for the current access_key will be returned.
     """
+    from ai.backend.client.func.keypair_resource_policy import _default_detail_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             rp = session.KeypairResourcePolicy(session.config.access_key)
@@ -53,6 +48,9 @@ def list(ctx: CLIContext) -> None:
     List and manage keypair resource policies.
     (admin privilege required)
     """
+    from ai.backend.client.func.keypair_resource_policy import _default_list_fields
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.KeypairResourcePolicy.list()
@@ -113,13 +111,23 @@ def list(ctx: CLIContext) -> None:
     "--vfhost-perms",
     "--allowed-vfolder-hosts",  # legacy name
     type=str,
-    default=json.dumps({
-        "local:volume1": [perm.value for perm in VFolderHostPermission],
-    }),
+    default='{"local:volume1": ["create-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-perm", "modify-vfolder", "clone-vfolder"]}',
     help=(
         "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
+)
+@click.option(
+    "--max-pending-session-count",
+    type=int,
+    default=None,
+    help="Number of maximum pending sessions.",
+)
+@click.option(
+    "--max-pending-session-resource-slots",
+    type=str,
+    default=None,
+    help="Set maximum resource slots for pending sessions.",
 )
 def add(
     ctx: CLIContext,
@@ -132,12 +140,16 @@ def add(
     max_containers_per_session: int,
     idle_timeout: int,
     vfolder_host_perms: str,  # JSON string
+    max_pending_session_count: int,
+    max_pending_session_resource_slots: str,  # JSON string
 ) -> None:
     """
     Add a new keypair resource policy.
 
     NAME: NAME of a new keypair resource policy.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.KeypairResourcePolicy.create(
@@ -150,6 +162,8 @@ def add(
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,
+                max_pending_session_count=max_pending_session_count,
+                max_pending_session_resource_slots=max_pending_session_resource_slots,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -228,6 +242,18 @@ def add(
         ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
+@click.option(
+    "--max-pending-session-count",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum pending sessions.",
+)
+@click.option(
+    "--max-pending-session-resource-slots",
+    type=OptionalType(str),
+    default=undefined,
+    help="Set maximum resource slots for pending sessions.",
+)
 def update(
     ctx: CLIContext,
     name: str,
@@ -239,12 +265,16 @@ def update(
     max_containers_per_session: int | Undefined,
     idle_timeout: int | Undefined,
     vfolder_host_perms: str | Undefined,  # JSON string
+    max_pending_session_count: int | Undefined,
+    max_pending_session_resource_slots: str | Undefined,  # JSON string
 ) -> None:
     """
     Update an existing keypair resource policy.
 
     NAME: NAME of a keypair resource policy to update.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.KeypairResourcePolicy.update(
@@ -257,6 +287,8 @@ def update(
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,
+                max_pending_session_count=max_pending_session_count,
+                max_pending_session_resource_slots=max_pending_session_resource_slots,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -289,6 +321,8 @@ def delete(ctx: CLIContext, name: str) -> None:
 
     NAME: NAME of a keypair resource policy to delete.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         if not ask_yn():
             print_info("Cancelled.")

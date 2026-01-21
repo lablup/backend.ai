@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextlib import AbstractAsyncContextManager
 from typing import (
     TYPE_CHECKING,
-    AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterable,
-    Mapping,
-    Tuple,
+    TypeAlias,
 )
 
 import aiohttp_cors
 from aiohttp import web
-from typing_extensions import TypeAlias
+from aiohttp.typedefs import Middleware
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -22,15 +19,12 @@ WebRequestHandler: TypeAlias = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Callable[
-    [web.Request, WebRequestHandler],
-    Awaitable[web.StreamResponse],
-]
+WebMiddleware: TypeAlias = Middleware
 
 CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
 AppCreator: TypeAlias = Callable[
     [CORSOptions],
-    Tuple[web.Application, Iterable[WebMiddleware]],
+    tuple[web.Application, Iterable[WebMiddleware]],
 ]
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]

@@ -1,0 +1,18 @@
+{
+    "container_registries": [
+        {
+            "id": "abc42a05-4471-41fa-8772-10bf6452c7d3",
+            "registry_name": "public.ecr.aws",
+            "url": "https://public.ecr.aws",
+            "type": "ecr",
+            "username": "AWS",
+            "password": "<password>",
+            "project": "<registry_alias>",
+            "extra": {
+                "access_token": "<access_token>",
+                "secret_access_token": "<secret_access_token>",
+                "region": "us-east-1"
+            }
+        }
+    ]
+}

@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import gzip
+import io
 import logging
 import lzma
 import os
@@ -8,54 +11,59 @@ import re
 import shutil
 import subprocess
 import textwrap
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, Final, Optional, cast, override
 
+import aiohttp
 import janus
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.utils import PersistentServiceContainer
+from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessStreamError
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
+from ai.backend.agent.utils import closing_async, get_arch_name
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.dto.agent.response import CodeCompletionResp
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData
-from ..utils import closing_async, get_arch_name
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
+    network_driver: str
+
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
+        network_id: str,
         image: ImageRef,
         version: int,
+        network_driver: str,
         *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -65,54 +73,67 @@ class DockerKernel(AbstractKernel):
             environ=environ,
         )
 
+        self.network_driver = network_driver
+
+    @override
     async def close(self) -> None:
         pass
 
-    def __getstate__(self):
-        props = super().__getstate__()
-        return props
+    def __getstate__(self) -> Mapping[str, Any]:
+        return super().__getstate__()
 
-    def __setstate__(self, props):
+    def __setstate__(self, props) -> None:
+        if "network_driver" not in props:
+            props["network_driver"] = "bridge"
         super().__setstate__(props)
 
+    @override
     async def create_code_runner(
-        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: frozenset[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host=self.data["kernel_host"],
+            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,
             client_features=client_features,
         )
 
-    async def get_completions(self, text: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+    @override
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         result = await self.runner.feed_and_get_completion(text, opts)
-        return {"status": "finished", "completions": result}
+        return CodeCompletionResp(result=result)
 
+    @override
     async def check_status(self):
-        assert self.runner is not None
-        result = await self.runner.feed_and_get_status()
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_and_get_status()
 
+    @override
     async def get_logs(self):
         container_id = self.data["container_id"]
         async with closing_async(Docker()) as docker:
             container = await docker.containers.get(container_id)
-            logs = await container.log(stdout=True, stderr=True)
+            logs = await container.log(stdout=True, stderr=True, follow=False)
         return {"logs": "".join(logs)}
 
+    @override
     async def interrupt_kernel(self):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
+    @override
     async def start_service(self, service: str, opts: Mapping[str, Any]):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
             return {
                 "status": "failed",
@@ -123,41 +144,46 @@ class DockerKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service({
+        return await self.runner.feed_start_service({
             "name": service,
             "port": sport["container_ports"][0],  # primary port
             "ports": sport["container_ports"],
             "protocol": sport["protocol"],
             "options": opts,
         })
-        return result
 
+    @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        assert self.runner is not None
-        result = await self.runner.feed_start_model_service(model_service)
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_start_model_service(model_service)
 
+    @override
     async def shutdown_service(self, service: str):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
+    @override
     async def get_service_apps(self):
-        assert self.runner is not None
-        result = await self.runner.feed_service_apps()
-        return result
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return await self.runner.feed_service_apps()
 
-    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
+    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> tuple[Path, Path]:
         base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]
         commit_path = base_commit_path / subdir
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
+    @override
     async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
+    @override
     async def commit(
         self,
         kernel_id,
@@ -165,9 +191,12 @@ class DockerKernel(AbstractKernel):
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
-        assert self.runner is not None
+        if extra_labels is None:
+            extra_labels = {}
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
 
         loop = asyncio.get_running_loop()
         path, lock_path = self._get_commit_path(kernel_id, subdir)
@@ -193,23 +222,44 @@ class DockerKernel(AbstractKernel):
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 log.info("Container (k: {}) is being committed", kernel_id)
                 docker = Docker()
-                container = docker.containers.container(container_id)
-                changes: list[str] = []
-                for label_name, label_value in extra_labels.items():
-                    changes.append(f"LABEL {label_name}={label_value}")
                 try:
+                    # There is a known issue at certain versions of Docker Engine
+                    # which prevents container from being committed when request config body is empty
+                    # https://github.com/moby/moby/issues/45543
+                    docker_info = await docker.system.info()
+                    docker_version = docker_info["ServerVersion"]
+                    major, _, patch = docker_version.split(".", maxsplit=2)
+                    config = None
+                    if (int(major) == 23 and int(patch) < 8) or (
+                        int(major) == 24 and int(patch) < 1
+                    ):
+                        config = {"ContainerSpec": {}}
+
+                    container = docker.containers.container(container_id)
+                    changes: list[str] = []
+
+                    for label_name, label_value in extra_labels.items():
+                        changes.append(f"LABEL {label_name}={label_value}")
                     if canonical:
                         if ":" in canonical:
-                            repo, tag = canonical.split(":", maxsplit=2)
+                            repo, tag = canonical.rsplit(":", maxsplit=1)
                         else:
                             repo, tag = canonical, "latest"
                         log.debug("tagging image as {}:{}", repo, tag)
                     else:
                         repo, tag = None, None
+                    # TODO:
+                    # - After aiodocker supports commit() timeout, set timeout there
+                    # - Impl Docker client wrapper
+                    commit_timeout = aiohttp.ClientTimeout(
+                        total=self.agent_config["api"]["commit-timeout"]
+                    )
+                    docker.session._timeout = commit_timeout
                     response: Mapping[str, Any] = await container.commit(
-                        changes=changes,
+                        changes=changes or None,
                         repository=repo,
                         tag=tag,
+                        config=config,
                     )
                     image_id = response["Id"]
                     if filename:
@@ -241,88 +291,105 @@ class DockerKernel(AbstractKernel):
                             await docker.images.delete(image_id)
                 finally:
                     await docker.close()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning("Session is already being committed.")
 
-    async def accept_file(self, filename: str, filedata: bytes):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
-        work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
-        try:
-            # create intermediate directories in the path
-            dest_path = (work_dir / filename).resolve(strict=False)
-            parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        )
+        host_abspath = (host_work_dir / container_path).resolve(strict=False)
+        if not host_abspath.is_relative_to(host_work_dir):
+            raise PermissionError("Not allowed to upload files outside /home/work")
 
         def _write_to_disk():
-            parent_path.mkdir(parents=True, exist_ok=True)
-            dest_path.write_bytes(filedata)
+            host_abspath.parent.mkdir(parents=True, exist_ok=True)
+            host_abspath.write_bytes(filedata)
 
         try:
             await loop.run_in_executor(None, _write_to_disk)
-        except FileNotFoundError:
-            log.error(
-                "{0}: writing uploaded file failed: {1} -> {2}", self.kernel_id, filename, dest_path
+        except OSError as e:
+            raise RuntimeError(
+                f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
             )
 
-    async def download_file(self, filepath: str):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         container_id = self.data["container_id"]
+
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
+            raise PermissionError("You cannot download files outside /home/work")
+
         async with closing_async(Docker()) as docker:
             container = docker.containers.container(container_id)
-            home_path = PurePosixPath("/home/work")
             try:
-                abspath = home_path / filepath
-                abspath.relative_to(home_path)
-            except ValueError:
-                raise PermissionError("You cannot download files outside /home/work")
-            try:
-                with await container.get_archive(str(abspath)) as tarobj:
-                    tarobj.fileobj.seek(0, 2)
-                    fsize = tarobj.fileobj.tell()
-                    if fsize > 1048576:
-                        raise ValueError("too large file")
-                    tarbytes = tarobj.fileobj.getvalue()
+                with await container.get_archive(str(container_abspath)) as tarobj:
+                    # FIXME: Replace this API call to a streaming version and cut the download if
+                    #        the downloaded size exceeds the limit.
+                    if tarobj.fileobj is None:
+                        raise SubprocessStreamError("Tar file object is not available")
+                    tar_fobj = cast(io.BufferedIOBase, tarobj.fileobj)
+                    tar_fobj.seek(0, io.SEEK_END)
+                    tar_size = tar_fobj.tell()
+                    if tar_size > 1048576:
+                        raise ValueError("Too large archive file exceeding 1 MiB")
+                    tar_fobj.seek(0, io.SEEK_SET)
+                    tarbytes = tar_fobj.read()
             except DockerError:
-                log.warning("Could not found the file: {0}", abspath)
-                raise FileNotFoundError(f"Could not found the file: {abspath}")
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
         return tarbytes
 
-    async def download_single(self, filepath: str):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         container_id = self.data["container_id"]
+
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
+            raise PermissionError("You cannot download files outside /home/work")
+
         async with closing_async(Docker()) as docker:
             container = docker.containers.container(container_id)
-            home_path = PurePosixPath("/home/work")
             try:
-                abspath = home_path / filepath
-                abspath.relative_to(home_path)
-            except ValueError:
-                raise PermissionError("You cannot download files outside /home/work")
-            try:
-                with await container.get_archive(str(abspath)) as tarobj:
-                    tarobj.fileobj.seek(0, 2)
-                    fsize = tarobj.fileobj.tell()
-                    if fsize > 1048576:
-                        raise ValueError("too large file")
-                    tarobj.fileobj.seek(0)
-                    inner_file = tarobj.extractfile(tarobj.getnames()[0])
-                    if inner_file:
-                        tarbytes = inner_file.read()
-                    else:
-                        log.warning("Could not found the file: {0}", abspath)
-                        raise FileNotFoundError(f"Could not found the file: {abspath}")
+                with await container.get_archive(str(container_abspath)) as tarobj:
+                    # FIXME: Replace this API call to a streaming version and cut the download if
+                    #        the downloaded size exceeds the limit.
+                    if tarobj.fileobj is None:
+                        raise SubprocessStreamError("Tar file object is not available")
+                    tar_fobj = cast(io.BufferedIOBase, tarobj.fileobj)
+                    tar_fobj.seek(0, io.SEEK_END)
+                    tar_size = tar_fobj.tell()
+                    if tar_size > 1048576:
+                        raise ValueError("Too large archive file exceeding 1 MiB")
+                    tar_fobj.seek(0, io.SEEK_SET)
+                    if len(tarobj.getnames()) > 1:
+                        raise ValueError(
+                            f"Expected a single-file archive but found multiple files from {container_abspath}"
+                        )
+                    inner_fname = tarobj.getnames()[0]
+                    inner_fobj = tarobj.extractfile(inner_fname)
+                    if not inner_fobj:
+                        raise ValueError(
+                            f"Could not read {inner_fname!r} the archive file {container_abspath}"
+                        )
+                    # FYI: To get the size of extracted file, seek and tell with inner_fobj.
+                    content_bytes = inner_fobj.read()
             except DockerError:
-                log.warning("Could not found the file: {0}", abspath)
-                raise FileNotFoundError(f"Could not found the file: {abspath}")
-        return tarbytes
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+        return content_bytes
 
-    async def list_files(self, container_path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work").resolve()
-        resolved_path = (home_path / container_path).resolve()
-
-        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
@@ -359,7 +426,7 @@ class DockerKernel(AbstractKernel):
                 "/opt/backend.ai/bin/python",
                 "-c",
                 code,
-                str(container_path),
+                str(container_abspath),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -369,8 +436,10 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    @override
     async def notify_event(self, evdata: AgentEventData):
-        assert self.runner is not None
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_event(evdata)
 
 
@@ -402,14 +471,16 @@ class DockerCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[str, Optional[str]]:
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
@@ -436,8 +507,12 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
             )
             with lzma.open(extractor_archive, "rb") as reader:
-                proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
-                if await proc.wait() != 0:
+                image_tar = reader.read()
+                proc = await asyncio.create_subprocess_exec(
+                    *["docker", "load"], stdin=asyncio.subprocess.PIPE
+                )
+                await proc.communicate(input=image_tar)
+                if proc.returncode != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
         log.info("checking krunner-env for {}...", distro)
@@ -496,7 +571,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
     return distro, volume_name
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner
@@ -548,8 +623,8 @@ LinuxKit_CMD_EXEC_PREFIX = [
 ]
 
 
-async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) -> None:
-    if local_config["agent"]["docker-mode"] == "linuxkit":
+async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig) -> None:
+    if local_config.agent.docker_mode == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
         proxy_worker_binary = pkg_resources.resource_filename(
@@ -557,7 +632,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
-        server_port = local_config["agent"]["metadata-server-port"]
+        server_port = local_config.agent.metadata_server_port
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(
             "linuxkit-nsenter:latest",
@@ -589,7 +664,8 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
             stderr=asyncio.subprocess.PIPE,
         )
         await proc.wait()
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStreamError("Subprocess stdout is not available")
         raw_rules = await proc.stdout.read()
         rules = raw_rules.decode()
         if LinuxKit_IPTABLES_RULE.search(rules) is None:

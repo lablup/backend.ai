@@ -1,24 +1,27 @@
 from __future__ import annotations
 
 import enum
-import textwrap
 import uuid
-from typing import Any, Iterable, Mapping, Sequence, Union
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
-from ...cli.types import Undefined, undefined
-from ..auth import AuthToken, AuthTokenTypes
-from ..output.fields import user_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..types import set_if_set
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.auth import AuthTokenTypes
+from ai.backend.client.output.fields import user_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+from ai.backend.common.dto.manager.auth.field import AuthResponse, parse_auth_response
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
-    "UserStatus",
     "UserRole",
+    "UserStatus",
 )
 
 
@@ -94,7 +97,7 @@ class User(BaseFunction):
         *,
         extra_args: Mapping[str, Any] = {},
         token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR,
-    ) -> AuthToken:
+    ) -> AuthResponse:
         """
         Authorize the given credentials and get the API authentication token.
         This function can be invoked anonymously; i.e., it does not require
@@ -115,10 +118,7 @@ class User(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return AuthToken(
-                type=token_type,
-                content=data["data"],
-            )
+            return parse_auth_response(data["data"])
 
     @api_function
     @classmethod
@@ -136,13 +136,11 @@ class User(BaseFunction):
         :param group: Fetch users in a specific group.
         :param fields: Additional per-user query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($status: String, $group: UUID) {
-                users(status: $status, group_id: $group) {$fields}
+                users(status: $status, group_id: $group) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "status": status,
@@ -200,21 +198,17 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if email is None:
-            query = textwrap.dedent(
-                """\
+            query = _d("""
                 query {
-                    user {$fields}
+                    user { $fields }
                 }
-            """
-            )
+            """)
         else:
-            query = textwrap.dedent(
-                """\
+            query = _d("""
                 query($email: String) {
-                    user(email: $email) {$fields}
+                    user(email: $email) { $fields }
                 }
-            """
-            )
+            """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
@@ -224,7 +218,7 @@ class User(BaseFunction):
     @classmethod
     async def detail_by_uuid(
         cls,
-        user_uuid: Union[str, uuid.UUID] | None = None,
+        user_uuid: str | uuid.UUID | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
         """
@@ -235,21 +229,17 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if user_uuid is None:
-            query = textwrap.dedent(
-                """\
+            query = _d("""
                 query {
-                    user {$fields}
+                    user { $fields }
                 }
-            """
-            )
+            """)
         else:
-            query = textwrap.dedent(
-                """\
+            query = _d("""
                 query($user_id: ID) {
-                    user_from_uuid(user_id: $user_id) {$fields}
+                    user_from_uuid(user_id: $user_id) { $fields }
                 }
-            """
-            )
+            """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"user_id": str(user_uuid)}
         data = await api_session.get().Admin._query(
@@ -275,21 +265,22 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool = False,
+        container_uid: int | Undefined = undefined,
+        container_main_gid: int | Undefined = undefined,
+        container_gids: Iterable[int] | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($email: String!, $input: UserInput!) {
                 create_user(email: $email, props: $input) {
-                    ok msg user {$fields}
+                    ok msg user { $fields }
                 }
             }
-        """
-        )
+        """)
         default_fields = (
             user_fields["domain_name"],
             user_fields["email"],
@@ -312,6 +303,9 @@ class User(BaseFunction):
         set_if_set(inputs, "full_name", full_name)
         set_if_set(inputs, "allowed_client_ip", allowed_client_ip)
         set_if_set(inputs, "group_ids", group_ids)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_gids", container_gids)
         variables = {
             "email": email,
             "input": inputs,
@@ -338,21 +332,22 @@ class User(BaseFunction):
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
         main_access_key: str | Undefined = undefined,
+        container_uid: int | None | Undefined = undefined,
+        container_main_gid: int | None | Undefined = undefined,
+        container_gids: Iterable[int] | None | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Update existing user.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($email: String!, $input: ModifyUserInput!) {
                 modify_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "password", password)
         set_if_set(inputs, "username", username)
@@ -367,6 +362,9 @@ class User(BaseFunction):
         set_if_set(inputs, "group_ids", group_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
         set_if_set(inputs, "main_access_key", main_access_key)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_gids", container_gids)
         variables = {
             "email": email,
             "input": inputs,
@@ -380,22 +378,25 @@ class User(BaseFunction):
         """
         Inactivates an existing user.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($email: String!) {
                 delete_user(email: $email) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_user"]
 
     @api_function
     @classmethod
-    async def purge(cls, email: str, purge_shared_vfolders=False):
+    async def purge(
+        cls,
+        email: str,
+        purge_shared_vfolders: bool = False,
+        delegate_endpoint_ownership: bool = False,
+    ):
         """
         Deletes an existing user.
 
@@ -403,19 +404,18 @@ class User(BaseFunction):
         Shared virtual folder's ownership will be transferred to the requested admin.
         To delete shared folders as well, set ``purge_shared_vfolders`` to ``True``.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($email: String!, $input: PurgeUserInput!) {
                 purge_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "email": email,
             "input": {
                 "purge_shared_vfolders": purge_shared_vfolders,
+                "delegate_endpoint_ownership": delegate_endpoint_ownership,
             },
         }
         data = await api_session.get().Admin._query(query, variables)

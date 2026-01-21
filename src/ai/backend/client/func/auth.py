@@ -1,9 +1,22 @@
-from typing import Optional
+import json
+from typing import Any, Optional
 
-from ..request import Request
+from ai.backend.client.auth import encrypt_payload
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Auth",)
+
+
+def _put_secure_body(rqst: Request, data: Any) -> None:
+    if rqst.config.endpoint.scheme == "https":
+        rqst.set_json(data)
+    else:
+        rqst.headers["X-BackendAI-Encoded"] = "true"
+        raw_body = json.dumps(data).encode()
+        encoded_body = encrypt_payload(str(rqst.config.endpoint), raw_body)
+        rqst.set_content(encoded_body)
 
 
 class Auth(BaseFunction):
@@ -19,6 +32,11 @@ class Auth(BaseFunction):
         It creates a server-side web session and return
         a dictionary with ``"authenticated"`` boolean field and
         JSON-encoded raw cookie data.
+
+        This SDK function works when env var BACKEND_ENDPOINT is endpoint of webserver, not manager.
+        If you want to use SDK funcs that send requests to the Manager with login,
+        update the cookie in the session context manager object and save the state with a file.
+        See the example in `src/ai/backend/client/cli/config.py` login function.
         """
         rqst = Request("POST", "/server/login")
         body = {
@@ -27,7 +45,7 @@ class Auth(BaseFunction):
         }
         if otp:
             body["otp"] = otp
-        rqst.set_json(body)
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             data = await resp.json()
             data["cookies"] = resp.raw_response.cookies
@@ -42,6 +60,8 @@ class Auth(BaseFunction):
         """
         Log-out from the endpoint.
         It clears the server-side web session.
+
+        This SDK function works when env var BACKEND_ENDPOINT is endpoint of webserver, not manager.
         """
         rqst = Request("POST", "/server/logout")
         async with rqst.fetch() as resp:
@@ -56,11 +76,12 @@ class Auth(BaseFunction):
         Update user's password. This API works only for account owner.
         """
         rqst = Request("POST", "/auth/update-password")
-        rqst.set_json({
+        body = {
             "old_password": old_password,
             "new_password": new_password,
             "new_password2": new_password2,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -75,12 +96,13 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/auth/update-password-no-auth")
-        rqst.set_json({
+        body = {
             "domain": domain,
             "username": user_id,
             "current_password": current_password,
             "new_password": new_password,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
 
@@ -95,10 +117,11 @@ class Auth(BaseFunction):
         """
 
         rqst = Request("POST", "/server/update-password-no-auth")
-        rqst.set_json({
+        body = {
             "username": user_id,
             "current_password": current_password,
             "new_password": new_password,
-        })
+        }
+        _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()

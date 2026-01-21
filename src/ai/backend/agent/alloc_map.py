@@ -7,26 +7,26 @@ import logging
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
-    FrozenSet,
-    Iterable,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     TypeVar,
+    final,
 )
 
 import attr
 import more_itertools
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
+from ai.backend.logging import BraceStyleAdapter
 
 from .affinity_map import AffinityHint, AffinityPolicy
+from .errors import ResourceAllocationError
 from .exception import (
+    FractionalResourceFragmented,
     InsufficientResource,
     InvalidResourceArgument,
     InvalidResourceCombination,
@@ -37,7 +37,7 @@ from .exception import (
 if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 log_alloc_map: bool = False
 T = TypeVar("T")
 
@@ -60,6 +60,7 @@ def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
         zip(
             groups,
             ((base + (1 if i < extra else 0)) for i in range(len(groups))),
+            strict=True,
         )
     )
 
@@ -73,7 +74,7 @@ def round_down(from_dec: Decimal, with_dec: Decimal):
 
 class AbstractAllocMap(metaclass=ABCMeta):
     device_slots: Mapping[DeviceId, DeviceSlotInfo]
-    device_mask: FrozenSet[DeviceId]
+    device_mask: frozenset[DeviceId]
     exclusive_slot_types: Iterable[SlotName]
     allocations: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]]
 
@@ -92,11 +93,13 @@ class AbstractAllocMap(metaclass=ABCMeta):
         for dev_id, dev_slot_info in self.device_slots.items():
             self.allocations[dev_slot_info.slot_name][dev_id] = Decimal(0)
 
+    @final
     def clear(self) -> None:
         self.allocations.clear()
         for dev_id, dev_slot_info in self.device_slots.items():
             self.allocations[dev_slot_info.slot_name][dev_id] = Decimal(0)
 
+    @final
     def check_exclusive(self, a: SlotName, b: SlotName) -> bool:
         if not self.exclusive_slot_types:
             return False
@@ -109,8 +112,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
             return True
         for t in self.exclusive_slot_types:
             if "*" in t:
-                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(a, t)
-                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(b, t)
+                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(str(a), str(t))
+                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(str(b), str(t))
         return a_in_exclusive_set and b_in_exclusive_set
 
     def format_current_allocations(self) -> str:
@@ -121,21 +124,67 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 bufs.append(f"  {device_id}: {alloc}")
         return "\n".join(bufs)
 
+    @final
     def get_current_allocations(
         self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
-        if affinity_hint is None or not affinity_hint.devices:  # for legacy
+
+        if affinity_hint is None:  # for legacy
             return sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
-        primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
-            affinity_hint.devices, device_name
+
+        # Use the affinity hint to reorder the device sets to prioritize allocation.
+        if not affinity_hint.devices:
+            # In the first resource slot during allocation,
+            # we extract the device clusters based on the logical distances between each pair.
+            primary_sets = affinity_hint.affinity_map.get_device_clusters_with_lowest_distance(
+                device_name
+            )
+            secondary_set: Sequence[AbstractComputeDevice] = []
+        else:
+            # In the subsequent resource slots during allocation,
+            # we build the device clusters based on the device sets allocated for the previous resource slot.
+            # This logic is particularly important to seamlessly support specific GDS solutions like WEKA,
+            # as it requires alignment of CPU cores and GPU devices to have consistent NUMA nodes.
+            primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+                affinity_hint.devices, device_name
+            )
+
+        if not primary_sets:
+            # In normal conditions, we should have at least one primary set.
+            # The errorneous case may happen when:
+            # - the device_name is not explicitly set, and
+            # - auto-generated device_name differs from the reported resource slot name.
+            #   (e.g., "NPUPlusDevice" -> "npuplus" while the slot name is "npu-plus.device")
+            # Here, we report this failure explicitly so that we could check the
+            # potentially missing explicit device_name in the accelerator plugins.
+            detected_device_names = {
+                device.device_name for device in affinity_hint.affinity_map.nodes.keys()
+            }
+            raise ConfigurationError({
+                "AbstractAllocMap.get_current_allocation()": (
+                    f"No suitable devices found "
+                    f"(searched: {device_name}, found: {', '.join(detected_device_names)})"
+                )
+            })
+
+        # Let it prefer the largest primary set based on the remaining capacity per NUMA node.
+        # Note that each primary device set is already included within the same numa node.
+        primary_sets = sorted(
+            primary_sets,
+            key=lambda device_set: sum(
+                (self.allocations[slot_name][device.device_id] for device in device_set),
+                start=Decimal(0),
+            ),
         )
 
-        def convert_to_sorted_dev_alloc(device_set: Iterable[AbstractComputeDevice]):
+        def convert_to_sorted_dev_alloc(
+            device_set: Iterable[AbstractComputeDevice],
+        ) -> list[tuple[DeviceId, Decimal]]:
             device_ids = {d.device_id for d in device_set}
             return sorted(
                 (
@@ -147,6 +196,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 reverse=True,
             )
 
+        # Inside each device cluster, let it prefer the devices with most remaining capacity.
         primary_sorted_dev_allocs = [
             convert_to_sorted_dev_alloc(primary_set) for primary_set in primary_sets
         ]
@@ -156,26 +206,33 @@ class AbstractAllocMap(metaclass=ABCMeta):
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
                     return [
-                        (device_id, alloc)
-                        for device_id, alloc in itertools.chain(*primary_sorted_dev_allocs)
-                    ]
+                        *itertools.chain(*primary_sorted_dev_allocs)
+                    ] + secondary_sorted_dev_alloc
                 case AffinityPolicy.INTERLEAVED:
                     return [
-                        (device_id, alloc)
-                        for device_id, alloc in more_itertools.interleave_longest(
-                            *primary_sorted_dev_allocs
-                        )
-                    ]
+                        *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
+                    ] + secondary_sorted_dev_alloc
         else:
             return [
-                *(
-                    (device_id, alloc)
-                    for device_id, alloc in more_itertools.interleave_longest(
-                        *primary_sorted_dev_allocs
-                    )
-                ),
-                *((device_id, alloc) for device_id, alloc in secondary_sorted_dev_alloc),
-            ]
+                *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
+            ] + secondary_sorted_dev_alloc
+
+    @final
+    def update_affinity_hint(
+        self,
+        device_alloc: Mapping[DeviceId, Decimal],
+        affinity_hint: Optional[AffinityHint] = None,
+    ) -> None:
+        if affinity_hint is None:
+            return
+        hint_for_next_allocation: list[AbstractComputeDevice] = []
+        for dev_id, alloc in device_alloc.items():
+            if alloc == Decimal(0):
+                continue
+            for dev in affinity_hint.affinity_map.nodes:
+                if dev.device_id == dev_id:
+                    hint_for_next_allocation.append(dev)
+        affinity_hint.devices = hint_for_next_allocation
 
     @abstractmethod
     def allocate(
@@ -252,8 +309,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         requested_slots = {k: v for k, v in slots.items() if v > 0}
 
         # check exclusive
-        for slot_name_a in requested_slots.keys():
-            for slot_name_b in requested_slots.keys():
+        for slot_name_a in requested_slots:
+            for slot_name_b in requested_slots:
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
                         f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
@@ -294,13 +351,17 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 )
                 log.debug("DiscretePropertyAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
 
-            total_allocatable = int(0)
+            total_allocatable = 0
             remaining_alloc = Decimal(requested_alloc).normalize()
 
-            # fill up starting from the most free devices
+            # fill up starting from the most free devices considering affinity hint
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += int(self.device_slots[dev_id].amount - current_alloc)
             if total_allocatable < requested_alloc:
                 raise InsufficientResource(
@@ -322,6 +383,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if remaining_alloc == 0:
                     break
             allocation[slot_name] = slot_allocation
+            self.update_affinity_hint(slot_allocation, affinity_hint)
 
         return allocation
 
@@ -348,6 +410,13 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if repeats >= 100:
                     raise ResourceError("too many repeats until allocation")
 
+                # sort the devices by the affinity hint
+                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+                if log_alloc_map and repeats == 0:
+                    log.debug(
+                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
+                    )
+
                 # calculate remaining slots per device
                 total_allocatable = int(
                     sum(
@@ -364,12 +433,6 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                         requested_alloc=requested_alloc,
                         total_allocatable=total_allocatable,
                         allocation=allocation,
-                    )
-
-                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
-                if log_alloc_map and repeats == 0:
-                    log.debug(
-                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
                     )
 
                 # calculate the amount to spread out
@@ -409,6 +472,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             for dev_id, allocated in new_alloc.items():
                 self.allocations[slot_name][dev_id] += allocated
             allocation[slot_name] = {k: v for k, v in new_alloc.items() if v > 0}
+            self.update_affinity_hint(new_alloc, affinity_hint)
             if log_alloc_map:
                 log.debug("DiscretePropertyAllocMap(EVENLY): new-alloc: {!r}", new_alloc)
 
@@ -458,13 +522,14 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal("0.01"),
+        allow_resource_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
         requested_slots = {k: v for k, v in slots.items() if v > 0}
 
         # check exclusive
-        for slot_name_a in requested_slots.keys():
-            for slot_name_b in requested_slots.keys():
+        for slot_name_a in requested_slots:
+            for slot_name_b in requested_slots:
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
                         f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
@@ -476,6 +541,7 @@ class FractionAllocMap(AbstractAllocMap):
             affinity_hint=affinity_hint,
             context_tag=context_tag,
             min_memory=min_memory,
+            allow_slot_fragmentation=allow_resource_fragmentation,
         )
         actual_alloc_map: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in calculated_alloc_map.items():
@@ -496,6 +562,35 @@ class FractionAllocMap(AbstractAllocMap):
 
         return actual_alloc_map
 
+    def ensure_slot_not_fragmented(
+        self,
+        slot_name: SlotName,
+        sorted_dev_allocs: Sequence[tuple[DeviceId, Decimal]],
+        alloc: Decimal,
+        *,
+        context_tag: Optional[str] = None,
+    ) -> None:
+        if len(sorted_dev_allocs) == 0:
+            raise FractionalResourceFragmented(
+                "FractionAllocMap: no device left for allocation!",
+                context_tag=context_tag,
+                slot_name=slot_name,
+                requested_alloc=alloc,
+                dev_allocs=sorted_dev_allocs,
+            )
+        most_free_dev_id, most_free_device_alloc = sorted_dev_allocs[0]
+        most_free_device_allocatable = (
+            self.device_slots[most_free_dev_id].amount - most_free_device_alloc
+        )
+        if most_free_device_allocatable < alloc:
+            raise FractionalResourceFragmented(
+                "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
+                context_tag=context_tag,
+                slot_name=slot_name,
+                requested_alloc=alloc,
+                dev_allocs=sorted_dev_allocs,
+            )
+
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
@@ -503,6 +598,7 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
+        allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
@@ -510,6 +606,13 @@ class FractionAllocMap(AbstractAllocMap):
 
             # fill up starting from the most free devices
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+            if not allow_slot_fragmentation:
+                self.ensure_slot_not_fragmented(
+                    slot_name,
+                    sorted_dev_allocs,
+                    alloc,
+                    context_tag=context_tag,
+                )
 
             if log_alloc_map:
                 log.debug("FractionAllocMap(FILL): allocating {} {}", slot_name, alloc)
@@ -528,7 +631,11 @@ class FractionAllocMap(AbstractAllocMap):
 
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
-                assert slot_name == self.device_slots[dev_id].slot_name
+                if slot_name != self.device_slots[dev_id].slot_name:
+                    raise ResourceAllocationError(
+                        f"Slot name mismatch: expected {slot_name}, "
+                        f"got {self.device_slots[dev_id].slot_name} for device {dev_id}."
+                    )
                 total_allocatable += self.device_slots[dev_id].amount - current_alloc
             if total_allocatable < alloc:
                 raise InsufficientResource(
@@ -551,6 +658,7 @@ class FractionAllocMap(AbstractAllocMap):
                     break
 
             allocation[slot_name] = slot_allocation
+            self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
     def _allocate_evenly(
@@ -560,6 +668,7 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
+        allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # higher value means more even with 0 being the highest value
         def measure_evenness(
@@ -610,7 +719,7 @@ class FractionAllocMap(AbstractAllocMap):
         def allocate_across_devices(
             dev_allocs: list[tuple[DeviceId, Decimal]],
             remaining_alloc: Decimal,
-            slot_name: str,
+            slot_name: SlotName,
         ) -> dict[DeviceId, Decimal]:
             slot_allocation: dict[DeviceId, Decimal] = {}
             n_devices = len(dev_allocs)
@@ -637,6 +746,13 @@ class FractionAllocMap(AbstractAllocMap):
             slot_allocation: dict[DeviceId, Decimal] = {}
             remaining_alloc = Decimal(alloc).normalize()
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+            if not allow_slot_fragmentation:
+                self.ensure_slot_not_fragmented(
+                    slot_name,
+                    sorted_dev_allocs,
+                    alloc,
+                    context_tag=context_tag,
+                )
 
             # do not consider devices whose remaining resource under min_memory
             sorted_dev_allocs = list(
@@ -761,6 +877,7 @@ class FractionAllocMap(AbstractAllocMap):
             allocation[slot_name] = slot_allocation
             for dev_id, value in slot_allocation.items():
                 self.allocations[slot_name][dev_id] += value
+            self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
     def apply_allocation(

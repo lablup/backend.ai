@@ -1,0 +1,41 @@
+[redis]
+addr = { host = "127.0.0.1", port = 8110 }
+
+[proxy_worker]
+coordinator_endpoint = "http://127.0.0.1:10200"
+authority = "worker-1"
+tls_listen = false
+tls_advertised = false
+aiomonitor_termui_port = 48610
+aiomonitor_webui_port = 49610
+frontend_mode = "port"
+protocol = "http"
+accepted_traffics = ["inference", "interactive"]
+api_bind_addr = { host = "0.0.0.0", port = 10201 }
+# Change `host` to the public/external address for user access. Change `port` only if port mapping is in use.
+api_advertised_addr = { host = "127.0.0.1", port = 10201 }
+
+[proxy_worker.port_proxy]
+bind_host = "0.0.0.0"
+# Change to the actual host for user access
+advertised_host = "127.0.0.1"
+bind_port_range = [10205, 10300]
+
+[secrets]
+api_secret = "some_api_secret"
+jwt_secret = "some_jwt_secret"
+
+[permit_hash]
+secret = "some_permit_hash_secret"
+
+[logging]
+level = "DEBUG"
+drivers = ["console"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[debug]
+enabled = true
+log-events = true

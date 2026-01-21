@@ -1,0 +1,33 @@
+name: skip-ci
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+jobs:
+  skip_ci:
+    if: contains(github.event.pull_request.labels.*.name, 'skip:ci')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.OCTODOG }}
+    - name: Skip CI
+      if: github.event.action == 'labeled'
+      run:
+        git config --global user.email "mu001@lablup.com"
+        git config --global user.name "octodog"
+        git commit --allow-empty -m "skip:ci"
+        git push
+    - name: Revoke skip:ci
+      if: github.event.action == 'unlabeled'
+      run:
+        git config --global user.email "mu001@lablup.com"
+        git config --global user.name "octodog"
+        previous_commit_message=$(git log -n 1 --pretty=format:%s --skip 1)
+        if [[ "$previous_commit_message" == "skip:ci" ]]; then
+          git log -n 1 --pretty=format:%H --skip 1 | xargs git revert --no-edit
+          git push
+        fi

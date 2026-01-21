@@ -170,8 +170,22 @@ latex_elements = {
     "pointsize": "12pt",
     "fontpkg": "\n".join([
         "\\usepackage{fontspec}",
-        "\\setmainfont{Pretendard}",
-        "\\setmonofont{D2Coding}",
+        "\\setmainfont{Pretendard}[" +
+        "  Path = ./fonts/Pretendard/public/static/, " +
+        "  Extension = .otf, " +
+        "  UprightFont = *-Regular, " +
+        "  BoldFont = *-Bold, " +
+        "  ItalicFont = *-Regular, " +
+        "  BoldItalicFont = *-Bold" +
+        "]",
+        "\\setmonofont{D2Coding}[" +
+        "  Path = ./fonts/D2Coding/D2Coding/, " +
+        "  Extension = .ttf, " +
+        "  UprightFont = *-Ver1.3.2-20180524, " +
+        "  BoldFont = *Bold-Ver1.3.2-20180524, " +
+        "  ItalicFont = *-Ver1.3.2-20180524, " +
+        "  BoldItalicFont = *Bold-Ver1.3.2-20180524" +
+        "]",
         "\\usepackage{kotex}",
         ""
     ])

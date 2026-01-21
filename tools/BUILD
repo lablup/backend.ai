@@ -3,11 +3,10 @@ python_requirements(
     name="reqs-pytest",
     source="pytest-requirements.txt",
     resolve="pytest",
-)
-python_requirements(
-    name="reqs-ruff",
-    source="ruff-requirements.txt",
-    resolve="ruff",
+    module_mapping={
+        "pytest-mock": ["pytest_mock"],
+        "pydantic": ["pydantic", "pydantic_core"],
+    },
 )
 python_requirements(
     name="reqs-black",
@@ -18,6 +17,9 @@ python_requirements(
     name="reqs-mypy",
     source="mypy-requirements.txt",
     resolve="mypy",
+    module_mapping={
+        "strawberry": ["strawberry_graphql"],
+    },
 )
 python_requirements(
     name="reqs-coveragepy",

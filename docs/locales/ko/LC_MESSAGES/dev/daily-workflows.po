@@ -666,7 +666,7 @@ msgid ""
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:535 6d3a2bba179445bca11ab8d1d85f88d1
-msgid "This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``."
+msgid "This will generate ``dist/backend_ai_client-{VERSION}-py3-none-any.whl``."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:537 2496d2b93dc24a3c9658c773663a3f16

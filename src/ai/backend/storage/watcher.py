@@ -3,23 +3,31 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 import traceback
 from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Sequence, Type
+from typing import Any, ClassVar, Self
 
+import aiofiles.os
 import attrs
 import zmq
 import zmq.asyncio
 
 from ai.backend.common import msgpack
-from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.events.event_types.volume.broadcast import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
+)
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
+from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+from .errors import InvalidDataLengthError, InvalidSocketPathError
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
@@ -79,26 +87,18 @@ class AbstractTask(metaclass=ABCMeta):
     async def run(self) -> Any:
         pass
 
-    @classmethod
-    def deserialize_from_request(cls, raw_data: Request) -> AbstractTask:
-        serializer_name = str(raw_data.header, "utf8")
-        values: tuple = msgpack.unpackb(raw_data.body)
-        serializer_cls = SERIALIZER_MAP[serializer_name]
-        return serializer_cls.deserialize(values)
-
-    def serialize_to_request(self) -> Request:
-        assert self.name in SERIALIZER_MAP
-        header = bytes(self.name, "utf8")
-        return Request(header, self.serialize())
-
     @abstractmethod
     def serialize(self) -> bytes:
         pass
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, values: tuple) -> AbstractTask:
+    def deserialize(cls, values: tuple) -> Self:
         pass
+
+    def serialize_to_request(self) -> Request:
+        header = bytes(self.name, "utf8")
+        return Request(header, self.serialize())
 
 
 @attrs.define(slots=True)
@@ -120,8 +120,8 @@ class ChownTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> ChownTask:
-        return ChownTask(
+    def deserialize(cls, values: tuple) -> Self:
+        return cls(
             values[0],
             values[1],
             values[2],
@@ -161,7 +161,7 @@ class MountTask(AbstractTask):
     def from_event(
         cls, event: DoVolumeMountEvent, *, mount_path: Path, mount_prefix: str | None = None
     ) -> MountTask:
-        return MountTask(
+        return cls(
             str(mount_path),
             event.quota_scope_id,
             event.fs_location,
@@ -187,8 +187,8 @@ class MountTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> MountTask:
-        return MountTask(
+    def deserialize(cls, values: tuple) -> Self:
+        return cls(
             values[0],
             QuotaScopeID.parse(values[1]),
             values[2],
@@ -236,7 +236,7 @@ class UmountTask(AbstractTask):
         mount_prefix: str | None = None,
         timeout: float | None = None,
     ) -> UmountTask:
-        return UmountTask(
+        return cls(
             str(mount_path),
             event.quota_scope_id,
             event.scaling_group,
@@ -258,8 +258,8 @@ class UmountTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> UmountTask:
-        return UmountTask(
+    def deserialize(cls, values: tuple) -> Self:
+        return cls(
             values[0],
             QuotaScopeID.parse(values[1]),
             values[2],
@@ -270,11 +270,29 @@ class UmountTask(AbstractTask):
         )
 
 
-SERIALIZER_MAP: dict[str, Type[AbstractTask]] = {
-    MountTask.name: MountTask,
-    UmountTask.name: UmountTask,
-    ChownTask.name: ChownTask,
-}
+@attrs.define(slots=True)
+class DeletePathTask(AbstractTask):
+    name = "delete-path"
+    path: Path
+
+    async def run(self) -> Any:
+        if self.path.is_dir():
+            loop = asyncio.get_running_loop()
+            try:
+                await loop.run_in_executor(None, lambda: shutil.rmtree(self.path))
+            except FileNotFoundError:
+                pass
+        else:
+            await aiofiles.os.remove(self.path)
+
+    def serialize(self) -> bytes:
+        return msgpack.packb((self.path,))
+
+    @classmethod
+    def deserialize(cls, values: tuple) -> Self:
+        return cls(
+            values[0],
+        )
 
 
 @attrs.define(slots=True)
@@ -305,7 +323,7 @@ class Response:
 
 def get_zmq_socket_file_path(path: str | Path | None, pidx: int) -> str:
     if path is None:
-        raise ValueError("Socket path should not be None")
+        raise InvalidSocketPathError("Socket path should not be None")
     return f"ipc://{path}-{pidx}"
 
 
@@ -322,7 +340,7 @@ class Protocol:
             raise asyncio.CancelledError
         data = await insock.recv_multipart()
         if (data_len := len(data)) != 2:
-            raise ValueError(f"data length for request should be 2, not {data_len}")
+            raise InvalidDataLengthError(f"data length for request should be 2, not {data_len}")
         return Request.deserialize((data[0], data[1]))
 
     @classmethod
@@ -337,7 +355,7 @@ class Protocol:
             raise asyncio.CancelledError
         data = await outsock.recv_multipart()
         if (data_len := len(data)) != 2:
-            raise ValueError(f"data length for respond should be 2, not {data_len}")
+            raise InvalidDataLengthError(f"data length for respond should be 2, not {data_len}")
         return Response.deserialize((data[0], data[1]))
 
 
@@ -355,6 +373,7 @@ class WatcherProcess:
 
         self.outsock = zctx.socket(zmq.PUSH)
         self.outsock.bind(get_zmq_socket_file_path(output_sock_prefix, self.pidx))
+        self.serializer_map = {cls.name: cls for cls in AbstractTask.__subclasses__()}
 
     async def close(self) -> None:
         self.insock.close()
@@ -366,13 +385,19 @@ class WatcherProcess:
     async def respond(self, succeeded: bool, data: str) -> None:
         await Protocol.respond(self.outsock, Response(succeeded, data))
 
+    def _deserialize_from_request(self, raw_data: Request) -> AbstractTask:
+        serializer_name = str(raw_data.header, "utf8")
+        values: tuple = msgpack.unpackb(raw_data.body)
+        serializer_cls = self.serializer_map[serializer_name]
+        return serializer_cls.deserialize(values)
+
     async def main(self) -> None:
         try:
             while True:
                 client_request = await Protocol.listen_to_request(self.insock)
 
                 try:
-                    task = AbstractTask.deserialize_from_request(client_request)
+                    task = self._deserialize_from_request(client_request)
                     result = await task.run()
                 except Exception as e:
                     log.exception(f"Error in watcher task. (e: {e})")

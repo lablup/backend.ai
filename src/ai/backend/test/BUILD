@@ -1,18 +1,23 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
         "//:reqs#pytest",
         "//:reqs#pytest-dependency",
+        "src/ai/backend/client:src",
     ],
 )
 
 visibility_private_component(
     allowed_dependents=[],
     allowed_dependencies=[
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/testutils/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
     ],
 )
 

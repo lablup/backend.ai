@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import shlex
 import subprocess
 from collections.abc import AsyncGenerator, Sequence
+
+from ai.backend.storage.errors import SubprocessStdoutNotAvailableError
 
 
 async def run(
@@ -43,7 +47,8 @@ async def spawn_and_watch(
         stderr=asyncio.subprocess.STDOUT,
     )
     try:
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStdoutNotAvailableError("Subprocess stdout is not available")
         while True:
             line = await proc.stdout.readline()
             if not line:

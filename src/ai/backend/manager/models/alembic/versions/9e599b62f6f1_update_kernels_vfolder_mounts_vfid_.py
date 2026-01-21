@@ -53,7 +53,7 @@ def list_chunk(lst, n):
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 
-def upgrade():
+def upgrade() -> None:
     connection = op.get_bind()
 
     batch_size = 100
@@ -66,7 +66,7 @@ def upgrade():
     updated_count = 0
 
     def render_vfolder_id(old_vfid: str) -> str:
-        if "/" in old_vfid and (old_vfid.startswith("user:") or old_vfid.startswith("project:")):
+        if "/" in old_vfid and old_vfid.startswith(("user:", "project:")):
             return old_vfid
 
         if "/" in old_vfid:
@@ -76,8 +76,7 @@ def upgrade():
 
         if quota_scope_id := known_quota_scopes.get(UUID(v2_id)):
             return f"{quota_scope_id}/{v2_id}"
-        else:
-            return v2_id
+        return v2_id
 
     prev_id = None
     while True:
@@ -143,7 +142,7 @@ def upgrade():
         prev_id = rows[-1][0]
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
 
     batch_size = 100

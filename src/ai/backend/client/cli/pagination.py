@@ -1,13 +1,13 @@
 import shutil
 import sys
-from typing import Any, Callable, Iterator, List, Literal, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, Literal, Optional
 
 import click
 from tabulate import tabulate
 
 from ai.backend.client.output.types import FieldSpec
-
-from ..pagination import MAX_PAGE_SIZE
+from ai.backend.client.pagination import MAX_PAGE_SIZE
 
 
 def get_preferred_page_size() -> int:
@@ -21,13 +21,13 @@ def tabulate_items(
     items: Iterator[_Item],
     fields: Sequence[FieldSpec],
     *,
-    page_size: int = None,
-    item_formatter: Callable[[_Item], None] = None,
+    page_size: Optional[int] = None,
+    item_formatter: Optional[Callable[[_Item], None]] = None,
     tablefmt: Literal["simple", "plain", "github"] = "simple",
 ) -> Iterator[str]:
     is_first = True
     output_count = 0
-    buffered_items: List[_Item] = []
+    buffered_items: list[_Item] = []
 
     # check table header/footer sizes
     header_height = 0
@@ -38,7 +38,10 @@ def tabulate_items(
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(
             [
-                [f.formatter.format_console(v, f) for f, v in zip(fields, item.values())]
+                [
+                    f.formatter.format_console(v, f)
+                    for f, v in zip(fields, item.values(), strict=True)
+                ]
                 for item in buffered_items
             ],
             headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),
@@ -70,13 +73,12 @@ def tabulate_items(
             is_first = False
             output_count = 0
             page_size = max(table_height - 1, 10)
-    if output_count > 0:
-        yield from _tabulate_buffer()
+    yield from _tabulate_buffer()
 
 
 def echo_via_pager(
     text_generator: Iterator[str],
-    break_callback: Callable[[], None] = None,
+    break_callback: Optional[Callable[[], None]] = None,
 ) -> None:
     """
     A variant of ``click.echo_via_pager()`` which implements our own simplified pagination.

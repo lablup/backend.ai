@@ -1,39 +1,42 @@
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from datetime import datetime, tzinfo
+from decimal import Decimal
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import attrs
 import msgpack
 import sqlalchemy as sa
-from dateutil.tz.tz import tzfile
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.sql.elements import ColumnElement
 
-from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
+from ai.backend.manager.data.kernel.types import KernelStatus
+
+if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .group import GroupRow
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
+    "BaseResourceUsageGroup",
     "ResourceGroupUnit",
     "ResourceUsage",
-    "BaseResourceUsageGroup",
+    "fetch_resource_usage",
     "parse_resource_usage",
     "parse_resource_usage_groups",
-    "fetch_resource_usage",
 )
 
 
-class ResourceGroupUnit(str, Enum):
+class ResourceGroupUnit(StrEnum):
     KERNEL = "kernel"
     SESSION = "session"
     PROJECT = "project"
@@ -66,7 +69,6 @@ class ResourceUsage:
                 "ResourceUsage should only be added to `ResourceUsage` type,"
                 f" not `{type(other)}` type."
             )
-        assert isinstance(other, ResourceUsage)
         self.nfs |= other.nfs  # Is this correct??
         self.device_type |= other.device_type
         self.cpu_allocated += other.cpu_allocated
@@ -102,6 +104,9 @@ class ResourceUsage:
             "gpu_allocated": self.gpu_allocated,
         }
 
+    def copy(self) -> ResourceUsage:
+        return attrs.evolve(self, nfs={*self.nfs}, device_type={*self.device_type})
+
 
 def to_str(val: Any) -> Optional[str]:
     return str(val) if val is not None else None
@@ -126,7 +131,7 @@ class BaseResourceUsageGroup:
     user_id: Optional[UUID] = attrs.field(default=None)
     user_email: Optional[str] = attrs.field(default=None)
     full_name: Optional[str] = attrs.field(default=None)  # User's full_name
-    access_key: Optional[UUID] = attrs.field(default=None)
+    access_key: Optional[str] = attrs.field(default=None)
     project_id: Optional[UUID] = attrs.field(default=None)
     project_name: Optional[str] = attrs.field(default=None)
     kernel_id: Optional[UUID] = attrs.field(default=None)
@@ -141,7 +146,7 @@ class BaseResourceUsageGroup:
 
     status: Optional[str] = attrs.field(default=None)
     status_info: Optional[str] = attrs.field(default=None)
-    status_history: Optional[str] = attrs.field(default=None)
+    status_history: Optional[Mapping[str, Any]] = attrs.field(default=None)
     cluster_mode: Optional[str] = attrs.field(default=None)
 
     total_usage: ResourceUsage = attrs.field(factory=ResourceUsage)
@@ -178,21 +183,21 @@ class BaseResourceUsageGroup:
             "project_id": self.project_id,
             "project_name": self.project_name,
             "kernel_id": self.kernel_id,
-            "container_ids": self.container_ids,
+            "container_ids": self.container_ids.copy() if self.container_ids is not None else None,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
-            "last_stat": self.last_stat,
-            "extra_info": self.extra_info,
+            "last_stat": {**self.last_stat} if self.last_stat is not None else None,
+            "extra_info": {**self.extra_info} if self.extra_info is not None else None,
             "full_name": self.full_name,
-            "images": self.images,
-            "agents": self.agents,
+            "images": self.images.copy() if self.images is not None else None,
+            "agents": self.agents.copy() if self.agents is not None else None,
             "status": self.status,
             "status_info": self.status_info,
             "status_history": self.status_history,
             "cluster_mode": self.cluster_mode,
             "scheduled_at": self.scheduled_at,
-            "total_usage": self.total_usage,
+            "total_usage": self.total_usage.copy(),
         }
 
     def to_json_base(self) -> dict[str, Any]:
@@ -238,7 +243,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
             "agent": self.agent,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
@@ -259,6 +264,8 @@ class KernelResourceUsage(BaseResourceUsageGroup):
             raise ValueError(
                 "Cannot parse `KernelResourceUsage` from usage_group that have None value field"
             )
+        if usage_group.kernel_row.agent is None:
+            raise ValueError("Kernel row agent is None")
         return cls(
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
@@ -285,7 +292,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
             **self.to_json_base(),
-            "agents": list(self.total_usage.agent_ids),
+            "agents": list(self.agents) if self.agents is not None else [],
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -312,7 +319,10 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         return cls(
             project_row=usage_group.project_row,
             session_row=usage_group.session_row,
-            **usage_group.to_map(),
+            **{
+                **usage_group.to_map(),
+                "total_usage": ResourceUsage(),
+            },
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
@@ -378,6 +388,7 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
             "cluster_mode": None,
             "scheduled_at": None,
             "terminated_at": None,
+            "total_usage": ResourceUsage(),
         }
         return cls(
             project_row=usage_group.project_row,
@@ -438,15 +449,15 @@ def parse_resource_usage(
 ) -> ResourceUsage:
     if not last_stat:
         return ResourceUsage(
-            agent_ids={kernel.agent},
+            agent_ids={kernel.agent} if kernel.agent else set(),
         )
     nfs = set()
     if kernel.vfolder_mounts:
         # For >=22.03, return used host directories instead of volume host, which is not so useful.
-        nfs = set([str(mount.host_path) for mount in kernel.vfolder_mounts])
+        nfs = {str(mount.host_path) for mount in kernel.vfolder_mounts}
     elif kernel.mounts and isinstance(kernel.mounts[0], list):
         # For the kernel records that have legacy contents of `mounts`.
-        nfs = set([mount[2] for mount in kernel.mounts])
+        nfs = {mount[2] for mount in kernel.mounts}
 
     device_type = set()
     smp = 0
@@ -457,25 +468,24 @@ def parse_resource_usage(
                 device_type.add(model_name)
             smp += int(nmget(dev_info, "data.smp", 0))
             gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
-    gpu_allocated = 0
-    if "cuda.devices" in kernel.occupied_slots:
-        gpu_allocated = kernel.occupied_slots["cuda.devices"]
-    if "cuda.shares" in kernel.occupied_slots:
-        gpu_allocated = kernel.occupied_slots["cuda.shares"]
+    gpu_allocated = Decimal(0)
+    for key, value in kernel.occupied_slots.items():
+        if SlotName(key).is_accelerator():
+            gpu_allocated += value
 
     return ResourceUsage(
-        agent_ids={kernel.agent},
-        nfs=nfs,
+        agent_ids={kernel.agent} if kernel.agent else set(),
+        nfs={*nfs},
         cpu_allocated=float(kernel.occupied_slots.get("cpu", 0)),
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
         mem_allocated=int(kernel.occupied_slots.get("mem", 0)),
         mem_used=int(nmget(last_stat, "mem.capacity", 0)),
-        shared_memory=int(nmget(kernel.resource_opts, "shmem", 0)),
+        shared_memory=int(nmget(kernel.resource_opts or {}, "shmem", 0)),
         disk_allocated=0,
         disk_used=int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
         io_read=int(nmget(last_stat, "io_read.current", 0)),
         io_write=int(nmget(last_stat, "io_write.current", 0)),
-        device_type=device_type,
+        device_type={*device_type},
         smp=float(smp),
         gpu_mem_allocated=float(gpu_mem_allocated),
         gpu_allocated=float(gpu_allocated),
@@ -484,20 +494,15 @@ def parse_resource_usage(
 
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
-    redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
+    valkey_stat_client: ValkeyStatClient,
+    local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
 
-    async def _pipe_builder(r: Redis) -> RedisPipeline:
-        pipe = r.pipeline()
-        for kern_id in stat_empty_kerns:
-            await pipe.get(str(kern_id))
-        return pipe
-
-    raw_stats = await redis_helper.execute(redis_stat, _pipe_builder)
-    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):
+    kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
+    raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
+    for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats, strict=True):
         if raw_stat is None:
             continue
         stat_map[kern_id] = msgpack.unpackb(raw_stat)
@@ -509,29 +514,33 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
-            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
+            scheduled_at=(
+                kern.status_history.get(KernelStatus.SCHEDULED.name)
+                if kern.status_history
+                else None
+            ),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
-            last_stat=stat_map[kern.id],
+            last_stat=stat_map.get(kern.id),
             user_id=kern.session.user_uuid,
-            user_email=kern.session.user.email,
+            user_email=kern.session.user.email if kern.session.user is not None else None,
             access_key=kern.session.access_key,
-            project_id=kern.session.group.id,
-            project_name=kern.session.group.name,
+            project_id=kern.session.group.id if kern.session.group is not None else None,
+            project_name=kern.session.group.name if kern.session.group is not None else None,
             kernel_id=kern.id,
-            container_ids={kern.container_id},
+            container_ids={kern.container_id} if kern.container_id else set(),
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
-            full_name=kern.session.user.full_name,
-            images={kern.image},
-            agents={kern.agent},
+            full_name=kern.session.user.full_name if kern.session.user is not None else None,
+            images={kern.image} if kern.image else set(),
+            agents={kern.agent} if kern.agent else set(),
             status=kern.status.name,
             status_history=kern.status_history,
             cluster_mode=kern.cluster_mode,
             status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
-            total_usage=parse_resource_usage(kern, stat_map[kern.id]),
+            total_usage=parse_resource_usage(kern, stat_map.get(kern.id)),
         )
         for kern in kernels
     ]
@@ -581,9 +590,9 @@ KERNEL_RESOURCE_SELECT_COLS = (
 
 
 def _parse_query(
-    kernel_cond: Optional[sa.sql.BinaryExpression] = None,
-    session_cond: Optional[sa.sql.BinaryExpression] = None,
-    project_cond: Optional[sa.sql.BinaryExpression] = None,
+    kernel_cond: Optional[ColumnElement[bool]] = None,
+    session_cond: Optional[ColumnElement[bool]] = None,
+    project_cond: Optional[ColumnElement[bool]] = None,
 ) -> sa.sql.Select:
     session_load = joinedload(KernelRow.session)
     if session_cond is not None:
@@ -637,6 +646,4 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        kernels = result.scalars().all()
-
-    return kernels
+        return list(result.scalars().all())

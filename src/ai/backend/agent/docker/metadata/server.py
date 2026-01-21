@@ -1,25 +1,29 @@
 import logging
-from typing import Any, Iterable, List, Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, Sequence
+from http import HTTPStatus
+from typing import Any, cast
 from uuid import UUID
 
 import attr
 from aiodocker.docker import Docker
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.types import WebMiddleware
 from ai.backend.agent.utils import closing_async
+from ai.backend.common.docker import LabelName
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
+from ai.backend.logging import BraceStyleAdapter
 
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class MetadataPluginContext(BasePluginContext[MetadataPlugin]):
@@ -53,11 +57,14 @@ async def container_resolver_middleware(
     elif remote_ip := request.remote:
         container_ip = remote_ip
     else:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     async with closing_async(Docker()) as docker:
-        containers = await docker.containers.list(
-            filters='{"label":["ai.backend.kernel-id"],"network":["bridge"],"status":["running"]}',
-        )
+        filters = dump_json_str({
+            "label": [LabelName.KERNEL_ID],
+            "network": ["bridge"],
+            "status": ["running"],
+        })
+        containers = await docker.containers.list(filters=filters)
     target_container = list(
         filter(
             lambda x: x["NetworkSettings"]["Networks"].get("bridge", {}).get("IPAddress")
@@ -67,11 +74,11 @@ async def container_resolver_middleware(
     )
 
     if len(target_container) == 0:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
     request["kernel"] = request.app["kernel-registry"].get(
-        UUID(target_container[0]["Labels"]["ai.backend.kernel-id"])
+        UUID(target_container[0]["Labels"][LabelName.KERNEL_ID])
     )
     return await handler(request)
 
@@ -84,11 +91,11 @@ class MetadataServer(aobject):
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
-    loaded_apps: List[str]
+    loaded_apps: list[str]
 
     def __init__(
         self,
-        local_config: Mapping[str, Any],
+        local_config: AgentUnifiedConfig,
         etcd: AsyncEtcd,
         kernel_registry: Mapping[KernelId, AbstractKernel],
     ) -> None:
@@ -106,12 +113,12 @@ class MetadataServer(aobject):
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
-    async def __ainit__(self):
-        local_config = self.app["_root.context"].local_config
+    async def __ainit__(self) -> None:
+        local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
-        self.app["docker-mode"] = local_config["agent"]["docker-mode"]
+        self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
-        metadata_plugin = ContainerMetadataPlugin({}, local_config)
+        metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
         self._init_subapp(
@@ -159,7 +166,7 @@ class MetadataServer(aobject):
         pkg_name: str,
         root_app: web.Application,
         subapp: web.Application,
-        global_middlewares: Iterable[WebMiddleware],
+        global_middlewares: Sequence[Middleware],
         route_structure: Mapping[str, Any],
         is_extension: bool = True,
     ) -> None:
@@ -182,31 +189,31 @@ class MetadataServer(aobject):
         root_app.middlewares.extend(global_middlewares)
         self.loaded_apps.append(prefix)
 
-    async def load_metadata_plugins(self):
+    async def load_metadata_plugins(self) -> None:
         root_ctx = self.app["_root.context"]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
         root_ctx.metadata_plugin_ctx = plugin_ctx
-        log.debug("Available plugins: {}", plugin_ctx.plugins)
+        log.debug("Available metadata plugins: {}", plugin_ctx.plugins)
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             log.info("Loading metadata plugin: {0}", plugin_name)
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()
             self._init_subapp(plugin_name, self.app, subapp, global_middlewares, route_structure)
 
-    async def start_server(self):
+    async def start_server(self) -> None:
         await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
-        local_config = self.app["_root.context"].local_config
+        local_config: AgentUnifiedConfig = self.app["_root.context"].local_config
         site = web.TCPSite(
             metadata_server_runner,
-            local_config["agent"]["metadata-server-bind-host"],
-            local_config["agent"]["metadata-server-port"],
+            local_config.agent.metadata_server_bind_host,
+            local_config.agent.metadata_server_port,
         )
         self.runner = metadata_server_runner
         await site.start()
 
-    async def cleanup(self):
+    async def cleanup(self) -> None:
         plugin_context = self.app["_root.context"].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()

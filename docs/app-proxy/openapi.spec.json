@@ -1,0 +1,2032 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Backend.AI Proxy Coordinator API",
+    "description": "Backend.AI Proxy Coordinator REST API specification",
+    "version": "25.18.0",
+    "contact": {
+      "name": "Lablup Inc.",
+      "url": "https://docs.backend.ai",
+      "email": "contect@lablup.com"
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "X-BackendAI-Token": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "BulkRemoveCircuitsRequestModel": {
+        "properties": {
+          "circuit_ids": {
+            "description": "Comma separated list of Circuit UUIDs.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Circuit Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "circuit_ids"
+        ],
+        "title": "BulkRemoveCircuitsRequestModel",
+        "type": "object"
+      },
+      "StubResponseModel": {
+        "properties": {
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "StubResponseModel",
+        "type": "object"
+      },
+      "AppMode": {
+        "enum": [
+          "interactive",
+          "inference"
+        ],
+        "title": "AppMode",
+        "type": "string"
+      },
+      "FrontendMode": {
+        "enum": [
+          "wildcard",
+          "port"
+        ],
+        "title": "FrontendMode",
+        "type": "string"
+      },
+      "ProxyProtocol": {
+        "enum": [
+          "http",
+          "grpc",
+          "h2",
+          "tcp"
+        ],
+        "title": "ProxyProtocol",
+        "type": "string"
+      },
+      "RouteInfo": {
+        "properties": {
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Name"
+          },
+          "kernel_host": {
+            "title": "Kernel Host",
+            "type": "string"
+          },
+          "kernel_port": {
+            "title": "Kernel Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ProxyProtocol"
+          },
+          "traffic_ratio": {
+            "default": 1.0,
+            "title": "Traffic Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "kernel_host",
+          "kernel_port",
+          "protocol"
+        ],
+        "title": "RouteInfo",
+        "type": "object"
+      },
+      "SerializableCircuit": {
+        "description": "Serializable representation of `ai.backend.appproxy.coordinator.models.Circuit`",
+        "properties": {
+          "id": {
+            "description": "ID of circuit.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "app": {
+            "description": "Name of the Backend.AI Kernel app circuit is hosting. Can be a blank string if circuit is referencing an inference app.",
+            "title": "App",
+            "type": "string"
+          },
+          "protocol": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProxyProtocol"
+              }
+            ],
+            "description": "Protocol of the Backend.AI Kernel app."
+          },
+          "worker": {
+            "description": "ID of the worker hosting the circuit.",
+            "format": "uuid",
+            "title": "Worker",
+            "type": "string"
+          },
+          "app_mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppMode"
+              }
+            ],
+            "description": "Application operation mode."
+          },
+          "frontend_mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FrontendMode"
+              }
+            ],
+            "description": "Frontend type of worker."
+          },
+          "envs": {
+            "title": "Envs",
+            "type": "object"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
+          "open_to_public": {
+            "description": "\nShows if the circuit is open to public.\nFor interactive apps, this set as true means users without authorization cookie set will also be able to access application.\nFor inference apps it means that API will work without authorization token passed.\n",
+            "title": "Open To Public",
+            "type": "boolean"
+          },
+          "allowed_client_ips": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comma separated list of CIDRs accepted as traffic source. null means the circuit is accessible anywhere.",
+            "title": "Allowed Client Ips"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Occupied worker port. Only set if `frontend_mode` is `port`.",
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Occupied worker subdomain. Only set if `frontend_mode` is `subdomain`.",
+            "title": "Subdomain"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session owner's UUID.",
+            "title": "User Id"
+          },
+          "endpoint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model service's UUID. Only set if `app_mode` is inference.",
+            "title": "Endpoint Id"
+          },
+          "route_info": {
+            "description": "List of kernel access information.",
+            "items": {
+              "$ref": "#/components/schemas/RouteInfo"
+            },
+            "title": "Route Info",
+            "type": "array"
+          },
+          "session_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "envs",
+          "arguments",
+          "session_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SerializableCircuit",
+        "type": "object"
+      },
+      "CircuitStatisticsModel": {
+        "properties": {
+          "id": {
+            "description": "ID of circuit.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "app": {
+            "description": "Name of the Backend.AI Kernel app circuit is hosting. Can be a blank string if circuit is referencing an inference app.",
+            "title": "App",
+            "type": "string"
+          },
+          "protocol": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProxyProtocol"
+              }
+            ],
+            "description": "Protocol of the Backend.AI Kernel app."
+          },
+          "worker": {
+            "description": "ID of the worker hosting the circuit.",
+            "format": "uuid",
+            "title": "Worker",
+            "type": "string"
+          },
+          "app_mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppMode"
+              }
+            ],
+            "description": "Application operation mode."
+          },
+          "frontend_mode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FrontendMode"
+              }
+            ],
+            "description": "Frontend type of worker."
+          },
+          "envs": {
+            "title": "Envs",
+            "type": "object"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
+          "open_to_public": {
+            "description": "\nShows if the circuit is open to public.\nFor interactive apps, this set as true means users without authorization cookie set will also be able to access application.\nFor inference apps it means that API will work without authorization token passed.\n",
+            "title": "Open To Public",
+            "type": "boolean"
+          },
+          "allowed_client_ips": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comma separated list of CIDRs accepted as traffic source. null means the circuit is accessible anywhere.",
+            "title": "Allowed Client Ips"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Occupied worker port. Only set if `frontend_mode` is `port`.",
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Occupied worker subdomain. Only set if `frontend_mode` is `subdomain`.",
+            "title": "Subdomain"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session owner's UUID.",
+            "title": "User Id"
+          },
+          "endpoint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model service's UUID. Only set if `app_mode` is inference.",
+            "title": "Endpoint Id"
+          },
+          "route_info": {
+            "description": "List of kernel access information.",
+            "items": {
+              "$ref": "#/components/schemas/RouteInfo"
+            },
+            "title": "Route Info",
+            "type": "array"
+          },
+          "session_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "requests": {
+            "description": "Number of requests processed by this circuit.",
+            "title": "Requests",
+            "type": "integer"
+          },
+          "last_access": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last access timestamp.",
+            "title": "Last Access"
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Number of seconds remaining before this circuit will be discharged due to inactivity. Can be null if `app_mode` is `interactive`.",
+            "title": "Ttl"
+          }
+        },
+        "required": [
+          "envs",
+          "arguments",
+          "session_ids",
+          "created_at",
+          "updated_at",
+          "requests",
+          "last_access",
+          "ttl"
+        ],
+        "title": "CircuitStatisticsModel",
+        "type": "object"
+      },
+      "SessionConfig": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "user_uuid": {
+            "format": "uuid",
+            "title": "User Uuid",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Key"
+          },
+          "domain_name": {
+            "title": "Domain Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_uuid",
+          "group_id",
+          "domain_name"
+        ],
+        "title": "SessionConfig",
+        "type": "object"
+      },
+      "ConfRequestModel": {
+        "properties": {
+          "login_session_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Session Token"
+          },
+          "kernel_host": {
+            "title": "Kernel Host",
+            "type": "string"
+          },
+          "kernel_port": {
+            "title": "Kernel Port",
+            "type": "integer"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionConfig"
+          }
+        },
+        "required": [
+          "login_session_token",
+          "kernel_host",
+          "kernel_port",
+          "session"
+        ],
+        "title": "ConfRequestModel",
+        "type": "object"
+      },
+      "TokenResponseModel": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "TokenResponseModel",
+        "type": "object"
+      },
+      "EndpointConfig": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "existing_url": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Url"
+          }
+        },
+        "required": [
+          "id",
+          "existing_url"
+        ],
+        "title": "EndpointConfig",
+        "type": "object"
+      },
+      "EndpointTagConfig": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionConfig"
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/EndpointConfig"
+          }
+        },
+        "required": [
+          "session",
+          "endpoint"
+        ],
+        "title": "EndpointTagConfig",
+        "type": "object"
+      },
+      "InferenceAppConfig": {
+        "properties": {
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "kernel_host": {
+            "title": "Kernel Host",
+            "type": "string"
+          },
+          "kernel_port": {
+            "title": "Kernel Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProxyProtocol"
+              }
+            ],
+            "default": "http"
+          },
+          "traffic_ratio": {
+            "default": 1.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Traffic Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "kernel_host",
+          "kernel_port"
+        ],
+        "title": "InferenceAppConfig",
+        "type": "object"
+      },
+      "EndpointCreationRequestModel": {
+        "properties": {
+          "service_name": {
+            "description": "Name of the model service.",
+            "title": "Service Name",
+            "type": "string"
+          },
+          "tags": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EndpointTagConfig"
+              }
+            ],
+            "description": "Metadata of target model service and dependent sessions."
+          },
+          "apps": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/InferenceAppConfig"
+              },
+              "type": "array"
+            },
+            "description": "\nkey-value pair of available applications exposed by requested endpoint.\nKey should be name of the app, and value as list of host-port pairs app is bound to.\n",
+            "title": "Apps",
+            "type": "object"
+          },
+          "open_to_public": {
+            "default": false,
+            "description": "\nIf set to true, AppProxy will require an API token (which can be obtained from `generate_endpoint_api_token` request)\nfullfilled at request header.\n",
+            "title": "Open To Public",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Preferred port number.",
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Preferred subdomain name.",
+            "title": "Subdomain"
+          }
+        },
+        "required": [
+          "service_name",
+          "tags",
+          "apps"
+        ],
+        "title": "EndpointCreationRequestModel",
+        "type": "object"
+      },
+      "EndpointCreationResponseModel": {
+        "properties": {
+          "endpoint": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
+        "title": "EndpointCreationResponseModel",
+        "type": "object"
+      },
+      "EndpointAPITokenGenerationRequestModel": {
+        "properties": {
+          "user_uuid": {
+            "format": "uuid",
+            "title": "User Uuid",
+            "type": "string"
+          },
+          "exp": {
+            "format": "date-time",
+            "title": "Exp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_uuid",
+          "exp"
+        ],
+        "title": "EndpointAPITokenGenerationRequestModel",
+        "type": "object"
+      },
+      "EndpointAPITokenResponseModel": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "EndpointAPITokenResponseModel",
+        "type": "object"
+      },
+      "WorkerInfoModel": {
+        "properties": {
+          "authority": {
+            "title": "Authority",
+            "type": "string"
+          },
+          "available_slots": {
+            "title": "Available Slots",
+            "type": "integer"
+          },
+          "occupied_slots": {
+            "title": "Occupied Slots",
+            "type": "integer"
+          },
+          "ha_setup": {
+            "title": "Ha Setup",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authority",
+          "available_slots",
+          "occupied_slots",
+          "ha_setup"
+        ],
+        "title": "WorkerInfoModel",
+        "type": "object"
+      },
+      "StatusResponseModel": {
+        "properties": {
+          "coordinator_version": {
+            "title": "Coordinator Version",
+            "type": "string"
+          },
+          "appproxy_api_version": {
+            "const": "v2",
+            "title": "Appproxy Api Version"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerInfoModel"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "coordinator_version",
+          "appproxy_api_version",
+          "workers"
+        ],
+        "title": "StatusResponseModel",
+        "type": "object"
+      },
+      "AddRequestModel": {
+        "properties": {
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ProxyProtocol"
+          },
+          "envs": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Envs",
+            "type": "object"
+          },
+          "args": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Args"
+          },
+          "open_to_public": {
+            "default": false,
+            "title": "Open To Public",
+            "type": "boolean"
+          },
+          "allowed_client_ips": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allowed Client Ips"
+          },
+          "redirect": {
+            "default": "",
+            "title": "Redirect",
+            "type": "string"
+          },
+          "no_reuse": {
+            "default": false,
+            "title": "No Reuse",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subdomain"
+          }
+        },
+        "required": [
+          "app",
+          "protocol"
+        ],
+        "title": "AddRequestModel",
+        "type": "object"
+      },
+      "AddResponseModel": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "integer"
+          },
+          "url": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "url"
+        ],
+        "title": "AddResponseModel",
+        "type": "object"
+      },
+      "ProxyRequestModel": {
+        "properties": {
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ProxyProtocol"
+          },
+          "envs": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Envs",
+            "type": "object"
+          },
+          "args": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Args"
+          },
+          "open_to_public": {
+            "default": false,
+            "title": "Open To Public",
+            "type": "boolean"
+          },
+          "allowed_client_ips": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allowed Client Ips"
+          },
+          "redirect": {
+            "default": "",
+            "title": "Redirect",
+            "type": "string"
+          },
+          "no_reuse": {
+            "default": false,
+            "title": "No Reuse",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subdomain"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app",
+          "protocol",
+          "token",
+          "session_id"
+        ],
+        "title": "ProxyRequestModel",
+        "type": "object"
+      },
+      "ProxyResponseModel": {
+        "properties": {
+          "redirect_url": {
+            "format": "uri",
+            "minLength": 1,
+            "title": "Redirect Url",
+            "type": "string"
+          },
+          "reuse": {
+            "title": "Reuse",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "redirect_url",
+          "reuse"
+        ],
+        "title": "ProxyResponseModel",
+        "type": "object"
+      },
+      "ListSlotsRequestModel": {
+        "properties": {
+          "wsproxy_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Authority string (not UUID) of AppProxy worker. If not set, API will return slots of every workers.",
+            "title": "Wsproxy Host"
+          },
+          "in_use": {
+            "default": true,
+            "description": "If set true, only returns information of occupied slots.",
+            "title": "In Use",
+            "type": "boolean"
+          }
+        },
+        "title": "ListSlotsRequestModel",
+        "type": "object"
+      },
+      "SlotModel": {
+        "properties": {
+          "frontend_mode": {
+            "$ref": "#/components/schemas/FrontendMode"
+          },
+          "in_use": {
+            "title": "In Use",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "subdomain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subdomain"
+          },
+          "circuit_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Circuit Id"
+          }
+        },
+        "required": [
+          "frontend_mode",
+          "in_use"
+        ],
+        "title": "SlotModel",
+        "type": "object"
+      },
+      "ListSlotsResponseModel": {
+        "properties": {
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotModel"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slots"
+        ],
+        "title": "ListSlotsResponseModel",
+        "type": "object"
+      },
+      "WorkerResponseModel": {
+        "properties": {
+          "authority": {
+            "description": "authority string of worker. Unique across every workers joined on a single coordinator.",
+            "title": "Authority",
+            "type": "string"
+          },
+          "frontend_mode": {
+            "$ref": "#/components/schemas/FrontendMode"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ProxyProtocol"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "use_tls": {
+            "title": "Use Tls",
+            "type": "boolean"
+          },
+          "api_port": {
+            "title": "Api Port",
+            "type": "integer"
+          },
+          "port_range": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port Range"
+          },
+          "wildcard_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wildcard Domain"
+          },
+          "filtered_apps_only": {
+            "title": "Filtered Apps Only",
+            "type": "boolean"
+          },
+          "accepted_traffics": {
+            "items": {
+              "$ref": "#/components/schemas/AppMode"
+            },
+            "title": "Accepted Traffics",
+            "type": "array"
+          },
+          "id": {
+            "description": "ID of worker.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "available_slots": {
+            "description": "\nNumber of slots worker is capable to hold. Workers serving `subdomain` frontend have -1 as `available_circuits`.\nFor `port` frontend this value is number of ports exposed by the worker.\n",
+            "title": "Available Slots",
+            "type": "integer"
+          },
+          "occupied_slots": {
+            "description": "Number of slots occupied by circuit.",
+            "title": "Occupied Slots",
+            "type": "integer"
+          },
+          "nodes": {
+            "description": "Number of actual nodes claiming as same worker. Can be considered as HA set up if this value is greater than 1.",
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotModel"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "authority",
+          "frontend_mode",
+          "protocol",
+          "hostname",
+          "use_tls",
+          "api_port",
+          "filtered_apps_only",
+          "accepted_traffics",
+          "id",
+          "created_at",
+          "updated_at",
+          "available_slots",
+          "occupied_slots",
+          "nodes",
+          "slots"
+        ],
+        "title": "WorkerResponseModel",
+        "type": "object"
+      },
+      "WorkerListResponseModel": {
+        "properties": {
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerResponseModel"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workers"
+        ],
+        "title": "WorkerListResponseModel",
+        "type": "object"
+      },
+      "AppFilter": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "AppFilter",
+        "type": "object"
+      },
+      "WorkerRequestModel": {
+        "properties": {
+          "authority": {
+            "description": "authority string of worker. Unique across every workers joined on a single coordinator.",
+            "title": "Authority",
+            "type": "string"
+          },
+          "frontend_mode": {
+            "$ref": "#/components/schemas/FrontendMode"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ProxyProtocol"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "use_tls": {
+            "title": "Use Tls",
+            "type": "boolean"
+          },
+          "api_port": {
+            "title": "Api Port",
+            "type": "integer"
+          },
+          "port_range": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port Range"
+          },
+          "wildcard_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wildcard Domain"
+          },
+          "filtered_apps_only": {
+            "title": "Filtered Apps Only",
+            "type": "boolean"
+          },
+          "accepted_traffics": {
+            "items": {
+              "$ref": "#/components/schemas/AppMode"
+            },
+            "title": "Accepted Traffics",
+            "type": "array"
+          },
+          "app_filters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AppFilter"
+            },
+            "title": "App Filters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "authority",
+          "frontend_mode",
+          "protocol",
+          "hostname",
+          "use_tls",
+          "api_port",
+          "filtered_apps_only",
+          "accepted_traffics"
+        ],
+        "title": "WorkerRequestModel",
+        "type": "object"
+      },
+      "CircuitListResponseModel": {
+        "properties": {
+          "circuits": {
+            "items": {
+              "$ref": "#/components/schemas/SerializableCircuit"
+            },
+            "title": "Circuits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "circuits"
+        ],
+        "title": "CircuitListResponseModel",
+        "type": "object"
+      }
+    }
+  },
+  "paths": {
+    "/api/circuit/_/bulk": {
+      "delete": {
+        "operationId": "api/circuit.delete_circuit_bulk",
+        "tags": [
+          "api/circuit"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StubResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRemoveCircuitsRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nRemoves circuit record from both coordinator and worker, in bulk.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/api/circuit/{circuit_id}": {
+      "get": {
+        "operationId": "api/circuit.get_circuit",
+        "tags": [
+          "api/circuit"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SerializableCircuit"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "circuit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nReturns information of a circuit.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      },
+      "delete": {
+        "operationId": "api/circuit.delete_circuit",
+        "tags": [
+          "api/circuit"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StubResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "circuit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRemoves circuit record from both coordinator and worker.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/api/circuit/{circuit_id}/statistics": {
+      "get": {
+        "operationId": "api/circuit.get_circuit_statistics",
+        "tags": [
+          "api/circuit"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircuitStatisticsModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "circuit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nLists statical informations about given circuit.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/v2/conf": {
+      "post": {
+        "operationId": "v2/conf.conf_v2",
+        "tags": [
+          "v2/conf"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nGenerates and returns a token which will be used as an authentication credential for\n /v2/proxy/{token}/{session}/add request.\n"
+      }
+    },
+    "/v2/endpoints/{endpoint_id}": {
+      "post": {
+        "operationId": "v2/endpoints.create_or_update_endpoint",
+        "tags": [
+          "v2/endpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointCreationResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointCreationRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nCreates or updates an inference circuit.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
+      },
+      "delete": {
+        "operationId": "v2/endpoints.remove_endpoint",
+        "tags": [
+          "v2/endpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StubResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDeassociates inference circuit from system.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/v2/endpoints/{endpoint_id}/token": {
+      "post": {
+        "operationId": "v2/endpoints.generate_endpoint_api_token",
+        "tags": [
+          "v2/endpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointAPITokenResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointAPITokenGenerationRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nCreates and returns API token required for execution of model service apps hosted by AppProxy.\n This API is meant to be called from Backend.AI manager rather than model service callee itself.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health.hello",
+        "tags": [
+          "health"
+        ],
+        "responses": {},
+        "parameters": [],
+        "description": ""
+      }
+    },
+    "/health/status": {
+      "get": {
+        "operationId": "health.status",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nReturns health status of coordinator.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/v2/proxy/{token}/{session_id}/add": {
+      "get": {
+        "operationId": "v2/proxy.add",
+        "tags": [
+          "v2/proxy"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDeprecated: only for legacy applications. Just call `proxy` API directly.\nReturns URL to AppProxy's `proxy` API handler.\n"
+      }
+    },
+    "/v2/proxy/auth": {
+      "get": {
+        "operationId": "v2/proxy.proxy",
+        "tags": [
+          "v2/proxy"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyResponseModel"
+                }
+              }
+            }
+          },
+          "302": {
+            "Description": "Redirection"
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxyRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nAssigns worker to host proxy app and starts proxy process.\nWhen `Accept` HTTP header is set to `application/json` access information to worker will be handed out inside response body;\notherwise coordinator will try to automatically redirect callee via `Location: ` response header.\n"
+      }
+    },
+    "/api/slots": {
+      "get": {
+        "operationId": "api/slots.slots",
+        "tags": [
+          "api/slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSlotsResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListSlotsRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nProvides slot information hosted by worker mentioned.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/api/worker": {
+      "get": {
+        "operationId": "api/worker.list_workers",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerListResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nLists all workers recognized by coordinator.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      },
+      "put": {
+        "operationId": "api/worker.update_worker",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "deprecated": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\nRegisters worker to coordinator.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/api/worker/{worker_id}": {
+      "get": {
+        "operationId": "api/worker.get_worker",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nReturns information about worker mentioned.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      },
+      "patch": {
+        "operationId": "api/worker.heartbeat_worker",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      },
+      "delete": {
+        "operationId": "api/worker.delete_worker",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StubResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDeassociates worker from coordinator.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    },
+    "/api/worker/{worker_id}/circuits": {
+      "get": {
+        "operationId": "api/worker.list_worker_circuits",
+        "tags": [
+          "api/worker"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircuitListResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nLists every circuits worker is currently serving.\n\n\n**Preconditions:**\n* Requires Worker token present at `X-BackendAI-Token` request header to work.\n"
+      }
+    }
+  }
+}

@@ -1,9 +1,10 @@
 import logging
 import os
 import platform
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Optional
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
@@ -11,19 +12,10 @@ from aiodocker.exceptions import DockerError
 from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    AcceleratorMetadata,
-    DeviceId,
-    DeviceModelInfo,
-    DeviceName,
-    SlotName,
-    SlotTypes,
-)
-
-from .. import __version__  # pants: no-infer-dep
-from ..alloc_map import AllocationStrategy
-from ..resources import (
+from ai.backend.agent import __version__  # pants: no-infer-dep
+from ai.backend.agent.alloc_map import AllocationStrategy
+from ai.backend.agent.errors import InvalidAllocMapTypeError, InvalidOvercommitFactorError
+from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -31,15 +23,31 @@ from ..resources import (
     DiscretePropertyAllocMap,
     MountInfo,
 )
-from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+)
+from ai.backend.common.types import (
+    AcceleratorMetadata,
+    ContainerId,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    SlotName,
+    SlotTypes,
+)
+from ai.backend.logging import BraceStyleAdapter
+
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
-    short_cid = container._id[:7]
+async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
+    short_cid = ContainerId(container.id[:7])
     try:
         ret = await container.stats(stream=False)  # TODO: cache
     except RuntimeError as e:
@@ -55,12 +63,13 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         )
         return None
     else:
+        entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
         if isinstance(ret, list):
             if not ret:
                 # The API may return an empty result upon container termination.
                 return None
-            ret = ret[0]
+            entry = ret[0]
         # The API may return an invalid or empty result upon container termination.
         if ret is None or not isinstance(ret, dict):
             log.warning(
@@ -69,9 +78,9 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
                 ret,
             )
             return None
-        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
+        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
-        return ret
+        return entry
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -93,7 +102,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -108,7 +117,10 @@ class CPUPlugin(AbstractComputePlugin):
 
         nodes = (await core_api.list_node()).to_dict()["items"]
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidOvercommitFactorError(
+                f"CPU overcommit factor must be between 1 and 10, got {overcommit_factor}."
+            )
 
         return [
             CPUDevice(
@@ -118,7 +130,7 @@ class CPUPlugin(AbstractComputePlugin):
                 memory_size=0,
                 processing_units=int(node["status"]["capacity"]["cpu"]) * overcommit_factor,
             )
-            for i, node in zip(range(len(nodes)), nodes)
+            for i, node in enumerate(nodes)
             # if 'node-role.kubernetes.io/master' not in node['metadata']['labels'].keys()
         ]
 
@@ -187,7 +199,10 @@ class CPUPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidAllocMapTypeError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}."
+            )
         # Docker does not return the original cpuset.... :(
         # We need to read our own records.
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
@@ -203,7 +218,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("cpu")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -215,12 +230,12 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
@@ -253,7 +268,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -268,7 +283,10 @@ class MemoryPlugin(AbstractComputePlugin):
 
         nodes = (await core_api.list_node()).to_dict()["items"]
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
-        assert 1 <= overcommit_factor <= 10
+        if not (1 <= overcommit_factor <= 10):
+            raise InvalidOvercommitFactorError(
+                f"Memory overcommit factor must be between 1 and 10, got {overcommit_factor}."
+            )
         mem = 0
         for node in nodes:
             # if 'node-role.kubernetes.io/master' in node['metadata']['labels'].keys():
@@ -340,7 +358,10 @@ class MemoryPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        assert isinstance(alloc_map, DiscretePropertyAllocMap)
+        if not isinstance(alloc_map, DiscretePropertyAllocMap):
+            raise InvalidAllocMapTypeError(
+                f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}."
+            )
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
         alloc_map.apply_allocation({
             SlotName("mem"): {DeviceId("root"): memory_limit},
@@ -352,7 +373,7 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("mem")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -364,12 +385,12 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:

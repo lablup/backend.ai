@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Mapping, Optional, Sequence, TypeVar
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Optional, TypeVar
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ResultSet
@@ -120,7 +121,7 @@ class JsonOutputHandler(BaseOutputHandler):
         self,
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
-        page_size: int = None,
+        page_size: Optional[int] = None,
         plain=False,
     ) -> None:
         page_size = page_size or 20

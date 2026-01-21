@@ -1,6 +1,7 @@
 import warnings
+from collections.abc import Callable, Mapping
 from functools import update_wrapper
-from typing import Any, Callable, Mapping, TypeVar, cast
+from typing import Concatenate, ParamSpec, TypeVar
 
 from click import get_current_context
 
@@ -34,11 +35,12 @@ def set_client_config(info: Mapping) -> CLIContext:
     return cli_ctx
 
 
-F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
+P = ParamSpec("P")
 
 
-def pass_ctx_obj(f: F) -> F:
-    def new_func(*args, **kwargs):
+def pass_ctx_obj(f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
+    def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj
         match obj:
             case CLIContext():
@@ -49,4 +51,4 @@ def pass_ctx_obj(f: F) -> F:
                 raise RuntimeError("Invalid Context from client command")
         return inner
 
-    return update_wrapper(cast(F, new_func), f)
+    return update_wrapper(new_func, f)

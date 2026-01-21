@@ -1,7 +1,9 @@
-from typing import Any, List, Mapping
+from collections.abc import Mapping
+from typing import Any, Optional
 
-from ..request import Request
-from ..session import api_session
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+
 from .base import BaseFunction, api_function
 
 __all__ = ("SessionTemplate",)
@@ -13,9 +15,9 @@ class SessionTemplate(BaseFunction):
     async def create(
         cls,
         template: str,
-        domain_name: str = None,
-        group_name: str = None,
-        owner_access_key: str = None,
+        domain_name: Optional[str] = None,
+        group_name: Optional[str] = None,
+        owner_access_key: Optional[str] = None,
     ) -> "SessionTemplate":
         rqst = Request("POST", "/template/session")
         if domain_name is None:
@@ -37,13 +39,13 @@ class SessionTemplate(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_templates(cls, list_all: bool = False) -> List[Mapping[str, str]]:
+    async def list_templates(cls, list_all: bool = False) -> list[Mapping[str, str]]:
         rqst = Request("GET", "/template/session")
         rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
             return await resp.json()
 
-    def __init__(self, template_id: str, owner_access_key: str = None):
+    def __init__(self, template_id: str, owner_access_key: Optional[str] = None) -> None:
         self.template_id = template_id
         self.owner_access_key = owner_access_key
 
@@ -54,8 +56,7 @@ class SessionTemplate(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         rqst = Request("GET", f"/template/session/{self.template_id}", params=params)
         async with rqst.fetch() as resp:
-            data = await resp.text()
-        return data
+            return await resp.text()
 
     @api_function
     async def put(self, template: str) -> Any:

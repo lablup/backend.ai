@@ -1,10 +1,11 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
 
-from ..request import Request
-from ..session import api_session
 from .base import BaseFunction, api_function
 
 __all__ = ("Image",)
@@ -37,19 +38,69 @@ class Image(BaseFunction):
         """
         Fetches the list of registered images in this cluster.
         """
-        q = (
-            "query($is_operation: Boolean) {"
-            "  images(is_operation: $is_operation) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            query($is_operation: Boolean) {
+                images(is_operation: $is_operation) {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "is_operation": operation,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["images"]
+
+    @api_function
+    @classmethod
+    async def get(
+        cls,
+        reference: str,
+        architecture: str,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ) -> Sequence[dict]:
+        """
+        Fetches the information about registered image in this cluster.
+        """
+        q = _d("""
+            query($reference: String!, $architecture: String!) {
+                image(reference: $reference, architecture: $architecture) {
+                    $fields
+                }
+            }
+        """)
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {
+            "reference": reference,
+            "architecture": architecture,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["image"]
+
+    @api_function
+    @classmethod
+    async def get_by_id(
+        cls,
+        id: str,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ) -> Sequence[dict]:
+        """
+        Fetches the information about registered image in this cluster.
+        """
+        q = _d("""
+            query($id: String!) {
+                image(id: $id) {
+                    $fields
+                }
+            }
+        """)
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {
+            "id": id,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["image"]
 
     @api_function
     @classmethod
@@ -60,37 +111,46 @@ class Image(BaseFunction):
         """
         Fetches the list of customized images in this cluster.
         """
-        q = "query {" "  customized_images {" "    $fields" "  }" "}"
+        q = _d("""
+            query {
+                customized_images {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {})
         return data["customized_images"]
 
     @api_function
     @classmethod
-    async def rescan_images(cls, registry: str):
-        q = (
-            "mutation($registry: String) {"
-            "  rescan_images(registry:$registry) {"
-            "   ok msg task_id"
-            "  }"
-            "}"
-        )
+    async def rescan_images(cls, registry: str, project: Optional[str] = None):
+        q = _d("""
+            mutation($registry: String, $project: String) {
+                rescan_images(registry:$registry, project: $project) {
+                   ok msg task_id
+                }
+            }
+        """)
+
         variables = {
             "registry": registry,
+            "project": project,
         }
+
         data = await api_session.get().Admin._query(q, variables)
         return data["rescan_images"]
 
     @api_function
     @classmethod
     async def forget_image_by_id(cls, image_id: str):
-        q = (
-            "mutation($image_id: String!) {"
-            "  forget_image_by_id(image_id: $image_id) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($image_id: String!) {
+                forget_image_by_id(image_id: $image_id) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "image_id": image_id,
         }
@@ -99,14 +159,60 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
+    async def purge_image_by_id(
+        cls,
+        image_id: str,
+        remove_from_registry: bool = False,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ):
+        q = _d("""
+            mutation($image_id: String!, $options: PurgeImageOptions) {
+                purge_image_by_id(image_id: $image_id, options: $options) {
+                    image {
+                        $fields
+                    }
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+            "options": {
+                "remove_from_registry": remove_from_registry,
+            },
+        }
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        data = await api_session.get().Admin._query(q, variables)
+        return data["purge_image_by_id"]
+
+    @api_function
+    @classmethod
+    async def untag_image_from_registry(cls, image_id: str):
+        """
+        Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+        """
+        q = _d("""
+            mutation($image_id: String!) {
+                untag_image_from_registry(image_id: $image_id) {
+                    ok msg
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["untag_image_from_registry"]
+
+    @api_function
+    @classmethod
     async def forget_image(cls, reference: str, architecture: str):
-        q = (
-            "mutation($reference: String!, $architecture: String!) {"
-            "  forget_image(reference: $reference, architecture: $architecture) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($reference: String!, $architecture: String!) {
+                forget_image(reference: $reference, architecture: $architecture) {
+                   ok msg
+                }
+            }
+        """)
         variables = {
             "reference": reference,
             "architecture": architecture,
@@ -122,13 +228,13 @@ class Image(BaseFunction):
         target: str,
         arch: Optional[str] = None,
     ) -> dict:
-        q = (
-            "mutation($alias: String!, $target: String!) {"
-            "  alias_image(alias: $alias, target: $target) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($alias: String!, $target: String!) {
+                alias_image(alias: $alias, target: $target) {
+                   ok msg
+                }
+            }
+        """)
         variables = {
             "alias": alias,
             "target": target,
@@ -141,26 +247,15 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def dealias_image(cls, alias: str) -> dict:
-        q = "mutation($alias: String!) {  dealias_image(alias: $alias) {   ok msg  }}"
+        q = _d("""
+            mutation($alias: String!) {
+                dealias_image(alias: $alias) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "alias": alias,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["dealias_image"]
-
-    @api_function
-    @classmethod
-    async def get_image_import_form(cls) -> dict:
-        rqst = Request("GET", "/image/import")
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data
-
-    @api_function
-    @classmethod
-    async def build(cls, **kwargs) -> dict:
-        rqst = Request("POST", "/image/import")
-        rqst.set_json(kwargs)
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data

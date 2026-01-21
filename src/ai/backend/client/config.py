@@ -2,33 +2,22 @@ import enum
 import os
 import random
 import re
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Optional, TypeVar, cast
 
 import appdirs
 from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
-    "parse_api_version",
-    "get_config",
-    "set_config",
-    "APIConfig",
     "API_VERSION",
     "DEFAULT_CHUNK_SIZE",
     "MAX_INFLIGHT_CHUNKS",
+    "APIConfig",
+    "get_config",
+    "parse_api_version",
+    "set_config",
 ]
 
 
@@ -39,7 +28,7 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-API_VERSION = (8, "20240315")
+API_VERSION = (9, "20250722")
 MIN_API_VERSION = (7, "20230615")
 
 DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
@@ -49,7 +38,7 @@ local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
 local_cache_path = Path(appdirs.user_cache_dir("backend.ai", "Lablup"))
 
 
-def parse_api_version(value: str) -> Tuple[int, str]:
+def parse_api_version(value: str) -> tuple[int, str]:
     match = re.search(r"^v(?P<major>\d+)\.(?P<date>\d{8})$", value)
     if match is not None:
         return int(match.group(1)), match.group(2)
@@ -65,7 +54,7 @@ def default_clean(v: T | Any) -> T:
 
 def get_env(
     key: str,
-    default: Union[str, Mapping, Undefined] = _undefined,
+    default: str | Mapping | Undefined = _undefined,
     *,
     clean: Callable[[Any], T] = default_clean,
 ) -> T:
@@ -106,7 +95,7 @@ def bool_env(v: str) -> bool:
     raise ValueError("Unrecognized value of boolean environment variable", v)
 
 
-def _clean_urls(v: Union[URL, str]) -> List[URL]:
+def _clean_urls(v: URL | str) -> list[URL]:
     if isinstance(v, URL):
         return [v]
     urls = []
@@ -114,18 +103,18 @@ def _clean_urls(v: Union[URL, str]) -> List[URL]:
         for entry in v.split(","):
             url = URL(entry)
             if not url.is_absolute():
-                raise ValueError("URL {} is not absolute.".format(url))
+                raise ValueError(f"URL {url} is not absolute.")
             urls.append(url)
     return urls
 
 
-def _clean_tokens(v: str) -> Tuple[str, ...]:
+def _clean_tokens(v: str) -> tuple[str, ...]:
     if not v:
         return tuple()
     return tuple(v.split(","))
 
 
-def _clean_address_map(v: Union[str, Mapping]) -> Mapping:
+def _clean_address_map(v: str | Mapping) -> Mapping:
     if isinstance(v, dict):
         return v
     if not isinstance(v, str):
@@ -182,7 +171,7 @@ class APIConfig:
         <ai.backend.client.kernel.Kernel.get_or_create>` calls.
     """
 
-    DEFAULTS: Mapping[str, Union[str, Mapping]] = {
+    DEFAULTS: Mapping[str, str | Mapping] = {
         "endpoint": "https://api.cloud.backend.ai",
         "endpoint_type": "api",
         "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",
@@ -198,7 +187,7 @@ class APIConfig:
     except the access and secret keys.
     """
 
-    _endpoints: List[URL]
+    _endpoints: list[URL]
     _group: str
     _hash_type: str
     _skip_sslcert_validation: bool
@@ -207,21 +196,21 @@ class APIConfig:
     def __init__(
         self,
         *,
-        endpoint: Union[URL, str] = None,
-        endpoint_type: str = None,
-        domain: str = None,
-        group: str = None,
-        storage_proxy_address_map: Mapping[str, str] = None,
-        version: str = None,
-        user_agent: str = None,
-        access_key: str = None,
-        secret_key: str = None,
-        hash_type: str = None,
-        vfolder_mounts: Iterable[str] = None,
-        skip_sslcert_validation: bool = None,
-        connection_timeout: float = None,
-        read_timeout: float = None,
-        announcement_handler: Callable[[str], None] = None,
+        endpoint: Optional[URL | str] = None,
+        endpoint_type: Optional[str] = None,
+        domain: Optional[str] = None,
+        group: Optional[str] = None,
+        storage_proxy_address_map: Optional[Mapping[str, str]] = None,
+        version: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        hash_type: Optional[str] = None,
+        vfolder_mounts: Optional[Iterable[str]] = None,
+        skip_sslcert_validation: Optional[bool] = None,
+        connection_timeout: Optional[float] = None,
+        read_timeout: Optional[float] = None,
+        announcement_handler: Optional[Callable[[str], None]] = None,
     ) -> None:
         from . import get_user_agent
 
@@ -254,6 +243,8 @@ class APIConfig:
         )
         self._version = version if version is not None else default_clean(self.DEFAULTS["version"])
         self._user_agent = user_agent if user_agent is not None else get_user_agent()
+        # Note: Running a web server with session BACKEND_ENDPOINT_TYPE is not an intended scenario;
+        # The normal scenario is to run with "api" as the endpoint type.
         if self._endpoint_type == "api":
             self._access_key = access_key if access_key is not None else get_env("ACCESS_KEY", "")
             self._secret_key = secret_key if secret_key is not None else get_env("SECRET_KEY", "")
@@ -333,7 +324,7 @@ class APIConfig:
     @property
     def storage_proxy_address_map(self) -> Mapping[str, str]:
         """The storage proxy address map for overriding."""
-        return self.storage_proxy_address_map
+        return self._storage_proxy_address_map
 
     @property
     def user_agent(self) -> str:

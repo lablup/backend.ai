@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import ast
 import collections
 import configparser
 import itertools
 import logging
 import os
+import sys
+import zipfile
+from collections.abc import Iterable, Iterator
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Optional
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 def scan_entrypoints(
@@ -19,9 +24,10 @@ def scan_entrypoints(
     if blocklist is None:
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
+
+    prepare_wheelhouse()
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
-        scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
@@ -62,6 +68,8 @@ def match_plugin_list(entry_path: str, plugin_list: set[str]) -> bool:
 
 
 def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoint]:
+    log.debug("scan_entrypoint_from_package_metadata(%r)", group_name)
+
     yield from entry_points().select(group=group_name)
 
 
@@ -70,27 +78,82 @@ _default_glob_excluded_patterns = [
     "ai/backend/web/static",
     "ai/backend/runner",
     "ai/backend/kernel",
+    "wheelhouse",
+    "tools",
 ]
 
+_optimized_glob_search_patterns = {
+    # These patterns only apply to scanning BUILD files in dev setups and pex distributions.
+    # They do not affect standard package entrypoint searches.
+    # NOTE: most entrypoint declaration in BUILD files are in the package's top-level only!
+    "backendai_cli_v10": ["ai/backend/*", "ai/backend/appproxy/*"],
+    "backendai_network_manager_v1": ["ai/backend/*"],
+    "backendai_event_dispatcher_v20": ["ai/backend/*", "ai/backend/appproxy/*"],
+    "backendai_stats_monitor_v20": ["ai/backend/*", "ai/backend/appproxy/*"],
+    "backendai_error_monitor_v20": ["ai/backend/*", "ai/backend/appproxy/*"],
+    "backendai_hook_v20": ["ai/backend/*"],
+    "backendai_webapp_v20": ["ai/backend/*"],
+    "backendai_scheduler_v10": ["ai/backend/manager"],
+    "backendai_agentselector_v10": ["ai/backend/manager"],
+}
 
-def _glob(base_path: Path, filename: str, excluded_patterns: Iterable[str]) -> Iterator[Path]:
-    q: collections.deque[Path] = collections.deque()
-    q.append(base_path)
+
+def _glob(
+    base_path: Path,
+    filename: str,
+    excluded_patterns: Iterable[str],
+    match_patterns: Iterable[str] | None = None,
+) -> Iterator[Path]:
+    q: collections.deque[tuple[Path, bool]] = collections.deque()
+    assert base_path.is_dir()
+    q.append((base_path, False))
     while q:
-        search_path = q.pop()
-        assert search_path.is_dir()
+        search_path, suffix_match = q.pop()
+
+        # Check if current directory matches any pattern and we should yield files from it
+        current_matches = False
+        if match_patterns is not None:
+            current_matches = any(search_path.match(pattern) for pattern in match_patterns)
+
         for item in search_path.iterdir():
             if item.is_dir():
-                if search_path.name == "__pycache__":
+                if item.name == "__pycache__":
                     continue
-                if search_path.name.startswith("."):
+                if item.name.startswith("."):
                     continue
-                if any(search_path.match(pattern) for pattern in excluded_patterns):
+                if any(item.match(pattern) for pattern in excluded_patterns):
                     continue
-                q.append(item)
+
+                # Determine if we should queue this directory
+                should_queue = False
+                new_suffix_match = False
+
+                if match_patterns is None:
+                    # No patterns specified - queue all non-excluded directories
+                    should_queue = True
+                    new_suffix_match = False
+                elif not suffix_match:
+                    # Haven't found a matching directory yet - check if this one matches
+                    if any(item.match(pattern) for pattern in match_patterns):
+                        should_queue = True
+                        new_suffix_match = True
+                    else:
+                        # Keep searching - queue without suffix match
+                        should_queue = True
+                        new_suffix_match = False
+                else:
+                    # Already found a matching directory - only queue if this also matches
+                    if any(item.match(pattern) for pattern in match_patterns):
+                        should_queue = True
+                        new_suffix_match = True
+
+                if should_queue:
+                    q.append((item, new_suffix_match))
             else:
                 if item.name == filename:
-                    yield item
+                    # Yield file if no patterns or current directory matches
+                    if match_patterns is None or current_matches:
+                        yield item
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
@@ -100,20 +163,36 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     log.debug(
         "scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path
     )
-    for buildscript_path in _glob(ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns):
+    match_patterns = _optimized_glob_search_patterns.get(group_name)
+    # First, it is invoked in PEX or temporary test environment generated by Pantsbuild.
+    # In the test environment, BUILD files are NOT copied, so the plugin discovery will rely on the
+    # followed build-root search below.
+    for buildscript_path in _glob(
+        ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns, match_patterns
+    ):
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
-    # Override with the entrypoints found in the current source directories,
-    try:
-        build_root = find_build_root()
-    except ValueError:
-        pass
+    if os.environ.get("SCIE", None) is None:
+        # Override with the entrypoints found in the current build-root directory.
+        try:
+            build_root = find_build_root()
+        except ValueError:
+            pass
+        else:
+            src_path = build_root / "src"
+            log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
+            for buildscript_path in _glob(
+                src_path, "BUILD", _default_glob_excluded_patterns, match_patterns
+            ):
+                for entrypoint in extract_entrypoints_from_buildscript(
+                    group_name, buildscript_path
+                ):
+                    entrypoints[entrypoint.name] = entrypoint
     else:
-        src_path = build_root / "src"
-        log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
-        for buildscript_path in _glob(src_path, "BUILD", _default_glob_excluded_patterns):
-            for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
-                entrypoints[entrypoint.name] = entrypoint
+        log.debug(
+            "scan_entrypoint_from_buildscript(%r): skipping 'src' when executed inside the SCIE environment",
+            group_name,
+        )
     yield from entrypoints.values()
 
 
@@ -141,6 +220,20 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
                     entrypoints[entrypoint.name] = entrypoint
         # TODO: implement pyproject.toml scanner
     yield from entrypoints.values()
+
+
+def prepare_wheelhouse(base_dir: Path | None = None) -> None:
+    if base_dir is None:
+        base_dir = Path.cwd()
+    for whl_path in (base_dir / "wheelhouse").glob("*.whl"):
+        extracted_path = whl_path.with_suffix("")  # strip the extension
+        log.debug("prepare_wheelhouse(): loading %s", whl_path)
+        if not extracted_path.exists():
+            with zipfile.ZipFile(whl_path, "r") as z:
+                z.extractall(extracted_path)
+        decoded_path = os.fsdecode(extracted_path)
+        if decoded_path not in sys.path:
+            sys.path.append(decoded_path)
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:

@@ -2,68 +2,59 @@ from __future__ import annotations
 
 import logging
 from pprint import pformat, pprint
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import sqlalchemy as sa
-from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
 
-from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
-from ai.backend.common.docker import ImageRef, validate_image_labels
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import ImageAlias, ImageID
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import rescan_images as rescan_images_func
+from ai.backend.manager.models.utils import connect_database
 
-from ..models.image import ImageAliasRow, ImageRow
-from ..models.image import rescan_images as rescan_images_func
-from ..models.utils import connect_database
-from .context import CLIContext, etcd_ctx, redis_ctx
+from .context import CLIContext, redis_ctx
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def list_images(cli_ctx, short, installed_only):
+async def list_images(cli_ctx: CLIContext, short, installed_only):
     # Connect to postgreSQL DB
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
-        displayed_items = []
+        displayed_items: list[tuple[Any, ...]] = []
         try:
+            # Idea: Add `--include-deleted` option to include deleted images?
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
+                image_ids = [ImageID(item.id) for item in items]
+                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(image_ids)
+                installed_items: list[ImageRow] = []
 
-                async def _build_scard_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
-                    for item in items:
-                        await pipe.scard(item.name)
-                    return pipe
+                for item, installed_count in zip(items, installed_counts, strict=True):
+                    if installed_count > 0:
+                        installed_items.append(item)
 
-                installed_counts = await redis_helper.execute(
-                    redis_conn_set.image, _build_scard_pipeline
+                installed_image_ids: list[ImageID] = [ImageID(item.id) for item in installed_items]
+                agents_per_installed_items = await redis_conn_set.image.get_agents_for_images(
+                    installed_image_ids
                 )
-                installed_items = []
 
-                async def _build_smembers_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
-                    for item, installed_count in zip(items, installed_counts):
-                        if installed_count > 0:
-                            installed_items.append(item)
-                            await pipe.smembers(item.name)
-                    return pipe
-
-                agents_per_installed_items = await redis_helper.execute(
-                    redis_conn_set.image,
-                    _build_smembers_pipeline,
-                )
-                for item, installed_agents in zip(installed_items, agents_per_installed_items):
-                    formatted_installed_agents = " ".join(
-                        map(lambda s: s.decode(), installed_agents)
-                    )
+                for item, installed_agents in zip(
+                    installed_items, agents_per_installed_items.values(), strict=True
+                ):
+                    formatted_installed_agents = " ".join(str(installed_agents))
                     if short:
                         displayed_items.append((
                             item.image_ref.canonical,
@@ -80,111 +71,147 @@ async def list_images(cli_ctx, short, installed_only):
                         pprint(item)
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
-async def inspect_image(cli_ctx, canonical_or_alias, architecture):
+async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             pprint(await image_row.inspect())
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def forget_image(cli_ctx, canonical_or_alias, architecture):
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
-            await session.delete(image_row)
+            await image_row.mark_as_deleted(session)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
+
+
+async def purge_image(
+    cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
+):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    async with (
+        connect_database(bootstrap_config.db) as db,
+        db.begin_session() as session,
+    ):
+        try:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
+                ],
+                filter_by_statuses=None,
+            )
+            await session.delete(image_row)
+
+            if remove_from_registry:
+                await image_row.untag_image_from_registry(db=db, session=session)
+
+        except UnknownImageReference:
+            log.exception("Image not found.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def set_image_resource_limit(
-    cli_ctx,
+    cli_ctx: CLIContext,
     canonical_or_alias,
     slot_type,
     range_value,
     architecture,
 ):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             await image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
-async def rescan_images(cli_ctx: CLIContext, registry_or_image: str, local: bool) -> None:
-    if not registry_or_image and not local:
+async def rescan_images(
+    cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None
+) -> None:
+    if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
-        etcd_ctx(cli_ctx) as etcd,
+        connect_database(bootstrap_config.db) as db,
     ):
         try:
-            await rescan_images_func(etcd, db, registry_or_image, local=local)
-        except Exception:
-            log.exception("An error occurred.")
+            result = await rescan_images_func(db, registry_or_image, project)
+            for error in result.errors:
+                log.error(f"Failed to scan registries: {error}")
+        except Exception as e:
+            log.exception(f"Unknown error occurred. Error: {e}")
 
 
-async def alias(cli_ctx, alias, target, architecture):
+async def alias(cli_ctx: CLIContext, alias, target, architecture):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(target, ["*"], architecture),
+                    ImageIdentifier(target, architecture),
                 ],
             )
             await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
-async def dealias(cli_ctx, alias):
+async def dealias(cli_ctx: CLIContext, alias):
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         alias_row = await session.scalar(
@@ -196,9 +223,10 @@ async def dealias(cli_ctx, alias):
         await session.delete(alias_row)
 
 
-async def validate_image_alias(cli_ctx, alias: str) -> None:
+async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -206,40 +234,51 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             for key, value in validate_image_labels(image_row.labels).items():
                 print(f"{key:<40}: ", end="")
                 if isinstance(value, list):
-                    value = f'[{", ".join(value)}]'
+                    value = f"[{', '.join(value)}]"
                 print(value)
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
+
+
+def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+    if architecture is not None:
+        return architecture
+    if current:
+        return CURRENT_ARCH
+
+    raise ValueError("Unreachable code!")
 
 
 async def validate_image_canonical(
-    cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.local_config) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
             if current or architecture is not None:
-                if current:
-                    architecture = architecture or CURRENT_ARCH
-                image_row = await session.scalar(
-                    sa.select(ImageRow).where(
-                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
-                    )
+                resolved_arch = _resolve_architecture(current, architecture)
+                image_row = await ImageRow.resolve(
+                    session, [ImageIdentifier(canonical, resolved_arch)]
                 )
-                if image_row is None:
-                    raise UnknownImageReference(f"{canonical}/{architecture}")
+
+                print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
-                        value = f'{", ".join(value)}'
+                        value = f"{', '.join(value)}"
                     print(value)
             else:
-                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                rows = await session.scalars(
+                    sa.select(ImageRow).where(
+                        sa.and_(ImageRow.name == canonical, ImageRow.status == ImageStatus.ALIVE)
+                    )
+                )
                 image_rows = rows.fetchall()
                 if not image_rows:
                     raise UnknownImageReference(f"{canonical}")
@@ -250,10 +289,10 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):
-                            value = f'{", ".join(value)}'
+                            value = f"{', '.join(value)}"
                         print(value)
 
         except UnknownImageReference as e:
             log.error(f"{e}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")

@@ -7,7 +7,8 @@ Create Date: 2022-12-05 16:12:53.275671
 """
 
 from collections import defaultdict
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -15,8 +16,9 @@ from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
 
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 from ai.backend.manager.models.session import SessionDependencyRow
 
@@ -523,7 +525,7 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
 
     # Kernel table
@@ -546,7 +548,7 @@ def downgrade():
         type_="foreignkey",
     )
 
-    class SessionRow(Base):
+    class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
         id = sa.Column(
             "id",
