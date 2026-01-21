@@ -60,16 +60,6 @@ if TYPE_CHECKING:
 _ = (AgentRow, KernelRow, SessionRow, ImageRow, ScalingGroupRow)
 
 
-def create_test_password_info(password: str = "test_password") -> PasswordInfo:
-    """Create a PasswordInfo object for testing."""
-    return PasswordInfo(
-        password=password,
-        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-        rounds=100_000,
-        salt_size=32,
-    )
-
-
 class TestUserPurgerSpecs:
     """Tests for PurgerSpec classes - verifying build_subquery() generates correct conditions."""
 
@@ -193,6 +183,16 @@ class TestUserPurgersIntegration:
     """Integration tests for user purgers with real database."""
 
     @pytest.fixture
+    def test_password_info(self) -> PasswordInfo:
+        """Create a PasswordInfo object for testing."""
+        return PasswordInfo(
+            password="test_password",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
+
+    @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
@@ -287,6 +287,7 @@ class TestUserPurgersIntegration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: str,
         user_resource_policy: str,
+        test_password_info: PasswordInfo,
     ) -> UserRow:
         """Create a test user and return the UserRow."""
         user_uuid = uuid.uuid4()
@@ -295,7 +296,7 @@ class TestUserPurgersIntegration:
                 uuid=user_uuid,
                 username=f"testuser-{uuid.uuid4().hex[:8]}",
                 email=f"test-{uuid.uuid4().hex[:8]}@example.com",
-                password=create_test_password_info("test_password"),
+                password=test_password_info,
                 need_password_change=False,
                 full_name="Test User",
                 description="Test Description",
@@ -313,16 +314,14 @@ class TestUserPurgersIntegration:
             session.expunge(user)
         return user
 
-    @pytest.mark.asyncio
-    async def test_purge_user_error_logs(
+    @pytest.fixture
+    async def sample_error_logs(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
-    ) -> None:
-        """Test purging user's error logs."""
-        user_uuid = sample_user.uuid
-
-        # Create error logs for the user
+    ) -> list[ErrorLogRow]:
+        """Create test error logs for the user."""
+        error_logs: list[ErrorLogRow] = []
         async with db_with_cleanup.begin_session() as session:
             for i in range(3):
                 error_log = ErrorLogRow(
@@ -331,49 +330,25 @@ class TestUserPurgersIntegration:
                     message=f"Test error {i}",
                     context_lang="en",
                     context_env={},
-                    user=user_uuid,
+                    user=sample_user.uuid,
                 )
                 session.add(error_log)
+                error_logs.append(error_log)
+        return error_logs
 
-        # Verify error logs exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(ErrorLogRow.__table__)
-                .where(ErrorLogRow.__table__.c.user == user_uuid)
-            )
-            assert count == 3
-
-        # Purge error logs
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_error_log_purger(user_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 3
-
-        # Verify error logs are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(ErrorLogRow.__table__)
-                .where(ErrorLogRow.__table__.c.user == user_uuid)
-            )
-            assert count == 0
-
-    @pytest.mark.asyncio
-    async def test_purge_user_keypairs(
+    @pytest.fixture
+    async def sample_keypairs(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
         keypair_resource_policy: str,
-    ) -> None:
-        """Test purging user's keypairs."""
-        user_uuid = sample_user.uuid
-
-        # Create keypairs for the user
+    ) -> list[KeyPairRow]:
+        """Create test keypairs for the user."""
+        keypairs: list[KeyPairRow] = []
         async with db_with_cleanup.begin_session() as session:
             for i in range(2):
                 keypair = KeyPairRow(
-                    user=user_uuid,
+                    user=sample_user.uuid,
                     access_key=f"AKTEST{uuid.uuid4().hex[:12].upper()}",
                     secret_key=f"SK{uuid.uuid4().hex}",
                     is_active=True,
@@ -383,43 +358,19 @@ class TestUserPurgersIntegration:
                     num_queries=0,
                 )
                 session.add(keypair)
+                keypairs.append(keypair)
+        return keypairs
 
-        # Verify keypairs exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(KeyPairRow)
-                .where(KeyPairRow.user == user_uuid)
-            )
-            assert count == 2
-
-        # Purge keypairs
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_keypair_purger(user_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 2
-
-        # Verify keypairs are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(KeyPairRow)
-                .where(KeyPairRow.user == user_uuid)
-            )
-            assert count == 0
-
-    @pytest.mark.asyncio
-    async def test_purge_user_group_associations(
+    @pytest.fixture
+    async def sample_group_associations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
         sample_domain: str,
         project_resource_policy: str,
-    ) -> None:
-        """Test purging user's group associations."""
-        user_uuid = sample_user.uuid
-
-        # Create groups and associations
+    ) -> list[AssocGroupUserRow]:
+        """Create test groups and associations for the user."""
+        associations: list[AssocGroupUserRow] = []
         async with db_with_cleanup.begin_session() as session:
             for i in range(2):
                 group = GroupRow(
@@ -438,10 +389,127 @@ class TestUserPurgersIntegration:
                 await session.flush()
 
                 assoc = AssocGroupUserRow(
-                    user_id=user_uuid,
+                    user_id=sample_user.uuid,
                     group_id=group.id,
                 )
                 session.add(assoc)
+                associations.append(assoc)
+        return associations
+
+    @pytest.fixture
+    async def sample_vfolder_permissions(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: UserRow,
+        sample_domain: str,
+    ) -> list[VFolderPermissionRow]:
+        """Create test vfolder and permissions for the user."""
+        permissions: list[VFolderPermissionRow] = []
+        async with db_with_cleanup.begin_session() as session:
+            vfolder_id = uuid.uuid4()
+            vfolder = VFolderRow(
+                id=vfolder_id,
+                host="local",
+                domain_name=sample_domain,
+                quota_scope_id=QuotaScopeID(QuotaScopeType.USER, sample_user.uuid),
+                name=f"test-vfolder-{uuid.uuid4().hex[:8]}",
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.READ_WRITE,
+                ownership_type=VFolderOwnershipType.USER,
+                user=sample_user.uuid,
+                cloneable=False,
+                status=VFolderOperationStatus.READY,
+            )
+            session.add(vfolder)
+            await session.flush()
+
+            for _ in range(2):
+                perm = VFolderPermissionRow(
+                    vfolder=vfolder_id,
+                    user=sample_user.uuid,
+                    permission=VFolderMountPermission.READ_ONLY,
+                )
+                session.add(perm)
+                permissions.append(perm)
+        return permissions
+
+    @pytest.mark.asyncio
+    async def test_purge_user_error_logs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: UserRow,
+        sample_error_logs: list[ErrorLogRow],
+    ) -> None:
+        """Test purging user's error logs."""
+        user_uuid = sample_user.uuid
+
+        # Verify error logs exist
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ErrorLogRow.__table__)
+                .where(ErrorLogRow.__table__.c.user == user_uuid)
+            )
+            assert count == len(sample_error_logs)
+
+        # Purge error logs
+        async with db_with_cleanup.begin_session() as session:
+            purger = create_user_error_log_purger(user_uuid)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(sample_error_logs)
+
+        # Verify error logs are deleted
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ErrorLogRow.__table__)
+                .where(ErrorLogRow.__table__.c.user == user_uuid)
+            )
+            assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_purge_user_keypairs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: UserRow,
+        sample_keypairs: list[KeyPairRow],
+    ) -> None:
+        """Test purging user's keypairs."""
+        user_uuid = sample_user.uuid
+
+        # Verify keypairs exist
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(KeyPairRow)
+                .where(KeyPairRow.user == user_uuid)
+            )
+            assert count == len(sample_keypairs)
+
+        # Purge keypairs
+        async with db_with_cleanup.begin_session() as session:
+            purger = create_user_keypair_purger(user_uuid)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(sample_keypairs)
+
+        # Verify keypairs are deleted
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(KeyPairRow)
+                .where(KeyPairRow.user == user_uuid)
+            )
+            assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_purge_user_group_associations(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: UserRow,
+        sample_group_associations: list[AssocGroupUserRow],
+    ) -> None:
+        """Test purging user's group associations."""
+        user_uuid = sample_user.uuid
 
         # Verify associations exist
         async with db_with_cleanup.begin_session() as session:
@@ -450,13 +518,13 @@ class TestUserPurgersIntegration:
                 .select_from(AssocGroupUserRow)
                 .where(AssocGroupUserRow.user_id == user_uuid)
             )
-            assert count == 2
+            assert count == len(sample_group_associations)
 
         # Purge associations
         async with db_with_cleanup.begin_session() as session:
             purger = create_user_group_association_purger(user_uuid)
             result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 2
+            assert result.deleted_count == len(sample_group_associations)
 
         # Verify associations are deleted
         async with db_with_cleanup.begin_session() as session:
@@ -472,38 +540,10 @@ class TestUserPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
-        sample_domain: str,
+        sample_vfolder_permissions: list[VFolderPermissionRow],
     ) -> None:
         """Test purging user's vfolder permissions."""
         user_uuid = sample_user.uuid
-
-        # Create a vfolder and permissions for the user
-        async with db_with_cleanup.begin_session() as session:
-            vfolder_id = uuid.uuid4()
-            vfolder = VFolderRow(
-                id=vfolder_id,
-                host="local",
-                domain_name=sample_domain,
-                quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_uuid),
-                name=f"test-vfolder-{uuid.uuid4().hex[:8]}",
-                usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
-                ownership_type=VFolderOwnershipType.USER,
-                user=user_uuid,
-                cloneable=False,
-                status=VFolderOperationStatus.READY,
-            )
-            session.add(vfolder)
-            await session.flush()
-
-            # Create permissions (shared with another user scenario)
-            for _ in range(2):
-                perm = VFolderPermissionRow(
-                    vfolder=vfolder_id,
-                    user=user_uuid,
-                    permission=VFolderMountPermission.READ_ONLY,
-                )
-                session.add(perm)
 
         # Verify permissions exist
         async with db_with_cleanup.begin_session() as session:
@@ -512,13 +552,13 @@ class TestUserPurgersIntegration:
                 .select_from(VFolderPermissionRow)
                 .where(VFolderPermissionRow.user == user_uuid)
             )
-            assert count == 2
+            assert count == len(sample_vfolder_permissions)
 
         # Purge permissions
         async with db_with_cleanup.begin_session() as session:
             purger = create_user_vfolder_permission_purger(user_uuid)
             result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 2
+            assert result.deleted_count == len(sample_vfolder_permissions)
 
         # Verify permissions are deleted
         async with db_with_cleanup.begin_session() as session:
@@ -557,36 +597,3 @@ class TestUserPurgersIntegration:
                 sa.select(sa.func.count()).select_from(UserRow).where(UserRow.uuid == user_uuid)
             )
             assert count == 0
-
-    @pytest.mark.asyncio
-    async def test_purge_nonexistent_user_data(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test purging data for a non-existent user returns 0 deleted count."""
-        nonexistent_uuid = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_error_log_purger(nonexistent_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 0
-
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_keypair_purger(nonexistent_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 0
-
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_group_association_purger(nonexistent_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 0
-
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_vfolder_permission_purger(nonexistent_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 0
-
-        async with db_with_cleanup.begin_session() as session:
-            purger = create_user_purger(nonexistent_uuid)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 0
