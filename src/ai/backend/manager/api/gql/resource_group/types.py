@@ -1,11 +1,11 @@
-"""GraphQL types for scaling group."""
+"""GraphQL types for resource group."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 
 import strawberry
 from strawberry.relay import Node, NodeID
@@ -37,36 +37,36 @@ from ai.backend.manager.repositories.scaling_group.options import (
 __all__ = (
     "AgentSelectorConfigGQL",
     "SchedulerConfigGQL",
-    "ScalingGroupDriverConfigGQL",
-    "ScalingGroupFilterGQL",
-    "ScalingGroupMetadataGQL",
-    "ScalingGroupNetworkConfigGQL",
-    "ScalingGroupOrderByGQL",
-    "ScalingGroupOrderFieldGQL",
-    "ScalingGroupSchedulerConfigGQL",
-    "ScalingGroupSchedulerOptionsGQL",
-    "ScalingGroupSchedulerTypeGQL",
-    "ScalingGroupStatusGQL",
-    "ScalingGroupV2GQL",
+    "ResourceGroupDriverConfigGQL",
+    "ResourceGroupFilterGQL",
+    "ResourceGroupMetadataGQL",
+    "ResourceGroupNetworkConfigGQL",
+    "ResourceGroupOrderByGQL",
+    "ResourceGroupOrderFieldGQL",
+    "ResourceGroupSchedulerConfigGQL",
+    "ResourceGroupSchedulerOptionsGQL",
+    "ResourceGroupSchedulerTypeGQL",
+    "ResourceGroupStatusGQL",
+    "ResourceGroupGQL",
 )
 
 
 @strawberry.type(
-    name="ScalingGroupStatus",
-    description="Added in 25.18.0. Status information for a scaling group",
+    name="ResourceGroupStatus",
+    description="Added in 25.18.0. Status information for a resource group",
 )
-class ScalingGroupStatusGQL:
+class ResourceGroupStatusGQL:
     is_active: bool = strawberry.field(
         description=dedent_strip("""
-            Whether the scaling group can accept new session creation requests.
-            Inactive scaling groups are excluded from scheduling and cannot start new sessions.
+            Whether the resource group can accept new session creation requests.
+            Inactive resource groups are excluded from scheduling and cannot start new sessions.
         """)
     )
     is_public: bool = strawberry.field(
         description=dedent_strip("""
-            Whether this scaling group is available for regular user sessions
+            Whether this resource group is available for regular user sessions
             (interactive/batch/inference).
-            When false, the scaling group is reserved for internal SYSTEM-type sessions only,
+            When false, the resource group is reserved for internal SYSTEM-type sessions only,
             such as management or infrastructure sessions.
         """)
     )
@@ -80,15 +80,15 @@ class ScalingGroupStatusGQL:
 
 
 @strawberry.type(
-    name="ScalingGroupMetadata",
-    description="Added in 25.18.0. Metadata information for a scaling group",
+    name="ResourceGroupMetadata",
+    description="Added in 25.18.0. Metadata information for a resource group",
 )
-class ScalingGroupMetadataGQL:
+class ResourceGroupMetadataGQL:
     description: str = strawberry.field(
-        description="Human-readable description of the scaling group's purpose"
+        description="Human-readable description of the resource group's purpose"
     )
     created_at: datetime = strawberry.field(
-        description="Timestamp when the scaling group was created"
+        description="Timestamp when the resource group was created"
     )
 
     @classmethod
@@ -100,10 +100,10 @@ class ScalingGroupMetadataGQL:
 
 
 @strawberry.type(
-    name="ScalingGroupNetworkConfig",
-    description="Added in 25.18.0. Network configuration for a scaling group",
+    name="ResourceGroupNetworkConfig",
+    description="Added in 25.18.0. Network configuration for a resource group",
 )
-class ScalingGroupNetworkConfigGQL:
+class ResourceGroupNetworkConfigGQL:
     wsproxy_addr: str = strawberry.field(
         description=dedent_strip("""
             App-proxy coordinator API server address.
@@ -133,14 +133,14 @@ class ScalingGroupNetworkConfigGQL:
 
 
 @strawberry.type(
-    name="ScalingGroupDriverConfig",
+    name="ResourceGroupDriverConfig",
     description="Added in 26.1.0. Driver configuration for resource allocation",
 )
-class ScalingGroupDriverConfigGQL:
+class ResourceGroupDriverConfigGQL:
     name: str = strawberry.field(
         description=dedent_strip("""
             Agent resource driver implementation name.
-            'static' uses a predefined set of agents registered to this scaling group.
+            'static' uses a predefined set of agents registered to this resource group.
         """)
     )
     options: JSON = strawberry.field(
@@ -199,13 +199,13 @@ class AgentSelectorConfigGQL:
 
 
 @strawberry.type(
-    name="ScalingGroupSchedulerOptions",
+    name="ResourceGroupSchedulerOptions",
     description="Added in 25.18.0. Scheduler configuration options",
 )
-class ScalingGroupSchedulerOptionsGQL:
+class ResourceGroupSchedulerOptionsGQL:
     allowed_session_types: list[str] = strawberry.field(
         description=dedent_strip("""
-            Session types that can be scheduled in this scaling group.
+            Session types that can be scheduled in this resource group.
             Valid values: 'interactive' , 'batch', 'inference'.
             Requests for unlisted types are rejected.
         """)
@@ -279,7 +279,7 @@ class ScalingGroupSchedulerOptionsGQL:
 
 
 @strawberry.enum(
-    name="ScalingGroupSchedulerType",
+    name="ResourceGroupSchedulerType",
     description=dedent_strip("""
         Added in 25.18.0. Scheduler type for session scheduling.
 
@@ -288,18 +288,18 @@ class ScalingGroupSchedulerOptionsGQL:
         - DRF: Dominant Resource Fairness - Balances resource usage across users
     """),
 )
-class ScalingGroupSchedulerTypeGQL(StrEnum):
+class ResourceGroupSchedulerTypeGQL(StrEnum):
     FIFO = "fifo"
     LIFO = "lifo"
     DRF = "drf"
 
 
 @strawberry.type(
-    name="ScalingGroupSchedulerConfig",
+    name="ResourceGroupSchedulerConfig",
     description="Added in 25.18.0. Scheduler configuration for session scheduling",
 )
-class ScalingGroupSchedulerConfigGQL:
-    name: ScalingGroupSchedulerTypeGQL = strawberry.field(
+class ResourceGroupSchedulerConfigGQL:
+    name: ResourceGroupSchedulerTypeGQL = strawberry.field(
         description=dedent_strip("""
             Scheduling algorithm implementation.
             'fifo' schedules oldest pending sessions first,
@@ -307,7 +307,7 @@ class ScalingGroupSchedulerConfigGQL:
             'drf' (Dominant Resource Fairness) balances resource usage across users.
         """)
     )
-    options: ScalingGroupSchedulerOptionsGQL = strawberry.field(
+    options: ResourceGroupSchedulerOptionsGQL = strawberry.field(
         description=dedent_strip("""
             Detailed scheduler behavior configuration including session type restrictions,
             timeouts, agent selection strategy, and resource allocation policies.
@@ -317,44 +317,44 @@ class ScalingGroupSchedulerConfigGQL:
     @classmethod
     def from_dataclass(cls, data: ScalingGroupSchedulerConfig) -> Self:
         return cls(
-            name=ScalingGroupSchedulerTypeGQL(data.name),
-            options=ScalingGroupSchedulerOptionsGQL.from_dataclass(data.options),
+            name=ResourceGroupSchedulerTypeGQL(data.name),
+            options=ResourceGroupSchedulerOptionsGQL.from_dataclass(data.options),
         )
 
 
 @strawberry.type(
-    name="ScalingGroupV2",
-    description="Added in 25.18.0. Scaling group with structured configuration",
+    name="ResourceGroup",
+    description="Added in 25.18.0. Resource group with structured configuration",
 )
-class ScalingGroupV2GQL(Node):
+class ResourceGroupGQL(Node):
     id: NodeID[str] = strawberry.field(
-        description="Relay-style global node identifier for the scaling group"
+        description="Relay-style global node identifier for the resource group"
     )
     name: str = strawberry.field(
         description=dedent_strip("""
-            Unique name identifying the scaling group.
+            Unique name identifying the resource group.
             Used as primary key and referenced by agents, sessions, and resource presets.
         """)
     )
-    status: ScalingGroupStatusGQL = strawberry.field(
+    status: ResourceGroupStatusGQL = strawberry.field(
         description=dedent_strip("""
-            Operational status controlling whether this scaling group accepts new sessions
+            Operational status controlling whether this resource group accepts new sessions
             and its visibility to users without explicit access grants.
         """)
     )
-    metadata: ScalingGroupMetadataGQL = strawberry.field(
+    metadata: ResourceGroupMetadataGQL = strawberry.field(
         description=dedent_strip("""
             Administrative metadata including human-readable description
             and creation timestamp for audit and documentation purposes.
         """)
     )
-    network: ScalingGroupNetworkConfigGQL = strawberry.field(
+    network: ResourceGroupNetworkConfigGQL = strawberry.field(
         description=dedent_strip("""
             Network configuration for connecting clients to interactive session services
             (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
         """)
     )
-    scheduler: ScalingGroupSchedulerConfigGQL = strawberry.field(
+    scheduler: ResourceGroupSchedulerConfigGQL = strawberry.field(
         description=dedent_strip("""
             Session scheduling configuration controlling queue management,
             agent selection strategy, resource allocation policies,
@@ -367,18 +367,18 @@ class ScalingGroupV2GQL(Node):
         return cls(
             id=data.name,
             name=data.name,
-            status=ScalingGroupStatusGQL.from_dataclass(data.status),
-            metadata=ScalingGroupMetadataGQL.from_dataclass(data.metadata),
-            network=ScalingGroupNetworkConfigGQL.from_dataclass(data.network),
-            scheduler=ScalingGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
+            status=ResourceGroupStatusGQL.from_dataclass(data.status),
+            metadata=ResourceGroupMetadataGQL.from_dataclass(data.metadata),
+            network=ResourceGroupNetworkConfigGQL.from_dataclass(data.network),
+            scheduler=ResourceGroupSchedulerConfigGQL.from_dataclass(data.scheduler),
         )
 
 
 # Filter and OrderBy types
 
 
-@strawberry.enum(name="ScalingGroupOrderField")
-class ScalingGroupOrderFieldGQL(StrEnum):
+@strawberry.enum(name="ResourceGroupOrderField")
+class ResourceGroupOrderFieldGQL(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     IS_ACTIVE = "is_active"
@@ -386,20 +386,20 @@ class ScalingGroupOrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="ScalingGroupFilter",
-    description="Added in 25.18.0. Filter for scaling groups",
+    name="ResourceGroupFilter",
+    description="Added in 25.18.0. Filter for resource groups",
 )
-class ScalingGroupFilterGQL(GQLFilter):
-    name: Optional[StringFilter] = None
-    description: Optional[StringFilter] = None
-    is_active: Optional[bool] = None
-    is_public: Optional[bool] = None
-    scheduler: Optional[str] = None
-    use_host_network: Optional[bool] = None
+class ResourceGroupFilterGQL(GQLFilter):
+    name: StringFilter | None = None
+    description: StringFilter | None = None
+    is_active: bool | None = None
+    is_public: bool | None = None
+    scheduler: str | None = None
+    use_host_network: bool | None = None
 
-    AND: Optional[list[ScalingGroupFilterGQL]] = None
-    OR: Optional[list[ScalingGroupFilterGQL]] = None
-    NOT: Optional[list[ScalingGroupFilterGQL]] = None
+    AND: list[ResourceGroupFilterGQL] | None = None
+    OR: list[ResourceGroupFilterGQL] | None = None
+    NOT: list[ResourceGroupFilterGQL] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -476,11 +476,11 @@ class ScalingGroupFilterGQL(GQLFilter):
 
 
 @strawberry.input(
-    name="ScalingGroupOrderBy",
-    description="Added in 25.18.0. Order by specification for scaling groups",
+    name="ResourceGroupOrderBy",
+    description="Added in 25.18.0. Order by specification for resource groups",
 )
-class ScalingGroupOrderByGQL(GQLOrderBy):
-    field: ScalingGroupOrderFieldGQL
+class ResourceGroupOrderByGQL(GQLOrderBy):
+    field: ResourceGroupOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     @override
@@ -488,11 +488,11 @@ class ScalingGroupOrderByGQL(GQLOrderBy):
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case ScalingGroupOrderFieldGQL.NAME:
+            case ResourceGroupOrderFieldGQL.NAME:
                 return ScalingGroupOrders.name(ascending)
-            case ScalingGroupOrderFieldGQL.CREATED_AT:
+            case ResourceGroupOrderFieldGQL.CREATED_AT:
                 return ScalingGroupOrders.created_at(ascending)
-            case ScalingGroupOrderFieldGQL.IS_ACTIVE:
+            case ResourceGroupOrderFieldGQL.IS_ACTIVE:
                 return ScalingGroupOrders.is_active(ascending)
-            case ScalingGroupOrderFieldGQL.IS_PUBLIC:
+            case ResourceGroupOrderFieldGQL.IS_PUBLIC:
                 return ScalingGroupOrders.is_public(ascending)

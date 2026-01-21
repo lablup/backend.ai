@@ -1,5 +1,5 @@
 """
-Tests for scaling group GraphQL adapter classes.
+Tests for resource group GraphQL adapter classes.
 Tests conversion from GraphQL filter objects to repository Querier objects.
 """
 
@@ -11,10 +11,10 @@ from ai.backend.manager.api.gql.adapter import (
     PaginationSpec,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.scaling_group.types import (
-    ScalingGroupFilterGQL,
-    ScalingGroupOrderByGQL,
-    ScalingGroupOrderFieldGQL,
+from ai.backend.manager.api.gql.resource_group.types import (
+    ResourceGroupFilterGQL,
+    ResourceGroupOrderByGQL,
+    ResourceGroupOrderFieldGQL,
 )
 from ai.backend.manager.repositories.base import OffsetPagination
 from ai.backend.manager.repositories.scaling_group.options import (
@@ -24,7 +24,7 @@ from ai.backend.manager.repositories.scaling_group.options import (
 
 
 def _get_pagination_spec() -> PaginationSpec:
-    """Create pagination spec for scaling groups.
+    """Create pagination spec for resource groups.
 
     For typical "newest first" lists:
     - Forward (first/after): DESC order, shows newer items first, next page shows older items
@@ -39,7 +39,7 @@ def _get_pagination_spec() -> PaginationSpec:
 
 
 class TestBaseGQLAdapter:
-    """Test cases for BaseGQLAdapter with scaling group types"""
+    """Test cases for BaseGQLAdapter with resource group types"""
 
     def test_empty_querier(self) -> None:
         """Test building querier with no filters, orders, or pagination returns default pagination"""
@@ -58,7 +58,7 @@ class TestBaseGQLAdapter:
 
     def test_name_equals_case_sensitive(self) -> None:
         """Test name equals filter (case-sensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(equals="default"),
         )
         adapter = BaseGQLAdapter()
@@ -75,7 +75,7 @@ class TestBaseGQLAdapter:
 
     def test_name_equals_case_insensitive(self) -> None:
         """Test name equals filter (case-insensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(i_equals="default"),
         )
         adapter = BaseGQLAdapter()
@@ -91,7 +91,7 @@ class TestBaseGQLAdapter:
 
     def test_name_contains_case_sensitive(self) -> None:
         """Test name contains filter (case-sensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(contains="def"),
         )
         adapter = BaseGQLAdapter()
@@ -107,7 +107,7 @@ class TestBaseGQLAdapter:
 
     def test_name_contains_case_insensitive(self) -> None:
         """Test name contains filter (case-insensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(i_contains="def"),
         )
         adapter = BaseGQLAdapter()
@@ -123,7 +123,7 @@ class TestBaseGQLAdapter:
 
     def test_description_equals_case_sensitive(self) -> None:
         """Test description equals filter (case-sensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             description=StringFilter(equals="Test Description"),
         )
         adapter = BaseGQLAdapter()
@@ -139,7 +139,7 @@ class TestBaseGQLAdapter:
 
     def test_description_equals_case_insensitive(self) -> None:
         """Test description equals filter (case-insensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             description=StringFilter(i_equals="test description"),
         )
         adapter = BaseGQLAdapter()
@@ -155,7 +155,7 @@ class TestBaseGQLAdapter:
 
     def test_description_contains_case_sensitive(self) -> None:
         """Test description contains filter (case-sensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             description=StringFilter(contains="Test"),
         )
         adapter = BaseGQLAdapter()
@@ -171,7 +171,7 @@ class TestBaseGQLAdapter:
 
     def test_description_contains_case_insensitive(self) -> None:
         """Test description contains filter (case-insensitive)"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             description=StringFilter(i_contains="test"),
         )
         adapter = BaseGQLAdapter()
@@ -187,7 +187,7 @@ class TestBaseGQLAdapter:
 
     def test_is_active_filter_true(self) -> None:
         """Test is_active filter (True)"""
-        filter_obj = ScalingGroupFilterGQL(is_active=True)
+        filter_obj = ResourceGroupFilterGQL(is_active=True)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -201,7 +201,7 @@ class TestBaseGQLAdapter:
 
     def test_is_active_filter_false(self) -> None:
         """Test is_active filter (False)"""
-        filter_obj = ScalingGroupFilterGQL(is_active=False)
+        filter_obj = ResourceGroupFilterGQL(is_active=False)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -215,7 +215,7 @@ class TestBaseGQLAdapter:
 
     def test_is_public_filter_true(self) -> None:
         """Test is_public filter (True)"""
-        filter_obj = ScalingGroupFilterGQL(is_public=True)
+        filter_obj = ResourceGroupFilterGQL(is_public=True)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -229,7 +229,7 @@ class TestBaseGQLAdapter:
 
     def test_is_public_filter_false(self) -> None:
         """Test is_public filter (False)"""
-        filter_obj = ScalingGroupFilterGQL(is_public=False)
+        filter_obj = ResourceGroupFilterGQL(is_public=False)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -243,7 +243,7 @@ class TestBaseGQLAdapter:
 
     def test_scheduler_filter(self) -> None:
         """Test scheduler filter"""
-        filter_obj = ScalingGroupFilterGQL(scheduler="fifo")
+        filter_obj = ResourceGroupFilterGQL(scheduler="fifo")
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -257,7 +257,7 @@ class TestBaseGQLAdapter:
 
     def test_use_host_network_filter_true(self) -> None:
         """Test use_host_network filter (True)"""
-        filter_obj = ScalingGroupFilterGQL(use_host_network=True)
+        filter_obj = ResourceGroupFilterGQL(use_host_network=True)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -271,7 +271,7 @@ class TestBaseGQLAdapter:
 
     def test_use_host_network_filter_false(self) -> None:
         """Test use_host_network filter (False)"""
-        filter_obj = ScalingGroupFilterGQL(use_host_network=False)
+        filter_obj = ResourceGroupFilterGQL(use_host_network=False)
         adapter = BaseGQLAdapter()
         querier = adapter.build_querier(
             PaginationOptions(),
@@ -285,7 +285,7 @@ class TestBaseGQLAdapter:
 
     def test_multiple_filters_combined(self) -> None:
         """Test multiple filters combined"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(contains="default"),
             is_active=True,
             is_public=True,
@@ -304,11 +304,11 @@ class TestBaseGQLAdapter:
 
     def test_and_logical_operator(self) -> None:
         """Test AND logical operator"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(contains="default"),
             AND=[
-                ScalingGroupFilterGQL(is_active=True),
-                ScalingGroupFilterGQL(scheduler="fifo"),
+                ResourceGroupFilterGQL(is_active=True),
+                ResourceGroupFilterGQL(scheduler="fifo"),
             ],
         )
         adapter = BaseGQLAdapter()
@@ -325,10 +325,10 @@ class TestBaseGQLAdapter:
 
     def test_or_logical_operator(self) -> None:
         """Test OR logical operator"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             OR=[
-                ScalingGroupFilterGQL(name=StringFilter(equals="default")),
-                ScalingGroupFilterGQL(name=StringFilter(equals="custom")),
+                ResourceGroupFilterGQL(name=StringFilter(equals="default")),
+                ResourceGroupFilterGQL(name=StringFilter(equals="custom")),
             ],
         )
         adapter = BaseGQLAdapter()
@@ -345,9 +345,9 @@ class TestBaseGQLAdapter:
 
     def test_not_logical_operator(self) -> None:
         """Test NOT logical operator"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             NOT=[
-                ScalingGroupFilterGQL(is_active=False),
+                ResourceGroupFilterGQL(is_active=False),
             ],
         )
         adapter = BaseGQLAdapter()
@@ -364,17 +364,17 @@ class TestBaseGQLAdapter:
 
     def test_complex_logical_operators(self) -> None:
         """Test complex combination of AND, OR, NOT operators"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(contains="default"),
             AND=[
-                ScalingGroupFilterGQL(is_active=True),
+                ResourceGroupFilterGQL(is_active=True),
             ],
             OR=[
-                ScalingGroupFilterGQL(scheduler="fifo"),
-                ScalingGroupFilterGQL(use_host_network=True),
+                ResourceGroupFilterGQL(scheduler="fifo"),
+                ResourceGroupFilterGQL(use_host_network=True),
             ],
             NOT=[
-                ScalingGroupFilterGQL(is_public=False),
+                ResourceGroupFilterGQL(is_public=False),
             ],
         )
         adapter = BaseGQLAdapter()
@@ -392,8 +392,8 @@ class TestBaseGQLAdapter:
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.NAME,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.NAME,
                 direction=OrderDirection.ASC,
             )
         ]
@@ -410,8 +410,8 @@ class TestBaseGQLAdapter:
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.NAME,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.NAME,
                 direction=OrderDirection.DESC,
             )
         ]
@@ -428,8 +428,8 @@ class TestBaseGQLAdapter:
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.CREATED_AT,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.CREATED_AT,
                 direction=OrderDirection.ASC,
             )
         ]
@@ -446,8 +446,8 @@ class TestBaseGQLAdapter:
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.CREATED_AT,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.CREATED_AT,
                 direction=OrderDirection.DESC,
             )
         ]
@@ -464,8 +464,8 @@ class TestBaseGQLAdapter:
     def test_order_by_is_active_ascending(self) -> None:
         """Test ordering by is_active ascending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.IS_ACTIVE,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.IS_ACTIVE,
                 direction=OrderDirection.ASC,
             )
         ]
@@ -482,8 +482,8 @@ class TestBaseGQLAdapter:
     def test_order_by_is_active_descending(self) -> None:
         """Test ordering by is_active descending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.IS_ACTIVE,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.IS_ACTIVE,
                 direction=OrderDirection.DESC,
             )
         ]
@@ -500,8 +500,8 @@ class TestBaseGQLAdapter:
     def test_order_by_is_public_ascending(self) -> None:
         """Test ordering by is_public ascending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.IS_PUBLIC,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.IS_PUBLIC,
                 direction=OrderDirection.ASC,
             )
         ]
@@ -518,8 +518,8 @@ class TestBaseGQLAdapter:
     def test_order_by_is_public_descending(self) -> None:
         """Test ordering by is_public descending"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.IS_PUBLIC,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.IS_PUBLIC,
                 direction=OrderDirection.DESC,
             )
         ]
@@ -536,12 +536,12 @@ class TestBaseGQLAdapter:
     def test_multiple_order_by(self) -> None:
         """Test multiple order by fields"""
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.IS_ACTIVE,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.IS_ACTIVE,
                 direction=OrderDirection.DESC,
             ),
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.NAME,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.NAME,
                 direction=OrderDirection.ASC,
             ),
         ]
@@ -571,13 +571,13 @@ class TestBaseGQLAdapter:
 
     def test_filter_order_pagination_combined(self) -> None:
         """Test filter, order, and pagination all combined"""
-        filter_obj = ScalingGroupFilterGQL(
+        filter_obj = ResourceGroupFilterGQL(
             name=StringFilter(contains="default"),
             is_active=True,
         )
         order_by = [
-            ScalingGroupOrderByGQL(
-                field=ScalingGroupOrderFieldGQL.NAME,
+            ResourceGroupOrderByGQL(
+                field=ResourceGroupOrderFieldGQL.NAME,
                 direction=OrderDirection.ASC,
             )
         ]
