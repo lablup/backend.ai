@@ -44,21 +44,17 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelSessionStatusDataGQL` - Session status data
 - `KernelStatusDataContainerGQL` - Container for status data
 
-#### Statistics Types
-- `KernelStatEntryGQL` - Single stat entry
-- `KernelStatGQL` - Collection of stats
-
 #### Internal Data Types
 - `KernelInternalDataGQL` - Internal kernel data
 
 #### Sub-Info Types
-- `KernelSessionInfoGQL` - Session info
+- `KernelSessionInfoGQL` - Session info (session_id deferred)
 - `KernelClusterInfoGQL` - Cluster config
-- `KernelUserPermissionInfoGQL` - User/permission info (partial - see deferred)
+- `KernelUserPermissionInfoGQL` - Unix process permissions only (most fields deferred)
 - `KernelDeviceModelInfoGQL` - Device model info
 - `KernelAttachedDeviceEntryGQL` - Device entry
 - `KernelAttachedDevicesGQL` - Attached devices collection
-- `KernelResourceInfoGQL` - Resource allocation
+- `KernelResourceInfoGQL` - Resource allocation (scaling_group deferred, agent included)
 - `KernelRuntimeInfoGQL` - Runtime config (partial - see deferred)
 - `KernelNetworkInfoGQL` - Network config
 - `KernelLifecycleInfoGQL` - Lifecycle info (partial - see skipped)
@@ -77,7 +73,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `ResourceOptsEntryGQL`, `ResourceOptsGQL` - Resource options
 - `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options input
 - `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports
-- `MetricStatGQL`, `MetricValueGQL` - Metric types
 - `DotfileInfoGQL`, `SSHKeypairGQL` - Internal data types
 
 ### Types to Skip (Do Not Implement)
@@ -95,7 +90,11 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 |------------|-------------|--------|
 | `KernelImageInfoGQL` | `ImageNode` | Do not include |
 | `KernelUserPermissionInfoGQL.user_uuid` | `UserNode` | Omit field |
+| `KernelUserPermissionInfoGQL.access_key` | `KeypairNode` | Omit field |
+| `KernelUserPermissionInfoGQL.domain_name` | `DomainNode` | Omit field |
 | `KernelUserPermissionInfoGQL.group_id` | `GroupNode` | Omit field |
+| `KernelSessionInfoGQL.session_id` | `SessionNode` | Omit field |
+| `KernelResourceInfoGQL.scaling_group` | `ScalingGroupNode` | Omit field |
 | `KernelRuntimeInfoGQL.vfolder_mounts` | `VFolderNode` | Omit field |
 
 ## Implementation Checklist
@@ -104,7 +103,12 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 
 - [ ] Implement all types listed in "Types to Include"
 - [ ] Skip all types listed in "Types to Skip"
-- [ ] Omit fields listed in "Types to Defer"
+- [ ] Omit fields listed in "Types to Defer":
+  - `KernelImageInfoGQL` entire type
+  - `KernelUserPermissionInfoGQL`: keep only `uid`, `main_gid`, `gids`
+  - `KernelSessionInfoGQL`: omit `session_id`
+  - `KernelResourceInfoGQL`: omit `scaling_group`, add `agent: AgentNode`
+  - `KernelRuntimeInfoGQL`: omit `vfolder_mounts`
 - [ ] Update `KernelLifecycleInfoGQL` to remove `status_history` field
 - [ ] Update `KernelStatusDataContainerGQL` to remove `scheduler` field
 - [ ] Update `from_kernel_info()` method to match new type structure
@@ -112,8 +116,12 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 ### Future PRs
 
 - [ ] ImageNode PR: Add `image` connection
-- [ ] UserNode PR: Add `owner` connection  
+- [ ] UserNode PR: Add `owner` connection
+- [ ] KeypairNode PR: Add `keypair` connection
+- [ ] DomainNode PR: Add `domain` connection
 - [ ] GroupNode PR: Add `project` connection
+- [ ] SessionNode PR: Add `session` connection
+- [ ] ScalingGroupNode PR: Add `scaling_group` connection
 - [ ] VFolderNode PR: Add `mounted_vfolders` connection
 
 ## References

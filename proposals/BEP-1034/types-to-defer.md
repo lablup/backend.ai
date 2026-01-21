@@ -1,6 +1,6 @@
 # KernelV2 GQL - Types to Defer
 
-These types reference entities (Image, User, Group, VFolder) that should be represented as proper Relay Node connections. Since the corresponding Node types are not yet implemented, these fields/types should be **omitted** and added later.
+These types reference entities that should be represented as proper Relay Node connections. Since the corresponding Node types are not yet implemented, these fields/types should be **omitted** and added later.
 
 ---
 
@@ -11,7 +11,11 @@ These types reference entities (Image, User, Group, VFolder) that should be repr
 | `KernelImageInfoGQL` | `ImageNode` | Do not include entire type |
 | `KernelV2GQL.image` | `ImageNode` | Omit field |
 | `KernelUserPermissionInfoGQL.user_uuid` | `UserNode` | Omit field |
+| `KernelUserPermissionInfoGQL.access_key` | `KeypairNode` | Omit field |
+| `KernelUserPermissionInfoGQL.domain_name` | `DomainNode` | Omit field |
 | `KernelUserPermissionInfoGQL.group_id` | `GroupNode` | Omit field |
+| `KernelSessionInfoGQL.session_id` | `SessionNode` | Omit field |
+| `KernelResourceInfoGQL.scaling_group` | `ScalingGroupNode` | Omit field |
 | `VFolderMountGQL` | `VFolderNode` | Do not include |
 | `KernelRuntimeInfoGQL.vfolder_mounts` | `VFolderNode` | Omit field |
 
@@ -29,19 +33,57 @@ These types reference entities (Image, User, Group, VFolder) that should be repr
 
 ---
 
-## User Types (Defer to UserNode)
+## User/Auth Types (Defer to Node connections)
 
-### KernelUserPermissionInfoGQL.user_uuid
+### KernelUserPermissionInfoGQL
 
-**Action**: Omit `user_uuid` field. Keep other fields (`access_key`, `domain_name`, `uid`, `main_gid`, `gids`).
+This type needs significant modification. Most fields should be deferred:
+
+| Field | Future Node | Keep? |
+|-------|-------------|-------|
+| `user_uuid` | `UserNode` | No |
+| `access_key` | `KeypairNode` | No |
+| `domain_name` | `DomainNode` | No |
+| `group_id` | `GroupNode` | No |
+| `uid` | - | Yes (Unix UID, primitive) |
+| `main_gid` | - | Yes (Unix GID, primitive) |
+| `gids` | - | Yes (Unix GIDs, primitive) |
+
+**Action**: Only keep `uid`, `main_gid`, `gids` fields (Unix process permissions). All entity references should be Node connections.
+
+**Resulting type**:
+```python
+@strawberry.type(name="KernelUserPermissionInfo")
+class KernelUserPermissionInfoGQL:
+    uid: int | None
+    main_gid: int | None
+    gids: list[int] | None
+```
 
 ---
 
-## Group Types (Defer to GroupNode)
+## Session Types (Defer to SessionNode)
 
-### KernelUserPermissionInfoGQL.group_id
+### KernelSessionInfoGQL.session_id
 
-**Action**: Omit `group_id` field.
+**Action**: Omit `session_id` field. The session should be accessed via `SessionNode` connection.
+
+**Resulting type**:
+```python
+@strawberry.type(name="KernelSessionInfo")
+class KernelSessionInfoGQL:
+    creation_id: str | None
+    name: str | None
+    session_type: SessionTypesGQL
+```
+
+---
+
+## Resource Types (Defer to Node connections)
+
+### KernelResourceInfoGQL.scaling_group
+
+**Action**: Omit `scaling_group` field. Will be replaced by `ScalingGroupNode` connection.
 
 ---
 
@@ -59,9 +101,13 @@ These types reference entities (Image, User, Group, VFolder) that should be repr
 
 ## Future Implementation PRs
 
-| PR | Action |
-|----|--------|
-| ImageNode PR | Add `image` connection to `KernelV2GQL` |
-| UserNode PR | Add `owner` connection to `KernelV2GQL` |
-| GroupNode PR | Add `project` connection to `KernelV2GQL` |
-| VFolderNode PR | Add `mounted_vfolders` connection to `KernelV2GQL` |
+| PR | Fields to Add |
+|----|---------------|
+| ImageNode PR | `KernelV2GQL.image` |
+| UserNode PR | `KernelV2GQL.owner` (replaces `user_uuid`) |
+| KeypairNode PR | `KernelV2GQL.keypair` (replaces `access_key`) |
+| DomainNode PR | `KernelV2GQL.domain` (replaces `domain_name`) |
+| GroupNode PR | `KernelV2GQL.project` (replaces `group_id`) |
+| SessionNode PR | `KernelV2GQL.session` (replaces `session_id`) |
+| ScalingGroupNode PR | `KernelV2GQL.scaling_group` |
+| VFolderNode PR | `KernelV2GQL.mounted_vfolders` |

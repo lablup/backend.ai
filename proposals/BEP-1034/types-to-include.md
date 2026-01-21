@@ -216,88 +216,6 @@ class KernelStatusDataContainerGQL:
 
 ---
 
-## Statistics Types
-
-### KernelStatEntryGQL
-
-```python
-@strawberry.type(
-    name="KernelStatEntry",
-    description=(
-        "Added in 26.1.0. A single kernel statistic entry with metric key and value. "
-        "Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx."
-    ),
-)
-class KernelStatEntryGQL:
-    key: str = strawberry.field(
-        description="Metric key name (e.g., 'cpu_util', 'mem', 'io_read')."
-    )
-    value: MetricValueGQL = strawberry.field(description="The metric measurement value.")
-```
-
-### KernelStatGQL
-
-```python
-@strawberry.type(
-    name="KernelStat",
-    description=(
-        "Added in 26.1.0. Collection of kernel resource statistics. "
-        "Contains utilization metrics for CPU, memory, I/O, network, and accelerators."
-    ),
-)
-class KernelStatGQL:
-    entries: list[KernelStatEntryGQL] = strawberry.field(
-        description="List of metric entries for this kernel."
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatGQL:
-        entries = []
-        for key, metric_value in data.items():
-            if not isinstance(metric_value, dict):
-                raise InvalidKernelData(
-                    f"Invalid metric value type for key '{key}': "
-                    f"expected dict, got {type(metric_value).__name__}"
-                )
-            stats = None
-            stat_keys = ["min", "max", "sum", "avg", "diff", "rate"]
-            stat_data = {}
-            for stat_key in stat_keys:
-                prefixed_key = f"stats.{stat_key}"
-                if prefixed_key in metric_value:
-                    stat_data[stat_key] = metric_value[prefixed_key]
-                elif stat_key in metric_value:
-                    stat_data[stat_key] = metric_value[stat_key]
-
-            if stat_data:
-                stats = MetricStatGQL(
-                    min=stat_data.get("min"),
-                    max=stat_data.get("max"),
-                    sum=stat_data.get("sum"),
-                    avg=stat_data.get("avg"),
-                    diff=stat_data.get("diff"),
-                    rate=stat_data.get("rate"),
-                )
-
-            entries.append(
-                KernelStatEntryGQL(
-                    key=key,
-                    value=MetricValueGQL(
-                        current=str(metric_value["current"]),
-                        capacity=str(metric_value["capacity"])
-                        if metric_value.get("capacity") is not None
-                        else None,
-                        pct=str(metric_value["pct"])
-                        if metric_value.get("pct") is not None
-                        else None,
-                        unit_hint=metric_value.get("unit_hint"),
-                        stats=stats,
-                    ),
-                )
-            )
-        return cls(entries=entries)
-```
-
 ---
 
 ## Internal Data Types
@@ -399,15 +317,15 @@ class KernelInternalDataGQL:
 
 ### KernelSessionInfoGQL
 
+> **Note**: `session_id` is **omitted** as it should be a SessionNode connection (see types-to-defer.md)
+
 ```python
 @strawberry.type(
     name="KernelSessionInfo",
     description="Added in 26.1.0. Information about the session this kernel belongs to.",
 )
 class KernelSessionInfoGQL:
-    session_id: UUID = strawberry.field(
-        description="The unique identifier of the session this kernel belongs to."
-    )
+    # session_id field OMITTED - will be SessionNode connection
     creation_id: str | None = strawberry.field(
         description="The creation ID used when creating the session."
     )
@@ -445,22 +363,18 @@ class KernelClusterInfoGQL:
 
 ### KernelUserPermissionInfoGQL
 
-> **Note**: `user_uuid` and `group_id` fields are **omitted** (see types-to-defer.md)
+> **Note**: Most fields are **omitted** as they should be Node connections (see types-to-defer.md)
 
 ```python
 @strawberry.type(
     name="KernelUserPermissionInfo",
-    description="Added in 26.1.0. User permission and ownership information for a kernel.",
+    description="Added in 26.1.0. Unix process permission information for a kernel.",
 )
 class KernelUserPermissionInfoGQL:
     # user_uuid field OMITTED - will be UserNode connection
+    # access_key field OMITTED - will be KeypairNode connection
+    # domain_name field OMITTED - will be DomainNode connection
     # group_id field OMITTED - will be GroupNode connection
-    access_key: str = strawberry.field(
-        description="The access key used to create this kernel."
-    )
-    domain_name: str = strawberry.field(
-        description="The domain this kernel belongs to."
-    )
     uid: int | None = strawberry.field(
         description="The Unix user ID for the kernel's container process."
     )
@@ -562,28 +476,30 @@ class KernelAttachedDevicesGQL:
 
 ### KernelResourceInfoGQL
 
+> **Note**: `scaling_group` is **omitted** as it should be a Node connection (see types-to-defer.md)
+
+> **Field Renames**:
+> - `occupied_slots` → `used`
+> - `requested_slots` → `requested`
+> - `agent_id`, `agent_addr` → `agent: AgentNode` (V2 type exists)
+
 ```python
 @strawberry.type(
     name="KernelResourceInfo",
     description="Added in 26.1.0. Resource allocation information for a kernel.",
 )
 class KernelResourceInfoGQL:
-    scaling_group: str | None = strawberry.field(
-        description="The scaling group this kernel is assigned to."
-    )
-    agent_id: str | None = strawberry.field(
-        description="The ID of the agent running this kernel. Null if not yet assigned or hidden."
-    )
-    agent_addr: str | None = strawberry.field(
-        description="The network address of the agent. Null if not yet assigned or hidden."
+    # scaling_group field OMITTED - will be ScalingGroupNode connection
+    agent: AgentNode | None = strawberry.field(
+        description="The agent running this kernel. Null if not yet assigned."
     )
     container_id: str | None = strawberry.field(
         description="The container ID on the agent. Null if container not yet created or hidden."
     )
-    occupied_slots: ResourceSlotGQL = strawberry.field(
-        description="The resource slots currently occupied by this kernel."
+    used: ResourceSlotGQL = strawberry.field(
+        description="The resource slots currently used by this kernel."
     )
-    requested_slots: ResourceSlotGQL = strawberry.field(
+    requested: ResourceSlotGQL = strawberry.field(
         description="The resource slots originally requested for this kernel."
     )
     occupied_shares: ResourceSlotGQL = strawberry.field(
@@ -685,6 +601,8 @@ class KernelLifecycleInfoGQL:
 
 ### KernelMetricsInfoGQL
 
+> **Note**: `last_stat` field is **removed**.
+
 ```python
 @strawberry.type(
     name="KernelMetricsInfo",
@@ -694,9 +612,7 @@ class KernelMetricsInfoGQL:
     num_queries: int = strawberry.field(
         description="The number of queries/executions performed by this kernel."
     )
-    last_stat: KernelStatGQL | None = strawberry.field(
-        description="The last collected statistics for this kernel."
-    )
+    # last_stat field REMOVED
 ```
 
 ### KernelMetadataInfoGQL
@@ -895,27 +811,6 @@ class ServicePortEntryGQL:
 @strawberry.type(name="ServicePorts")
 class ServicePortsGQL:
     entries: list[ServicePortEntryGQL]
-```
-
-### MetricValueGQL
-
-```python
-@strawberry.type(name="MetricStat")
-class MetricStatGQL:
-    min: str | None
-    max: str | None
-    sum: str | None
-    avg: str | None
-    diff: str | None
-    rate: str | None
-
-@strawberry.type(name="MetricValue")
-class MetricValueGQL:
-    current: str
-    capacity: str | None
-    pct: str | None
-    unit_hint: str | None
-    stats: MetricStatGQL | None
 ```
 
 ### DotfileInfoGQL & SSHKeypairGQL
