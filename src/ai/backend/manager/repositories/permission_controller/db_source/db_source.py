@@ -87,15 +87,12 @@ class PermissionDBSource:
         Returns:
             Created role row
         """
-        # TODO: Object permissions require permission_group_id which is not yet
-        # supported in ObjectPermissionCreateInputBeforeRoleCreation.
-        # This feature needs to be redesigned to associate object permissions
-        # with specific permission groups during role creation.
-        if input_data.object_permissions:
-            raise NotImplementedError(
-                "Creating object permissions during role creation is not yet supported. "
-                "Object permissions must be added after role and permission groups are created."
-            )
+        # TODO: Object permissions require a permission group for the scope they reference.
+        # When creating object permissions during role creation, the corresponding permission group
+        # for each object permission's scope MUST be included in `permission_groups`.
+        # This acts as a "guest permission group" providing scope visibility (see BEP-1012-main.md).
+        # Currently, ObjectPermissionCreateInputBeforeRoleCreation does not include scope_id,
+        # so the caller must ensure the correct permission group is provided in `permission_groups`.
 
         async with self._db.begin_session() as db_session:
             # 1. Create role
