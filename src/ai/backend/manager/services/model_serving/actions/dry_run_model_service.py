@@ -14,9 +14,9 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class DryRunModelServiceAction(ModelServiceAction):
     service_name: str
     replicas: int
-    image: str
+    image: str | None
     runtime_variant: RuntimeVariant
-    architecture: str
+    architecture: str | None
     group_name: str
     domain_name: str
     cluster_size: int

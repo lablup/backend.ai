@@ -12,11 +12,20 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
+from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import (
+    ExecutionSpec,
+    ImageIdentifier,
+    ModelRevisionSpec,
+    MountMetadata,
+    ResourceSpec,
+)
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
@@ -30,6 +39,80 @@ from ai.backend.manager.services.model_serving.services.model_serving import Mod
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
+
+
+@pytest.fixture
+def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
+    mock = mocker.patch.object(
+        mock_repositories.repository,
+        "get_vfolder_by_id",
+        new_callable=AsyncMock,
+    )
+    mock.return_value = MagicMock(
+        id=uuid.uuid4(),
+        ownership_type=VFolderOwnershipType.USER,
+    )
+    return mock
+
+
+@pytest.fixture
+def mock_revision_generator_dry_run(mock_revision_generator_registry: MagicMock) -> MagicMock:
+    """Mock RevisionGenerator.generate_revision for dry_run tests."""
+    mock_generator = MagicMock()
+    mock_generator.generate_revision = AsyncMock(
+        return_value=ModelRevisionSpec(
+            image_identifier=ImageIdentifier(
+                canonical="ai.backend/python:3.9",
+                architecture="x86_64",
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=uuid.UUID("77777777-7777-7777-7777-777777777777"),
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command=None,
+                environ={},
+            ),
+        )
+    )
+    mock_revision_generator_registry.get.return_value = mock_generator
+    return mock_generator
+
+
+@pytest.fixture
+def mock_get_user_with_keypair(mocker, mock_repositories):
+    return mocker.patch.object(
+        mock_repositories.repository,
+        "get_user_with_keypair",
+        new_callable=AsyncMock,
+    )
+
+
+@pytest.fixture
+def mock_resolve_image_for_endpoint_creation_dry_run(mocker, mock_repositories):
+    mock = mocker.patch.object(
+        mock_repositories.repository,
+        "resolve_image_for_endpoint_creation",
+        new_callable=AsyncMock,
+    )
+    mock.return_value = MagicMock(image_ref="test-image:latest")
+    return mock
+
+
+@pytest.fixture
+def mock_background_task_manager_start(mocker, mock_background_task_manager):
+    return mocker.patch.object(
+        mock_background_task_manager,
+        "start",
+        new_callable=AsyncMock,
+    )
 
 
 class TestDryRunModelService:
@@ -134,6 +217,7 @@ class TestDryRunModelService:
             repository=mock_repositories.repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            revision_generator_registry=mock_repositories.revision_generator_registry,
         )
 
     @pytest.fixture
@@ -243,11 +327,12 @@ class TestDryRunModelService:
         self,
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id_dry_run,
-        mock_get_user_with_keypair,
-        mock_resolve_image_for_endpoint_creation_dry_run,
-        mock_background_task_manager_start,
-    ):
+        mock_get_vfolder_by_id_dry_run: MagicMock,
+        mock_revision_generator_dry_run: MagicMock,
+        mock_get_user_with_keypair: AsyncMock,
+        mock_resolve_image_for_endpoint_creation_dry_run: MagicMock,
+        mock_background_task_manager_start: AsyncMock,
+    ) -> None:
         mock_get_user_with_keypair.return_value = MagicMock(
             uuid=scenario.input.model_service_prepare_ctx.owner_uuid,
             role=scenario.input.model_service_prepare_ctx.owner_role,
