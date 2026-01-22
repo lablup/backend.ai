@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
@@ -144,6 +145,7 @@ class SessionProvisioner:
         self,
         scaling_group: str,
         scheduling_data: SchedulingData,
+        provision_time: datetime,
     ) -> ScheduleResult:
         """
         Schedule sessions for a specific scaling group.
@@ -244,6 +246,7 @@ class SessionProvisioner:
                     session_id=session_workload.session_id,
                     passed_phases=passed,
                     failed_phases=failed,
+                    last_try=provision_time,
                     msg=str(e),
                 )
                 scheduling_failures.append(failure)
