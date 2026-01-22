@@ -91,28 +91,104 @@ Each storage destination has different quota mechanisms:
 | StorageNamespace | `StorageNamespaceRow.max_size` (NEW) | Aggregated from `artifact_revisions` via association table | [storage_namespace.md](BEP-1036/storage_namespace.md) |
 | VFolder | `max_quota_scope_size` from resource policy | Storage proxy API | [vfolder_storage.md](BEP-1036/vfolder_storage.md) |
 
-### Import Flow Integration
+### Import Flow with Quota Check
 
-The quota check is integrated into the import flow before any file transfer begins:
-
-```python
-async def import_revision(self, action: ImportArtifactRevisionAction) -> ...:
-    revision_data = await self._artifact_repository.get_artifact_revision_by_id(...)
-
-    # Determine storage destination and check quota
-    if action.vfolder_id:
-        destination = VFolderDestination(...)
-    else:
-        destination = StorageNamespaceDestination(namespace_id=namespace_id)
-
-    if revision_data.size:
-        await self._quota_service.check_quota(destination, revision_data.size)
-
-    # Proceed with import only if quota check passes
-    ...
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         import_revision(action)                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. Get revision_data (includes size)                                        │
+│                                                                              │
+│  2. Determine storage destination                                            │
+│     ┌─────────────────────────────┬────────────────────────────────────┐    │
+│     │    vfolder_id provided?     │                                    │    │
+│     └──────────┬──────────────────┴────────────────────┬───────────────┘    │
+│                │ YES                                   │ NO                  │
+│                ▼                                       ▼                     │
+│     ┌─────────────────────────┐          ┌─────────────────────────────┐    │
+│     │  VFolderDestination     │          │  StorageNamespaceDestination│    │
+│     │  - vfolder_id           │          │  - namespace_id             │    │
+│     │  - quota_scope_id       │          │                             │    │
+│     └───────────┬─────────────┘          └───────────────┬─────────────┘    │
+│                 │                                         │                  │
+│                 └──────────────┬──────────────────────────┘                  │
+│                                ▼                                             │
+│  3. ┌──────────────────────────────────────────────────────────────────┐    │
+│     │            ArtifactStorageQuotaService.check_quota()             │    │
+│     └──────────────────────────────────────────────────────────────────┘    │
+│                                │                                             │
+│                 ┌──────────────┴──────────────┐                              │
+│                 ▼                              ▼                             │
+│     ┌─────────────────────────┐    ┌─────────────────────────────────┐      │
+│     │ _check_vfolder_quota()  │    │ _check_storage_namespace_quota()│      │
+│     └───────────┬─────────────┘    └───────────────┬─────────────────┘      │
+│                 │                                   │                        │
+│                 └──────────────┬────────────────────┘                        │
+│                                ▼                                             │
+│                 ┌──────────────────────────────┐                             │
+│                 │     Quota Exceeded?          │                             │
+│                 └──────────────┬───────────────┘                             │
+│                    YES │              │ NO                                   │
+│                        ▼              ▼                                      │
+│     ┌─────────────────────────┐    ┌─────────────────────────────────┐      │
+│     │ Raise appropriate error │    │ 4. Proceed with import          │      │
+│     │ - VFolderQuotaExceeded  │    │    - Call storage proxy         │      │
+│     │ - StorageNamespace      │    │    - Update status              │      │
+│     │   QuotaExceeded         │    │    - Associate with storage     │      │
+│     └─────────────────────────┘    └─────────────────────────────────┘      │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-See [quota-flow.md](BEP-1036/quota-flow.md) for the complete flow diagram.
+### Data Sources for Quota Check
+
+**StorageNamespace**: Usage is aggregated from artifact revisions linked via association table.
+
+```
+┌─────────────────────┐     ┌─────────────────────────────────┐
+│ storage_namespace   │     │ association_artifacts_storages  │
+├─────────────────────┤     ├─────────────────────────────────┤
+│ id                  │◄────│ storage_namespace_id            │
+│ max_size (NEW)      │     │ artifact_revision_id ───────────┼──┐
+└─────────────────────┘     └─────────────────────────────────┘  │
+                                                                  │
+                            ┌─────────────────────────────────┐  │
+                            │ artifact_revisions              │  │
+                            ├─────────────────────────────────┤  │
+                            │ id ◄────────────────────────────┼──┘
+                            │ size                            │
+                            └─────────────────────────────────┘
+```
+
+**VFolder**: Usage is queried from storage proxy, limit comes from resource policies.
+
+```
+┌─────────────────────┐     ┌─────────────────────────────────┐
+│ vfolders            │     │ user_resource_policies /        │
+├─────────────────────┤     │ project_resource_policies       │
+│ id                  │     ├─────────────────────────────────┤
+│ quota_scope_id ─────┼────►│ max_quota_scope_size            │
+└─────────────────────┘     └─────────────────────────────────┘
+         │
+         │ VFolderID
+         ▼
+┌─────────────────────┐
+│ Storage Proxy       │
+├─────────────────────┤
+│ get_quota_scope_    │
+│ usage(quota_scope)  │──► Current usage in bytes
+└─────────────────────┘
+```
+
+### Quota Check Comparison
+
+| Aspect | StorageNamespace | VFolder |
+|--------|------------------|---------|
+| Limit Source | `storage_namespace.max_size` | `resource_policy.max_quota_scope_size` |
+| Usage Source | DB aggregation via association table | Storage proxy API |
+| Unlimited Value | `NULL` | `-1` |
+| Scope | Per namespace | Per quota scope (user/project) |
 
 ### Error Types
 
@@ -203,6 +279,3 @@ When storage usage approaches the configured limit, the system could notify admi
 ## References
 
 - [BEP-1019: MinIO Artifact Registry Storage](BEP-1019-minio-artifact-registry-storage.md)
-- [StorageNamespace Quota Details](BEP-1036/storage_namespace.md)
-- [VFolder Storage Quota Details](BEP-1036/vfolder_storage.md)
-- [Quota Flow Diagram](BEP-1036/quota-flow.md)
