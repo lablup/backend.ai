@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     ResourceSlot,
+    VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
@@ -1702,13 +1703,90 @@ class TestGroupRowVFolderHostPermissionMap:
 
     async def test_group_data_allowed_vfolder_hosts_is_vfolder_host_permission_map(
         self,
+        test_domain: str,
+        project_resource_policy: str,
+    ) -> None:
+        """Test that GroupRow.to_data() properly converts allowed_vfolder_hosts to enums.
+
+        This tests the create path (not DB read path) where allowed_vfolder_hosts
+        is passed as string lists. GroupRow.to_data() should convert strings to
+        VFolderHostPermission enums. If not converted, to_json() will fail with
+        "'str' object has no attribute 'value'".
+
+        Note: DB read path is already handled by VFolderHostPermissionColumn.process_result_value()
+        which returns sets of enums. This test verifies the create path works correctly.
+        """
+        # Create GroupRow directly without DB (simulates create path)
+        group_row = GroupRow(
+            id=uuid.uuid4(),
+            name="test-group",
+            description="Test group",
+            is_active=True,
+            domain_name=test_domain,
+            total_resource_slots={},
+            # String lists as passed from GroupCreatorSpec
+            allowed_vfolder_hosts={
+                "local": ["create-vfolder", "mount-in-session"],
+            },
+            integration_id=None,
+            resource_policy=project_resource_policy,
+            type=ProjectType.GENERAL,
+        )
+
+        group_data = group_row.to_data()
+        assert isinstance(group_data.allowed_vfolder_hosts, VFolderHostPermissionMap)
+
+        # Verify values are VFolderHostPermission enums, not strings
+        for host, perms in group_data.allowed_vfolder_hosts.items():
+            for perm in perms:
+                assert isinstance(perm, VFolderHostPermission), (
+                    f"allowed_vfolder_hosts['{host}'] contains {type(perm).__name__} "
+                    f"instead of VFolderHostPermission enum"
+                )
+
+    async def test_group_data_allowed_vfolder_hosts_values_are_sets(
+        self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_group: uuid.UUID,
     ) -> None:
-        """Test that GroupData.allowed_vfolder_hosts is VFolderHostPermissionMap type."""
+        """Test that GroupData.allowed_vfolder_hosts values are sets of VFolderHostPermission.
+
+        VFolderHostPermissionColumn.process_result_value() returns sets, so the values
+        in allowed_vfolder_hosts should be sets, not lists.
+        """
         async with db_with_cleanup.begin_session() as session:
             group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
             assert group_row is not None
 
             group_data = group_row.to_data()
-            assert isinstance(group_data.allowed_vfolder_hosts, VFolderHostPermissionMap)
+
+            # Values should be sets (from VFolderHostPermissionColumn)
+            for host, perms in group_data.allowed_vfolder_hosts.items():
+                assert isinstance(perms, set), (
+                    f"allowed_vfolder_hosts['{host}'] should be a set, got {type(perms).__name__}"
+                )
+
+    async def test_group_data_allowed_vfolder_hosts_to_json_is_serializable(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupData.allowed_vfolder_hosts.to_json() returns JSON-serializable data.
+
+        Since allowed_vfolder_hosts values are sets (not JSON serializable),
+        calling .to_json() should convert them to lists for proper serialization.
+        """
+        import json
+
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+
+            group_data = group_row.to_data()
+            json_data = group_data.allowed_vfolder_hosts.to_json()
+
+            # Should be JSON serializable without error
+            try:
+                json.dumps(json_data)
+            except TypeError as e:
+                pytest.fail(f"to_json() result is not JSON serializable: {e}")

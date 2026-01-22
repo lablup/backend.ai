@@ -22,7 +22,7 @@ from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -154,7 +154,7 @@ class GroupNode(graphene.ObjectType):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            allowed_vfolder_hosts=VFolderHostPermissionMap(row.allowed_vfolder_hosts).to_json(),
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,

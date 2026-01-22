@@ -262,7 +262,7 @@ class GroupRow(Base):
             integration_id=self.integration_id,
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=VFolderHostPermissionMap(self.allowed_vfolder_hosts),
+            allowed_vfolder_hosts=VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts),
             dotfiles=self.dotfiles,
             resource_policy=self.resource_policy,
             type=self.type,
