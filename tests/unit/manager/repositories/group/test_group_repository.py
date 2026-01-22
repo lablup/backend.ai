@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
@@ -1699,7 +1700,7 @@ class TestGroupRowVFolderHostPermissionMap:
         async with db_with_cleanup.begin_session() as session:
             group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
             assert group_row is not None
-            assert isinstance(group_row.allowed_vfolder_hosts, dict)
+            assert isinstance(group_row.allowed_vfolder_hosts, VFolderHostPermissionMap)
 
     async def test_group_data_allowed_vfolder_hosts_is_vfolder_host_permission_map(
         self,
@@ -1776,7 +1777,6 @@ class TestGroupRowVFolderHostPermissionMap:
         Since allowed_vfolder_hosts values are sets (not JSON serializable),
         calling .to_json() should convert them to lists for proper serialization.
         """
-        import json
 
         async with db_with_cleanup.begin_session() as session:
             group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))

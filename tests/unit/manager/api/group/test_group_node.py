@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import graphene
 import pytest
 from aiohttp import web
+from aiohttp.test_utils import TestClient
 
 from ai.backend.common.types import (
     ResourceSlot,
@@ -22,10 +22,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.group.actions.create_group import CreateGroupActionResult
-
-if TYPE_CHECKING:
-    from aiohttp.test_utils import TestClient
 
 
 class TestCreateGroupMutation:
@@ -70,7 +68,6 @@ class TestCreateGroupMutation:
     @pytest.fixture
     def mock_graph_ctx(self, group_data_response: GroupData) -> MagicMock:
         """GraphQueryContext mock with processors and user context."""
-        from ai.backend.manager.models.user import UserRole
 
         ctx = MagicMock()
         ctx.processors.group.create_group.wait_for_complete = AsyncMock(
@@ -254,7 +251,6 @@ class TestGroupNodeQuery:
 
         return await aiohttp_client(app)
 
-    @pytest.mark.asyncio
     async def test_group_node_response_is_json_serializable(
         self,
         graphql_client: TestClient,
