@@ -574,7 +574,7 @@ class GroupInput(graphene.InputObjectType):
         allowed_vfolder_hosts_val = (
             None
             if self.allowed_vfolder_hosts is Undefined
-            else VFolderHostPermissionMap(self.allowed_vfolder_hosts)
+            else VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts)
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
