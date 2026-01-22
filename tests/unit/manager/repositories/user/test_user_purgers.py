@@ -20,21 +20,21 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.image import ImageRow  # noqa: F401
+from ai.backend.manager.models.kernel import KernelRow  # noqa: F401
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow  # noqa: F401
+from ai.backend.manager.models.session import SessionRow  # noqa: F401
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
@@ -54,10 +54,6 @@ from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
-# Force mapper initialization by importing Row classes with relationships
-# This ensures all related mappers are initialized before tests run
-_ = (AgentRow, KernelRow, SessionRow, ImageRow, ScalingGroupRow)
 
 
 class TestUserPurgerSpecs:
