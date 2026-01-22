@@ -5,12 +5,14 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.registry_quota.actions.base import RegistryQuotaAction
+from ai.backend.manager.services.project_registry_quota.actions.base import (
+    ProjectRegistryQuotaAction,
+)
 
 
 @dataclass
-class DeleteRegistryQuotaAction(RegistryQuotaAction):
-    """Action to delete a registry quota for a project."""
+class ReadProjectRegistryQuotaAction(ProjectRegistryQuotaAction):
+    """Action to read a registry quota for a project."""
 
     project_id: UUID
 
@@ -21,14 +23,15 @@ class DeleteRegistryQuotaAction(RegistryQuotaAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "delete_registry_quota"
+        return "read_project_registry_quota"
 
 
 @dataclass
-class DeleteRegistryQuotaActionResult(BaseActionResult):
-    """Result of deleting a registry quota."""
+class ReadProjectRegistryQuotaActionResult(BaseActionResult):
+    """Result of reading a registry quota."""
 
     project_id: UUID
+    quota: int
 
     @override
     def entity_id(self) -> str | None:

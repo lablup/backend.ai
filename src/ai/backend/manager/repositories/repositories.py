@@ -32,11 +32,11 @@ from ai.backend.manager.repositories.object_storage.repositories import ObjectSt
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
+from ai.backend.manager.repositories.project_registry_quota.repositories import (
+    ProjectRegistryQuotaRepositories,
+)
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
-)
-from ai.backend.manager.repositories.registry_quota.repositories import (
-    RegistryQuotaRepositories,
 )
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
@@ -83,7 +83,7 @@ class Repositories:
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
-    registry_quota: RegistryQuotaRepositories
+    project_registry_quota: ProjectRegistryQuotaRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
@@ -122,7 +122,7 @@ class Repositories:
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
-        registry_quota_repositories = RegistryQuotaRepositories.create(args)
+        registry_quota_repositories = ProjectRegistryQuotaRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
@@ -160,7 +160,7 @@ class Repositories:
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
             project_resource_policy=project_resource_policy_repositories,
-            registry_quota=registry_quota_repositories,
+            project_registry_quota=registry_quota_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_usage_history=resource_usage_history_repositories,

@@ -5,8 +5,8 @@ from ai.backend.manager.actions.action import BaseAction
 
 
 @dataclass
-class RegistryQuotaAction(BaseAction):
+class ProjectRegistryQuotaAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> str:
-        return "registry_quota"
+        return "project_registry_quota"

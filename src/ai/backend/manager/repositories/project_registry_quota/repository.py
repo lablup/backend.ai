@@ -36,7 +36,7 @@ class ContainerRegistryRowInfo:
     extra: dict[str, Any]
 
 
-class AbstractRegistryQuotaRepository(abc.ABC):
+class AbstractProjectRegistryQuotaRepository(abc.ABC):
     @abc.abstractmethod
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
@@ -44,7 +44,7 @@ class AbstractRegistryQuotaRepository(abc.ABC):
         raise NotImplementedError
 
 
-class RegistryQuotaRepository(AbstractRegistryQuotaRepository):
+class ProjectRegistryQuotaRepository(AbstractProjectRegistryQuotaRepository):
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
@@ -71,7 +71,7 @@ class RegistryQuotaRepository(AbstractRegistryQuotaRepository):
             result = await db_sess.execute(group_query)
             group_row = result.scalar_one_or_none()
 
-            if not RegistryQuotaRepository._is_valid_group_row(group_row):
+            if not ProjectRegistryQuotaRepository._is_valid_group_row(group_row):
                 raise ContainerRegistryNotFound(
                     f"Container registry info does not exist or is invalid in the group. (group: {project_id})"
                 )

@@ -5,11 +5,13 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.registry_quota.actions.base import RegistryQuotaAction
+from ai.backend.manager.services.project_registry_quota.actions.base import (
+    ProjectRegistryQuotaAction,
+)
 
 
 @dataclass
-class UpdateRegistryQuotaAction(RegistryQuotaAction):
+class UpdateProjectRegistryQuotaAction(ProjectRegistryQuotaAction):
     """Action to update a registry quota for a project."""
 
     project_id: UUID
@@ -22,11 +24,11 @@ class UpdateRegistryQuotaAction(RegistryQuotaAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "update_registry_quota"
+        return "update_project_registry_quota"
 
 
 @dataclass
-class UpdateRegistryQuotaActionResult(BaseActionResult):
+class UpdateProjectRegistryQuotaActionResult(BaseActionResult):
     """Result of updating a registry quota."""
 
     project_id: UUID

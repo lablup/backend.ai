@@ -31,30 +31,30 @@ from ai.backend.manager.clients.container_registry.harbor import (
 )
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.repositories.registry_quota.repository import (
-    AbstractRegistryQuotaRepository,
+from ai.backend.manager.repositories.project_registry_quota.repository import (
+    AbstractProjectRegistryQuotaRepository,
 )
-from ai.backend.manager.services.registry_quota.actions.create_registry_quota import (
-    CreateRegistryQuotaAction,
-    CreateRegistryQuotaActionResult,
+from ai.backend.manager.services.project_registry_quota.actions.create_project_registry_quota import (
+    CreateProjectRegistryQuotaAction,
+    CreateProjectRegistryQuotaActionResult,
 )
-from ai.backend.manager.services.registry_quota.actions.delete_registry_quota import (
-    DeleteRegistryQuotaAction,
-    DeleteRegistryQuotaActionResult,
+from ai.backend.manager.services.project_registry_quota.actions.delete_project_registry_quota import (
+    DeleteProjectRegistryQuotaAction,
+    DeleteProjectRegistryQuotaActionResult,
 )
-from ai.backend.manager.services.registry_quota.actions.read_registry_quota import (
-    ReadRegistryQuotaAction,
-    ReadRegistryQuotaActionResult,
+from ai.backend.manager.services.project_registry_quota.actions.read_project_registry_quota import (
+    ReadProjectRegistryQuotaAction,
+    ReadProjectRegistryQuotaActionResult,
 )
-from ai.backend.manager.services.registry_quota.actions.update_registry_quota import (
-    UpdateRegistryQuotaAction,
-    UpdateRegistryQuotaActionResult,
+from ai.backend.manager.services.project_registry_quota.actions.update_project_registry_quota import (
+    UpdateProjectRegistryQuotaAction,
+    UpdateProjectRegistryQuotaActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def make_registry_quota_client(
+def make_project_registry_quota_client(
     type_: ContainerRegistryType,
 ) -> AbstractPerProjectRegistryQuotaClient:
     match type_:
@@ -66,12 +66,12 @@ def make_registry_quota_client(
             )
 
 
-class RegistryQuotaService:
+class ProjectRegistryQuotaService:
     """Service for managing per-project container registry quotas."""
 
     def __init__(
         self,
-        repository: AbstractRegistryQuotaRepository,
+        repository: AbstractProjectRegistryQuotaRepository,
     ) -> None:
         self._repository = repository
 
@@ -79,7 +79,7 @@ class RegistryQuotaService:
         self, scope_id: ProjectScope
     ) -> tuple[AbstractPerProjectRegistryQuotaClient, HarborProjectInfo, HarborAuthArgs]:
         registry_info = await self._repository.fetch_container_registry_row(scope_id)
-        client = make_registry_quota_client(registry_info.type)
+        client = make_project_registry_quota_client(registry_info.type)
         project_info = HarborProjectInfo(
             url=registry_info.url,
             project=registry_info.project,
@@ -108,30 +108,30 @@ class RegistryQuotaService:
 
     # Action-based methods for Processors pattern
 
-    async def create_registry_quota(
-        self, action: CreateRegistryQuotaAction
-    ) -> CreateRegistryQuotaActionResult:
+    async def create_project_registry_quota(
+        self, action: CreateProjectRegistryQuotaAction
+    ) -> CreateProjectRegistryQuotaActionResult:
         scope_id = ProjectScope(project_id=action.project_id, domain_name=None)
         await self.create_quota(scope_id, action.quota)
-        return CreateRegistryQuotaActionResult(project_id=action.project_id)
+        return CreateProjectRegistryQuotaActionResult(project_id=action.project_id)
 
-    async def read_registry_quota(
-        self, action: ReadRegistryQuotaAction
-    ) -> ReadRegistryQuotaActionResult:
+    async def read_project_registry_quota(
+        self, action: ReadProjectRegistryQuotaAction
+    ) -> ReadProjectRegistryQuotaActionResult:
         scope_id = ProjectScope(project_id=action.project_id, domain_name=None)
         quota = await self.read_quota(scope_id)
-        return ReadRegistryQuotaActionResult(project_id=action.project_id, quota=quota)
+        return ReadProjectRegistryQuotaActionResult(project_id=action.project_id, quota=quota)
 
-    async def update_registry_quota(
-        self, action: UpdateRegistryQuotaAction
-    ) -> UpdateRegistryQuotaActionResult:
+    async def update_project_registry_quota(
+        self, action: UpdateProjectRegistryQuotaAction
+    ) -> UpdateProjectRegistryQuotaActionResult:
         scope_id = ProjectScope(project_id=action.project_id, domain_name=None)
         await self.update_quota(scope_id, action.quota)
-        return UpdateRegistryQuotaActionResult(project_id=action.project_id)
+        return UpdateProjectRegistryQuotaActionResult(project_id=action.project_id)
 
-    async def delete_registry_quota(
-        self, action: DeleteRegistryQuotaAction
-    ) -> DeleteRegistryQuotaActionResult:
+    async def delete_project_registry_quota(
+        self, action: DeleteProjectRegistryQuotaAction
+    ) -> DeleteProjectRegistryQuotaActionResult:
         scope_id = ProjectScope(project_id=action.project_id, domain_name=None)
         await self.delete_quota(scope_id)
-        return DeleteRegistryQuotaActionResult(project_id=action.project_id)
+        return DeleteProjectRegistryQuotaActionResult(project_id=action.project_id)
