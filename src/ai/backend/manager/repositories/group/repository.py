@@ -148,7 +148,7 @@ class GroupRepository:
 
             # Create the group
             creator_result = await execute_creator(db_session, creator)
-            row = creator_result.row
+            row: GroupRow = creator_result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)
