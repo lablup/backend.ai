@@ -54,7 +54,7 @@ from ai.backend.manager.repositories.fair_share import (
     UserFairShareCreatorSpec,
     UserFairShareUpserterSpec,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -267,7 +267,7 @@ class TestFairShareRepository:
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
                 domain_name=test_domain_name,
-                weight=OptionalState.update(Decimal("1.5")),
+                weight=TriState.update(Decimal("1.5")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
                 fair_share_factor=OptionalState.update(Decimal("1.0")),
             )
@@ -293,7 +293,7 @@ class TestFairShareRepository:
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
                 domain_name=test_domain_name,
-                weight=OptionalState.update(Decimal("1.0")),
+                weight=TriState.update(Decimal("1.0")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
                 fair_share_factor=OptionalState.update(Decimal("1.0")),
             )
@@ -444,7 +444,7 @@ class TestFairShareRepository:
                 resource_group=test_scaling_group,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                weight=OptionalState.update(Decimal("2.0")),
+                weight=TriState.update(Decimal("2.0")),
                 fair_share_factor=OptionalState.update(Decimal("0.8")),
             )
         )
@@ -525,7 +525,7 @@ class TestFairShareRepository:
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-                weight=OptionalState.update(Decimal("1.5")),
+                weight=TriState.update(Decimal("1.5")),
                 fair_share_factor=OptionalState.update(Decimal("0.9")),
             )
         )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
@@ -226,3 +227,96 @@ class SearchUserFairSharesActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
+
+
+# Upsert Actions for Fair Share Weight
+
+
+@dataclass
+class UpsertDomainFairShareWeightAction(DomainFairShareAction):
+    """Action to upsert a domain fair share weight."""
+
+    resource_group: str
+    domain_name: str
+    weight: Decimal | None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:{self.domain_name}"
+
+
+@dataclass
+class UpsertDomainFairShareWeightActionResult(BaseActionResult):
+    """Result of upserting a domain fair share weight."""
+
+    data: DomainFairShareData
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.data.id)
+
+
+@dataclass
+class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
+    """Action to upsert a project fair share weight."""
+
+    resource_group: str
+    project_id: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:{self.project_id}"
+
+
+@dataclass
+class UpsertProjectFairShareWeightActionResult(BaseActionResult):
+    """Result of upserting a project fair share weight."""
+
+    data: ProjectFairShareData
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.data.id)
+
+
+@dataclass
+class UpsertUserFairShareWeightAction(UserFairShareAction):
+    """Action to upsert a user fair share weight."""
+
+    resource_group: str
+    project_id: uuid.UUID
+    user_uuid: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
+
+
+@dataclass
+class UpsertUserFairShareWeightActionResult(BaseActionResult):
+    """Result of upserting a user fair share weight."""
+
+    data: UserFairShareData
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.data.id)

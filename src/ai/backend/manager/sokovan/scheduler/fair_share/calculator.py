@@ -175,7 +175,9 @@ class FairShareFactorCalculator:
         for domain_name, usage in decayed_usages["domain"].items():
             weight = default_weight
             if domain_name in fair_shares.domain:
-                weight = fair_shares.domain[domain_name].spec.weight
+                spec_weight = fair_shares.domain[domain_name].spec.weight
+                if spec_weight is not None:
+                    weight = spec_weight
 
             factor_result = self._calculate_factor(
                 usage=usage,
@@ -198,7 +200,9 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if project_id in fair_shares.project:
-                weight = fair_shares.project[project_id].spec.weight
+                spec_weight = fair_shares.project[project_id].spec.weight
+                if spec_weight is not None:
+                    weight = spec_weight
                 domain_name = fair_shares.project[project_id].domain_name
 
             factor_result = self._calculate_factor(
@@ -223,7 +227,9 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if user_key in fair_shares.user:
-                weight = fair_shares.user[user_key].spec.weight
+                spec_weight = fair_shares.user[user_key].spec.weight
+                if spec_weight is not None:
+                    weight = spec_weight
                 domain_name = fair_shares.user[user_key].domain_name
 
             factor_result = self._calculate_factor(

@@ -16,9 +16,14 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    UpsertProjectFairShareWeightInput,
+    UpsertProjectFairShareWeightPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.fair_share.actions import GetProjectFairShareAction
+from ai.backend.manager.services.fair_share.actions import (
+    GetProjectFairShareAction,
+    UpsertProjectFairShareWeightAction,
+)
 
 
 @strawberry.field(description="Added in 26.1.0. Get project fair share data (superadmin only).")
@@ -72,4 +77,34 @@ async def project_fair_shares(
         last=last,
         limit=limit,
         offset=offset,
+    )
+
+
+@strawberry.mutation(
+    description=(
+        "Added in 26.1.0. Upsert project fair share weight (superadmin only). "
+        "Creates a new record if it doesn't exist, or updates the weight if it does."
+    )
+)
+async def upsert_project_fair_share_weight(
+    info: Info[StrawberryGQLContext],
+    input: UpsertProjectFairShareWeightInput,
+) -> UpsertProjectFairShareWeightPayload:
+    """Upsert project fair share weight."""
+    me = current_user()
+    if me is None or not me.is_superadmin:
+        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+
+    processors = info.context.processors
+    action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
+        UpsertProjectFairShareWeightAction(
+            resource_group=input.resource_group,
+            project_id=input.project_id,
+            domain_name=input.domain_name,
+            weight=input.weight,
+        )
+    )
+
+    return UpsertProjectFairShareWeightPayload(
+        project_fair_share=ProjectFairShareGQL.from_dataclass(action_result.data)
     )

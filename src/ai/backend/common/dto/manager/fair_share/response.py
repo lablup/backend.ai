@@ -67,7 +67,10 @@ class ResourceSlotDTO(BaseModel):
 class FairShareSpecDTO(BaseModel):
     """Fair share specification parameters."""
 
-    weight: Decimal = Field(description="Base weight for this entity")
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description="Base weight for this entity. None means use resource group's default_weight.",
+    )
     half_life_days: int = Field(description="Half-life for exponential decay in days")
     lookback_days: int = Field(description="Total lookback period in days")
     decay_unit_days: int = Field(description="Granularity of decay buckets in days")

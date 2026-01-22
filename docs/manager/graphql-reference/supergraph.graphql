@@ -3666,15 +3666,47 @@ type FairShareCalculationSnapshot
 }
 
 """
+Added in 26.1.0. Fair share calculation configuration for a resource group. Defines parameters for computing fair share factors across domains, projects, and users.
+"""
+type FairShareScalingGroupSpec
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. Default is 7 days.
+  """
+  halfLifeDays: Int!
+
+  """
+  Total lookback period in days for usage aggregation. Only usage within this window is considered. Default is 28 days.
+  """
+  lookbackDays: Int!
+
+  """
+  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Default is 1 day.
+  """
+  decayUnitDays: Int!
+
+  """
+  Default weight for entities without explicit weight in this resource group. Default is 1.0.
+  """
+  defaultWeight: Decimal!
+
+  """
+  Weights for each resource type when calculating normalized usage. If a resource type is not specified, default weight (1.0) is used.
+  """
+  resourceWeights: ResourceSlot!
+}
+
+"""
 Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation.
 """
 type FairShareSpec
   @join__type(graph: STRAWBERRY)
 {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Default is 1.0. A weight of 2.0 means this entity is twice as important as one with weight 1.0.
+  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Null means using resource group's default_weight.
   """
-  weight: Decimal!
+  weight: Decimal
 
   """
   Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
@@ -5885,6 +5917,26 @@ type Mutation
 
   """Added in 25.19.0. Update the traffic status of a route."""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values.
+  """
+  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -7116,11 +7168,8 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.1.0. List resource groups for a specific project"""
-  resourceGroups(project: ID!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List all resource groups"""
-  allResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
+  """Added in 26.1.0. List resource groups"""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
@@ -7390,6 +7439,11 @@ type ResourceGroup implements Node
   Used as primary key and referenced by agents, sessions, and resource presets.
   """
   name: String!
+
+  """
+  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
+  """
+  fairShareSpec: FairShareScalingGroupSpec!
 }
 
 """Added in 26.1.0. Resource group connection"""
@@ -7548,9 +7602,9 @@ type ResourceSlotEntry
   resourceType: String!
 
   """
-  Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
+  Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction.
   """
-  quantity: String!
+  quantity: Decimal!
 }
 
 """
@@ -7574,6 +7628,23 @@ input ResourceSlotInput
 {
   """List of resource allocations."""
   entries: [ResourceSlotEntryInput!]!
+}
+
+"""
+Added in 26.1.0. Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.
+"""
+input ResourceWeightEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). Must match the resource types used in the cluster.
+  """
+  resourceType: String!
+
+  """
+  Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
+  """
+  weight: Decimal = null
 }
 
 """
@@ -8649,6 +8720,47 @@ type UpdateReservoirRegistryPayload
   reservoir: ReservoirRegistry!
 }
 
+"""
+Added in 26.1.0. Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.
+"""
+input UpdateResourceGroupFairShareSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the resource group to update."""
+  resourceGroup: String!
+
+  """
+  Half-life for exponential decay in days. Leave null to keep existing value.
+  """
+  halfLifeDays: Int = null
+
+  """Total lookback period in days. Leave null to keep existing value."""
+  lookbackDays: Int = null
+
+  """
+  Granularity of decay buckets in days. Leave null to keep existing value.
+  """
+  decayUnitDays: Int = null
+
+  """Default weight for entities. Leave null to keep existing value."""
+  defaultWeight: Decimal = null
+
+  """
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  """
+  resourceWeights: [ResourceWeightEntryInput!] = null
+}
+
+"""
+Added in 26.1.0. Payload for resource group fair share spec update mutation.
+"""
+type UpdateResourceGroupFairShareSpecPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated resource group with new fair share configuration."""
+  resourceGroup: ResourceGroup!
+}
+
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput
   @join__type(graph: STRAWBERRY)
@@ -8711,6 +8823,63 @@ type UpsertDomainConfigPayload
 }
 
 """
+Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertDomainFairShareWeightInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """Name of the domain to update weight for."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""Added in 26.1.0. Payload for domain fair share weight upsert mutation."""
+type UpsertDomainFairShareWeightPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated or created domain fair share record."""
+  domainFairShare: DomainFairShare!
+}
+
+"""
+Added in 26.1.0. Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertProjectFairShareWeightInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """UUID of the project to update weight for."""
+  projectId: UUID!
+
+  """Name of the domain the project belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""
+Added in 26.1.0. Payload for project fair share weight upsert mutation.
+"""
+type UpsertProjectFairShareWeightPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated or created project fair share record."""
+  projectFairShare: ProjectFairShare!
+}
+
+"""
 Added in 25.16.0.
 Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
@@ -8734,6 +8903,38 @@ type UpsertUserConfigPayload
   @join__type(graph: STRAWBERRY)
 {
   appConfig: AppConfig!
+}
+
+"""
+Added in 26.1.0. Input for upserting user fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertUserFairShareWeightInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """UUID of the project the user belongs to."""
+  projectId: UUID!
+
+  """UUID of the user to update weight for."""
+  userUuid: UUID!
+
+  """Name of the domain the user belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""Added in 26.1.0. Payload for user fair share weight upsert mutation."""
+type UpsertUserFairShareWeightPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated or created user fair share record."""
+  userFairShare: UserFairShare!
 }
 
 """

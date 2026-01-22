@@ -34,8 +34,9 @@ class FairShareSpec:
     These values determine how fair share factor is computed.
     """
 
-    weight: Decimal
-    """Base weight for this entity (higher weight = higher priority)."""
+    weight: Decimal | None
+    """Base weight for this entity (higher weight = higher priority).
+    None means use resource group's default_weight."""
 
     half_life_days: int
     """Half-life for exponential decay in days."""

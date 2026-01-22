@@ -74,6 +74,9 @@ from .fair_share import (
     domain_fair_shares,
     project_fair_share,
     project_fair_shares,
+    upsert_domain_fair_share_weight,
+    upsert_project_fair_share_weight,
+    upsert_user_fair_share_weight,
     user_fair_share,
     user_fair_shares,
 )
@@ -115,7 +118,10 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
-from .resource_group import all_resource_groups, resource_groups
+from .resource_group import (
+    resource_groups,
+    update_resource_group_fair_share_spec,
+)
 from .resource_usage import (
     domain_usage_buckets,
     project_usage_buckets,
@@ -182,7 +188,6 @@ class Query:
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
     resource_groups = resource_groups
-    all_resource_groups = all_resource_groups
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
@@ -247,6 +252,12 @@ class Mutation:
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
+    # Fair Share
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    # Resource Group
+    update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
 
 
 @strawberry.type
