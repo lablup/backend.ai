@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
-from dateutil.tz import tzutc
-
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -400,7 +398,7 @@ class SchedulingFailure:
     session_id: SessionId
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
     failed_phases: list[SchedulingPredicate] = field(default_factory=list)
-    last_try: Optional[datetime] = field(default_factory=lambda: datetime.now(tzutc()))
+    last_try: Optional[datetime] = None
     msg: Optional[str] = None
 
     def to_status_data(self, current_retries: int) -> dict:

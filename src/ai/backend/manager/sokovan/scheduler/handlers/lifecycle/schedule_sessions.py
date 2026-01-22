@@ -134,8 +134,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Provisioner with pre-fetched data
+        provision_time = await self._repository.get_db_now()
         schedule_result = await self._provisioner.schedule_scaling_group(
-            scaling_group, scheduling_data
+            scaling_group, scheduling_data, provision_time
         )
 
         # Track scheduled session IDs

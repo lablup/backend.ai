@@ -297,6 +297,7 @@ class TestUpdateWithHistory:
         updater = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=to_status,
+                status_changed_at=datetime.now(tzutc()),
                 reason="test-success",
             ),
             conditions=[
@@ -361,6 +362,7 @@ class TestUpdateWithHistory:
         updater = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=to_status,
+                status_changed_at=datetime.now(tzutc()),
                 reason="agent-lost",
             ),
             conditions=[
@@ -454,6 +456,7 @@ class TestUpdateWithHistory:
         updater = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=to_status,
+                status_changed_at=datetime.now(tzutc()),
                 reason="batch-success",
             ),
             conditions=[
@@ -513,6 +516,7 @@ class TestUpdateWithHistory:
         updater = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARED,
+                status_changed_at=datetime.now(tzutc()),
                 reason="test",
             ),
             conditions=[
@@ -556,6 +560,7 @@ class TestUpdateWithHistory:
         updater = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=to_status,
+                status_changed_at=datetime.now(tzutc()),
                 reason="test-empty-history",
             ),
             conditions=[
@@ -599,6 +604,7 @@ class TestUpdateWithHistory:
         updater1 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="retry-1",
             ),
             conditions=[
@@ -634,6 +640,7 @@ class TestUpdateWithHistory:
         updater2 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="retry-2",
             ),
             conditions=[
@@ -669,6 +676,7 @@ class TestUpdateWithHistory:
         updater3 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="retry-3",
             ),
             conditions=[
@@ -712,6 +720,7 @@ class TestUpdateWithHistory:
         updater1 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="first",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -734,6 +743,7 @@ class TestUpdateWithHistory:
         updater2 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="second",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -776,6 +786,7 @@ class TestUpdateWithHistory:
         updater1 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="first",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -798,6 +809,7 @@ class TestUpdateWithHistory:
         updater2 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="second",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -839,6 +851,7 @@ class TestUpdateWithHistory:
         updater1 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="first",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -861,6 +874,7 @@ class TestUpdateWithHistory:
         updater2 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.SCHEDULED,
+                status_changed_at=datetime.now(tzutc()),
                 reason="second",
             ),
             conditions=[lambda: SessionRow.id.in_([test_session_id])],
@@ -932,6 +946,7 @@ class TestUpdateWithHistory:
         updater1 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="batch-1",
             ),
             conditions=[lambda: SessionRow.id.in_(session_ids)],
@@ -964,6 +979,7 @@ class TestUpdateWithHistory:
         updater2 = BatchUpdater(
             spec=SessionStatusBatchUpdaterSpec(
                 to_status=SessionStatus.PREPARING,
+                status_changed_at=datetime.now(tzutc()),
                 reason="batch-2",
             ),
             conditions=[lambda: SessionRow.id.in_(session_ids)],

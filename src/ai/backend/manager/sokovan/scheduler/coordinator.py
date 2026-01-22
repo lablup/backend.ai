@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Optional
 
-from dateutil.tz import tzutc
-
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
@@ -829,6 +827,9 @@ class ScheduleCoordinator:
         if not result.successes:
             return
 
+        # Get DB time for status transition timestamp
+        current_time = await self._repository.get_db_now()
+
         to_status = spec.success_status
         sessions_to_transition = result.successes
 
@@ -851,6 +852,7 @@ class ScheduleCoordinator:
                 transition,
                 SchedulingResult.SUCCESS,
                 records,
+                current_time,
             )
 
             # Broadcast events for successful transitions
@@ -1030,6 +1032,9 @@ class ScheduleCoordinator:
         handler_name = handler.name()
         classified: FailureClassificationResult | None = None
 
+        # Get DB time once for all operations in this result handling
+        current_time = await self._repository.get_db_now()
+
         # SUCCESS transitions
         if transitions.success and result.successes:
             await self._apply_transition(
@@ -1038,6 +1043,7 @@ class ScheduleCoordinator:
                 transitions.success,
                 SchedulingResult.SUCCESS,
                 records,
+                current_time,
             )
             # Broadcast events for successful transitions
             if transitions.success.session:
@@ -1047,7 +1053,7 @@ class ScheduleCoordinator:
 
         # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry
         if result.failures:
-            classified = self._classify_failures(result.failures, sessions)
+            classified = self._classify_failures(result.failures, sessions, current_time)
 
             # Apply transitions for each classification
             if classified.give_up and transitions.give_up:
@@ -1057,6 +1063,7 @@ class ScheduleCoordinator:
                     transitions.give_up,
                     SchedulingResult.GIVE_UP,
                     records,
+                    current_time,
                 )
 
             if classified.expired and transitions.expired:
@@ -1066,6 +1073,7 @@ class ScheduleCoordinator:
                     transitions.expired,
                     SchedulingResult.EXPIRED,
                     records,
+                    current_time,
                 )
 
             if classified.need_retry and transitions.need_retry:
@@ -1075,6 +1083,7 @@ class ScheduleCoordinator:
                     transitions.need_retry,
                     SchedulingResult.NEED_RETRY,
                     records,
+                    current_time,
                 )
 
         # SKIPPED - Record history without status change
@@ -1087,6 +1096,7 @@ class ScheduleCoordinator:
         self,
         failures: list[SessionTransitionInfo],
         sessions: list[SessionWithKernels],
+        current_time: datetime,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
 
@@ -1101,12 +1111,12 @@ class ScheduleCoordinator:
         Args:
             failures: Failed session transition info
             sessions: Original sessions with phase_attempts and phase_started_at populated
+            current_time: Current database time for timeout comparison
 
         Returns:
             FailureClassificationResult with give_up, expired, need_retry lists
         """
         session_map = {s.session_info.identity.id: s for s in sessions}
-        now = datetime.now(tzutc())
 
         give_up_failures: list[SessionTransitionInfo] = []
         expired_failures: list[SessionTransitionInfo] = []
@@ -1128,7 +1138,7 @@ class ScheduleCoordinator:
                 status = session.session_info.lifecycle.status
                 timeout = STATUS_TIMEOUT_MAP.get(status)
                 if timeout:
-                    elapsed = (now - session.phase_started_at).total_seconds()
+                    elapsed = (current_time - session.phase_started_at).total_seconds()
                     if elapsed > timeout:
                         expired_failures.append(failure)
                         continue
@@ -1149,6 +1159,7 @@ class ScheduleCoordinator:
         transition: TransitionStatus,
         scheduling_result: SchedulingResult,
         records: Mapping[SessionId, ExecutionRecord],
+        status_changed_at: datetime,
     ) -> None:
         """Apply a single transition type to sessions (BEP-1030).
 
@@ -1158,6 +1169,7 @@ class ScheduleCoordinator:
             transition: Target status transition to apply
             scheduling_result: Result type for history recording
             records: Mapping of session IDs to their execution records
+            status_changed_at: Database timestamp for status change
         """
         if not session_infos:
             return
@@ -1167,7 +1179,10 @@ class ScheduleCoordinator:
         # Session status update
         if transition.session:
             updater = BatchUpdater(
-                spec=SessionStatusBatchUpdaterSpec(to_status=transition.session),
+                spec=SessionStatusBatchUpdaterSpec(
+                    to_status=transition.session,
+                    status_changed_at=status_changed_at,
+                ),
                 conditions=[SessionConditions.by_ids(session_ids)],
             )
             history_specs = [
