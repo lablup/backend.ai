@@ -37,10 +37,6 @@ class GPFSInternalError(GPFSAPIError):
     pass
 
 
-class GPFSNoMetricError(GPFSError):
-    pass
-
-
 class GPFSJobFailedError(GPFSError):
     pass
 
