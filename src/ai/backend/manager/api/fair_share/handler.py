@@ -33,10 +33,38 @@ from ai.backend.common.dto.manager.fair_share import (
     SearchUserFairSharesResponse,
     SearchUserUsageBucketsRequest,
     SearchUserUsageBucketsResponse,
+    UpdateResourceGroupFairShareSpecPathParam,
+    UpdateResourceGroupFairShareSpecRequest,
+    UpdateResourceGroupFairShareSpecResponse,
+    UpsertDomainFairShareWeightPathParam,
+    UpsertDomainFairShareWeightRequest,
+    UpsertDomainFairShareWeightResponse,
+    UpsertProjectFairShareWeightPathParam,
+    UpsertProjectFairShareWeightRequest,
+    UpsertProjectFairShareWeightResponse,
+    UpsertUserFairShareWeightPathParam,
+    UpsertUserFairShareWeightRequest,
+    UpsertUserFairShareWeightResponse,
 )
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.updaters import (
+    ScalingGroupUpdaterSpec,
+)
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    Updater,
+)
+from ai.backend.manager.repositories.matching import StringMatchSpec
+from ai.backend.manager.repositories.scaling_group.options import (
+    ScalingGroupConditions,
+)
+from ai.backend.manager.repositories.scaling_group.updaters import (
+    ResourceGroupFairShareUpdaterSpec,
+)
 from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
@@ -44,12 +72,22 @@ from ai.backend.manager.services.fair_share.actions import (
     SearchDomainFairSharesAction,
     SearchProjectFairSharesAction,
     SearchUserFairSharesAction,
+    UpsertDomainFairShareWeightAction,
+    UpsertProjectFairShareWeightAction,
+    UpsertUserFairShareWeightAction,
 )
 from ai.backend.manager.services.resource_usage.actions import (
     SearchDomainUsageBucketsAction,
     SearchProjectUsageBucketsAction,
     SearchUserUsageBucketsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
+    SearchScalingGroupsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.modify import (
+    ModifyScalingGroupAction,
+)
+from ai.backend.manager.types import TriState
 
 from .adapter import FairShareAdapter
 
@@ -352,6 +390,152 @@ class FairShareAPIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    # Upsert Domain Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def upsert_domain_fair_share_weight(
+        self,
+        path: PathParam[UpsertDomainFairShareWeightPathParam],
+        body: BodyParam[UpsertDomainFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Upsert domain fair share weight."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        action_result = (
+            await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
+                UpsertDomainFairShareWeightAction(
+                    resource_group=path.parsed.resource_group,
+                    domain_name=path.parsed.domain_name,
+                    weight=body.parsed.weight,
+                )
+            )
+        )
+
+        item = self._adapter.convert_domain_fair_share_to_dto(action_result.data)
+        resp = UpsertDomainFairShareWeightResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Upsert Project Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def upsert_project_fair_share_weight(
+        self,
+        path: PathParam[UpsertProjectFairShareWeightPathParam],
+        body: BodyParam[UpsertProjectFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Upsert project fair share weight."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        action_result = (
+            await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
+                UpsertProjectFairShareWeightAction(
+                    resource_group=path.parsed.resource_group,
+                    project_id=path.parsed.project_id,
+                    domain_name=body.parsed.domain_name,
+                    weight=body.parsed.weight,
+                )
+            )
+        )
+
+        item = self._adapter.convert_project_fair_share_to_dto(action_result.data)
+        resp = UpsertProjectFairShareWeightResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Upsert User Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def upsert_user_fair_share_weight(
+        self,
+        path: PathParam[UpsertUserFairShareWeightPathParam],
+        body: BodyParam[UpsertUserFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Upsert user fair share weight."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        action_result = await processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
+            UpsertUserFairShareWeightAction(
+                resource_group=path.parsed.resource_group,
+                project_id=path.parsed.project_id,
+                user_uuid=path.parsed.user_uuid,
+                domain_name=body.parsed.domain_name,
+                weight=body.parsed.weight,
+            )
+        )
+
+        item = self._adapter.convert_user_fair_share_to_dto(action_result.data)
+        resp = UpsertUserFairShareWeightResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Update Resource Group Fair Share Spec
+
+    @auth_required_for_method
+    @api_handler
+    async def update_resource_group_fair_share_spec(
+        self,
+        path: PathParam[UpdateResourceGroupFairShareSpecPathParam],
+        body: BodyParam[UpdateResourceGroupFairShareSpecRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Update resource group fair share spec with partial update (Read-Modify-Write pattern)."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # 1. Read: Get existing scaling group
+        name_spec = StringMatchSpec(
+            value=path.parsed.resource_group,
+            case_insensitive=False,
+            negated=False,
+        )
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
+        )
+        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+            SearchScalingGroupsAction(querier=querier)
+        )
+
+        if not search_result.scaling_groups:
+            raise web.HTTPNotFound(
+                reason=f"Resource group '{path.parsed.resource_group}' not found"
+            )
+
+        existing_data = search_result.scaling_groups[0]
+
+        # 2. Modify: Merge partial input with existing fair_share_spec
+        merged_spec = self._adapter.merge_fair_share_spec(
+            body.parsed, existing_data.fair_share_spec
+        )
+
+        # 3. Write: Update using the updater
+        fair_share_updater = ResourceGroupFairShareUpdaterSpec(
+            fair_share_spec=TriState.update(merged_spec),
+        )
+        updater: Updater[ScalingGroupRow] = Updater(
+            pk_value=path.parsed.resource_group,
+            spec=ScalingGroupUpdaterSpec(fair_share=fair_share_updater),
+        )
+
+        result = await processors.scaling_group.modify_scaling_group.wait_for_complete(
+            ModifyScalingGroupAction(updater=updater)
+        )
+
+        resp = UpdateResourceGroupFairShareSpecResponse(
+            resource_group=result.scaling_group.name,
+            fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(
+                result.scaling_group.fair_share_spec
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -432,6 +616,38 @@ def create_app(
             "POST",
             "/usage-buckets/users/search",
             api_handler.search_user_usage_buckets,
+        )
+    )
+
+    # Upsert weight routes
+    cors.add(
+        app.router.add_route(
+            "PUT",
+            "/domains/{resource_group}/{domain_name}/weight",
+            api_handler.upsert_domain_fair_share_weight,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "PUT",
+            "/projects/{resource_group}/{project_id}/weight",
+            api_handler.upsert_project_fair_share_weight,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "PUT",
+            "/users/{resource_group}/{project_id}/{user_uuid}/weight",
+            api_handler.upsert_user_fair_share_weight,
+        )
+    )
+
+    # Resource group spec update route
+    cors.add(
+        app.router.add_route(
+            "PATCH",
+            "/resource-groups/{resource_group}/spec",
+            api_handler.update_resource_group_fair_share_spec,
         )
     )
 

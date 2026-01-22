@@ -9,12 +9,21 @@ from .request import (
     GetProjectFairShareRequest,
     GetUserFairSharePathParam,
     GetUserFairShareRequest,
+    ResourceWeightEntryInput,
     SearchDomainFairSharesRequest,
     SearchDomainUsageBucketsRequest,
     SearchProjectFairSharesRequest,
     SearchProjectUsageBucketsRequest,
     SearchUserFairSharesRequest,
     SearchUserUsageBucketsRequest,
+    UpdateResourceGroupFairShareSpecPathParam,
+    UpdateResourceGroupFairShareSpecRequest,
+    UpsertDomainFairShareWeightPathParam,
+    UpsertDomainFairShareWeightRequest,
+    UpsertProjectFairShareWeightPathParam,
+    UpsertProjectFairShareWeightRequest,
+    UpsertUserFairShareWeightPathParam,
+    UpsertUserFairShareWeightRequest,
 )
 from .response import (
     DomainFairShareDTO,
@@ -27,6 +36,7 @@ from .response import (
     PaginationInfo,
     ProjectFairShareDTO,
     ProjectUsageBucketDTO,
+    ResourceGroupFairShareSpecDTO,
     ResourceSlotDTO,
     ResourceSlotEntryDTO,
     SearchDomainFairSharesResponse,
@@ -35,6 +45,10 @@ from .response import (
     SearchProjectUsageBucketsResponse,
     SearchUserFairSharesResponse,
     SearchUserUsageBucketsResponse,
+    UpdateResourceGroupFairShareSpecResponse,
+    UpsertDomainFairShareWeightResponse,
+    UpsertProjectFairShareWeightResponse,
+    UpsertUserFairShareWeightResponse,
     UsageBucketMetadataDTO,
     UserFairShareDTO,
     UserUsageBucketDTO,
@@ -88,10 +102,16 @@ __all__ = (
     "UserUsageBucketOrderField",
     "UserUsageBucketFilter",
     "UserUsageBucketOrder",
-    # Request - Path Parameters
+    # Request - Path Parameters (Get)
     "GetDomainFairSharePathParam",
     "GetProjectFairSharePathParam",
     "GetUserFairSharePathParam",
+    # Request - Path Parameters (Upsert Weight)
+    "UpsertDomainFairShareWeightPathParam",
+    "UpsertProjectFairShareWeightPathParam",
+    "UpsertUserFairShareWeightPathParam",
+    # Request - Path Parameters (Update Spec)
+    "UpdateResourceGroupFairShareSpecPathParam",
     # Request - Get (deprecated, use PathParam)
     "GetDomainFairShareRequest",
     "GetProjectFairShareRequest",
@@ -103,6 +123,13 @@ __all__ = (
     "SearchDomainUsageBucketsRequest",
     "SearchProjectUsageBucketsRequest",
     "SearchUserUsageBucketsRequest",
+    # Request - Upsert Weight
+    "UpsertDomainFairShareWeightRequest",
+    "UpsertProjectFairShareWeightRequest",
+    "UpsertUserFairShareWeightRequest",
+    # Request - Update Spec
+    "ResourceWeightEntryInput",
+    "UpdateResourceGroupFairShareSpecRequest",
     # Response - Common
     "PaginationInfo",
     "ResourceSlotEntryDTO",
@@ -114,14 +141,17 @@ __all__ = (
     "DomainFairShareDTO",
     "GetDomainFairShareResponse",
     "SearchDomainFairSharesResponse",
+    "UpsertDomainFairShareWeightResponse",
     # Response - Project Fair Share
     "ProjectFairShareDTO",
     "GetProjectFairShareResponse",
     "SearchProjectFairSharesResponse",
+    "UpsertProjectFairShareWeightResponse",
     # Response - User Fair Share
     "UserFairShareDTO",
     "GetUserFairShareResponse",
     "SearchUserFairSharesResponse",
+    "UpsertUserFairShareWeightResponse",
     # Response - Domain Usage Bucket
     "DomainUsageBucketDTO",
     "SearchDomainUsageBucketsResponse",
@@ -131,4 +161,7 @@ __all__ = (
     # Response - User Usage Bucket
     "UserUsageBucketDTO",
     "SearchUserUsageBucketsResponse",
+    # Response - Resource Group Fair Share Spec
+    "ResourceGroupFairShareSpecDTO",
+    "UpdateResourceGroupFairShareSpecResponse",
 )
