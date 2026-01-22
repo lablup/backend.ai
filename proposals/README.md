@@ -123,6 +123,7 @@ BEP numbers start from 1000.
 | [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
 | [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | - | Draft |
+| [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
