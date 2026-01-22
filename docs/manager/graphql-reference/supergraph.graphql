@@ -338,22 +338,6 @@ type AgentResource
   free: JSON!
 }
 
-"""Added in 26.1.0. Configuration for the agent selection strategy"""
-type AgentSelectorConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Number of existing kernels already running on the same endpoint.
-  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
-  
-  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
-  across different agents for improved fault tolerance. This count helps the scheduler
-  avoid placing new replicas on agents that already host replicas for the same endpoint,
-  ensuring better distribution of model serving workloads.
-  """
-  kernelCountsAtSameEndpoint: Int!
-}
-
 """Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -7132,11 +7116,11 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.18.0. List scaling groups for a specific project"""
-  scalingGroupsV2(project: ID!, filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection! @join__field(graph: STRAWBERRY)
+  """Added in 26.1.0. List resource groups for a specific project"""
+  resourceGroups(project: ID!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.18.0. List all scaling groups"""
-  allScalingGroupsV2(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection! @join__field(graph: STRAWBERRY)
+  """Added in 26.1.0. List all resource groups"""
+  allResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
@@ -7393,11 +7377,74 @@ input ResourceConfigInput
   resourceOpts: ResourceOptsInput = null
 }
 
+"""Added in 26.1.0. Resource group with structured configuration"""
+type ResourceGroup implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique name identifying the resource group.
+  Used as primary key and referenced by agents, sessions, and resource presets.
+  """
+  name: String!
+}
+
+"""Added in 26.1.0. Resource group connection"""
+type ResourceGroupConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ResourceGroupEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ResourceGroupEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ResourceGroup!
+}
+
+"""Added in 26.1.0. Filter for resource groups"""
+input ResourceGroupFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  AND: [ResourceGroupFilter!] = null
+  OR: [ResourceGroupFilter!] = null
+  NOT: [ResourceGroupFilter!] = null
+}
+
 """Added in 25.19.0"""
 input ResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
   name: String!
+}
+
+"""Added in 26.1.0. Order by specification for resource groups"""
+input ResourceGroupOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ResourceGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.1.0. Fields available for ordering resource groups"""
+enum ResourceGroupOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 type ResourceLimit
@@ -7860,55 +7907,6 @@ type ScalingGroupEdge
   cursor: String!
 }
 
-"""Added in 25.18.0. Filter for scaling groups"""
-input ScalingGroupFilter
-  @join__type(graph: STRAWBERRY)
-{
-  name: StringFilter = null
-  description: StringFilter = null
-  isActive: Boolean = null
-  isPublic: Boolean = null
-  scheduler: String = null
-  useHostNetwork: Boolean = null
-  AND: [ScalingGroupFilter!] = null
-  OR: [ScalingGroupFilter!] = null
-  NOT: [ScalingGroupFilter!] = null
-}
-
-"""Added in 25.18.0. Metadata information for a scaling group"""
-type ScalingGroupMetadata
-  @join__type(graph: STRAWBERRY)
-{
-  """Human-readable description of the scaling group's purpose"""
-  description: String!
-
-  """Timestamp when the scaling group was created"""
-  createdAt: DateTime!
-}
-
-"""Added in 25.18.0. Network configuration for a scaling group"""
-type ScalingGroupNetworkConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  App-proxy coordinator API server address.
-  Manager uses this address to communicate with the app-proxy coordinator
-  for managing service routes, endpoint registration, and proxying client connections
-  to session services.
-  """
-  wsproxyAddr: String!
-
-  """Authentication token for the App-proxy coordinator API server."""
-  wsproxyApiToken: String!
-
-  """
-  Whether session containers use the host's network namespace
-  instead of isolated container networking.
-  Enables direct host port binding but reduces isolation.
-  """
-  useHostNetwork: Boolean!
-}
-
 """Added in 24.12.0."""
 type ScalingGroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
@@ -7929,204 +7927,6 @@ type ScalingGroupNode implements Node
   scheduler: String @join__field(graph: GRAPHENE)
   scheduler_opts: JSONString @join__field(graph: GRAPHENE)
   use_host_network: Boolean @join__field(graph: GRAPHENE)
-}
-
-"""Added in 25.18.0. Order by specification for scaling groups"""
-input ScalingGroupOrderBy
-  @join__type(graph: STRAWBERRY)
-{
-  field: ScalingGroupOrderField!
-  direction: OrderDirection! = ASC
-}
-
-enum ScalingGroupOrderField
-  @join__type(graph: STRAWBERRY)
-{
-  NAME @join__enumValue(graph: STRAWBERRY)
-  CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
-  IS_PUBLIC @join__enumValue(graph: STRAWBERRY)
-}
-
-"""Added in 25.18.0. Scheduler configuration for session scheduling"""
-type ScalingGroupSchedulerConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Scheduling algorithm implementation.
-  'fifo' schedules oldest pending sessions first,
-  'lifo' schedules newest first,
-  'drf' (Dominant Resource Fairness) balances resource usage across users.
-  """
-  name: ScalingGroupSchedulerType!
-
-  """
-  Detailed scheduler behavior configuration including session type restrictions,
-  timeouts, agent selection strategy, and resource allocation policies.
-  """
-  options: ScalingGroupSchedulerOptions!
-}
-
-"""Added in 25.18.0. Scheduler configuration options"""
-type ScalingGroupSchedulerOptions
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Session types that can be scheduled in this scaling group.
-  Valid values: 'interactive' , 'batch', 'inference'.
-  Requests for unlisted types are rejected.
-  """
-  allowedSessionTypes: [String!]!
-
-  """
-  Maximum time in seconds a session can wait in PENDING state
-  before automatic cancellation.
-  Zero means no timeout.
-  Used to prevent indefinite resource waiting when no agents are available.
-  """
-  pendingTimeout: Float!
-
-  """
-  Scheduler-specific configuration options.
-  Contents depend on the scheduler implementation (fifo/lifo/drf).
-  Used for advanced scheduling behavior customization.
-  """
-  config: SchedulerConfig!
-
-  """
-  Algorithm for selecting target agents when scheduling sessions.
-  'dispersed' spreads sessions across available agents,
-  'concentrated' packs sessions onto fewer agents,
-  'roundrobin' cycles through agents sequentially.
-  """
-  agentSelectionStrategy: String!
-
-  """
-  Configuration for the agent selection strategy.
-  Structure varies by strategy - for example,
-  concentrated strategy may specify endpoint spreading rules.
-  """
-  agentSelectorConfig: AgentSelectorConfig!
-
-  """
-  Whether inference service replicas should be distributed across different agents
-  instead of co-locating on same agent.
-  When true, forces replica spreading.
-  Applied only when using concentrated agent selection strategy.
-  Improves fault tolerance for model serving.
-  """
-  enforceSpreadingEndpointReplica: Boolean!
-
-  """
-  Whether agents accept session requests that allocate fractional resources
-  (e.g., 0.5 GPU) causing resource fragmentation.
-  When false, agents reject sessions that would prevent future efficient resource allocation.
-  """
-  allowFractionalResourceFragmentation: Boolean!
-
-  """
-  List of route health statuses that trigger automatic cleanup of service routes.
-  Valid values: 'healthy', 'unhealthy', 'degraded'.
-  Default: ['unhealthy'].
-  """
-  routeCleanupTargetStatuses: [String!]!
-}
-
-"""
-Added in 25.18.0. Scheduler type for session scheduling.
-
-- FIFO: First-In-First-Out - Schedules oldest pending sessions first
-- LIFO: Last-In-First-Out - Schedules newest pending sessions first
-- DRF: Dominant Resource Fairness - Balances resource usage across users
-"""
-enum ScalingGroupSchedulerType
-  @join__type(graph: STRAWBERRY)
-{
-  FIFO @join__enumValue(graph: STRAWBERRY)
-  LIFO @join__enumValue(graph: STRAWBERRY)
-  DRF @join__enumValue(graph: STRAWBERRY)
-}
-
-"""Added in 25.18.0. Status information for a scaling group"""
-type ScalingGroupStatus
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Whether the scaling group can accept new session creation requests.
-  Inactive scaling groups are excluded from scheduling and cannot start new sessions.
-  """
-  isActive: Boolean!
-
-  """
-  Whether this scaling group is available for regular user sessions
-  (interactive/batch/inference).
-  When false, the scaling group is reserved for internal SYSTEM-type sessions only,
-  such as management or infrastructure sessions.
-  """
-  isPublic: Boolean!
-}
-
-"""Added in 25.18.0. Scaling group with structured configuration"""
-type ScalingGroupV2 implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """
-  Unique name identifying the scaling group.
-  Used as primary key and referenced by agents, sessions, and resource presets.
-  """
-  name: String!
-
-  """
-  Operational status controlling whether this scaling group accepts new sessions
-  and its visibility to users without explicit access grants.
-  """
-  status: ScalingGroupStatus!
-
-  """
-  Administrative metadata including human-readable description
-  and creation timestamp for audit and documentation purposes.
-  """
-  metadata: ScalingGroupMetadata!
-
-  """
-  Network configuration for connecting clients to interactive session services
-  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
-  """
-  network: ScalingGroupNetworkConfig!
-
-  """
-  Session scheduling configuration controlling queue management,
-  agent selection strategy, resource allocation policies,
-  and session lifecycle timeouts.
-  """
-  scheduler: ScalingGroupSchedulerConfig!
-}
-
-"""Added in 25.18.0. Scaling group connection"""
-type ScalingGroupV2Connection
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ScalingGroupV2Edge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ScalingGroupV2Edge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ScalingGroupV2!
 }
 
 type ScalingRule
@@ -8196,17 +7996,6 @@ type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
-}
-
-"""Added in 26.1.0. Scheduler-specific configuration options"""
-type SchedulerConfig
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Number of scheduling retries to skip before attempting to schedule a session.
-  Used to prevent repeated scheduling attempts for sessions that previously failed.
-  """
-  numRetriesToSkip: Int!
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""

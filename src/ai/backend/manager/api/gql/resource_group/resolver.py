@@ -1,9 +1,8 @@
-"""GraphQL query resolvers for scaling group system."""
+"""GraphQL query resolvers for resource group system."""
 
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 import strawberry
 from strawberry import ID, Info
@@ -21,16 +20,16 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 )
 
 from .types import (
-    ScalingGroupFilterGQL,
-    ScalingGroupOrderByGQL,
-    ScalingGroupV2GQL,
+    ResourceGroupFilterGQL,
+    ResourceGroupGQL,
+    ResourceGroupOrderByGQL,
 )
 
 # Pagination specs
 
 
 @lru_cache(maxsize=1)
-def _get_scaling_group_pagination_spec() -> PaginationSpec:
+def _get_resource_group_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ScalingGroupOrders.created_at(ascending=False),
         backward_order=ScalingGroupOrders.created_at(ascending=True),
@@ -41,11 +40,11 @@ def _get_scaling_group_pagination_spec() -> PaginationSpec:
 
 # Connection types
 
-ScalingGroupV2Edge = Edge[ScalingGroupV2GQL]
+ResourceGroupEdge = Edge[ResourceGroupGQL]
 
 
-@strawberry.type(description="Added in 25.18.0. Scaling group connection")
-class ScalingGroupV2Connection(Connection[ScalingGroupV2GQL]):
+@strawberry.type(description="Added in 26.1.0. Resource group connection")
+class ResourceGroupConnection(Connection[ResourceGroupGQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:
@@ -56,19 +55,19 @@ class ScalingGroupV2Connection(Connection[ScalingGroupV2GQL]):
 # Query fields
 
 
-@strawberry.field(description="Added in 25.18.0. List scaling groups for a specific project")
-async def scaling_groups_v2(
+@strawberry.field(description="Added in 26.1.0. List resource groups for a specific project")
+async def resource_groups(
     info: Info[StrawberryGQLContext],
     project: ID,
-    filter: Optional[ScalingGroupFilterGQL] = None,
-    order_by: Optional[list[ScalingGroupOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ScalingGroupV2Connection:
+    filter: ResourceGroupFilterGQL | None = None,
+    order_by: list[ResourceGroupOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ResourceGroupConnection:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
@@ -81,7 +80,7 @@ async def scaling_groups_v2(
             limit=limit,
             offset=offset,
         ),
-        _get_scaling_group_pagination_spec(),
+        _get_resource_group_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
@@ -94,11 +93,11 @@ async def scaling_groups_v2(
         SearchScalingGroupsAction(querier=querier)
     )
 
-    nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
+    nodes = [ResourceGroupGQL.from_dataclass(data) for data in action_result.scaling_groups]
 
-    edges = [ScalingGroupV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
-    return ScalingGroupV2Connection(
+    return ResourceGroupConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=action_result.has_next_page,
@@ -110,18 +109,18 @@ async def scaling_groups_v2(
     )
 
 
-@strawberry.field(description="Added in 25.18.0. List all scaling groups")
-async def all_scaling_groups_v2(
+@strawberry.field(description="Added in 26.1.0. List all resource groups")
+async def all_resource_groups(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ScalingGroupFilterGQL] = None,
-    order_by: Optional[list[ScalingGroupOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ScalingGroupV2Connection:
+    filter: ResourceGroupFilterGQL | None = None,
+    order_by: list[ResourceGroupOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ResourceGroupConnection:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
@@ -134,7 +133,7 @@ async def all_scaling_groups_v2(
             limit=limit,
             offset=offset,
         ),
-        _get_scaling_group_pagination_spec(),
+        _get_resource_group_pagination_spec(),
         filter=filter,
         order_by=order_by,
     )
@@ -143,11 +142,11 @@ async def all_scaling_groups_v2(
         SearchScalingGroupsAction(querier=querier)
     )
 
-    nodes = [ScalingGroupV2GQL.from_dataclass(data) for data in action_result.scaling_groups]
+    nodes = [ResourceGroupGQL.from_dataclass(data) for data in action_result.scaling_groups]
 
-    edges = [ScalingGroupV2Edge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
-    return ScalingGroupV2Connection(
+    return ResourceGroupConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=action_result.has_next_page,

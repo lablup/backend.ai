@@ -115,12 +115,12 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
+from .resource_group import all_resource_groups, resource_groups
 from .resource_usage import (
     domain_usage_buckets,
     project_usage_buckets,
     user_usage_buckets,
 )
-from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -181,8 +181,8 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
-    scaling_groups_v2 = scaling_groups_v2
-    all_scaling_groups_v2 = all_scaling_groups_v2
+    resource_groups = resource_groups
+    all_resource_groups = all_resource_groups
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config

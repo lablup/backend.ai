@@ -38,7 +38,7 @@ from .huggingface_registry import load_huggingface_registries_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
-from .scaling_group import load_scaling_groups_by_names
+from .resource_group import load_resource_groups_by_names
 from .storage_namespace import load_storage_namespaces_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
 
@@ -58,11 +58,11 @@ class DataLoaders:
         self._processors = processors
 
     @cached_property
-    def scaling_group_loader(
+    def resource_group_loader(
         self,
     ) -> DataLoader[str, Optional[ScalingGroupData]]:
         return DataLoader(
-            load_fn=partial(load_scaling_groups_by_names, self._processors.scaling_group)
+            load_fn=partial(load_resource_groups_by_names, self._processors.scaling_group)
         )
 
     @cached_property
