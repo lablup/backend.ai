@@ -5,7 +5,7 @@ Storage-Proxy handles file storage operations for virtual folders (vfolders). It
 ## Current State
 
 Storage-Proxy does not have standardized request_id support:
-- No `request_id_middleware`
+- No HTTP middleware for request ID
 - No `X-Backend-Request-ID` in responses
 - Background tasks have no request_id
 
@@ -13,13 +13,13 @@ Storage-Proxy does not have standardized request_id support:
 
 ### HTTP Middleware
 
-Apply `request_id_middleware` to handle:
+Apply HTTP middleware for request ID handling:
 - Incoming requests from Manager (with `X-Backend-Request-ID`)
 - Direct client requests (generate new request_id)
 
 ### Background Operations
 
-Apply `@with_request_id_context` to background tasks:
+Apply context binding decorator to background tasks:
 - File cleanup tasks
 - Storage sync operations
 - Clone/copy operations
@@ -62,6 +62,6 @@ When clients access Storage-Proxy directly (e.g., presigned URLs), Storage-Proxy
 
 ## Implementation Checklist
 
-- [ ] Apply `request_id_middleware` to main app
+- [ ] Apply HTTP middleware to main app
 - [ ] Response includes `X-Backend-Request-ID`
-- [ ] `@with_request_id_context` on background tasks
+- [ ] Context binding decorator on background tasks

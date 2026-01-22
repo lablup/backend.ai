@@ -53,16 +53,17 @@ Embed headers in the message body:
 }
 ```
 
-### Headers Model
+### Headers Model (Example)
 
 ```python
-class RPCHeaders(BaseModel):
+# Pydantic model for RPC headers
+class RPCHeadersModel(BaseModel):
     request_id: str | None = None
     # Extensible for future tracing
     correlation_id: str | None = None
     trace_id: str | None = None
     span_id: str | None = None
-    
+
     class Config:
         extra = "allow"
 ```
@@ -87,7 +88,7 @@ Legacy Agents ignore unknown `headers` field. New Agents use it for tracing.
 
 ## Implementation Checklist
 
-- [ ] Add `RPCHeaders` model
+- [ ] Add RPC headers model to common
 - [ ] Update Agent RPC dispatcher for new format
 - [ ] Add legacy format fallback
 - [ ] Update Manager to send headers

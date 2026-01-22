@@ -31,7 +31,7 @@ Client                    Coordinator                   Worker                  
 ## Current State
 
 App-Proxy (Coordinator and Worker) does not have request_id support:
-- No `request_id_middleware`
+- No HTTP middleware for request ID
 - No request_id propagation between Coordinator and Worker
 - No request_id in WebSocket/SSE connections
 
@@ -39,7 +39,7 @@ App-Proxy (Coordinator and Worker) does not have request_id support:
 
 ### 1. Apply Standard Middleware
 
-Apply `request_id_middleware` to both Coordinator and Worker aiohttp applications.
+Apply HTTP middleware for request ID to both Coordinator and Worker aiohttp applications.
 
 ### 2. Coordinator → Worker Propagation
 
@@ -106,13 +106,13 @@ Client                    Coordinator                   Worker
 
 ### Coordinator
 
-- [ ] Apply `request_id_middleware`
+- [ ] Apply HTTP middleware for request ID
 - [ ] Propagate `X-Backend-Request-ID` to Worker
 - [ ] Store origin_request_id in session info
 - [ ] Handle WebSocket connections with session context
 
 ### Worker
 
-- [ ] Apply `request_id_middleware`
+- [ ] Apply HTTP middleware for request ID
 - [ ] Propagate `X-Backend-Request-ID` to applications
 - [ ] Handle streaming responses with proper context

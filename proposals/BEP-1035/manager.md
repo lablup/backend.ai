@@ -6,7 +6,7 @@ The Manager serves as the central hub in Backend.AI's architecture. It receives 
 
 ### HTTP API
 
-Apply `request_id_middleware` to the aiohttp application. The middleware:
+Apply HTTP middleware to the aiohttp application. The middleware:
 1. Extracts `X-Backend-Request-ID` header if present
 2. Generates new request ID if not present
 3. Binds request ID to context
@@ -14,7 +14,7 @@ Apply `request_id_middleware` to the aiohttp application. The middleware:
 
 ### Background Tasks
 
-Apply `@with_request_id_context` decorator to background tasks that don't originate from HTTP requests.
+Apply context binding decorator to background tasks that don't originate from HTTP requests. The decorator auto-generates request ID and binds it to the async context.
 
 ### Message Queue Event Handlers
 
@@ -28,7 +28,7 @@ Manager communicates with Agents via Callosum RPC. Include request ID in the req
 
 ```python
 request_body = {
-    "headers": {"request_id": current_request_id()},
+    "headers": {"request_id": get_current_request_id()},  # from context
     "args": args,
     "kwargs": kwargs,
 }
@@ -89,8 +89,8 @@ Client                    Manager               Storage-Proxy
 
 ## Implementation Checklist
 
-- [ ] `request_id_middleware` applied to main app and sub-apps
-- [ ] `@with_request_id_context` on background tasks
+- [ ] HTTP middleware applied to main app and sub-apps
+- [ ] Context binding decorator on background tasks
 - [ ] Agent RPC calls include headers
 - [ ] Storage-Proxy/App-Proxy HTTP calls include header
 - [ ] Event system propagates request_id

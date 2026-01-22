@@ -108,7 +108,6 @@ Detailed specifications are organized into component-specific documents:
 
 | Document | Description |
 |----------|-------------|
-| [common.md](./BEP-1035/common.md) | Common infrastructure: ContextVar, middleware, utilities |
 | [manager.md](./BEP-1035/manager.md) | Manager component: entry points, outbound propagation |
 | [agent.md](./BEP-1035/agent.md) | Agent component: RPC headers design |
 | [storage-proxy.md](./BEP-1035/storage-proxy.md) | Storage-Proxy component |
@@ -118,19 +117,19 @@ Detailed specifications are organized into component-specific documents:
 
 | Component | Current State | Target State | Priority |
 |-----------|--------------|--------------|----------|
-| Common | `request_id_middleware` only | Add utilities, `RPCHeaders` model | High |
+| Common | HTTP middleware only | Add utilities, RPC headers model | High |
 | Manager | HTTP middleware only | Propagate to all outbound calls | High |
 | Agent | No request_id support | RPC headers support | High |
-| Storage-Proxy | HTTP middleware only | Add background task decorator | Low |
+| Storage-Proxy | HTTP middleware only | Add context binding for background tasks | Low |
 | App-Proxy | No request_id support | Add middleware | Medium |
 
 ## Migration Plan
 
 ### Phase 1: Common Infrastructure
 
-1. Add `RPCHeaders` Pydantic model to common
-2. Add `@with_request_id_context` decorator
-3. Add utilities (`bind_request_id`, `current_request_id`, etc.)
+1. Add RPC headers model to common
+2. Add decorator for background task/event handler context binding
+3. Add context utilities for request ID propagation
 
 ### Phase 2: Agent RPC Headers
 
@@ -140,12 +139,12 @@ Detailed specifications are organized into component-specific documents:
 
 ### Phase 3: App-Proxy Standardization
 
-1. Add `request_id_middleware` to Coordinator and Worker
+1. Add HTTP middleware for request ID to Coordinator and Worker
 2. Ensure Worker ↔ Coordinator propagation
 
 ### Phase 4: Full Coverage
 
-1. Add `@with_request_id_context` to all background tasks
+1. Apply context binding decorator to all background tasks and event handlers
 2. Add request_id to event system metadata
 
 ## Backward Compatibility
@@ -161,7 +160,7 @@ Version detection via Agent capability advertisement.
 
 ### HTTP Services
 
-HTTP services can adopt `request_id_middleware` incrementally - no breaking changes.
+HTTP services can adopt request ID middleware incrementally - no breaking changes.
 
 ## Open Questions
 
