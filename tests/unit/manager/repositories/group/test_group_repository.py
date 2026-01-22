@@ -10,7 +10,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -743,7 +749,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=project_resource_policy,
             type=ProjectType.GENERAL,
@@ -769,7 +775,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=nonexistent_policy,
             type=ProjectType.GENERAL,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -20,7 +20,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     description: Optional[str] = None
     is_active: Optional[bool] = None
     total_resource_slots: Optional[ResourceSlot] = None
-    allowed_vfolder_hosts: Optional[dict[str, str]] = None
+    allowed_vfolder_hosts: Optional[VFolderHostPermissionMap] = None
     integration_id: Optional[str] = None
     resource_policy: Optional[str] = None
     container_registry: Optional[dict[str, str]] = None

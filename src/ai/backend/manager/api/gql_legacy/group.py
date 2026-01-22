@@ -22,7 +22,7 @@ from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -394,7 +394,9 @@ class Group(graphene.ObjectType):
             total_resource_slots=dto.total_resource_slots.to_json()
             if dto.total_resource_slots
             else {},
-            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json()
+            if dto.allowed_vfolder_hosts
+            else {},
             integration_id=dto.integration_id,
             resource_policy=dto.resource_policy,
             type=dto.type.name,
@@ -569,7 +571,11 @@ class GroupInput(graphene.InputObjectType):
             if self.total_resource_slots is Undefined
             else ResourceSlot.from_user_input(self.total_resource_slots, None)
         )
-        allowed_vfolder_hosts_val = value_or_none(self.allowed_vfolder_hosts)
+        allowed_vfolder_hosts_val = (
+            None
+            if self.allowed_vfolder_hosts is Undefined
+            else VFolderHostPermissionMap(self.allowed_vfolder_hosts)
+        )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)
