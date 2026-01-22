@@ -116,51 +116,6 @@ Detailed specifications are organized into component-specific documents:
 | [storage-proxy.md](./BEP-1035/storage-proxy.md) | Storage-Proxy component |
 | [app-proxy.md](./BEP-1035/app-proxy.md) | App-Proxy Coordinator and Worker |
 
-### Key Design Decisions
-
-#### 1. RPC Header Structure (Extensible)
-
-For Agent RPC calls via Callosum (which doesn't support separate headers), we embed headers in the body:
-
-```python
-# Request Structure
-{
-    "headers": {
-        "request_id": "550e8400-e29b-41d4-a716-446655440000",
-        "correlation_id": "...",    # Optional, future
-        "trace_id": "...",          # Optional, OpenTelemetry
-        "span_id": "...",           # Optional, OpenTelemetry
-    },
-    "args": [...],
-    "kwargs": {...}
-}
-
-# Response Structure
-{
-    "headers": {
-        "request_id": "550e8400-e29b-41d4-a716-446655440000",
-    },
-    "result": {...}  # or "error": {...}
-}
-```
-
-See [agent.md](./BEP-1035/agent.md) for complete RPC headers specification.
-
-#### 2. HTTP Header Standard
-
-| Header Name | Direction | Description |
-|-------------|-----------|-------------|
-| `X-Backend-Request-ID` | Request/Response | Primary request identifier, echoed in response |
-
-#### 3. Request ID Format
-
-```
-Format: "{uuid4}"
-Example: "550e8400-e29b-41d4-a716-446655440000"
-```
-
-Generated using `uuid.uuid4()`.
-
 ## Implementation Status
 
 | Component | Current State | Target State | Priority |
