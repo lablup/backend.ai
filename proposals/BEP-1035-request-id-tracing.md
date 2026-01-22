@@ -72,36 +72,34 @@ This leads to:
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Request Flow                                    │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    External Request                 Background Task
-          │                                │
-          ▼                                ▼
-    ┌─────────────┐                 ┌─────────────────┐
-    │    HTTP     │                 │   Auto-generate │
-    │ middleware  │                 │   request_id    │
-    └──────┬──────┘                 └────────┬────────┘
-           │                                 │
-           ▼                                 ▼
-    ┌─────────────────────────────────────────────────┐
-    │              _request_id_var (ContextVar)        │
-    │                                                  │
-    │   current_request_id() → str | None             │
-    │   bind_request_id(id) → context manager         │
-    └──────────────────────────────────────────────────┘
-           │
-           ├──────────────────┬──────────────────┬────────────────────┐
-           ▼                  ▼                  ▼                    ▼
-    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-    │    Agent    │    │  Storage-   │    │  App-Proxy  │    │   Event     │
-    │    (RPC)    │    │   Proxy     │    │    (HTTP)   │    │   System    │
-    │             │    │   (HTTP)    │    │             │    │             │
-    │ headers: {  │    │ X-Request-  │    │ X-Request-  │    │ metadata: { │
-    │  request_id │    │    ID       │    │    ID       │    │  request_id │
-    │ }           │    │             │    │             │    │ }           │
-    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+  External Request              Background Task / Event Handler
+        │                                  │
+        ▼                                  ▼
+  ┌───────────┐                    ┌───────────────┐
+  │   HTTP    │                    │ Auto-generate │
+  │ Middleware│                    │  request_id   │
+  └─────┬─────┘                    └───────┬───────┘
+        │                                  │
+        └────────────────┬─────────────────┘
+                         ▼
+         ┌───────────────────────────────────────┐
+         │     _request_id_var (ContextVar)      │
+         │                                       │
+         │  current_request_id() → str | None    │
+         │  bind_request_id(id) → context manager│
+         └───────────────────┬───────────────────┘
+                             │
+           ┌─────────────────┼─────────────────┐
+           │                 │                 │
+           ▼                 ▼                 ▼
+    ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+    │    Agent    │   │   Storage   │   │  App-Proxy  │
+    │    (RPC)    │   │    Proxy    │   │   (HTTP)    │
+    │             │   │   (HTTP)    │   │             │
+    │ headers: {  │   │ X-Backend-  │   │ X-Backend-  │
+    │  request_id │   │ Request-ID  │   │ Request-ID  │
+    │ }           │   │             │   │             │
+    └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
 ## Detailed Design
