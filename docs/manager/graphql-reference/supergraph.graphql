@@ -7419,11 +7419,6 @@ input ResourceGroupFilter
   @join__type(graph: STRAWBERRY)
 {
   name: StringFilter = null
-  description: StringFilter = null
-  isActive: Boolean = null
-  isPublic: Boolean = null
-  scheduler: String = null
-  useHostNetwork: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -7449,9 +7444,6 @@ enum ResourceGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
-  CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
-  IS_PUBLIC @join__enumValue(graph: STRAWBERRY)
 }
 
 type ResourceLimit

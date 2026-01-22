@@ -65,9 +65,6 @@ class ResourceGroupGQL(Node):
 )
 class ResourceGroupOrderFieldGQL(StrEnum):
     NAME = "name"
-    CREATED_AT = "created_at"
-    IS_ACTIVE = "is_active"
-    IS_PUBLIC = "is_public"
 
 
 @strawberry.input(
@@ -141,9 +138,3 @@ class ResourceGroupOrderByGQL(GQLOrderBy):
         match self.field:
             case ResourceGroupOrderFieldGQL.NAME:
                 return ScalingGroupOrders.name(ascending)
-            case ResourceGroupOrderFieldGQL.CREATED_AT:
-                return ScalingGroupOrders.created_at(ascending)
-            case ResourceGroupOrderFieldGQL.IS_ACTIVE:
-                return ScalingGroupOrders.is_active(ascending)
-            case ResourceGroupOrderFieldGQL.IS_PUBLIC:
-                return ScalingGroupOrders.is_public(ascending)
