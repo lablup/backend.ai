@@ -14,8 +14,6 @@ Both types share the same quota mechanism via `StorageNamespaceRow.max_size`.
 
 ## Data Model
 
-### Current Structure
-
 ```
 ┌─────────────────────────┐
 │ object_storage          │
@@ -33,7 +31,8 @@ Both types share the same quota mechanism via `StorageNamespaceRow.max_size`.
 ├─────────────────────────┤
 │ id                      │◄─────────────────────────────────────┐
 │ storage_id              │                                      │
-│ namespace (bucket name) │                                      │
+│ namespace               │                                      │
+│ max_size (NEW)          │  ◄── NULL = unlimited, in bytes      │
 └─────────────────────────┘                                      │
                                                                   │
 ┌─────────────────────────┐      ┌─────────────────────────┐     │
@@ -60,19 +59,6 @@ Both types share the same quota mechanism via `StorageNamespaceRow.max_size`.
 │ version                 │
 │ size                    │  ◄── Individual revision size
 │ status                  │
-└─────────────────────────┘
-```
-
-### Proposed: Add max_size
-
-```
-┌─────────────────────────┐
-│ storage_namespace       │
-├─────────────────────────┤
-│ id                      │
-│ storage_id              │
-│ namespace               │
-│ max_size (NEW)          │  ◄── NULL = unlimited, in bytes
 └─────────────────────────┘
 ```
 
