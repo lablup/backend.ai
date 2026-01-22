@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -865,3 +866,32 @@ class SchedulerRepository:
             min_priority: Minimum priority floor (priority will not go below this)
         """
         await self._db_source.lower_session_priority(session_ids, amount, min_priority)
+
+    async def update_kernels_last_observed_at(
+        self,
+        kernel_observation_times: Mapping[UUID, datetime],
+    ) -> int:
+        """Update the last_observed_at timestamp for multiple kernels.
+
+        Used by fair share observer to record when kernels were last observed
+        for resource usage tracking. Each kernel can have a different observation
+        time (e.g., terminated kernels use terminated_at, running kernels use now).
+
+        Args:
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+
+        Returns:
+            Number of kernels updated
+        """
+        return await self._db_source.update_kernels_last_observed_at(kernel_observation_times)
+
+    async def get_db_now(self) -> datetime:
+        """Get the current timestamp from the database.
+
+        Used for consistent time handling across HA environments
+        where server clocks may differ.
+
+        Returns:
+            Current database timestamp with timezone
+        """
+        return await self._db_source.get_db_now()

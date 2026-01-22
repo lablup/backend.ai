@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Final, Optional
 
 from dateutil.tz import tzutc
 
@@ -41,7 +41,7 @@ from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.pagination import NoPagination
+from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, SessionConditions
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -59,6 +59,7 @@ from ai.backend.manager.types import DistributedLockFactory
 from .factory import CoordinatorHandlers
 from .handlers import SessionLifecycleHandler
 from .handlers.kernel import KernelLifecycleHandler
+from .handlers.observer import KernelObserver
 from .hooks.registry import HookRegistry
 from .kernel import KernelStateEngine
 from .post_processors import (
@@ -87,6 +88,9 @@ STATUS_TIMEOUT_MAP: dict[SessionStatus, float] = {
     SessionStatus.PULLING: 900.0,  # 15 minutes
     SessionStatus.CREATING: 600.0,  # 10 minutes
 }
+
+# Batch size for observer kernel processing
+_OBSERVER_BATCH_SIZE: Final[int] = 500
 
 
 @dataclass
@@ -233,7 +237,12 @@ class ScheduleCoordinator:
         Returns:
             True if operation was performed, False otherwise
         """
-        # Check promotion specs first, then kernel handlers, then lifecycle handlers
+        # Check kernel observers first (no state transitions)
+        kernel_observer = self._handlers.kernel_observers.get(schedule_type)
+        if kernel_observer:
+            return await self._process_observer_schedule(schedule_type, kernel_observer)
+
+        # Check promotion specs, then kernel handlers, then lifecycle handlers
         promotion_spec = self._handlers.promotion_specs.get(schedule_type)
         if promotion_spec:
             return await self._process_promotion_schedule(schedule_type, promotion_spec)
@@ -404,6 +413,111 @@ class ScheduleCoordinator:
                 e,
             )
             raise
+
+    async def _process_observer_schedule(
+        self,
+        schedule_type: ScheduleType,
+        observer: KernelObserver,
+    ) -> bool:
+        """Process a kernel observer schedule type.
+
+        Observers do not change kernel state - they only collect data.
+        Used for fair share usage tracking, metrics collection, etc.
+
+        Args:
+            schedule_type: Type of scheduling operation
+            observer: The kernel observer to execute
+
+        Returns:
+            True if operation was performed, False otherwise
+        """
+        try:
+            log.debug("Processing observer schedule type: {}", schedule_type.value)
+
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
+
+                # Process each scaling group in parallel
+                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+
+                results = await asyncio.gather(
+                    *[
+                        self._process_observer_scaling_group(observer, scaling_group)
+                        for scaling_group in scaling_groups
+                    ],
+                    return_exceptions=True,
+                )
+
+                # Log any exceptions that occurred during parallel processing
+                for scaling_group, result in zip(scaling_groups, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error(
+                            "Error observing scaling group {} for {}: {}",
+                            scaling_group,
+                            schedule_type.value,
+                            result,
+                        )
+
+            return True
+
+        except Exception as e:
+            log.exception(
+                "Error processing observer schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_observer_scaling_group(
+        self,
+        observer: KernelObserver,
+        scaling_group: str,
+    ) -> None:
+        """Process a single scaling group for the given observer.
+
+        This method:
+        1. Queries kernels using observer's query condition
+        2. Processes kernels in batches with pagination
+        3. Executes observer logic (no state transitions)
+        4. Emits metrics
+
+        Args:
+            observer: The kernel observer to execute
+            scaling_group: The scaling group to process
+        """
+        condition = observer.get_query_condition(scaling_group)
+
+        # Process in batches with pagination for large result sets
+        offset = 0
+        total_observed = 0
+
+        while True:
+            querier = BatchQuerier(
+                pagination=OffsetPagination(limit=_OBSERVER_BATCH_SIZE, offset=offset),
+                conditions=[condition],
+            )
+
+            kernel_result = await self._repository.search_kernels_for_handler(querier)
+
+            if not kernel_result.items:
+                break
+
+            # Execute observer logic (no status transitions)
+            result = await observer.observe(scaling_group, kernel_result.items)
+            total_observed += result.observed_count
+
+            # Check if there are more pages
+            if not kernel_result.has_next_page:
+                break
+
+            offset += _OBSERVER_BATCH_SIZE
+
+        # Emit metrics (total observed count across all batches)
+        if total_observed > 0:
+            self._operation_metrics.observe_success(
+                operation=observer.name(),
+                count=total_observed,
+            )
 
     async def _process_kernel_scaling_group(
         self,
@@ -1459,6 +1573,13 @@ class ScheduleCoordinator:
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
+            ),
+            # Fair share observation - records RUNNING kernel usage for fair share calculation
+            SchedulerTaskSpec(
+                ScheduleType.OBSERVE_FAIR_SHARE,
+                short_interval=None,  # No short-cycle task for observation
+                long_interval=300.0,  # 5 minutes
+                initial_delay=60.0,  # Start 1 minute after manager starts
             ),
         ]
 

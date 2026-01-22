@@ -1702,6 +1702,7 @@ class TestSearchKernels:
                 status_data=None,
                 status_history=None,
                 last_seen=datetime.now(tzutc()),
+                last_observed_at=None,
             ),
             metrics=Metrics(
                 num_queries=0,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
         UserUsageBucketRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.sokovan.scheduler.fair_share import UsageBucketAggregationResult
 
 
 __all__ = ("ResourceUsageHistoryRepository",)
@@ -91,6 +92,64 @@ class ResourceUsageHistoryRepository:
         per-period usage slices for all running kernels.
         """
         return await self._db_source.bulk_create_kernel_usage_records(bulk_creator)
+
+    @resource_usage_history_repository_resilience.apply()
+    async def bulk_create_kernel_usage_records_with_observation_update(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Bulk create kernel usage records and update observation timestamps atomically.
+
+        This method performs both operations in a single transaction for data consistency:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+
+        Used by FairShareObserver to record usage and update observation state atomically.
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        return await self._db_source.bulk_create_kernel_usage_records_with_observation_update(
+            bulk_creator, kernel_observation_times
+        )
+
+    @resource_usage_history_repository_resilience.apply()
+    async def record_fair_share_observation(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+        aggregation_result: UsageBucketAggregationResult,
+        decay_unit_days: int = 1,
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Record fair share observation data atomically.
+
+        This method combines all fair share observation writes in a single transaction:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+        3. Increment user/project/domain usage buckets
+
+        By performing all writes in a single transaction, we ensure data consistency
+        even if the server crashes mid-operation.
+
+        Used by FairShareObserver as the single entry point for all DB writes.
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+            aggregation_result: Aggregated usage deltas for bucket updates
+            decay_unit_days: Decay unit days for new buckets (default: 1)
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        return await self._db_source.record_fair_share_observation(
+            bulk_creator, kernel_observation_times, aggregation_result, decay_unit_days
+        )
 
     @resource_usage_history_repository_resilience.apply()
     async def search_kernel_usage_records(
@@ -228,3 +287,25 @@ class ResourceUsageHistoryRepository:
         return await self._db_source.get_aggregated_usage_by_domain(
             resource_group, lookback_start, lookback_end
         )
+
+    # ==================== Bucket Delta Updates ====================
+
+    @resource_usage_history_repository_resilience.apply()
+    async def increment_usage_buckets(
+        self,
+        aggregation_result: UsageBucketAggregationResult,
+        decay_unit_days: int = 1,
+    ) -> None:
+        """Increment usage buckets with aggregated deltas.
+
+        For each bucket key:
+        - If bucket exists: add delta to existing resource_usage
+        - If bucket doesn't exist: create new bucket with delta as resource_usage
+
+        All operations are performed in a single transaction for consistency.
+
+        Args:
+            aggregation_result: Aggregated usage deltas from FairShareAggregator
+            decay_unit_days: Decay unit days for new buckets (default: 1)
+        """
+        return await self._db_source.increment_usage_buckets(aggregation_result, decay_unit_days)
