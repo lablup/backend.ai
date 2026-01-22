@@ -9152,7 +9152,7 @@
     },
     "/group/registry-quota": {
       "post": {
-        "operationId": "group.create_registry_quota",
+        "operationId": "group.create_project_registry_quota",
         "tags": [
           "group"
         ],
@@ -9192,7 +9192,7 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
-        "operationId": "group.read_registry_quota",
+        "operationId": "group.read_project_registry_quota",
         "tags": [
           "group"
         ],
@@ -9219,7 +9219,7 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
-        "operationId": "group.update_registry_quota",
+        "operationId": "group.update_project_registry_quota",
         "tags": [
           "group"
         ],
@@ -9259,7 +9259,7 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "delete": {
-        "operationId": "group.delete_registry_quota",
+        "operationId": "group.delete_project_registry_quota",
         "tags": [
           "group"
         ],
