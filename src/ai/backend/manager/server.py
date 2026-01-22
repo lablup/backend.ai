@@ -1337,23 +1337,13 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """
+    DEPRECATED: This context is being phased out in favor of ProcessorsCtx pattern.
+    The registry quota service has been migrated to services/registry_quota/.
+    """
     from .service.base import ServicesContext
-    from .service.container_registry.base import PerProjectRegistryQuotaRepository
-    from .service.container_registry.harbor import (
-        PerProjectContainerRegistryQuotaClientPool,
-        PerProjectContainerRegistryQuotaService,
-    )
 
-    db = root_ctx.db
-
-    per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
-        repository=PerProjectRegistryQuotaRepository(db),
-        client_pool=PerProjectContainerRegistryQuotaClientPool(),
-    )
-
-    root_ctx.services_ctx = ServicesContext(
-        per_project_container_registries_quota,
-    )
+    root_ctx.services_ctx = ServicesContext()
     yield None
 
 

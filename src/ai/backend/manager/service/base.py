@@ -1,19 +1,17 @@
-from .container_registry.harbor import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
+"""
+DEPRECATED: This module is being phased out in favor of ProcessorsCtx pattern.
+The registry quota service has been migrated to services/registry_quota/.
+"""
 
 
 class ServicesContext:
     """
+    DEPRECATED: This class is being phased out in favor of ProcessorsCtx pattern.
+
     In the API layer, requests are processed through the ServicesContext and
     its subordinate layers, including the DB, Client, and Repository layers.
     Each layer separates the responsibilities specific to its respective level.
     """
 
-    per_project_container_registries_quota: AbstractPerProjectContainerRegistryQuotaService
-
-    def __init__(
-        self,
-        per_project_container_registries_quota: AbstractPerProjectContainerRegistryQuotaService,
-    ) -> None:
-        self.per_project_container_registries_quota = per_project_container_registries_quota
+    def __init__(self) -> None:
+        pass
