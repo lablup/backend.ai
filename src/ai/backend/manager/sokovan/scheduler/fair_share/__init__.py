@@ -13,14 +13,12 @@ from .aggregator import (
     UserUsageBucketKey,
 )
 from .calculator import (
-    DecayedUsageResult,
     DomainFactorResult,
     FairShareFactorCalculationResult,
     FairShareFactorCalculator,
     ProjectFactorResult,
     UserFactorResult,
-    aggregate_with_decay,
-    apply_time_decay,
+    UserSchedulingRank,
 )
 
 __all__ = [
@@ -32,12 +30,10 @@ __all__ = [
     "UsageBucketAggregationResult",
     "UserUsageBucketKey",
     # Calculator
-    "DecayedUsageResult",
     "DomainFactorResult",
     "FairShareFactorCalculationResult",
     "FairShareFactorCalculator",
     "ProjectFactorResult",
     "UserFactorResult",
-    "aggregate_with_decay",
-    "apply_time_decay",
+    "UserSchedulingRank",
 ]

@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -217,8 +217,6 @@ class FairShareAggregator:
         Returns:
             List of (period_date, resource_usage) tuples
         """
-        from datetime import timedelta
-
         result: list[tuple[date, ResourceSlot]] = []
 
         total_seconds = (spec.period_end - spec.period_start).total_seconds()

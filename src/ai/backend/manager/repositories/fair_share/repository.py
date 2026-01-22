@@ -19,6 +19,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
+    FairShareCalculationContext,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
@@ -230,26 +231,7 @@ class FairShareRepository:
             resource_group, calculation_result, lookback_start, lookback_end
         )
 
-    @fair_share_repository_resilience.apply()
-    async def get_all_fair_shares_for_resource_group(
-        self,
-        resource_group: str,
-    ) -> tuple[
-        dict[str, DomainFairShareData],
-        dict[uuid.UUID, ProjectFairShareData],
-        dict[tuple[uuid.UUID, uuid.UUID], UserFairShareData],
-    ]:
-        """Get all fair share records for a resource group.
-
-        Used for factor calculation to get current weights and configurations.
-
-        Args:
-            resource_group: The resource group to query
-
-        Returns:
-            Tuple of (domain_fair_shares, project_fair_shares, user_fair_shares)
-        """
-        return await self._db_source.get_all_fair_shares_for_resource_group(resource_group)
+    # ==================== Batched Reads ====================
 
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share_factors_batch(
@@ -274,3 +256,26 @@ class FairShareRepository:
         return await self._db_source.get_user_fair_share_factors_batch(
             resource_group, project_user_ids
         )
+
+    @fair_share_repository_resilience.apply()
+    async def get_fair_share_calculation_context(
+        self,
+        scaling_group: str,
+        today: date,
+    ) -> FairShareCalculationContext:
+        """Get all data needed for fair share factor calculation.
+
+        Fetches scaling group config, fair share records, and decayed usages
+        in one database session for consistency and efficiency.
+
+        Args:
+            scaling_group: The scaling group name
+            today: Current date for decay calculation
+
+        Returns:
+            FairShareCalculationContext containing all data for factor calculation
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group doesn't exist
+        """
+        return await self._db_source.get_fair_share_calculation_context(scaling_group, today)

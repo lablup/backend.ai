@@ -35,21 +35,22 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Default fair share configuration
-DEFAULT_HALF_LIFE_DAYS = 7
-DEFAULT_LOOKBACK_DAYS = 28
-
 
 class FairShareObserver(KernelObserver):
     """Observes kernels and updates fair share data.
 
-    This observer performs four main operations:
-    1. Records kernel resource usage (resource-seconds)
-    2. Updates last_observed_at for observed kernels
-    3. Aggregates usage into daily buckets (user/project/domain)
-    4. Calculates and updates fair share factors
+    This observer performs operations in two main phases:
 
-    All DB writes are performed in transactions to ensure data consistency.
+    Phase 1: Usage Recording
+    - Prepare kernel usage records (pure computation)
+    - Aggregate to daily buckets (pure computation)
+    - Persist usage data to DB
+
+    Phase 2: Factor and Rank Calculation
+    - Read fair shares and decayed usages from DB (batched)
+    - Calculate fair share factors (pure computation)
+    - Calculate scheduling ranks from factors (pure computation)
+    - Persist factors and ranks to DB (batched)
 
     Targets:
     - Running kernels (terminated_at IS NULL, starts_at IS NOT NULL)
@@ -105,11 +106,18 @@ class FairShareObserver(KernelObserver):
     ) -> ObservationResult:
         """Observe kernel usage and update fair share data.
 
-        All operations are performed in phases:
-        1. Pure computation: prepare usage records and aggregate to buckets
-        2. Atomic DB write: persist usage data
-        3. Calculate fair share factors from aggregated usage
-        4. Update fair share tables with new factors
+        Operations are performed in two phases for efficient DB batching:
+
+        Phase 1: Record usage
+        - Prepare usage records (pure)
+        - Aggregate to buckets (pure)
+        - DB write: usage records + bucket increments
+
+        Phase 2: Calculate and update factors + ranks
+        - DB read: fair shares + decayed usages (batched)
+        - Calculate factors (pure)
+        - Calculate ranks from factors (pure, no DB read)
+        - DB write: factors + ranks (batched)
 
         Args:
             scaling_group: The scaling group being processed
@@ -118,107 +126,91 @@ class FairShareObserver(KernelObserver):
         Returns:
             ObservationResult containing observed count
         """
-        # ===== Phase 1: Record usage (even if no kernels, still calculate factors) =====
-        observed_count = 0
+        if not kernels:
+            return ObservationResult(observed_count=0)
+
         now = await self._scheduler_repository.get_db_now()
 
-        if kernels:
-            # Prepare kernel usage records
-            preparation_result = self._aggregator.prepare_kernel_usage_records(
-                kernels, scaling_group, now
-            )
+        # ===== Phase 1: Record usage =====
+        preparation_result = self._aggregator.prepare_kernel_usage_records(
+            kernels, scaling_group, now
+        )
 
-            if preparation_result.specs:
-                # Aggregate to daily buckets (pure computation)
-                aggregation_result = self._aggregator.aggregate_kernel_usage_to_buckets(
-                    preparation_result.specs
-                )
+        if not preparation_result.specs:
+            return ObservationResult(observed_count=0)
 
-                # Atomic DB write for usage records
-                bulk_creator = BulkCreator(specs=preparation_result.specs)
-                await self._resource_usage_repository.record_fair_share_observation(
-                    bulk_creator,
-                    preparation_result.kernel_observation_times,
-                    aggregation_result,
-                )
-                observed_count = preparation_result.observed_count
+        # Aggregate to daily buckets (pure computation)
+        aggregation_result = self._aggregator.aggregate_kernel_usage_to_buckets(
+            preparation_result.specs
+        )
 
-        # ===== Phase 2: Calculate and update fair share factors =====
-        await self._calculate_and_update_factors(scaling_group, now.date())
+        # Atomic DB write for usage records
+        bulk_creator = BulkCreator(specs=preparation_result.specs)
+        await self._resource_usage_repository.record_fair_share_observation(
+            bulk_creator,
+            preparation_result.kernel_observation_times,
+            aggregation_result,
+        )
 
-        return ObservationResult(observed_count=observed_count)
+        # ===== Phase 2: Calculate and update factors + ranks =====
+        await self._calculate_and_update_factors_and_ranks(scaling_group, now.date())
 
-    async def _calculate_and_update_factors(
+        return ObservationResult(observed_count=preparation_result.observed_count)
+
+    async def _calculate_and_update_factors_and_ranks(
         self,
         scaling_group: str,
         today: date,
     ) -> None:
-        """Calculate fair share factors and update tables.
+        """Calculate fair share factors and scheduling ranks, then update tables.
+
+        This method batches DB operations:
+        1. READ: scaling group config + fair shares + decayed usages (single session)
+        2. PURE: calculate factors from usage with config
+        3. PURE: calculate ranks from factors (no DB read needed)
+        4. WRITE: update factors + ranks together
 
         Args:
             scaling_group: The scaling group being processed
             today: Current date for decay calculation
         """
-        # Get fair share configuration (use defaults for now)
-        # TODO: Get from scaling group configuration
-        half_life_days = DEFAULT_HALF_LIFE_DAYS
-        lookback_days = DEFAULT_LOOKBACK_DAYS
-
         try:
-            # Get current fair share records for weights
-            (
-                domain_fair_shares,
-                project_fair_shares,
-                user_fair_shares,
-            ) = await self._fair_share_repository.get_all_fair_shares_for_resource_group(
-                scaling_group
-            )
-
-            # Get aggregated usage with decay
-            domain_usages = await self._resource_usage_repository.get_decayed_usage_by_domain(
-                scaling_group, today, half_life_days, lookback_days
-            )
-            project_usages = await self._resource_usage_repository.get_decayed_usage_by_project(
-                scaling_group, today, half_life_days, lookback_days
-            )
-            user_usages = await self._resource_usage_repository.get_decayed_usage_by_user(
-                scaling_group, today, half_life_days, lookback_days
+            # ===== Single batched DB read =====
+            # Get all data needed for calculation in one database session
+            context = await self._fair_share_repository.get_fair_share_calculation_context(
+                scaling_group, today
             )
 
             # Skip if no usage data
-            if not domain_usages and not project_usages and not user_usages:
+            if context.raw_usage_buckets.is_empty():
                 return
 
-            # Calculate factors
-            lookback_start = today - timedelta(days=lookback_days)
-            calculation_result = self._calculator.calculate_factors(
-                domain_usages=domain_usages,
-                project_usages=project_usages,
-                user_usages=user_usages,
-                domain_fair_shares=domain_fair_shares,
-                project_fair_shares=project_fair_shares,
-                user_fair_shares=user_fair_shares,
-                lookback_start=lookback_start,
-                lookback_end=today,
-            )
+            # ===== Pure computation: factors + ranks =====
+            calculation_result = self._calculator.calculate_factors(context)
 
-            # Update fair share tables
-            if (
+            # Skip if no results
+            if not (
                 calculation_result.domain_results
                 or calculation_result.project_results
                 or calculation_result.user_results
             ):
-                await self._fair_share_repository.bulk_update_fair_share_factors(
-                    scaling_group,
-                    calculation_result,
-                    lookback_start,
-                    today,
-                )
+                return
+
+            # Calculate lookback_start for DB write
+            lookback_start = today - timedelta(days=context.lookback_days)
+
+            # ===== Batched DB write: factors + ranks =====
+            await self._fair_share_repository.bulk_update_fair_share_factors(
+                scaling_group,
+                calculation_result,
+                lookback_start,
+                today,
+            )
 
         except Exception as e:
             log.warning(
-                "Failed to calculate fair share factors for {}: {}",
+                "Failed to calculate fair share factors and ranks for {}: {}",
                 scaling_group,
                 e,
             )
-            # Don't fail the observation for factor calculation errors
+            # Don't fail the observation for calculation errors

@@ -4,27 +4,40 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
+    FairShareCalculationContext,
+    FairSharesByLevel,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
+    RawUsageBucketsByLevel,
     UserFairShareData,
     UserFairShareFactors,
     UserFairShareSearchResult,
+    UserProjectKey,
 )
 from ai.backend.manager.errors.fair_share import FairShareNotFoundError
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.resource_usage_history import (
+    DomainUsageBucketRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -35,6 +48,8 @@ from ai.backend.manager.repositories.base import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
@@ -303,17 +318,23 @@ class FairShareDBSource:
         lookback_start: date,
         lookback_end: date,
     ) -> None:
-        """Bulk update fair share factors for all levels.
+        """Bulk update fair share factors and scheduling ranks for all levels.
 
         Updates domain, project, and user fair share records with calculated
-        factors in a single transaction.
+        factors and ranks in a single transaction.
 
         Args:
             resource_group: The resource group being updated
-            calculation_result: Calculated factors from FairShareFactorCalculator
+            calculation_result: Calculated factors and ranks from FairShareFactorCalculator
             lookback_start: Start of lookback period used in calculation
             lookback_end: End of lookback period used in calculation
         """
+        # Build rank lookup for O(1) access
+        rank_by_user: dict[UserProjectKey, int] = {
+            UserProjectKey(rank.user_uuid, rank.project_id): rank.rank
+            for rank in calculation_result.scheduling_ranks
+        }
+
         async with self._db.begin_session() as db_sess:
             now = sa.func.now()
 
@@ -357,15 +378,16 @@ class FairShareDBSource:
                     )
                 )
 
-            # Update user fair shares
-            for (user_uuid, project_id), user_result in calculation_result.user_results.items():
+            # Update user fair shares with scheduling ranks
+            for user_key, user_result in calculation_result.user_results.items():
+                scheduling_rank = rank_by_user.get(user_key)
                 await db_sess.execute(
                     sa.update(UserFairShareRow)
                     .where(
                         sa.and_(
                             UserFairShareRow.resource_group == resource_group,
-                            UserFairShareRow.user_uuid == user_uuid,
-                            UserFairShareRow.project_id == project_id,
+                            UserFairShareRow.user_uuid == user_key.user_uuid,
+                            UserFairShareRow.project_id == user_key.project_id,
                         )
                     )
                     .values(
@@ -375,54 +397,11 @@ class FairShareDBSource:
                         lookback_start=lookback_start,
                         lookback_end=lookback_end,
                         last_calculated_at=now,
+                        scheduling_rank=scheduling_rank,
                     )
                 )
 
-    async def get_all_fair_shares_for_resource_group(
-        self,
-        resource_group: str,
-    ) -> tuple[
-        dict[str, DomainFairShareData],
-        dict[uuid.UUID, ProjectFairShareData],
-        dict[tuple[uuid.UUID, uuid.UUID], UserFairShareData],
-    ]:
-        """Get all fair share records for a resource group.
-
-        Used for factor calculation to get current weights and configurations.
-
-        Args:
-            resource_group: The resource group to query
-
-        Returns:
-            Tuple of (domain_fair_shares, project_fair_shares, user_fair_shares)
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Get domain fair shares
-            domain_query = sa.select(DomainFairShareRow).where(
-                DomainFairShareRow.resource_group == resource_group
-            )
-            domain_result = await db_sess.execute(domain_query)
-            domain_fair_shares = {row.domain_name: row.to_data() for row in domain_result.scalars()}
-
-            # Get project fair shares
-            project_query = sa.select(ProjectFairShareRow).where(
-                ProjectFairShareRow.resource_group == resource_group
-            )
-            project_result = await db_sess.execute(project_query)
-            project_fair_shares = {
-                row.project_id: row.to_data() for row in project_result.scalars()
-            }
-
-            # Get user fair shares
-            user_query = sa.select(UserFairShareRow).where(
-                UserFairShareRow.resource_group == resource_group
-            )
-            user_result = await db_sess.execute(user_query)
-            user_fair_shares = {
-                (row.user_uuid, row.project_id): row.to_data() for row in user_result.scalars()
-            }
-
-            return domain_fair_shares, project_fair_shares, user_fair_shares
+    # ==================== Batched Reads ====================
 
     async def get_user_fair_share_factors_batch(
         self,
@@ -504,3 +483,196 @@ class FairShareDBSource:
                 )
                 for row in result
             }
+
+    async def get_fair_share_calculation_context(
+        self,
+        scaling_group: str,
+        today: date,
+    ) -> FairShareCalculationContext:
+        """Get all data needed for fair share factor calculation in a single session.
+
+        Fetches scaling group config, fair share records, and raw usage buckets
+        in one database session for consistency and efficiency.
+
+        The Calculator is responsible for applying time decay to raw usage buckets.
+
+        Args:
+            scaling_group: The scaling group name
+            today: Current date for decay calculation
+
+        Returns:
+            FairShareCalculationContext containing all data for factor calculation
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group doesn't exist
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # 1. Fetch scaling group spec
+            spec = await self._fetch_fair_share_spec(db_sess, scaling_group)
+
+            # Calculate lookback range
+            lookback_start = today - timedelta(days=spec.lookback_days)
+            lookback_end = today
+
+            # 2. Fetch fair shares
+            fair_shares = await self._fetch_fair_shares(db_sess, scaling_group)
+
+            # 3. Fetch raw usage buckets (no decay applied)
+            raw_usage_buckets = await self._fetch_raw_usage_buckets(
+                db_sess, scaling_group, lookback_start, lookback_end
+            )
+
+        return FairShareCalculationContext(
+            fair_shares=fair_shares,
+            raw_usage_buckets=raw_usage_buckets,
+            half_life_days=spec.half_life_days,
+            lookback_days=spec.lookback_days,
+            default_weight=spec.default_weight,
+            resource_weights=spec.resource_weights,
+            today=today,
+        )
+
+    async def _fetch_fair_share_spec(
+        self,
+        db_sess: SASession,
+        scaling_group: str,
+    ) -> FairShareScalingGroupSpec:
+        """Fetch fair share spec from scaling group."""
+        result = await db_sess.execute(
+            sa.select(
+                ScalingGroupRow.name,
+                ScalingGroupRow.fair_share_spec,
+            ).where(ScalingGroupRow.name == scaling_group)
+        )
+        row = result.one_or_none()
+        if row is None:
+            raise ScalingGroupNotFound(scaling_group)
+
+        if row.fair_share_spec is not None:
+            return row.fair_share_spec
+
+        return FairShareScalingGroupSpec()
+
+    async def _fetch_fair_shares(
+        self,
+        db_sess: SASession,
+        scaling_group: str,
+    ) -> FairSharesByLevel:
+        """Fetch all fair share records for a resource group."""
+        # Get domain fair shares
+        domain_query = sa.select(DomainFairShareRow).where(
+            DomainFairShareRow.resource_group == scaling_group
+        )
+        domain_result = await db_sess.execute(domain_query)
+        domain_fair_shares = {row.domain_name: row.to_data() for row in domain_result.scalars()}
+
+        # Get project fair shares
+        project_query = sa.select(ProjectFairShareRow).where(
+            ProjectFairShareRow.resource_group == scaling_group
+        )
+        project_result = await db_sess.execute(project_query)
+        project_fair_shares = {row.project_id: row.to_data() for row in project_result.scalars()}
+
+        # Get user fair shares
+        user_query = sa.select(UserFairShareRow).where(
+            UserFairShareRow.resource_group == scaling_group
+        )
+        user_result = await db_sess.execute(user_query)
+        user_fair_shares = {
+            UserProjectKey(row.user_uuid, row.project_id): row.to_data()
+            for row in user_result.scalars()
+        }
+
+        return FairSharesByLevel(
+            domain=domain_fair_shares,
+            project=project_fair_shares,
+            user=user_fair_shares,
+        )
+
+    async def _fetch_raw_usage_buckets(
+        self,
+        db_sess: SASession,
+        scaling_group: str,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> RawUsageBucketsByLevel:
+        """Fetch raw usage buckets without applying decay.
+
+        Returns per-date buckets for each entity. The Calculator is responsible
+        for applying time decay to these raw values.
+        """
+        # Fetch user usage buckets
+        user_query = sa.select(
+            UserUsageBucketRow.user_uuid,
+            UserUsageBucketRow.project_id,
+            UserUsageBucketRow.period_start,
+            UserUsageBucketRow.resource_usage,
+        ).where(
+            sa.and_(
+                UserUsageBucketRow.resource_group == scaling_group,
+                UserUsageBucketRow.period_start >= lookback_start,
+                UserUsageBucketRow.period_start <= lookback_end,
+            )
+        )
+        user_result = await db_sess.execute(user_query)
+        user_rows = user_result.all()
+
+        # Fetch project usage buckets
+        project_query = sa.select(
+            ProjectUsageBucketRow.project_id,
+            ProjectUsageBucketRow.period_start,
+            ProjectUsageBucketRow.resource_usage,
+        ).where(
+            sa.and_(
+                ProjectUsageBucketRow.resource_group == scaling_group,
+                ProjectUsageBucketRow.period_start >= lookback_start,
+                ProjectUsageBucketRow.period_start <= lookback_end,
+            )
+        )
+        project_result = await db_sess.execute(project_query)
+        project_rows = project_result.all()
+
+        # Fetch domain usage buckets
+        domain_query = sa.select(
+            DomainUsageBucketRow.domain_name,
+            DomainUsageBucketRow.period_start,
+            DomainUsageBucketRow.resource_usage,
+        ).where(
+            sa.and_(
+                DomainUsageBucketRow.resource_group == scaling_group,
+                DomainUsageBucketRow.period_start >= lookback_start,
+                DomainUsageBucketRow.period_start <= lookback_end,
+            )
+        )
+        domain_result = await db_sess.execute(domain_query)
+        domain_rows = domain_result.all()
+
+        # Organize into per-date buckets (no decay applied)
+        user_buckets: dict[UserProjectKey, dict[date, ResourceSlot]] = {}
+        for user_row in user_rows:
+            key = UserProjectKey(user_row.user_uuid, user_row.project_id)
+            if key not in user_buckets:
+                user_buckets[key] = {}
+            user_buckets[key][user_row.period_start] = user_row.resource_usage
+
+        project_buckets: dict[uuid.UUID, dict[date, ResourceSlot]] = {}
+        for project_row in project_rows:
+            if project_row.project_id not in project_buckets:
+                project_buckets[project_row.project_id] = {}
+            project_buckets[project_row.project_id][project_row.period_start] = (
+                project_row.resource_usage
+            )
+
+        domain_buckets: dict[str, dict[date, ResourceSlot]] = {}
+        for domain_row in domain_rows:
+            if domain_row.domain_name not in domain_buckets:
+                domain_buckets[domain_row.domain_name] = {}
+            domain_buckets[domain_row.domain_name][domain_row.period_start] = (
+                domain_row.resource_usage
+            )
+
+        return RawUsageBucketsByLevel(
+            domain=domain_buckets,
+            project=project_buckets,
+            user=user_buckets,
+        )
