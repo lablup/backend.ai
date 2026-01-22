@@ -59,7 +59,10 @@ class ResourceGroupGQL(Node):
 # Filter and OrderBy types
 
 
-@strawberry.enum(name="ResourceGroupOrderField")
+@strawberry.enum(
+    name="ResourceGroupOrderField",
+    description="Added in 26.1.0. Fields available for ordering resource groups",
+)
 class ResourceGroupOrderFieldGQL(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"

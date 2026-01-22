@@ -43,7 +43,7 @@ def _get_resource_group_pagination_spec() -> PaginationSpec:
 ResourceGroupEdge = Edge[ResourceGroupGQL]
 
 
-@strawberry.type(description="Added in 25.18.0. Resource group connection")
+@strawberry.type(description="Added in 26.1.0. Resource group connection")
 class ResourceGroupConnection(Connection[ResourceGroupGQL]):
     count: int
 
@@ -55,7 +55,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 # Query fields
 
 
-@strawberry.field(description="Added in 25.18.0. List resource groups for a specific project")
+@strawberry.field(description="Added in 26.1.0. List resource groups for a specific project")
 async def resource_groups(
     info: Info[StrawberryGQLContext],
     project: ID,
@@ -109,7 +109,7 @@ async def resource_groups(
     )
 
 
-@strawberry.field(description="Added in 25.18.0. List all resource groups")
+@strawberry.field(description="Added in 26.1.0. List all resource groups")
 async def all_resource_groups(
     info: Info[StrawberryGQLContext],
     filter: ResourceGroupFilterGQL | None = None,

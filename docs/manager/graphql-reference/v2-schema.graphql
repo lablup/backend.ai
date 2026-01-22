@@ -169,20 +169,6 @@ type AgentResource {
   free: JSON!
 }
 
-"""Added in 26.1.0. Configuration for the agent selection strategy"""
-type AgentSelectorConfig {
-  """
-  Number of existing kernels already running on the same endpoint.
-  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
-  
-  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
-  across different agents for improved fault tolerance. This count helps the scheduler
-  avoid placing new replicas on agents that already host replicas for the same endpoint,
-  ensuring better distribution of model serving workloads.
-  """
-  kernelCountsAtSameEndpoint: Int!
-}
-
 """Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
@@ -3130,10 +3116,10 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
-  """Added in 25.18.0. List resource groups for a specific project"""
+  """Added in 26.1.0. List resource groups for a specific project"""
   resourceGroups(project: ID!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
 
-  """Added in 25.18.0. List all resource groups"""
+  """Added in 26.1.0. List all resource groups"""
   allResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
 
   """Added in 25.14.0"""
@@ -3317,7 +3303,7 @@ input ResourceConfigInput {
   resourceOpts: ResourceOptsInput = null
 }
 
-"""Added in 25.18.0. Resource group with structured configuration"""
+"""Added in 26.1.0. Resource group with structured configuration"""
 type ResourceGroup implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -3327,34 +3313,9 @@ type ResourceGroup implements Node {
   Used as primary key and referenced by agents, sessions, and resource presets.
   """
   name: String!
-
-  """
-  Operational status controlling whether this resource group accepts new sessions
-  and its visibility to users without explicit access grants.
-  """
-  status: ResourceGroupStatus!
-
-  """
-  Administrative metadata including human-readable description
-  and creation timestamp for audit and documentation purposes.
-  """
-  metadata: ResourceGroupMetadata!
-
-  """
-  Network configuration for connecting clients to interactive session services
-  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
-  """
-  network: ResourceGroupNetworkConfig!
-
-  """
-  Session scheduling configuration controlling queue management,
-  agent selection strategy, resource allocation policies,
-  and session lifecycle timeouts.
-  """
-  scheduler: ResourceGroupSchedulerConfig!
 }
 
-"""Added in 25.18.0. Resource group connection"""
+"""Added in 26.1.0. Resource group connection"""
 type ResourceGroupConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -3373,7 +3334,7 @@ type ResourceGroupEdge {
   node: ResourceGroup!
 }
 
-"""Added in 25.18.0. Filter for resource groups"""
+"""Added in 26.1.0. Filter for resource groups"""
 input ResourceGroupFilter {
   name: StringFilter = null
   description: StringFilter = null
@@ -3391,157 +3352,18 @@ input ResourceGroupInput {
   name: String!
 }
 
-"""Added in 25.18.0. Metadata information for a resource group"""
-type ResourceGroupMetadata {
-  """Human-readable description of the resource group's purpose"""
-  description: String!
-
-  """Timestamp when the resource group was created"""
-  createdAt: DateTime!
-}
-
-"""Added in 25.18.0. Network configuration for a resource group"""
-type ResourceGroupNetworkConfig {
-  """
-  App-proxy coordinator API server address.
-  Manager uses this address to communicate with the app-proxy coordinator
-  for managing service routes, endpoint registration, and proxying client connections
-  to session services.
-  """
-  wsproxyAddr: String!
-
-  """Authentication token for the App-proxy coordinator API server."""
-  wsproxyApiToken: String!
-
-  """
-  Whether session containers use the host's network namespace
-  instead of isolated container networking.
-  Enables direct host port binding but reduces isolation.
-  """
-  useHostNetwork: Boolean!
-}
-
-"""Added in 25.18.0. Order by specification for resource groups"""
+"""Added in 26.1.0. Order by specification for resource groups"""
 input ResourceGroupOrderBy {
   field: ResourceGroupOrderField!
   direction: OrderDirection! = ASC
 }
 
+"""Added in 26.1.0. Fields available for ordering resource groups"""
 enum ResourceGroupOrderField {
   NAME
   CREATED_AT
   IS_ACTIVE
   IS_PUBLIC
-}
-
-"""Added in 25.18.0. Scheduler configuration for session scheduling"""
-type ResourceGroupSchedulerConfig {
-  """
-  Scheduling algorithm implementation.
-  'fifo' schedules oldest pending sessions first,
-  'lifo' schedules newest first,
-  'drf' (Dominant Resource Fairness) balances resource usage across users.
-  """
-  name: ResourceGroupSchedulerType!
-
-  """
-  Detailed scheduler behavior configuration including session type restrictions,
-  timeouts, agent selection strategy, and resource allocation policies.
-  """
-  options: ResourceGroupSchedulerOptions!
-}
-
-"""Added in 25.18.0. Scheduler configuration options"""
-type ResourceGroupSchedulerOptions {
-  """
-  Session types that can be scheduled in this resource group.
-  Valid values: 'interactive' , 'batch', 'inference'.
-  Requests for unlisted types are rejected.
-  """
-  allowedSessionTypes: [String!]!
-
-  """
-  Maximum time in seconds a session can wait in PENDING state
-  before automatic cancellation.
-  Zero means no timeout.
-  Used to prevent indefinite resource waiting when no agents are available.
-  """
-  pendingTimeout: Float!
-
-  """
-  Scheduler-specific configuration options.
-  Contents depend on the scheduler implementation (fifo/lifo/drf).
-  Used for advanced scheduling behavior customization.
-  """
-  config: SchedulerConfig!
-
-  """
-  Algorithm for selecting target agents when scheduling sessions.
-  'dispersed' spreads sessions across available agents,
-  'concentrated' packs sessions onto fewer agents,
-  'roundrobin' cycles through agents sequentially.
-  """
-  agentSelectionStrategy: String!
-
-  """
-  Configuration for the agent selection strategy.
-  Structure varies by strategy - for example,
-  concentrated strategy may specify endpoint spreading rules.
-  """
-  agentSelectorConfig: AgentSelectorConfig!
-
-  """
-  Whether inference service replicas should be distributed across different agents
-  instead of co-locating on same agent.
-  When true, forces replica spreading.
-  Applied only when using concentrated agent selection strategy.
-  Improves fault tolerance for model serving.
-  """
-  enforceSpreadingEndpointReplica: Boolean!
-
-  """
-  Whether agents accept session requests that allocate fractional resources
-  (e.g., 0.5 GPU) causing resource fragmentation.
-  When false, agents reject sessions that would prevent future efficient resource allocation.
-  """
-  allowFractionalResourceFragmentation: Boolean!
-
-  """
-  List of route health statuses that trigger automatic cleanup of service routes.
-  Valid values: 'healthy', 'unhealthy', 'degraded'.
-  Default: ['unhealthy'].
-  """
-  routeCleanupTargetStatuses: [String!]!
-}
-
-"""
-Added in 25.18.0. Scheduler type for session scheduling.
-
-- FIFO: First-In-First-Out - Schedules oldest pending sessions first
-- LIFO: Last-In-First-Out - Schedules newest pending sessions first
-- DRF: Dominant Resource Fairness - Balances resource usage across users
-"""
-enum ResourceGroupSchedulerType {
-  FIFO
-  LIFO
-  DRF
-}
-
-"""Added in 25.18.0. Status information for a resource group"""
-type ResourceGroupStatus {
-  """
-  Whether the resource group can accept new session creation requests.
-  Inactive resource groups are excluded from scheduling and cannot start new sessions.
-  """
-  isActive: Boolean!
-
-  """
-  Whether this resource group is available for regular user sessions
-  (interactive/batch/inference).
-  When false, the resource group is reserved for internal SYSTEM-type sessions only,
-  such as management or infrastructure sessions.
-  """
-  isPublic: Boolean!
 }
 
 """
@@ -3890,15 +3712,6 @@ These artifacts are registered with SCANNED status and can be imported for actua
 """
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
-}
-
-"""Added in 26.1.0. Scheduler-specific configuration options"""
-type SchedulerConfig {
-  """
-  Number of scheduling retries to skip before attempting to schedule a session.
-  Used to prevent repeated scheduling attempts for sessions that previously failed.
-  """
-  numRetriesToSkip: Int!
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
