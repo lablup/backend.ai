@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
@@ -25,10 +26,16 @@ from .types import (
 )
 
 __all__ = (
-    # Path parameters
+    # Path parameters - Get
     "GetDomainFairSharePathParam",
     "GetProjectFairSharePathParam",
     "GetUserFairSharePathParam",
+    # Path parameters - Upsert Weight
+    "UpsertDomainFairShareWeightPathParam",
+    "UpsertProjectFairShareWeightPathParam",
+    "UpsertUserFairShareWeightPathParam",
+    # Path parameters - Update Spec
+    "UpdateResourceGroupFairShareSpecPathParam",
     # Get requests (deprecated, use PathParam)
     "GetDomainFairShareRequest",
     "GetProjectFairShareRequest",
@@ -40,6 +47,13 @@ __all__ = (
     "SearchDomainUsageBucketsRequest",
     "SearchProjectUsageBucketsRequest",
     "SearchUserUsageBucketsRequest",
+    # Upsert Weight Requests
+    "UpsertDomainFairShareWeightRequest",
+    "UpsertProjectFairShareWeightRequest",
+    "UpsertUserFairShareWeightRequest",
+    # Update Spec Requests
+    "ResourceWeightEntryInput",
+    "UpdateResourceGroupFairShareSpecRequest",
 )
 
 
@@ -162,3 +176,137 @@ class SearchUserUsageBucketsRequest(BaseRequestModel):
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+# Upsert Weight Path Parameters
+
+
+class UpsertDomainFairShareWeightPathParam(BaseRequestModel):
+    """Path parameters for upserting domain fair share weight."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+
+
+class UpsertProjectFairShareWeightPathParam(BaseRequestModel):
+    """Path parameters for upserting project fair share weight."""
+
+    resource_group: str = Field(description="Scaling group name")
+    project_id: UUID = Field(description="Project ID")
+
+
+class UpsertUserFairShareWeightPathParam(BaseRequestModel):
+    """Path parameters for upserting user fair share weight."""
+
+    resource_group: str = Field(description="Scaling group name")
+    project_id: UUID = Field(description="Project ID")
+    user_uuid: UUID = Field(description="User UUID")
+
+
+class UpdateResourceGroupFairShareSpecPathParam(BaseRequestModel):
+    """Path parameters for updating resource group fair share spec."""
+
+    resource_group: str = Field(description="Scaling group name")
+
+
+# Upsert Weight Request Bodies
+
+
+class UpsertDomainFairShareWeightRequest(BaseRequestModel):
+    """Request body for upserting domain fair share weight.
+
+    Set weight to null to use the resource group's default_weight.
+    """
+
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+class UpsertProjectFairShareWeightRequest(BaseRequestModel):
+    """Request body for upserting project fair share weight.
+
+    Set weight to null to use the resource group's default_weight.
+    """
+
+    domain_name: str = Field(description="Domain name the project belongs to")
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+class UpsertUserFairShareWeightRequest(BaseRequestModel):
+    """Request body for upserting user fair share weight.
+
+    Set weight to null to use the resource group's default_weight.
+    """
+
+    domain_name: str = Field(description="Domain name the user belongs to")
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+# Update Resource Group Fair Share Spec
+
+
+class ResourceWeightEntryInput(BaseModel):
+    """A single resource weight entry for fair share calculation.
+
+    Set weight to null to remove the resource type weight (revert to default).
+    """
+
+    resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description=(
+            "Weight multiplier for this resource type. "
+            "Set to null to remove (revert to default weight)."
+        ),
+    )
+
+
+class UpdateResourceGroupFairShareSpecRequest(BaseRequestModel):
+    """Request body for updating resource group fair share spec (partial update).
+
+    All fields are optional. Only provided fields are updated; others retain existing values.
+    """
+
+    half_life_days: Optional[int] = Field(
+        default=None,
+        description="Half-life for exponential decay in days. Leave null to keep existing value.",
+    )
+    lookback_days: Optional[int] = Field(
+        default=None,
+        description="Total lookback period in days. Leave null to keep existing value.",
+    )
+    decay_unit_days: Optional[int] = Field(
+        default=None,
+        description="Granularity of decay buckets in days. Leave null to keep existing value.",
+    )
+    default_weight: Optional[Decimal] = Field(
+        default=None,
+        description="Default weight for entities. Leave null to keep existing value.",
+    )
+    resource_weights: Optional[list[ResourceWeightEntryInput]] = Field(
+        default=None,
+        description=(
+            "Resource weights for fair share calculation. "
+            "Each entry specifies a resource type and its weight multiplier. "
+            "Only provided resource types are updated (partial update). "
+            "Set weight to null to remove that resource type (revert to default). "
+            "Leave the entire list null to keep all existing values."
+        ),
+    )
