@@ -47,23 +47,21 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertUserFairShareWeightResponse,
 )
 from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.models.scaling_group.updaters import (
-    ScalingGroupUpdaterSpec,
-)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     Updater,
 )
-from ai.backend.manager.repositories.matching import StringMatchSpec
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ResourceGroupFairShareUpdaterSpec,
+    ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
