@@ -9,11 +9,6 @@ Implemented-Version:
 
 # Artifact Storage Usage Tracking and Quota Enforcement
 
-## Related Issues
-
-- JIRA: BA-3989 (Epic), BA-3990, BA-3991, BA-3992, BA-3994
-- GitHub: #8194
-
 ## Motivation
 
 Currently, artifact storage has no usage tracking or capacity limits. When artifacts are imported, they are stored without any visibility into how much space is being consumed or any mechanism to prevent storage exhaustion.
@@ -236,18 +231,6 @@ Updates quota for a storage namespace. Admin-only.
 ```json
 { "max_size": 107374182400 }  // or null for unlimited
 ```
-
-## Migration / Compatibility
-
-### Backward Compatibility
-
-- Existing storage namespaces will have `max_size = NULL` (unlimited)
-- No changes to existing import behavior unless quota is explicitly set
-- VFolder quota integration uses existing `max_quota_scope_size` from resource policies
-
-### Breaking Changes
-
-None. This is an additive feature.
 
 ## Testing Scenarios
 
