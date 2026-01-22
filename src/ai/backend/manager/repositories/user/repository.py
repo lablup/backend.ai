@@ -651,8 +651,6 @@ class UserRepository:
         """Completely purge user and all associated data."""
         async with self._db.begin_session() as session:
             user_uuid = await self._get_user_uuid_by_email_with_session(session, email)
-            if not user_uuid:
-                raise UserNotFound()
 
             # Delete all user data in proper order using purger pattern
             await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
@@ -758,14 +756,13 @@ class UserRepository:
         row = result.first()
         return row.uuid if row else None
 
-    async def _get_user_uuid_by_email_with_session(
-        self, session: SASession, email: str
-    ) -> Optional[UUID]:
+    async def _get_user_uuid_by_email_with_session(self, session: SASession, email: str) -> UUID:
         """Get user UUID by email using ORM session."""
         result = await session.execute(sa.select(UserRow.uuid).where(UserRow.email == email))
         row = result.first()
-
-        return row.uuid if row else None
+        if not row:
+            raise UserNotFound()
+        return row.uuid
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,
