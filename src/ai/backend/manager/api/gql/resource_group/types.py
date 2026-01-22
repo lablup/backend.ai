@@ -76,11 +76,6 @@ class ResourceGroupOrderFieldGQL(StrEnum):
 )
 class ResourceGroupFilterGQL(GQLFilter):
     name: StringFilter | None = None
-    description: StringFilter | None = None
-    is_active: bool | None = None
-    is_public: bool | None = None
-    scheduler: str | None = None
-    use_host_network: bool | None = None
 
     AND: list[ResourceGroupFilterGQL] | None = None
     OR: list[ResourceGroupFilterGQL] | None = None
@@ -106,35 +101,6 @@ class ResourceGroupFilterGQL(GQLFilter):
             )
             if name_condition:
                 field_conditions.append(name_condition)
-
-        # Apply description filter
-        if self.description:
-            description_condition = self.description.build_query_condition(
-                contains_factory=ScalingGroupConditions.by_description_contains,
-                equals_factory=ScalingGroupConditions.by_description_equals,
-                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
-                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
-            )
-            if description_condition:
-                field_conditions.append(description_condition)
-
-        # Apply is_active filter
-        if self.is_active is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_active(self.is_active))
-
-        # Apply is_public filter
-        if self.is_public is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
-
-        # Apply scheduler filter
-        if self.scheduler:
-            field_conditions.append(ScalingGroupConditions.by_scheduler(self.scheduler))
-
-        # Apply use_host_network filter
-        if self.use_host_network is not None:
-            field_conditions.append(
-                ScalingGroupConditions.by_use_host_network(self.use_host_network)
-            )
 
         # Handle AND logical operator - these are implicitly ANDed with field conditions
         if self.AND:
