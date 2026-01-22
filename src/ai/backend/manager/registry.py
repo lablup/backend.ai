@@ -2292,7 +2292,7 @@ class AgentRegistry:
                     # Update occupied_slots for agents with running containers.
                     await db_sess.execute(
                         (
-                            sa.update(AgentRow)
+                            sa.update(AgentRow.__table__)
                             .where(AgentRow.id == sa.bindparam("agent_id"))
                             .values(occupied_slots=sa.bindparam("occupied_slots"))
                         ),
@@ -2302,18 +2302,20 @@ class AgentRegistry:
                         ],
                     )
                     await db_sess.execute(
-                        sa.update(AgentRow)
+                        sa.update(AgentRow.__table__)
                         .values(occupied_slots=ResourceSlot({}))
                         .where(AgentRow.status == AgentStatus.ALIVE)
-                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys()))),
                     )
                 else:
                     query = (
-                        sa.update(AgentRow)
+                        sa.update(AgentRow.__table__)
                         .values(occupied_slots=ResourceSlot({}))
                         .where(AgentRow.status == AgentStatus.ALIVE)
                     )
-                    await db_sess.execute(query)
+                    await db_sess.execute(
+                        query,
+                    )
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
