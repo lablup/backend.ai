@@ -87,6 +87,12 @@ class PermissionDBSource:
         Returns:
             Created role row
         """
+        # TODO: Object permissions require a permission group for the scope they reference.
+        # When creating object permissions during role creation, the corresponding permission group
+        # for each object permission's scope MUST be included in `permission_groups`.
+        # This acts as a "guest permission group" providing scope visibility (see BEP-1012-main.md).
+        # Currently, ObjectPermissionCreateInputBeforeRoleCreation does not include scope_id,
+        # so the caller must ensure the correct permission group is provided in `permission_groups`.
 
         async with self._db.begin_session() as db_session:
             # 1. Create role
@@ -117,19 +123,6 @@ class PermissionDBSource:
                         )
                     )
                     await self._add_permission_to_group(db_session, perm_creator)
-
-            # 3. Create object permissions
-            for obj_perm_input in input_data.object_permissions:
-                obj_perm_creator = Creator(
-                    spec=ObjectPermissionCreatorSpec(
-                        role_id=role_id,
-                        entity_type=obj_perm_input.entity_type,
-                        entity_id=obj_perm_input.entity_id,
-                        operation=obj_perm_input.operation,
-                        status=obj_perm_input.status,
-                    )
-                )
-                await self._add_object_permission_to_role(db_session, obj_perm_creator)
 
             await db_session.refresh(role_row)
             return role_row
@@ -576,6 +569,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
+                        permission_group_id=obj_perm_input.permission_group_id,
                         entity_type=obj_perm_input.entity_type,
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
