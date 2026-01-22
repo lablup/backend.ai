@@ -160,4 +160,3 @@ backup.*.json
 /DIST-INFO
 /INSTALL-INFO
 .serena/
-.claude/tasks/
