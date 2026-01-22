@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -134,10 +135,33 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 
 
 @dataclass
+class ResourceGroupFairShareUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
+    """UpdaterSpec for scaling group fair share configuration updates.
+
+    Maps to FairShareScalingGroupSpec in types.
+    """
+
+    fair_share_spec: TriState[FairShareScalingGroupSpec] = field(
+        default_factory=TriState[FairShareScalingGroupSpec].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.fair_share_spec.update_dict(to_update, "fair_share_spec")
+        return to_update
+
+
+@dataclass
 class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     """Composite UpdaterSpec for scaling group updates.
 
-    Combines status, metadata, network, driver, and scheduler updates.
+    Combines status, metadata, network, driver, scheduler, and fair_share updates.
     Maps to ScalingGroupV2GQL structure in GraphQL types.
     """
 
@@ -146,6 +170,7 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     network: Optional[ScalingGroupNetworkConfigUpdaterSpec] = None
     driver: Optional[ScalingGroupDriverConfigUpdaterSpec] = None
     scheduler: Optional[ScalingGroupSchedulerConfigUpdaterSpec] = None
+    fair_share: Optional[ResourceGroupFairShareUpdaterSpec] = None
 
     @property
     @override
@@ -165,4 +190,6 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update.update(self.driver.build_values())
         if self.scheduler:
             to_update.update(self.scheduler.build_values())
+        if self.fair_share:
+            to_update.update(self.fair_share.build_values())
         return to_update

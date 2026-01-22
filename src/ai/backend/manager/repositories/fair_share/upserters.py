@@ -15,7 +15,7 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.repositories.base import UpserterSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -33,8 +33,9 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     resource_group: str
     domain_name: str
 
-    # Spec (OptionalState - uses Row defaults on INSERT if NOP)
-    weight: OptionalState[Decimal] = field(default_factory=OptionalState.nop)
+    # Spec (uses Row defaults on INSERT if NOP)
+    # weight uses TriState to support NULLIFY (set to None means use resource group's default_weight)
+    weight: TriState[Decimal] = field(default_factory=TriState.nop)
     half_life_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     lookback_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     decay_unit_days: OptionalState[int] = field(default_factory=OptionalState.nop)
@@ -75,6 +76,9 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     @override
     def build_update_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
+        # Spec fields (weight can be updated via mutation)
+        self.weight.update_dict(values, "weight")
+        # Calculation fields
         self.fair_share_factor.update_dict(values, "fair_share_factor")
         self.total_decayed_usage.update_dict(values, "total_decayed_usage")
         self.normalized_usage.update_dict(values, "normalized_usage")
@@ -100,8 +104,9 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     project_id: uuid.UUID
     domain_name: str
 
-    # Spec (OptionalState - uses Row defaults on INSERT if NOP)
-    weight: OptionalState[Decimal] = field(default_factory=OptionalState.nop)
+    # Spec (uses Row defaults on INSERT if NOP)
+    # weight uses TriState to support NULLIFY (set to None means use resource group's default_weight)
+    weight: TriState[Decimal] = field(default_factory=TriState.nop)
     half_life_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     lookback_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     decay_unit_days: OptionalState[int] = field(default_factory=OptionalState.nop)
@@ -143,6 +148,9 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     @override
     def build_update_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
+        # Spec fields (weight can be updated via mutation)
+        self.weight.update_dict(values, "weight")
+        # Calculation fields
         self.fair_share_factor.update_dict(values, "fair_share_factor")
         self.total_decayed_usage.update_dict(values, "total_decayed_usage")
         self.normalized_usage.update_dict(values, "normalized_usage")
@@ -169,8 +177,9 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     project_id: uuid.UUID
     domain_name: str
 
-    # Spec (OptionalState - uses Row defaults on INSERT if NOP)
-    weight: OptionalState[Decimal] = field(default_factory=OptionalState.nop)
+    # Spec (uses Row defaults on INSERT if NOP)
+    # weight uses TriState to support NULLIFY (set to None means use resource group's default_weight)
+    weight: TriState[Decimal] = field(default_factory=TriState.nop)
     half_life_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     lookback_days: OptionalState[int] = field(default_factory=OptionalState.nop)
     decay_unit_days: OptionalState[int] = field(default_factory=OptionalState.nop)
@@ -213,6 +222,9 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     @override
     def build_update_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
+        # Spec fields (weight can be updated via mutation)
+        self.weight.update_dict(values, "weight")
+        # Calculation fields
         self.fair_share_factor.update_dict(values, "fair_share_factor")
         self.total_decayed_usage.update_dict(values, "total_decayed_usage")
         self.normalized_usage.update_dict(values, "normalized_usage")

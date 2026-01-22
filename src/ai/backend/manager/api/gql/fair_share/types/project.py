@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Optional, override
 from uuid import UUID
@@ -304,3 +305,43 @@ class ProjectFairShareOrderBy(GQLOrderBy):
                 return ProjectFairShareOrders.by_fair_share_factor(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
                 return ProjectFairShareOrders.by_created_at(ascending)
+
+
+# Mutation Input/Payload Types
+
+
+@strawberry.input(
+    name="UpsertProjectFairShareWeightInput",
+    description=(
+        "Added in 26.1.0. Input for upserting project fair share weight. "
+        "The weight parameter affects scheduling priority - higher weight = higher priority. "
+        "Set weight to null to use resource group's default_weight."
+    ),
+)
+class UpsertProjectFairShareWeightInput:
+    """Input for upserting project fair share weight."""
+
+    resource_group: str = strawberry.field(
+        description="Name of the scaling group (resource group) for this fair share."
+    )
+    project_id: UUID = strawberry.field(description="UUID of the project to update weight for.")
+    domain_name: str = strawberry.field(description="Name of the domain the project belongs to.")
+    weight: Decimal | None = strawberry.field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority allocation ratio. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+@strawberry.type(
+    name="UpsertProjectFairShareWeightPayload",
+    description="Added in 26.1.0. Payload for project fair share weight upsert mutation.",
+)
+class UpsertProjectFairShareWeightPayload:
+    """Payload for project fair share weight upsert mutation."""
+
+    project_fair_share: ProjectFairShareGQL = strawberry.field(
+        description="The updated or created project fair share record."
+    )

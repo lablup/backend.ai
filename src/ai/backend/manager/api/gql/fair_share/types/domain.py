@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Optional, override
 
@@ -285,3 +286,42 @@ class DomainFairShareOrderBy(GQLOrderBy):
                 return DomainFairShareOrders.by_domain_name(ascending)
             case DomainFairShareOrderField.CREATED_AT:
                 return DomainFairShareOrders.by_created_at(ascending)
+
+
+# Mutation Input/Payload Types
+
+
+@strawberry.input(
+    name="UpsertDomainFairShareWeightInput",
+    description=(
+        "Added in 26.1.0. Input for upserting domain fair share weight. "
+        "The weight parameter affects scheduling priority - higher weight = higher priority. "
+        "Set weight to null to use resource group's default_weight."
+    ),
+)
+class UpsertDomainFairShareWeightInput:
+    """Input for upserting domain fair share weight."""
+
+    resource_group: str = strawberry.field(
+        description="Name of the scaling group (resource group) for this fair share."
+    )
+    domain_name: str = strawberry.field(description="Name of the domain to update weight for.")
+    weight: Decimal | None = strawberry.field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority allocation ratio. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+@strawberry.type(
+    name="UpsertDomainFairShareWeightPayload",
+    description="Added in 26.1.0. Payload for domain fair share weight upsert mutation.",
+)
+class UpsertDomainFairShareWeightPayload:
+    """Payload for domain fair share weight upsert mutation."""
+
+    domain_fair_share: DomainFairShareGQL = strawberry.field(
+        description="The updated or created domain fair share record."
+    )

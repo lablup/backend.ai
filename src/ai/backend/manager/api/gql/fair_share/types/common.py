@@ -28,13 +28,40 @@ class ResourceSlotEntryGQL:
             "'rocm.device' (AMD GPU devices). Custom accelerator plugins may define additional types."
         )
     )
-    quantity: str = strawberry.field(
+    quantity: Decimal = strawberry.field(
         description=(
-            "Quantity of the resource as a decimal string to preserve precision. "
-            "For 'cpu': number of cores (e.g., '2.0', '0.5'). "
-            "For 'mem': bytes (e.g., '4294967296' for 4GB). "
+            "Quantity of the resource. "
+            "For 'cpu': number of cores (e.g., 2.0, 0.5). "
+            "For 'mem': bytes (e.g., 4294967296 for 4GB). "
             "For accelerators: device count or share fraction."
         )
+    )
+
+
+@strawberry.input(
+    name="ResourceWeightEntryInput",
+    description=(
+        "Added in 26.1.0. Input for a single resource weight entry. "
+        "Specifies how much a resource type contributes to fair share calculations."
+    ),
+)
+class ResourceWeightEntryInputGQL:
+    """Input for single resource weight entry."""
+
+    resource_type: str = strawberry.field(
+        description=(
+            "Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). "
+            "Must match the resource types used in the cluster."
+        )
+    )
+    weight: Decimal | None = strawberry.field(
+        default=None,
+        description=(
+            "Weight multiplier for this resource type in fair share calculations. "
+            "Higher weight means this resource contributes more to the normalized usage. "
+            "Set to null to remove this resource type (revert to default weight 1.0). "
+            "Example: 0.001 for memory (bytes) to normalize against CPU cores."
+        ),
     )
 
 
@@ -59,7 +86,13 @@ class ResourceSlotGQL:
     @classmethod
     def from_resource_slot(cls, slot: Mapping[str, Decimal | str]) -> ResourceSlotGQL:
         """Convert a ResourceSlot or dict-based resource slot to GraphQL type."""
-        entries = [ResourceSlotEntryGQL(resource_type=k, quantity=str(v)) for k, v in slot.items()]
+        entries = [
+            ResourceSlotEntryGQL(
+                resource_type=k,
+                quantity=Decimal(v) if isinstance(v, str) else v,
+            )
+            for k, v in slot.items()
+        ]
         return cls(entries=entries)
 
 
@@ -73,10 +106,10 @@ class ResourceSlotGQL:
 class FairShareSpecGQL:
     """Specification parameters for fair share calculation."""
 
-    weight: Decimal = strawberry.field(
+    weight: Decimal | None = strawberry.field(
         description=(
             "Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. "
-            "Default is 1.0. A weight of 2.0 means this entity is twice as important as one with weight 1.0."
+            "Null means using resource group's default_weight."
         )
     )
     half_life_days: int = strawberry.field(

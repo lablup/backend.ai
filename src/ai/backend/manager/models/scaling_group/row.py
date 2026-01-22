@@ -370,6 +370,7 @@ class ScalingGroupRow(Base):
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                 ),
             ),
+            fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
         )
 
     @classmethod

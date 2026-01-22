@@ -5,12 +5,13 @@ Tests the service layer with mocked repository operations.
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AccessKey, AgentSelectionStrategy, SessionTypes
+from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -33,6 +34,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
@@ -135,6 +137,13 @@ class TestScalingGroupService:
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
+            ),
+            fair_share_spec=FairShareScalingGroupSpec(
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                default_weight=Decimal("1.0"),
+                resource_weights=ResourceSlot(),
             ),
         )
 
@@ -262,6 +271,13 @@ class TestScalingGroupService:
                         allow_fractional_resource_fragmentation=True,
                         route_cleanup_target_statuses=["unhealthy"],
                     ),
+                ),
+                fair_share_spec=FairShareScalingGroupSpec(
+                    half_life_days=7,
+                    lookback_days=28,
+                    decay_unit_days=1,
+                    default_weight=Decimal("1.0"),
+                    resource_weights=ResourceSlot(),
                 ),
             )
             for i in range(3)

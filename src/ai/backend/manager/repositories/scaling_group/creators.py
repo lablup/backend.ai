@@ -13,6 +13,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
@@ -31,6 +32,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
     driver_opts: Mapping[str, Any] = field(default_factory=dict)
     scheduler_opts: Optional[ScalingGroupOpts] = None
     use_host_network: bool = False
+    fair_share_spec: Optional[FairShareScalingGroupSpec] = None
 
     @override
     def build_row(self) -> ScalingGroupRow:
@@ -46,6 +48,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             scheduler=self.scheduler,
             scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
             use_host_network=self.use_host_network,
+            fair_share_spec=self.fair_share_spec,
         )
 
 
