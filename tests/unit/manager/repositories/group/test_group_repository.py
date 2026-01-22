@@ -750,7 +750,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=project_resource_policy,
             type=ProjectType.GENERAL,
@@ -776,7 +776,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=nonexistent_policy,
             type=ProjectType.GENERAL,
@@ -1725,9 +1725,9 @@ class TestGroupRowVFolderHostPermissionMap:
             domain_name=test_domain,
             total_resource_slots={},
             # String lists as passed from GroupCreatorSpec
-            allowed_vfolder_hosts={
-                "local": ["create-vfolder", "mount-in-session"],
-            },
+            allowed_vfolder_hosts=VFolderHostPermissionMap({
+                "local": [VFolderHostPermission.CREATE, VFolderHostPermission.MOUNT_IN_SESSION],
+            }),
             integration_id=None,
             resource_policy=project_resource_policy,
             type=ProjectType.GENERAL,

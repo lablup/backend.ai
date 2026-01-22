@@ -191,7 +191,7 @@ class GroupRow(Base):
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
         "total_resource_slots", ResourceSlotColumn(), default=dict, nullable=False
     )
-    allowed_vfolder_hosts: Mapped[dict[str, Any]] = mapped_column(
+    allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
@@ -262,7 +262,7 @@ class GroupRow(Base):
             integration_id=self.integration_id,
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts),
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
             dotfiles=self.dotfiles,
             resource_policy=self.resource_policy,
             type=self.type,
@@ -432,7 +432,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
             type=row.type,
             _integration_id=row.integration_id,
             _total_resource_slots=row.total_resource_slots,
-            _allowed_vfolder_hosts=VFolderHostPermissionMap(row.allowed_vfolder_hosts),
+            _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _dotfiles=row.dotfiles,
             _resource_policy=row.resource_policy,
             _container_registry=row.container_registry,

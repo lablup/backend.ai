@@ -154,7 +154,7 @@ class GroupNode(graphene.ObjectType):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=VFolderHostPermissionMap(row.allowed_vfolder_hosts).to_json(),
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
@@ -569,7 +569,11 @@ class GroupInput(graphene.InputObjectType):
             if self.total_resource_slots is Undefined
             else ResourceSlot.from_user_input(self.total_resource_slots, None)
         )
-        allowed_vfolder_hosts_val = value_or_none(self.allowed_vfolder_hosts)
+        allowed_vfolder_hosts_val = (
+            VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts)
+            if self.allowed_vfolder_hosts is not Undefined
+            else None
+        )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)
