@@ -35,7 +35,7 @@ __all__ = (
 
 @strawberry.type(
     name="ResourceGroup",
-    description="Added in 25.18.0. Resource group with structured configuration",
+    description="Added in 26.1.0. Resource group with structured configuration",
 )
 class ResourceGroupGQL(Node):
     id: NodeID[str] = strawberry.field(
@@ -69,7 +69,7 @@ class ResourceGroupOrderFieldGQL(StrEnum):
 
 @strawberry.input(
     name="ResourceGroupFilter",
-    description="Added in 25.18.0. Filter for resource groups",
+    description="Added in 26.1.0. Filter for resource groups",
 )
 class ResourceGroupFilterGQL(GQLFilter):
     name: StringFilter | None = None
@@ -159,7 +159,7 @@ class ResourceGroupFilterGQL(GQLFilter):
 
 @strawberry.input(
     name="ResourceGroupOrderBy",
-    description="Added in 25.18.0. Order by specification for resource groups",
+    description="Added in 26.1.0. Order by specification for resource groups",
 )
 class ResourceGroupOrderByGQL(GQLOrderBy):
     field: ResourceGroupOrderFieldGQL
