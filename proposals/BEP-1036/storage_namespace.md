@@ -10,6 +10,8 @@ This storage is managed by `StorageNamespaceRow` and supports two backend types:
 - **Object Storage** (MinIO, S3, etc.)
 - **VFS Storage** (local/network filesystem)
 
+Both types share the same quota mechanism via `StorageNamespaceRow.max_size`.
+
 ## Data Model
 
 ### Current Structure
@@ -74,103 +76,15 @@ This storage is managed by `StorageNamespaceRow` and supports two backend types:
 └─────────────────────────┘
 ```
 
-## Scenarios by Storage Type
+## Backend Type Differences
 
-### Object Storage (MinIO/S3)
+| Aspect | Object Storage | VFS Storage |
+|--------|---------------|-------------|
+| Config key for namespace | `bucket_name` | `subpath` |
+| Reference table | `object_storage` | `vfs_storage` |
+| Physical storage | S3 bucket (e.g., `s3://artifacts/`) | Filesystem path (e.g., `/mnt/nfs/artifacts/`) |
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Object Storage Scenario                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  Reservoir Config                                                        │
-│  ┌────────────────────────────────────────┐                             │
-│  │ storage_type: "object_storage"         │                             │
-│  │ archive_storage: "minio-main"          │                             │
-│  │ bucket_name: "artifacts"               │ ─── namespace               │
-│  └────────────────────────────────────────┘                             │
-│                                                                          │
-│  import_revision() flow                                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ 1. namespace = reservoir_config.bucket_name                      │   │
-│  │                                                                  │   │
-│  │ 2. object_storage = get_by_name("minio-main")                    │   │
-│  │    → ObjectStorageRow { id, host, endpoint, ... }                │   │
-│  │                                                                  │   │
-│  │ 3. storage_namespace = get_by_storage_and_namespace(             │   │
-│  │        storage_id=object_storage.id,                             │   │
-│  │        namespace="artifacts"                                     │   │
-│  │    )                                                             │   │
-│  │    → StorageNamespaceRow { id, max_size, ... }                   │   │
-│  │                                                                  │   │
-│  │ 4. quota_check(storage_namespace.id, revision.size)              │   │
-│  │                                                                  │   │
-│  │ 5. storage_proxy.import_huggingface_models(...)                  │   │
-│  │    → Files stored in MinIO bucket                                │   │
-│  │                                                                  │   │
-│  │ 6. associate_artifact_with_storage(                              │   │
-│  │        revision_id, namespace_id, "object_storage"               │   │
-│  │    )                                                             │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│  Physical storage location                                               │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ MinIO: s3://artifacts/{revision_id}/model.safetensors            │   │
-│  │                ▲                                                 │   │
-│  │                │                                                 │   │
-│  │        bucket_name (namespace)                                   │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### VFS Storage (Filesystem)
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          VFS Storage Scenario                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  Reservoir Config                                                        │
-│  ┌────────────────────────────────────────┐                             │
-│  │ storage_type: "vfs_storage"            │                             │
-│  │ archive_storage: "nfs-models"          │                             │
-│  │ subpath: "reservoir/artifacts"         │ ─── namespace               │
-│  └────────────────────────────────────────┘                             │
-│                                                                          │
-│  import_revision() flow                                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ 1. namespace = reservoir_config.subpath                          │   │
-│  │                                                                  │   │
-│  │ 2. vfs_storage = get_by_name("nfs-models")                       │   │
-│  │    → VFSStorageRow { id, host, base_path, ... }                  │   │
-│  │                                                                  │   │
-│  │ 3. storage_namespace = get_by_storage_and_namespace(             │   │
-│  │        storage_id=vfs_storage.id,                                │   │
-│  │        namespace="reservoir/artifacts"                           │   │
-│  │    )                                                             │   │
-│  │    → StorageNamespaceRow { id, max_size, ... }                   │   │
-│  │                                                                  │   │
-│  │ 4. quota_check(storage_namespace.id, revision.size)              │   │
-│  │                                                                  │   │
-│  │ 5. storage_proxy.import_huggingface_models(...)                  │   │
-│  │    → Files stored on NFS                                         │   │
-│  │                                                                  │   │
-│  │ 6. associate_artifact_with_storage(                              │   │
-│  │        revision_id, namespace_id, "vfs_storage"                  │   │
-│  │    )                                                             │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│  Physical storage location                                               │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ NFS: /mnt/nfs/reservoir/artifacts/{revision_id}/model.safetensors│   │
-│  │              ▲                                                   │   │
-│  │              │                                                   │   │
-│  │        base_path + subpath (namespace)                           │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+Quota management and usage aggregation are identical for both types.
 
 ## Quota Check Logic
 
@@ -182,27 +96,19 @@ async def check_storage_namespace_quota(
 ) -> None:
     """
     Check the quota for a StorageNamespace.
-
-    Same logic applies regardless of storage_type (object_storage/vfs_storage).
+    Same logic applies regardless of storage_type.
     """
-    # 1. Get max_size from namespace
     namespace = await self._storage_namespace_repo.get_by_id(namespace_id)
 
     # NULL means unlimited
     if namespace.max_size is None:
         return
 
-    # 2. Aggregate current usage (sum of revision sizes linked via association table)
+    # Aggregate current usage via association table
     usage = await self._storage_namespace_repo.get_usage(namespace_id)
 
-    # 3. Check if limit would be exceeded
     if usage.total_size + additional_size > namespace.max_size:
-        raise StorageNamespaceQuotaExceededError(
-            namespace_id=namespace_id,
-            current_size=usage.total_size,
-            max_size=namespace.max_size,
-            requested_size=additional_size,
-        )
+        raise StorageNamespaceQuotaExceededError(...)
 ```
 
 ### Usage Aggregation Query
@@ -215,17 +121,6 @@ FROM association_artifacts_storages aas
 JOIN artifact_revisions ar ON aas.artifact_revision_id = ar.id
 WHERE aas.storage_namespace_id = :namespace_id
 ```
-
-## Object Storage vs VFS Storage Comparison
-
-| Aspect | Object Storage | VFS Storage |
-|--------|---------------|-------------|
-| Config key | `bucket_name` | `subpath` |
-| Reference table | `object_storage` | `vfs_storage` |
-| `storage_type` value | `"object_storage"` | `"vfs_storage"` |
-| Physical storage | S3 bucket | Filesystem path |
-| Quota management | **Same** (StorageNamespaceRow.max_size) |
-| Usage aggregation | **Same** (association table based) |
 
 ## API
 
