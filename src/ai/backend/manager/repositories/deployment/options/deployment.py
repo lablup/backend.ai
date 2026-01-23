@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Collection
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.manager.api.gql.base import StringMatchSpec
@@ -165,11 +166,35 @@ class DeploymentConditions:
 
     @staticmethod
     def by_tag_contains(spec: StringMatchSpec) -> QueryCondition:
+        """Filter by tag key or value containing the specified string.
+
+        Searches in both keys and values of the JSON dict.
+        For key-only search, use "key:" format (e.g., "project:").
+        For key-value search, use "key=value" format (e.g., "project=ai").
+        """
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = EndpointRow.tag.ilike(f"%{spec.value}%")
+            # Parse spec.value to determine search intent
+            if "=" in spec.value:
+                # key=value format: exact key-value match
+                key, value = spec.value.split("=", 1)
+                json_tag = sa.cast(EndpointRow.tag, JSONB)
+                if spec.case_insensitive:
+                    condition = sa.func.lower(json_tag[key].astext) == value.lower()
+                else:
+                    condition = json_tag[key].astext == value
+            elif spec.value.endswith(":"):
+                # key: format: check key existence
+                key = spec.value[:-1]
+                json_tag = sa.cast(EndpointRow.tag, JSONB)
+                condition = json_tag.has_key(key)
             else:
-                condition = EndpointRow.tag.like(f"%{spec.value}%")
+                # Default: search in both keys and values using text cast
+                json_text = sa.cast(EndpointRow.tag, sa.Text)
+                if spec.case_insensitive:
+                    condition = json_text.ilike(f'%"{spec.value}"%')
+                else:
+                    condition = json_text.like(f'%"{spec.value}"%')
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -178,11 +203,20 @@ class DeploymentConditions:
 
     @staticmethod
     def by_tag_equals(spec: StringMatchSpec) -> QueryCondition:
+        """Filter by exact tag key-value match.
+
+        Expects "key=value" format. For key existence check, use by_tag_contains with "key:" format.
+        """
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if "=" not in spec.value:
+                raise ValueError(f"by_tag_equals expects 'key=value' format, got: '{spec.value}'")
+            key, value = spec.value.split("=", 1)
+            json_tag = sa.cast(EndpointRow.tag, JSONB)
             if spec.case_insensitive:
-                condition = sa.func.lower(EndpointRow.tag) == spec.value.lower()
+                condition = sa.func.lower(json_tag[key].astext) == value.lower()
             else:
-                condition = EndpointRow.tag == spec.value
+                condition = json_tag[key].astext == value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -191,11 +225,22 @@ class DeploymentConditions:
 
     @staticmethod
     def by_tag_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        """Filter by tag value starting with the specified string.
+
+        Expects "key=prefix" format. Matches tags where tag[key] starts with prefix.
+        """
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if "=" not in spec.value:
+                raise ValueError(
+                    f"by_tag_starts_with expects 'key=prefix' format, got: '{spec.value}'"
+                )
+            key, prefix = spec.value.split("=", 1)
+            json_tag = sa.cast(EndpointRow.tag, JSONB)
             if spec.case_insensitive:
-                condition = EndpointRow.tag.ilike(f"{spec.value}%")
+                condition = sa.func.lower(json_tag[key].astext).like(f"{prefix.lower()}%")
             else:
-                condition = EndpointRow.tag.like(f"{spec.value}%")
+                condition = json_tag[key].astext.like(f"{prefix}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -204,11 +249,22 @@ class DeploymentConditions:
 
     @staticmethod
     def by_tag_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        """Filter by tag value ending with the specified string.
+
+        Expects "key=suffix" format. Matches tags where tag[key] ends with suffix.
+        """
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if "=" not in spec.value:
+                raise ValueError(
+                    f"by_tag_ends_with expects 'key=suffix' format, got: '{spec.value}'"
+                )
+            key, suffix = spec.value.split("=", 1)
+            json_tag = sa.cast(EndpointRow.tag, JSONB)
             if spec.case_insensitive:
-                condition = EndpointRow.tag.ilike(f"%{spec.value}")
+                condition = sa.func.lower(json_tag[key].astext).like(f"%{suffix.lower()}")
             else:
-                condition = EndpointRow.tag.like(f"%{spec.value}")
+                condition = json_tag[key].astext.like(f"%{suffix}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
