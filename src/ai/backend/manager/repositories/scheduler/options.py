@@ -12,9 +12,13 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+
+# Default lookback period for fair share calculation (28 days)
+DEFAULT_LOOKBACK_DAYS = 28
 
 
 class SessionConditions:
@@ -189,6 +193,66 @@ class KernelConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def for_fair_share_observation(
+        scaling_group: str,
+    ) -> QueryCondition:
+        """Filter kernels that need fair share observation.
+
+        Includes:
+        1. Running kernels (terminated_at IS NULL) with starts_at set
+        2. Recently terminated kernels with unobserved periods
+           (terminated_at > last_observed_at, within lookback window)
+
+        The lookback_days is fetched from scaling_groups.fair_share_spec via subquery.
+
+        Args:
+            scaling_group: The scaling group to filter
+
+        Returns:
+            QueryCondition for fair share observation targets
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            # Subquery to get lookback_days from scaling_group's fair_share_spec
+            # Falls back to DEFAULT_LOOKBACK_DAYS if not set
+            lookback_days_subquery = (
+                sa.select(
+                    sa.func.coalesce(
+                        sa.cast(
+                            ScalingGroupRow.fair_share_spec["lookback_days"].as_string(),
+                            sa.Integer,
+                        ),
+                        DEFAULT_LOOKBACK_DAYS,
+                    )
+                )
+                .where(ScalingGroupRow.name == scaling_group)
+                .scalar_subquery()
+            )
+
+            # Calculate lookback cutoff using the subquery
+            lookback_cutoff = sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days_subquery)
+
+            return sa.and_(
+                KernelRow.scaling_group == scaling_group,
+                KernelRow.starts_at.isnot(None),  # Must have started
+                sa.or_(
+                    # Running kernels (not yet terminated)
+                    KernelRow.terminated_at.is_(None),
+                    # Terminated kernels with unobserved period, within lookback
+                    sa.and_(
+                        KernelRow.terminated_at
+                        > sa.func.coalesce(
+                            KernelRow.last_observed_at,
+                            KernelRow.starts_at,
+                        ),
+                        KernelRow.terminated_at >= lookback_cutoff,
+                    ),
+                ),
+            )
 
         return inner
 

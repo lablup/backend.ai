@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Upserter
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.upserters import (
+    DomainFairShareUpserterSpec,
+    ProjectFairShareUpserterSpec,
+    UserFairShareUpserterSpec,
+)
+from ai.backend.manager.types import TriState
 
 from .actions import (
     GetDomainFairShareAction,
@@ -18,6 +24,12 @@ from .actions import (
     SearchProjectFairSharesActionResult,
     SearchUserFairSharesAction,
     SearchUserFairSharesActionResult,
+    UpsertDomainFairShareWeightAction,
+    UpsertDomainFairShareWeightActionResult,
+    UpsertProjectFairShareWeightAction,
+    UpsertProjectFairShareWeightActionResult,
+    UpsertUserFairShareWeightAction,
+    UpsertUserFairShareWeightActionResult,
 )
 
 __all__ = ("FairShareService",)
@@ -116,3 +128,47 @@ class FairShareService:
             items=result.items,
             total_count=result.total_count,
         )
+
+    # Upsert Weight Operations
+
+    async def upsert_domain_fair_share_weight(
+        self, action: UpsertDomainFairShareWeightAction
+    ) -> UpsertDomainFairShareWeightActionResult:
+        """Upsert a domain fair share weight."""
+        spec = DomainFairShareUpserterSpec(
+            resource_group=action.resource_group,
+            domain_name=action.domain_name,
+            weight=TriState.from_graphql(action.weight),
+        )
+        upserter = Upserter(spec=spec)
+        result = await self._repository.upsert_domain_fair_share(upserter)
+        return UpsertDomainFairShareWeightActionResult(data=result)
+
+    async def upsert_project_fair_share_weight(
+        self, action: UpsertProjectFairShareWeightAction
+    ) -> UpsertProjectFairShareWeightActionResult:
+        """Upsert a project fair share weight."""
+        spec = ProjectFairShareUpserterSpec(
+            resource_group=action.resource_group,
+            project_id=action.project_id,
+            domain_name=action.domain_name,
+            weight=TriState.from_graphql(action.weight),
+        )
+        upserter = Upserter(spec=spec)
+        result = await self._repository.upsert_project_fair_share(upserter)
+        return UpsertProjectFairShareWeightActionResult(data=result)
+
+    async def upsert_user_fair_share_weight(
+        self, action: UpsertUserFairShareWeightAction
+    ) -> UpsertUserFairShareWeightActionResult:
+        """Upsert a user fair share weight."""
+        spec = UserFairShareUpserterSpec(
+            resource_group=action.resource_group,
+            user_uuid=action.user_uuid,
+            project_id=action.project_id,
+            domain_name=action.domain_name,
+            weight=TriState.from_graphql(action.weight),
+        )
+        upserter = Upserter(spec=spec)
+        result = await self._repository.upsert_user_fair_share(upserter)
+        return UpsertUserFairShareWeightActionResult(data=result)

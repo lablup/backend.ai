@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.fair_share import (
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrder,
     ProjectUsageBucketOrderField,
+    ResourceGroupFairShareSpecDTO,
     ResourceSlotDTO,
     ResourceSlotEntryDTO,
     SearchDomainFairSharesRequest,
@@ -34,6 +35,7 @@ from ai.backend.common.dto.manager.fair_share import (
     SearchProjectUsageBucketsRequest,
     SearchUserFairSharesRequest,
     SearchUserUsageBucketsRequest,
+    UpdateResourceGroupFairShareSpecRequest,
     UsageBucketMetadataDTO,
     UserFairShareDTO,
     UserFairShareFilter,
@@ -52,6 +54,7 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -509,3 +512,65 @@ class FairShareAdapter:
             for key, value in slot.items()
         ]
         return ResourceSlotDTO(entries=entries)
+
+    # Resource Group Fair Share Spec
+
+    def merge_fair_share_spec(
+        self,
+        request: UpdateResourceGroupFairShareSpecRequest,
+        existing: FairShareScalingGroupSpec,
+    ) -> FairShareScalingGroupSpec:
+        """Merge partial update request with existing spec.
+
+        Only provided fields are updated; others retain existing values.
+        """
+        # Merge resource_weights: partial update with deletion support
+        merged_resource_weights = existing.resource_weights
+        if request.resource_weights is not None:
+            # Start with existing weights
+            merged_weights_dict = dict(existing.resource_weights)
+            for entry in request.resource_weights:
+                if entry.weight is None:
+                    # Remove the resource type (revert to default)
+                    merged_weights_dict.pop(entry.resource_type, None)
+                else:
+                    # Update or add the resource type
+                    merged_weights_dict[entry.resource_type] = entry.weight
+            merged_resource_weights = ResourceSlot(merged_weights_dict)
+
+        return FairShareScalingGroupSpec(
+            half_life_days=(
+                request.half_life_days
+                if request.half_life_days is not None
+                else existing.half_life_days
+            ),
+            lookback_days=(
+                request.lookback_days
+                if request.lookback_days is not None
+                else existing.lookback_days
+            ),
+            decay_unit_days=(
+                request.decay_unit_days
+                if request.decay_unit_days is not None
+                else existing.decay_unit_days
+            ),
+            default_weight=(
+                request.default_weight
+                if request.default_weight is not None
+                else existing.default_weight
+            ),
+            resource_weights=merged_resource_weights,
+        )
+
+    def convert_scaling_group_spec_to_dto(
+        self,
+        spec: FairShareScalingGroupSpec,
+    ) -> ResourceGroupFairShareSpecDTO:
+        """Convert FairShareScalingGroupSpec to DTO."""
+        return ResourceGroupFairShareSpecDTO(
+            half_life_days=spec.half_life_days,
+            lookback_days=spec.lookback_days,
+            decay_unit_days=spec.decay_unit_days,
+            default_weight=spec.default_weight,
+            resource_weights=self._convert_resource_slot(spec.resource_weights),
+        )

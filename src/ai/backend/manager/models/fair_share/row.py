@@ -77,13 +77,15 @@ class DomainFairShareRow(Base):
     # Numeric(precision=10, scale=4): Total 10 digits with 4 decimal places.
     # Range: -999999.9999 ~ 999999.9999
     # Example: weight=1.5 means 1.5x priority multiplier compared to default weight=1.0
-    weight: Mapped[Decimal] = mapped_column(
+    # When NULL, the resource group's default_weight should be used.
+    weight: Mapped[Decimal | None] = mapped_column(
         "weight",
         sa.Numeric(precision=10, scale=4),
-        nullable=False,
-        default=Decimal("1.0"),
+        nullable=True,
+        default=None,
         comment="Priority weight multiplier. Higher weight = higher priority allocation ratio. "
-        "Example: 2.0 means 2x priority compared to default 1.0",
+        "Example: 2.0 means 2x priority compared to default 1.0. "
+        "NULL means use resource group's default_weight.",
     )
 
     # Numeric(precision=8, scale=6): Total 8 digits with 6 decimal places.
@@ -264,13 +266,14 @@ class ProjectFairShareRow(Base):
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
 
-    weight: Mapped[Decimal] = mapped_column(
+    weight: Mapped[Decimal | None] = mapped_column(
         "weight",
         sa.Numeric(precision=10, scale=4),
-        nullable=False,
-        default=Decimal("1.0"),
+        nullable=True,
+        default=None,
         comment="Priority weight multiplier. Higher weight = higher priority allocation ratio. "
-        "Example: 2.0 means 2x priority compared to default 1.0",
+        "Example: 2.0 means 2x priority compared to default 1.0. "
+        "NULL means use resource group's default_weight.",
     )
 
     fair_share_factor: Mapped[Decimal] = mapped_column(
@@ -458,13 +461,14 @@ class UserFairShareRow(Base):
         "domain_name", sa.String(length=64), nullable=False, index=True
     )
 
-    weight: Mapped[Decimal] = mapped_column(
+    weight: Mapped[Decimal | None] = mapped_column(
         "weight",
         sa.Numeric(precision=10, scale=4),
-        nullable=False,
-        default=Decimal("1.0"),
+        nullable=True,
+        default=None,
         comment="Priority weight multiplier. Higher weight = higher priority allocation ratio. "
-        "Example: 2.0 means 2x priority compared to default 1.0",
+        "Example: 2.0 means 2x priority compared to default 1.0. "
+        "NULL means use resource group's default_weight.",
     )
 
     fair_share_factor: Mapped[Decimal] = mapped_column(

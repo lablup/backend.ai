@@ -169,20 +169,6 @@ type AgentResource {
   free: JSON!
 }
 
-"""Added in 26.1.0. Configuration for the agent selection strategy"""
-type AgentSelectorConfig {
-  """
-  Number of existing kernels already running on the same endpoint.
-  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
-  
-  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
-  across different agents for improved fault tolerance. This count helps the scheduler
-  avoid placing new replicas on agents that already host replicas for the same endpoint,
-  ensuring better distribution of model serving workloads.
-  """
-  kernelCountsAtSameEndpoint: Int!
-}
-
 """Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
@@ -1847,13 +1833,43 @@ type FairShareCalculationSnapshot {
 }
 
 """
+Added in 26.1.0. Fair share calculation configuration for a resource group. Defines parameters for computing fair share factors across domains, projects, and users.
+"""
+type FairShareScalingGroupSpec {
+  """
+  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. Default is 7 days.
+  """
+  halfLifeDays: Int!
+
+  """
+  Total lookback period in days for usage aggregation. Only usage within this window is considered. Default is 28 days.
+  """
+  lookbackDays: Int!
+
+  """
+  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Default is 1 day.
+  """
+  decayUnitDays: Int!
+
+  """
+  Default weight for entities without explicit weight in this resource group. Default is 1.0.
+  """
+  defaultWeight: Decimal!
+
+  """
+  Weights for each resource type when calculating normalized usage. If a resource type is not specified, default weight (1.0) is used.
+  """
+  resourceWeights: ResourceSlot!
+}
+
+"""
 Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation.
 """
 type FairShareSpec {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Default is 1.0. A weight of 2.0 means this entity is twice as important as one with weight 1.0.
+  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Null means using resource group's default_weight.
   """
-  weight: Decimal!
+  weight: Decimal
 
   """
   Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
@@ -2540,6 +2556,26 @@ type Mutation {
 
   """Added in 25.19.0. Update the traffic status of a route."""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
+
+  """
+  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values.
+  """
+  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -3131,11 +3167,8 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
-  """Added in 25.18.0. List scaling groups for a specific project"""
-  scalingGroupsV2(project: ID!, filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
-
-  """Added in 25.18.0. List all scaling groups"""
-  allScalingGroupsV2(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
+  """Added in 26.1.0. List resource groups"""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
@@ -3318,9 +3351,64 @@ input ResourceConfigInput {
   resourceOpts: ResourceOptsInput = null
 }
 
+"""Added in 26.1.0. Resource group with structured configuration"""
+type ResourceGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique name identifying the resource group.
+  Used as primary key and referenced by agents, sessions, and resource presets.
+  """
+  name: String!
+
+  """
+  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
+  """
+  fairShareSpec: FairShareScalingGroupSpec!
+}
+
+"""Added in 26.1.0. Resource group connection"""
+type ResourceGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ResourceGroupEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ResourceGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ResourceGroup!
+}
+
+"""Added in 26.1.0. Filter for resource groups"""
+input ResourceGroupFilter {
+  name: StringFilter = null
+  AND: [ResourceGroupFilter!] = null
+  OR: [ResourceGroupFilter!] = null
+  NOT: [ResourceGroupFilter!] = null
+}
+
 """Added in 25.19.0"""
 input ResourceGroupInput {
   name: String!
+}
+
+"""Added in 26.1.0. Order by specification for resource groups"""
+input ResourceGroupOrderBy {
+  field: ResourceGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.1.0. Fields available for ordering resource groups"""
+enum ResourceGroupOrderField {
+  NAME
 }
 
 """
@@ -3381,9 +3469,9 @@ type ResourceSlotEntry {
   resourceType: String!
 
   """
-  Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
+  Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction.
   """
-  quantity: String!
+  quantity: Decimal!
 }
 
 """
@@ -3403,6 +3491,21 @@ Added in 26.1.0. A collection of compute resource allocations for input.
 input ResourceSlotInput {
   """List of resource allocations."""
   entries: [ResourceSlotEntryInput!]!
+}
+
+"""
+Added in 26.1.0. Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.
+"""
+input ResourceWeightEntryInput {
+  """
+  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). Must match the resource types used in the cluster.
+  """
+  resourceType: String!
+
+  """
+  Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
+  """
+  weight: Decimal = null
 }
 
 """
@@ -3608,230 +3711,8 @@ input SMTPConnectionInput {
   timeout: Int! = 30
 }
 
-"""Added in 25.18.0. Filter for scaling groups"""
-input ScalingGroupFilter {
-  name: StringFilter = null
-  description: StringFilter = null
-  isActive: Boolean = null
-  isPublic: Boolean = null
-  scheduler: String = null
-  useHostNetwork: Boolean = null
-  AND: [ScalingGroupFilter!] = null
-  OR: [ScalingGroupFilter!] = null
-  NOT: [ScalingGroupFilter!] = null
-}
-
-"""Added in 25.18.0. Metadata information for a scaling group"""
-type ScalingGroupMetadata {
-  """Human-readable description of the scaling group's purpose"""
-  description: String!
-
-  """Timestamp when the scaling group was created"""
-  createdAt: DateTime!
-}
-
-"""Added in 25.18.0. Network configuration for a scaling group"""
-type ScalingGroupNetworkConfig {
-  """
-  App-proxy coordinator API server address.
-  Manager uses this address to communicate with the app-proxy coordinator
-  for managing service routes, endpoint registration, and proxying client connections
-  to session services.
-  """
-  wsproxyAddr: String!
-
-  """Authentication token for the App-proxy coordinator API server."""
-  wsproxyApiToken: String!
-
-  """
-  Whether session containers use the host's network namespace
-  instead of isolated container networking.
-  Enables direct host port binding but reduces isolation.
-  """
-  useHostNetwork: Boolean!
-}
-
 extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""Added in 25.18.0. Order by specification for scaling groups"""
-input ScalingGroupOrderBy {
-  field: ScalingGroupOrderField!
-  direction: OrderDirection! = ASC
-}
-
-enum ScalingGroupOrderField {
-  NAME
-  CREATED_AT
-  IS_ACTIVE
-  IS_PUBLIC
-}
-
-"""Added in 25.18.0. Scheduler configuration for session scheduling"""
-type ScalingGroupSchedulerConfig {
-  """
-  Scheduling algorithm implementation.
-  'fifo' schedules oldest pending sessions first,
-  'lifo' schedules newest first,
-  'drf' (Dominant Resource Fairness) balances resource usage across users.
-  """
-  name: ScalingGroupSchedulerType!
-
-  """
-  Detailed scheduler behavior configuration including session type restrictions,
-  timeouts, agent selection strategy, and resource allocation policies.
-  """
-  options: ScalingGroupSchedulerOptions!
-}
-
-"""Added in 25.18.0. Scheduler configuration options"""
-type ScalingGroupSchedulerOptions {
-  """
-  Session types that can be scheduled in this scaling group.
-  Valid values: 'interactive' , 'batch', 'inference'.
-  Requests for unlisted types are rejected.
-  """
-  allowedSessionTypes: [String!]!
-
-  """
-  Maximum time in seconds a session can wait in PENDING state
-  before automatic cancellation.
-  Zero means no timeout.
-  Used to prevent indefinite resource waiting when no agents are available.
-  """
-  pendingTimeout: Float!
-
-  """
-  Scheduler-specific configuration options.
-  Contents depend on the scheduler implementation (fifo/lifo/drf).
-  Used for advanced scheduling behavior customization.
-  """
-  config: SchedulerConfig!
-
-  """
-  Algorithm for selecting target agents when scheduling sessions.
-  'dispersed' spreads sessions across available agents,
-  'concentrated' packs sessions onto fewer agents,
-  'roundrobin' cycles through agents sequentially.
-  """
-  agentSelectionStrategy: String!
-
-  """
-  Configuration for the agent selection strategy.
-  Structure varies by strategy - for example,
-  concentrated strategy may specify endpoint spreading rules.
-  """
-  agentSelectorConfig: AgentSelectorConfig!
-
-  """
-  Whether inference service replicas should be distributed across different agents
-  instead of co-locating on same agent.
-  When true, forces replica spreading.
-  Applied only when using concentrated agent selection strategy.
-  Improves fault tolerance for model serving.
-  """
-  enforceSpreadingEndpointReplica: Boolean!
-
-  """
-  Whether agents accept session requests that allocate fractional resources
-  (e.g., 0.5 GPU) causing resource fragmentation.
-  When false, agents reject sessions that would prevent future efficient resource allocation.
-  """
-  allowFractionalResourceFragmentation: Boolean!
-
-  """
-  List of route health statuses that trigger automatic cleanup of service routes.
-  Valid values: 'healthy', 'unhealthy', 'degraded'.
-  Default: ['unhealthy'].
-  """
-  routeCleanupTargetStatuses: [String!]!
-}
-
-"""
-Added in 25.18.0. Scheduler type for session scheduling.
-
-- FIFO: First-In-First-Out - Schedules oldest pending sessions first
-- LIFO: Last-In-First-Out - Schedules newest pending sessions first
-- DRF: Dominant Resource Fairness - Balances resource usage across users
-"""
-enum ScalingGroupSchedulerType {
-  FIFO
-  LIFO
-  DRF
-}
-
-"""Added in 25.18.0. Status information for a scaling group"""
-type ScalingGroupStatus {
-  """
-  Whether the scaling group can accept new session creation requests.
-  Inactive scaling groups are excluded from scheduling and cannot start new sessions.
-  """
-  isActive: Boolean!
-
-  """
-  Whether this scaling group is available for regular user sessions
-  (interactive/batch/inference).
-  When false, the scaling group is reserved for internal SYSTEM-type sessions only,
-  such as management or infrastructure sessions.
-  """
-  isPublic: Boolean!
-}
-
-"""Added in 25.18.0. Scaling group with structured configuration"""
-type ScalingGroupV2 implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """
-  Unique name identifying the scaling group.
-  Used as primary key and referenced by agents, sessions, and resource presets.
-  """
-  name: String!
-
-  """
-  Operational status controlling whether this scaling group accepts new sessions
-  and its visibility to users without explicit access grants.
-  """
-  status: ScalingGroupStatus!
-
-  """
-  Administrative metadata including human-readable description
-  and creation timestamp for audit and documentation purposes.
-  """
-  metadata: ScalingGroupMetadata!
-
-  """
-  Network configuration for connecting clients to interactive session services
-  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
-  """
-  network: ScalingGroupNetworkConfig!
-
-  """
-  Session scheduling configuration controlling queue management,
-  agent selection strategy, resource allocation policies,
-  and session lifecycle timeouts.
-  """
-  scheduler: ScalingGroupSchedulerConfig!
-}
-
-"""Added in 25.18.0. Scaling group connection"""
-type ScalingGroupV2Connection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ScalingGroupV2Edge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ScalingGroupV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ScalingGroupV2!
 }
 
 type ScalingRule {
@@ -3891,15 +3772,6 @@ These artifacts are registered with SCANNED status and can be imported for actua
 """
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
-}
-
-"""Added in 26.1.0. Scheduler-specific configuration options"""
-type SchedulerConfig {
-  """
-  Number of scheduling retries to skip before attempting to schedule a session.
-  Used to prevent repeated scheduling attempts for sessions that previously failed.
-  """
-  numRetriesToSkip: Int!
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
@@ -4302,6 +4174,43 @@ type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
+"""
+Added in 26.1.0. Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.
+"""
+input UpdateResourceGroupFairShareSpecInput {
+  """Name of the resource group to update."""
+  resourceGroup: String!
+
+  """
+  Half-life for exponential decay in days. Leave null to keep existing value.
+  """
+  halfLifeDays: Int = null
+
+  """Total lookback period in days. Leave null to keep existing value."""
+  lookbackDays: Int = null
+
+  """
+  Granularity of decay buckets in days. Leave null to keep existing value.
+  """
+  decayUnitDays: Int = null
+
+  """Default weight for entities. Leave null to keep existing value."""
+  defaultWeight: Decimal = null
+
+  """
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  """
+  resourceWeights: [ResourceWeightEntryInput!] = null
+}
+
+"""
+Added in 26.1.0. Payload for resource group fair share spec update mutation.
+"""
+type UpdateResourceGroupFairShareSpecPayload {
+  """The updated resource group with new fair share configuration."""
+  resourceGroup: ResourceGroup!
+}
+
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput {
   """The ID of the route to update."""
@@ -4352,6 +4261,55 @@ type UpsertDomainConfigPayload {
 }
 
 """
+Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertDomainFairShareWeightInput {
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """Name of the domain to update weight for."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""Added in 26.1.0. Payload for domain fair share weight upsert mutation."""
+type UpsertDomainFairShareWeightPayload {
+  """The updated or created domain fair share record."""
+  domainFairShare: DomainFairShare!
+}
+
+"""
+Added in 26.1.0. Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertProjectFairShareWeightInput {
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """UUID of the project to update weight for."""
+  projectId: UUID!
+
+  """Name of the domain the project belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""
+Added in 26.1.0. Payload for project fair share weight upsert mutation.
+"""
+type UpsertProjectFairShareWeightPayload {
+  """The updated or created project fair share record."""
+  projectFairShare: ProjectFairShare!
+}
+
+"""
 Added in 25.16.0.
 Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
@@ -4371,6 +4329,34 @@ Contains the resulting configuration that was stored.
 """
 type UpsertUserConfigPayload {
   appConfig: AppConfig!
+}
+
+"""
+Added in 26.1.0. Input for upserting user fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
+"""
+input UpsertUserFairShareWeightInput {
+  """Name of the scaling group (resource group) for this fair share."""
+  resourceGroup: String!
+
+  """UUID of the project the user belongs to."""
+  projectId: UUID!
+
+  """UUID of the user to update weight for."""
+  userUuid: UUID!
+
+  """Name of the domain the user belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
+"""Added in 26.1.0. Payload for user fair share weight upsert mutation."""
+type UpsertUserFairShareWeightPayload {
+  """The updated or created user fair share record."""
+  userFairShare: UserFairShare!
 }
 
 """

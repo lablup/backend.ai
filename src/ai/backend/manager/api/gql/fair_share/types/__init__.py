@@ -5,6 +5,7 @@ from .common import (
     FairShareSpecGQL,
     ResourceSlotEntryGQL,
     ResourceSlotGQL,
+    ResourceWeightEntryInputGQL,
 )
 from .domain import (
     DomainFairShareConnection,
@@ -13,6 +14,8 @@ from .domain import (
     DomainFairShareGQL,
     DomainFairShareOrderBy,
     DomainFairShareOrderField,
+    UpsertDomainFairShareWeightInput,
+    UpsertDomainFairShareWeightPayload,
 )
 from .project import (
     ProjectFairShareConnection,
@@ -21,8 +24,12 @@ from .project import (
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
     ProjectFairShareOrderField,
+    UpsertProjectFairShareWeightInput,
+    UpsertProjectFairShareWeightPayload,
 )
 from .user import (
+    UpsertUserFairShareWeightInput,
+    UpsertUserFairShareWeightPayload,
     UserFairShareConnection,
     UserFairShareEdge,
     UserFairShareFilter,
@@ -35,6 +42,7 @@ __all__ = [
     # Common
     "ResourceSlotEntryGQL",
     "ResourceSlotGQL",
+    "ResourceWeightEntryInputGQL",
     "FairShareSpecGQL",
     "FairShareCalculationSnapshotGQL",
     # Domain
@@ -44,6 +52,8 @@ __all__ = [
     "DomainFairShareFilter",
     "DomainFairShareOrderField",
     "DomainFairShareOrderBy",
+    "UpsertDomainFairShareWeightInput",
+    "UpsertDomainFairShareWeightPayload",
     # Project
     "ProjectFairShareGQL",
     "ProjectFairShareConnection",
@@ -51,6 +61,8 @@ __all__ = [
     "ProjectFairShareFilter",
     "ProjectFairShareOrderField",
     "ProjectFairShareOrderBy",
+    "UpsertProjectFairShareWeightInput",
+    "UpsertProjectFairShareWeightPayload",
     # User
     "UserFairShareGQL",
     "UserFairShareConnection",
@@ -58,4 +70,6 @@ __all__ = [
     "UserFairShareFilter",
     "UserFairShareOrderField",
     "UserFairShareOrderBy",
+    "UpsertUserFairShareWeightInput",
+    "UpsertUserFairShareWeightPayload",
 ]

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import date
-from typing import TYPE_CHECKING
+from datetime import date, datetime
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -41,6 +44,12 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.sokovan.scheduler.fair_share import (
+        DomainUsageBucketKey,
+        ProjectUsageBucketKey,
+        UsageBucketAggregationResult,
+        UserUsageBucketKey,
+    )
 
 
 __all__ = ("ResourceUsageHistoryDBSource",)
@@ -77,6 +86,108 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_session() as db_sess:
             result = await execute_bulk_creator(db_sess, bulk_creator)
             return [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+    async def bulk_create_kernel_usage_records_with_observation_update(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Bulk create kernel usage records and update observation timestamps atomically.
+
+        This method performs both operations in a single transaction for data consistency:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        async with self._db.begin_session() as db_sess:
+            # Step 1: Bulk create kernel usage records
+            result = await execute_bulk_creator(db_sess, bulk_creator)
+            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+            # Step 2: Update last_observed_at for kernels
+            updated_count = 0
+            if kernel_observation_times:
+                # Group by observation time for efficient batch updates
+                time_to_kernels: dict[datetime, list[uuid.UUID]] = {}
+                for kernel_id, observed_at in kernel_observation_times.items():
+                    time_to_kernels.setdefault(observed_at, []).append(kernel_id)
+
+                for observed_at, kernel_ids in time_to_kernels.items():
+                    update_stmt = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id.in_(kernel_ids))
+                        .values(last_observed_at=observed_at)
+                    )
+                    update_result = await db_sess.execute(update_stmt)
+                    updated_count += cast(CursorResult, update_result).rowcount
+
+            return records, updated_count
+
+    async def record_fair_share_observation(
+        self,
+        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        kernel_observation_times: Mapping[uuid.UUID, datetime],
+        aggregation_result: UsageBucketAggregationResult,
+        decay_unit_days: int = 1,
+    ) -> tuple[list[KernelUsageRecordData], int]:
+        """Record fair share observation data atomically.
+
+        This method combines all fair share observation writes in a single transaction:
+        1. Bulk create kernel usage records
+        2. Update last_observed_at for the observed kernels
+        3. Increment user/project/domain usage buckets
+
+        By performing all writes in a single transaction, we ensure data consistency
+        even if the server crashes mid-operation.
+
+        Args:
+            bulk_creator: Specs for creating kernel usage records
+            kernel_observation_times: Mapping of kernel ID to observation timestamp
+            aggregation_result: Aggregated usage deltas for bucket updates
+            decay_unit_days: Decay unit days for new buckets (default: 1)
+
+        Returns:
+            Tuple of (created records data, number of kernels with updated observation times)
+        """
+        async with self._db.begin_session() as db_sess:
+            # Step 1: Bulk create kernel usage records
+            result = await execute_bulk_creator(db_sess, bulk_creator)
+            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+
+            # Step 2: Update last_observed_at for kernels
+            updated_count = 0
+            if kernel_observation_times:
+                time_to_kernels: dict[datetime, list[uuid.UUID]] = {}
+                for kernel_id, observed_at in kernel_observation_times.items():
+                    time_to_kernels.setdefault(observed_at, []).append(kernel_id)
+
+                for observed_at, kernel_ids in time_to_kernels.items():
+                    update_stmt = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id.in_(kernel_ids))
+                        .values(last_observed_at=observed_at)
+                    )
+                    update_result = await db_sess.execute(update_stmt)
+                    updated_count += cast(CursorResult, update_result).rowcount
+
+            # Step 3: Increment usage buckets
+            await self._increment_user_usage_buckets(
+                db_sess, aggregation_result.user_usage_deltas, decay_unit_days
+            )
+            await self._increment_project_usage_buckets(
+                db_sess, aggregation_result.project_usage_deltas, decay_unit_days
+            )
+            await self._increment_domain_usage_buckets(
+                db_sess, aggregation_result.domain_usage_deltas, decay_unit_days
+            )
+
+            return records, updated_count
 
     async def search_kernel_usage_records(
         self,
@@ -337,3 +448,260 @@ class ResourceUsageHistoryDBSource:
                     aggregated[row.domain_name] = ResourceSlot()
                 aggregated[row.domain_name] = aggregated[row.domain_name] + row.resource_usage
             return aggregated
+
+    # ==================== Bucket Delta Updates ====================
+
+    async def increment_usage_buckets(
+        self,
+        aggregation_result: UsageBucketAggregationResult,
+        decay_unit_days: int = 1,
+    ) -> None:
+        """Increment usage buckets with aggregated deltas.
+
+        For each bucket key:
+        - If bucket exists: add delta to existing resource_usage
+        - If bucket doesn't exist: create new bucket with delta as resource_usage
+
+        All operations are performed in a single transaction for consistency.
+
+        Args:
+            aggregation_result: Aggregated usage deltas from FairShareAggregator
+            decay_unit_days: Decay unit days for new buckets (default: 1)
+        """
+        if not (
+            aggregation_result.user_usage_deltas
+            or aggregation_result.project_usage_deltas
+            or aggregation_result.domain_usage_deltas
+        ):
+            return
+
+        async with self._db.begin_session() as db_sess:
+            # Process user buckets
+            await self._increment_user_usage_buckets(
+                db_sess, aggregation_result.user_usage_deltas, decay_unit_days
+            )
+
+            # Process project buckets
+            await self._increment_project_usage_buckets(
+                db_sess, aggregation_result.project_usage_deltas, decay_unit_days
+            )
+
+            # Process domain buckets
+            await self._increment_domain_usage_buckets(
+                db_sess, aggregation_result.domain_usage_deltas, decay_unit_days
+            )
+
+    async def _increment_user_usage_buckets(
+        self,
+        db_sess: SASession,
+        deltas: Mapping[UserUsageBucketKey, ResourceSlot],
+        decay_unit_days: int,
+    ) -> None:
+        """Increment user usage buckets with deltas."""
+        if not deltas:
+            return
+
+        # Fetch existing buckets
+        keys_list = list(deltas.keys())
+        existing = await self._fetch_existing_user_buckets(db_sess, keys_list)
+
+        for key, delta in deltas.items():
+            lookup_key = (key.user_uuid, key.project_id, key.resource_group, key.period_date)
+            existing_usage = existing.get(lookup_key, ResourceSlot())
+            new_usage = existing_usage + delta
+
+            # Upsert with merged usage
+            stmt = (
+                pg_insert(UserUsageBucketRow.__table__)
+                .values(
+                    user_uuid=key.user_uuid,
+                    project_id=key.project_id,
+                    domain_name=key.domain_name,
+                    resource_group=key.resource_group,
+                    period_start=key.period_date,
+                    period_end=key.period_date,
+                    decay_unit_days=decay_unit_days,
+                    resource_usage=new_usage,
+                )
+                .on_conflict_do_update(
+                    index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def _fetch_existing_user_buckets(
+        self,
+        db_sess: SASession,
+        keys: list[UserUsageBucketKey],
+    ) -> dict[tuple[uuid.UUID, uuid.UUID, str, date], ResourceSlot]:
+        """Fetch existing user buckets for the given keys."""
+        if not keys:
+            return {}
+
+        # Build OR conditions for each key
+        conditions = [
+            sa.and_(
+                UserUsageBucketRow.user_uuid == key.user_uuid,
+                UserUsageBucketRow.project_id == key.project_id,
+                UserUsageBucketRow.resource_group == key.resource_group,
+                UserUsageBucketRow.period_start == key.period_date,
+            )
+            for key in keys
+        ]
+
+        query = sa.select(
+            UserUsageBucketRow.user_uuid,
+            UserUsageBucketRow.project_id,
+            UserUsageBucketRow.resource_group,
+            UserUsageBucketRow.period_start,
+            UserUsageBucketRow.resource_usage,
+        ).where(sa.or_(*conditions))
+
+        result = await db_sess.execute(query)
+        return {
+            (
+                row.user_uuid,
+                row.project_id,
+                row.resource_group,
+                row.period_start,
+            ): row.resource_usage
+            for row in result.all()
+        }
+
+    async def _increment_project_usage_buckets(
+        self,
+        db_sess: SASession,
+        deltas: Mapping[ProjectUsageBucketKey, ResourceSlot],
+        decay_unit_days: int,
+    ) -> None:
+        """Increment project usage buckets with deltas."""
+        if not deltas:
+            return
+
+        # Fetch existing buckets
+        keys_list = list(deltas.keys())
+        existing = await self._fetch_existing_project_buckets(db_sess, keys_list)
+
+        for key, delta in deltas.items():
+            lookup_key = (key.project_id, key.resource_group, key.period_date)
+            existing_usage = existing.get(lookup_key, ResourceSlot())
+            new_usage = existing_usage + delta
+
+            # Upsert with merged usage
+            stmt = (
+                pg_insert(ProjectUsageBucketRow.__table__)
+                .values(
+                    project_id=key.project_id,
+                    domain_name=key.domain_name,
+                    resource_group=key.resource_group,
+                    period_start=key.period_date,
+                    period_end=key.period_date,
+                    decay_unit_days=decay_unit_days,
+                    resource_usage=new_usage,
+                )
+                .on_conflict_do_update(
+                    index_elements=["project_id", "resource_group", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def _fetch_existing_project_buckets(
+        self,
+        db_sess: SASession,
+        keys: list[ProjectUsageBucketKey],
+    ) -> dict[tuple[uuid.UUID, str, date], ResourceSlot]:
+        """Fetch existing project buckets for the given keys."""
+        if not keys:
+            return {}
+
+        conditions = [
+            sa.and_(
+                ProjectUsageBucketRow.project_id == key.project_id,
+                ProjectUsageBucketRow.resource_group == key.resource_group,
+                ProjectUsageBucketRow.period_start == key.period_date,
+            )
+            for key in keys
+        ]
+
+        query = sa.select(
+            ProjectUsageBucketRow.project_id,
+            ProjectUsageBucketRow.resource_group,
+            ProjectUsageBucketRow.period_start,
+            ProjectUsageBucketRow.resource_usage,
+        ).where(sa.or_(*conditions))
+
+        result = await db_sess.execute(query)
+        return {
+            (row.project_id, row.resource_group, row.period_start): row.resource_usage
+            for row in result.all()
+        }
+
+    async def _increment_domain_usage_buckets(
+        self,
+        db_sess: SASession,
+        deltas: Mapping[DomainUsageBucketKey, ResourceSlot],
+        decay_unit_days: int,
+    ) -> None:
+        """Increment domain usage buckets with deltas."""
+        if not deltas:
+            return
+
+        # Fetch existing buckets
+        keys_list = list(deltas.keys())
+        existing = await self._fetch_existing_domain_buckets(db_sess, keys_list)
+
+        for key, delta in deltas.items():
+            lookup_key = (key.domain_name, key.resource_group, key.period_date)
+            existing_usage = existing.get(lookup_key, ResourceSlot())
+            new_usage = existing_usage + delta
+
+            # Upsert with merged usage
+            stmt = (
+                pg_insert(DomainUsageBucketRow.__table__)
+                .values(
+                    domain_name=key.domain_name,
+                    resource_group=key.resource_group,
+                    period_start=key.period_date,
+                    period_end=key.period_date,
+                    decay_unit_days=decay_unit_days,
+                    resource_usage=new_usage,
+                )
+                .on_conflict_do_update(
+                    index_elements=["domain_name", "resource_group", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def _fetch_existing_domain_buckets(
+        self,
+        db_sess: SASession,
+        keys: list[DomainUsageBucketKey],
+    ) -> dict[tuple[str, str, date], ResourceSlot]:
+        """Fetch existing domain buckets for the given keys."""
+        if not keys:
+            return {}
+
+        conditions = [
+            sa.and_(
+                DomainUsageBucketRow.domain_name == key.domain_name,
+                DomainUsageBucketRow.resource_group == key.resource_group,
+                DomainUsageBucketRow.period_start == key.period_date,
+            )
+            for key in keys
+        ]
+
+        query = sa.select(
+            DomainUsageBucketRow.domain_name,
+            DomainUsageBucketRow.resource_group,
+            DomainUsageBucketRow.period_start,
+            DomainUsageBucketRow.resource_usage,
+        ).where(sa.or_(*conditions))
+
+        result = await db_sess.execute(query)
+        return {
+            (row.domain_name, row.resource_group, row.period_start): row.resource_usage
+            for row in result.all()
+        }

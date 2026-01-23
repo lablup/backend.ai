@@ -22,14 +22,17 @@ __all__ = (
     "DomainFairShareDTO",
     "GetDomainFairShareResponse",
     "SearchDomainFairSharesResponse",
+    "UpsertDomainFairShareWeightResponse",
     # Project Fair Share
     "ProjectFairShareDTO",
     "GetProjectFairShareResponse",
     "SearchProjectFairSharesResponse",
+    "UpsertProjectFairShareWeightResponse",
     # User Fair Share
     "UserFairShareDTO",
     "GetUserFairShareResponse",
     "SearchUserFairSharesResponse",
+    "UpsertUserFairShareWeightResponse",
     # Domain Usage Bucket
     "UsageBucketMetadataDTO",
     "DomainUsageBucketDTO",
@@ -40,6 +43,9 @@ __all__ = (
     # User Usage Bucket
     "UserUsageBucketDTO",
     "SearchUserUsageBucketsResponse",
+    # Resource Group Fair Share Spec
+    "ResourceGroupFairShareSpecDTO",
+    "UpdateResourceGroupFairShareSpecResponse",
 )
 
 
@@ -67,7 +73,10 @@ class ResourceSlotDTO(BaseModel):
 class FairShareSpecDTO(BaseModel):
     """Fair share specification parameters."""
 
-    weight: Decimal = Field(description="Base weight for this entity")
+    weight: Optional[Decimal] = Field(
+        default=None,
+        description="Base weight for this entity. None means use resource group's default_weight.",
+    )
     half_life_days: int = Field(description="Half-life for exponential decay in days")
     lookback_days: int = Field(description="Total lookback period in days")
     decay_unit_days: int = Field(description="Granularity of decay buckets in days")
@@ -311,3 +320,46 @@ class SearchUserUsageBucketsResponse(BaseResponseModel):
 
     items: list[UserUsageBucketDTO] = Field(description="List of user usage buckets")
     pagination: PaginationInfo = Field(description="Pagination information")
+
+
+# Upsert Weight Responses
+
+
+class UpsertDomainFairShareWeightResponse(BaseResponseModel):
+    """Response for upserting domain fair share weight."""
+
+    item: DomainFairShareDTO = Field(description="Updated domain fair share data")
+
+
+class UpsertProjectFairShareWeightResponse(BaseResponseModel):
+    """Response for upserting project fair share weight."""
+
+    item: ProjectFairShareDTO = Field(description="Updated project fair share data")
+
+
+class UpsertUserFairShareWeightResponse(BaseResponseModel):
+    """Response for upserting user fair share weight."""
+
+    item: UserFairShareDTO = Field(description="Updated user fair share data")
+
+
+# Resource Group Fair Share Spec
+
+
+class ResourceGroupFairShareSpecDTO(BaseModel):
+    """Fair share specification for a resource group."""
+
+    half_life_days: int = Field(description="Half-life for exponential decay in days")
+    lookback_days: int = Field(description="Total lookback period in days")
+    decay_unit_days: int = Field(description="Granularity of decay buckets in days")
+    default_weight: Decimal = Field(description="Default weight for entities")
+    resource_weights: ResourceSlotDTO = Field(description="Weights for each resource type")
+
+
+class UpdateResourceGroupFairShareSpecResponse(BaseResponseModel):
+    """Response for updating resource group fair share spec."""
+
+    resource_group: str = Field(description="Name of the resource group")
+    fair_share_spec: ResourceGroupFairShareSpecDTO = Field(
+        description="Updated fair share specification"
+    )

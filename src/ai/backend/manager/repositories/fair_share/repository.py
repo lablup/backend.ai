@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -18,10 +19,12 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
+    FairShareCalculationContext,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
     UserFairShareData,
+    UserFairShareFactors,
     UserFairShareSearchResult,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
@@ -35,6 +38,7 @@ if TYPE_CHECKING:
         UserFairShareRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
 
 __all__ = ("FairShareRepository",)
@@ -201,3 +205,77 @@ class FairShareRepository:
         return await self._db_source.get_user_scheduling_ranks_batch(
             resource_group, project_user_ids
         )
+
+    # ==================== Bulk Factor Updates ====================
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_update_fair_share_factors(
+        self,
+        resource_group: str,
+        calculation_result: FairShareFactorCalculationResult,
+        lookback_start: date,
+        lookback_end: date,
+    ) -> None:
+        """Bulk update fair share factors for all levels.
+
+        Updates domain, project, and user fair share records with calculated
+        factors in a single transaction.
+
+        Args:
+            resource_group: The resource group being updated
+            calculation_result: Calculated factors from FairShareFactorCalculator
+            lookback_start: Start of lookback period used in calculation
+            lookback_end: End of lookback period used in calculation
+        """
+        return await self._db_source.bulk_update_fair_share_factors(
+            resource_group, calculation_result, lookback_start, lookback_end
+        )
+
+    # ==================== Batched Reads ====================
+
+    @fair_share_repository_resilience.apply()
+    async def get_user_fair_share_factors_batch(
+        self,
+        resource_group: str,
+        project_user_ids: Sequence[ProjectUserIds],
+    ) -> dict[uuid.UUID, UserFairShareFactors]:
+        """Get combined fair share factors for multiple users with 3-way JOIN.
+
+        Fetches domain, project, and user fair share factors in a single query
+        by joining the three fair share tables. Used for factor-based workload
+        sequencing in FairShareSequencer.
+
+        Args:
+            resource_group: The resource group (scaling group) name.
+            project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
+
+        Returns:
+            A mapping from user_uuid to UserFairShareFactors containing all three factor levels.
+            Users not found in any of the fair share tables are omitted.
+        """
+        return await self._db_source.get_user_fair_share_factors_batch(
+            resource_group, project_user_ids
+        )
+
+    @fair_share_repository_resilience.apply()
+    async def get_fair_share_calculation_context(
+        self,
+        scaling_group: str,
+        today: date,
+    ) -> FairShareCalculationContext:
+        """Get all data needed for fair share factor calculation.
+
+        Fetches scaling group config, fair share records, and decayed usages
+        in one database session for consistency and efficiency.
+
+        Args:
+            scaling_group: The scaling group name
+            today: Current date for decay calculation
+
+        Returns:
+            FairShareCalculationContext containing all data for factor calculation
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group doesn't exist
+        """
+        return await self._db_source.get_fair_share_calculation_context(scaling_group, today)

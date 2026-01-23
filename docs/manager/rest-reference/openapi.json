@@ -11205,6 +11205,154 @@
         "description": "Search user usage buckets.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/fair-share/domains/{resource_group}/{domain_name}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_domain_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert domain fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/projects/{resource_group}/{project_id}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_project_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert project fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/users/{resource_group}/{project_id}/{user_uuid}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_user_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert user fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/resource-groups/{resource_group}/spec": {
+      "patch": {
+        "operationId": "fair-share.update_resource_group_fair_share_spec",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update resource group fair share spec with partial update (Read-Modify-Write pattern).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/export/reports": {
       "get": {
         "operationId": "export.list_reports",

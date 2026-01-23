@@ -241,12 +241,16 @@ class SchedulingController:
                 creation_context,
             )
 
+            # Get DB time for session enqueue timestamp
+            enqueue_time = await self._repository.get_db_now()
+
             # Prepare session data with calculated resources
             session_data = await self._preparer.prepare(
                 session_spec,
                 validated_scaling_group,
                 creation_context,
                 calculated_resources,
+                enqueue_time,
             )
 
         hook_result = await self._hook_plugin_ctx.dispatch(

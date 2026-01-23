@@ -11,7 +11,6 @@ from typing import Any, Optional, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from dateutil.tz import tzutc
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -700,9 +699,8 @@ class ScheduleDBSource:
         Uses UPDATE ... WHERE ... RETURNING for atomic status transitions.
         Returns categorized session IDs based on their current status.
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             # 1. Cancel pending sessions
             cancelled_sessions = await self._cancel_pending_sessions(
                 db_sess, session_ids, reason, now
@@ -910,10 +908,10 @@ class ScheduleDBSource:
         if not session_ids:
             return []
 
-        now = datetime.now(tzutc())
         timed_out_sessions: list[SweptSessionInfo] = []
 
         async with self._begin_readonly_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             query = (
                 sa.select(
                     SessionRow.id,
@@ -1513,6 +1511,7 @@ class ScheduleDBSource:
                     affected_agent_ids.add(kernel_alloc.agent_id)
 
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             # First, fetch session data to get creation_id and access_key
             session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
             if session_ids:
@@ -1538,7 +1537,7 @@ class ScheduleDBSource:
             # Process successful allocations
             for allocation in allocation_batch.allocations:
                 try:
-                    await self._allocate_single_session(db_sess, allocation)
+                    await self._allocate_single_session(db_sess, allocation, now)
                 except Exception as e:
                     log.error(
                         "Error allocating session {}: {}",
@@ -1595,13 +1594,13 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         allocation: SessionAllocation,
+        now: datetime,
     ) -> None:
         """
         Allocate resources for a single session.
         Updates session first, then its kernels.
         Only updates if session is in PENDING status.
         """
-        now = datetime.now(tzutc())
 
         # Update session status and metadata first
         session_update_query = (
@@ -1831,9 +1830,8 @@ class ScheduleDBSource:
         :param reason: The reason for status change
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1865,9 +1863,8 @@ class ScheduleDBSource:
         :param reason: The reason for status change
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1902,9 +1899,8 @@ class ScheduleDBSource:
         :param creation_info: Container creation information as dataclass
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1917,6 +1913,7 @@ class ScheduleDBSource:
                     status=KernelStatus.RUNNING,
                     status_info=reason,
                     status_changed=now,
+                    starts_at=now,
                     occupied_slots=creation_info.get_resource_allocations(),
                     container_id=creation_info.container_id,
                     attached_devices=creation_info.attached_devices,
@@ -1944,9 +1941,8 @@ class ScheduleDBSource:
         :param kernel_id: Kernel ID to update
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -1978,9 +1974,8 @@ class ScheduleDBSource:
         :param reason: Cancellation reason
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2022,9 +2017,8 @@ class ScheduleDBSource:
         :param exit_code: Process exit code
         :return: True if update was successful, False otherwise
         """
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2066,10 +2060,10 @@ class ScheduleDBSource:
         if not session_ids:
             return 0
 
-        now = datetime.now(tzutc())
         status_data = {"retries": 0}
 
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2115,9 +2109,8 @@ class ScheduleDBSource:
         if not session_ids:
             return 0
 
-        now = datetime.now(tzutc())
-
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2151,10 +2144,10 @@ class ScheduleDBSource:
         if not kernel_ids:
             return 0
 
-        now = datetime.now(tzutc())
         kernel_uuids = [UUID(kid) for kid in kernel_ids]
 
         async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.id.in_(kernel_uuids))
@@ -2185,7 +2178,7 @@ class ScheduleDBSource:
         :return: Number of kernels updated
         """
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
+            now = await self._get_db_now_in_session(db_sess)
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
             # Find kernels on this agent with this image in SCHEDULED or PREPARING state.
@@ -2228,7 +2221,7 @@ class ScheduleDBSource:
         :return: Number of kernels updated
         """
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
+            now = await self._get_db_now_in_session(db_sess)
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
             # Find kernels on this agent with this image in SCHEDULED, PULLING or PREPARING state
@@ -2274,7 +2267,7 @@ class ScheduleDBSource:
         :return: Set of affected session IDs
         """
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
+            now = await self._get_db_now_in_session(db_sess)
             # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
             # Find and cancel kernels on this agent with this image in SCHEDULED, PULLING
@@ -2330,7 +2323,7 @@ class ScheduleDBSource:
 
             if non_cancelled_count == 0:
                 # All kernels are cancelled, cancel the session
-                now = datetime.now(tzutc())
+                now = await self._get_db_now_in_session(db_sess)
                 stmt = (
                     sa.update(SessionRow)
                     .where(
@@ -2910,7 +2903,7 @@ class ScheduleDBSource:
         Used when session fails to start.
         """
         async with self._begin_session_read_committed() as db_sess:
-            now = datetime.now(tzutc())
+            now = await self._get_db_now_in_session(db_sess)
 
             # Update session status with status_history
             stmt = (
@@ -4108,3 +4101,66 @@ class ScheduleDBSource:
                 .values(priority=new_priority)
             )
             await db_sess.execute(update_stmt)
+
+    async def update_kernels_last_observed_at(
+        self,
+        kernel_observation_times: Mapping[UUID, datetime],
+    ) -> int:
+        """
+        Update the last_observed_at timestamp for multiple kernels.
+
+        Used by fair share observer to record when kernels were last observed
+        for resource usage tracking. Each kernel can have a different observation
+        time (e.g., terminated kernels use terminated_at, running kernels use now).
+
+        :param kernel_observation_times: Mapping of kernel ID to observation timestamp
+        :return: Number of kernels updated
+        """
+        if not kernel_observation_times:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # Group by observation time for efficient batch updates
+            time_to_kernels: dict[datetime, list[UUID]] = {}
+            for kernel_id, observed_at in kernel_observation_times.items():
+                time_to_kernels.setdefault(observed_at, []).append(kernel_id)
+
+            for observed_at, kernel_ids in time_to_kernels.items():
+                update_stmt = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id.in_(kernel_ids))
+                    .values(last_observed_at=observed_at)
+                )
+                result = await db_sess.execute(update_stmt)
+                total_updated += cast(CursorResult, result).rowcount
+
+            return total_updated
+
+    async def get_db_now(self) -> datetime:
+        """Get the current timestamp from the database.
+
+        Used for consistent time handling across HA environments
+        where server clocks may differ.
+
+        Returns:
+            Current database timestamp with timezone
+        """
+        async with self._begin_readonly_read_committed() as conn:
+            result = await conn.execute(sa.select(sa.func.now()))
+            return result.scalar_one()
+
+    async def _get_db_now_in_session(self, db_sess: SASession) -> datetime:
+        """Get the current timestamp from the database within an existing session.
+
+        Use this when you already have an open session to avoid creating
+        a new connection.
+
+        Args:
+            db_sess: The existing database session
+
+        Returns:
+            Current database timestamp with timezone
+        """
+        result = await db_sess.execute(sa.select(sa.func.now()))
+        return result.scalar_one()

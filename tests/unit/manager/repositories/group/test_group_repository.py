@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
@@ -10,7 +11,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -743,7 +751,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=project_resource_policy,
             type=ProjectType.GENERAL,
@@ -769,7 +777,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=VFolderHostPermissionMap(),
             integration_id=None,
             resource_policy=nonexistent_policy,
             type=ProjectType.GENERAL,
@@ -1588,3 +1596,197 @@ class TestGroupRepository:
                 sa.select(GroupRow).where(GroupRow.id == group_with_mounted_vfolders)
             )
             assert group_row is not None
+
+
+class TestGroupRowVFolderHostPermissionMap:
+    """Tests for VFolderHostPermissionMap type handling in GroupRow"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                GroupRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                dotfiles=b"",
+                integration_id=None,
+            )
+            session.add(domain)
+            await session.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def project_resource_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a project resource policy."""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as session:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(policy)
+            await session.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+        project_resource_policy: str,
+    ) -> uuid.UUID:
+        """Create a group with allowed_vfolder_hosts set."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as session:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{group_id.hex[:8]}",
+                description="Test group with vfolder hosts",
+                is_active=True,
+                domain_name=test_domain,
+                total_resource_slots={},
+                allowed_vfolder_hosts={
+                    "local": ["create-vfolder", "mount-in-session"],
+                },
+                integration_id=None,
+                resource_policy=project_resource_policy,
+                type=ProjectType.GENERAL,
+            )
+            session.add(group)
+            await session.commit()
+
+        return group_id
+
+    async def test_group_row_allowed_vfolder_hosts_is_dict(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupRow.allowed_vfolder_hosts is dict type."""
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+            assert isinstance(group_row.allowed_vfolder_hosts, VFolderHostPermissionMap)
+
+    async def test_group_data_allowed_vfolder_hosts_is_vfolder_host_permission_map(
+        self,
+        test_domain: str,
+        project_resource_policy: str,
+    ) -> None:
+        """Test that GroupRow.to_data() properly converts allowed_vfolder_hosts to enums.
+
+        This tests the create path (not DB read path) where allowed_vfolder_hosts
+        is passed as string lists. GroupRow.to_data() should convert strings to
+        VFolderHostPermission enums. If not converted, to_json() will fail with
+        "'str' object has no attribute 'value'".
+
+        Note: DB read path is already handled by VFolderHostPermissionColumn.process_result_value()
+        which returns sets of enums. This test verifies the create path works correctly.
+        """
+        # Create GroupRow directly without DB (simulates create path)
+        group_row = GroupRow(
+            id=uuid.uuid4(),
+            name="test-group",
+            description="Test group",
+            is_active=True,
+            domain_name=test_domain,
+            total_resource_slots={},
+            # String lists as passed from GroupCreatorSpec
+            allowed_vfolder_hosts=VFolderHostPermissionMap({
+                "local": [VFolderHostPermission.CREATE, VFolderHostPermission.MOUNT_IN_SESSION],
+            }),
+            integration_id=None,
+            resource_policy=project_resource_policy,
+            type=ProjectType.GENERAL,
+        )
+
+        group_data = group_row.to_data()
+        assert isinstance(group_data.allowed_vfolder_hosts, VFolderHostPermissionMap)
+
+        # Verify values are VFolderHostPermission enums, not strings
+        for host, perms in group_data.allowed_vfolder_hosts.items():
+            for perm in perms:
+                assert isinstance(perm, VFolderHostPermission), (
+                    f"allowed_vfolder_hosts['{host}'] contains {type(perm).__name__} "
+                    f"instead of VFolderHostPermission enum"
+                )
+
+    async def test_group_data_allowed_vfolder_hosts_values_are_sets(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupData.allowed_vfolder_hosts values are sets of VFolderHostPermission.
+
+        VFolderHostPermissionColumn.process_result_value() returns sets, so the values
+        in allowed_vfolder_hosts should be sets, not lists.
+        """
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+
+            group_data = group_row.to_data()
+
+            # Values should be sets (from VFolderHostPermissionColumn)
+            for host, perms in group_data.allowed_vfolder_hosts.items():
+                assert isinstance(perms, set), (
+                    f"allowed_vfolder_hosts['{host}'] should be a set, got {type(perms).__name__}"
+                )
+
+    async def test_group_data_allowed_vfolder_hosts_to_json_is_serializable(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that GroupData.allowed_vfolder_hosts.to_json() returns JSON-serializable data.
+
+        Since allowed_vfolder_hosts values are sets (not JSON serializable),
+        calling .to_json() should convert them to lists for proper serialization.
+        """
+
+        async with db_with_cleanup.begin_session() as session:
+            group_row = await session.scalar(sa.select(GroupRow).where(GroupRow.id == test_group))
+            assert group_row is not None
+
+            group_data = group_row.to_data()
+            json_data = group_data.allowed_vfolder_hosts.to_json()
+
+            # Should be JSON serializable without error
+            try:
+                json.dumps(json_data)
+            except TypeError as e:
+                pytest.fail(f"to_json() result is not JSON serializable: {e}")

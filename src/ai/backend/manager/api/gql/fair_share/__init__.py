@@ -5,18 +5,25 @@ from .resolver import (
     domain_fair_shares,
     project_fair_share,
     project_fair_shares,
+    upsert_domain_fair_share_weight,
+    upsert_project_fair_share_weight,
+    upsert_user_fair_share_weight,
     user_fair_share,
     user_fair_shares,
 )
 
 __all__ = [
-    # Domain Fair Share
+    # Domain Fair Share Queries
     "domain_fair_share",
     "domain_fair_shares",
-    # Project Fair Share
+    # Project Fair Share Queries
     "project_fair_share",
     "project_fair_shares",
-    # User Fair Share
+    # User Fair Share Queries
     "user_fair_share",
     "user_fair_shares",
+    # Mutations
+    "upsert_domain_fair_share_weight",
+    "upsert_project_fair_share_weight",
+    "upsert_user_fair_share_weight",
 ]

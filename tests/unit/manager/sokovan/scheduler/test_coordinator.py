@@ -111,6 +111,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -147,6 +148,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -180,6 +182,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -213,6 +216,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert - give_up takes priority
@@ -262,6 +266,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure_1, failure_2, failure_3],
             sessions=[session_1, session_2, session_3],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -281,6 +286,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[],
             sessions=[],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -304,6 +310,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[],  # Empty - no matching session
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert
@@ -339,6 +346,7 @@ class TestScheduleCoordinatorFailureClassification:
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
+            current_time=datetime.now(tzutc()),
         )
 
         # Assert - PENDING has no timeout, so it's need_retry
@@ -791,6 +799,7 @@ class TestScheduleCoordinatorStatusTransition:
             transition=transition,
             scheduling_result=SchedulingResult.NEED_RETRY,
             records={},
+            status_changed_at=datetime.now(tzutc()),
         )
 
         # Assert
@@ -824,6 +833,7 @@ class TestScheduleCoordinatorStatusTransition:
             transition=transition,
             scheduling_result=SchedulingResult.SUCCESS,
             records={},
+            status_changed_at=datetime.now(tzutc()),
         )
 
         # Assert

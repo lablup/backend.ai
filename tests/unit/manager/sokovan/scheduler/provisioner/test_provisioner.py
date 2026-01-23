@@ -8,10 +8,12 @@ and correct agent selector selection based on agent_selection_strategy.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from dateutil.tz import tzutc
 
 from ai.backend.common.types import (
     AccessKey,
@@ -270,8 +272,11 @@ class TestScheduleScalingGroup:
 
         # When: Execute schedule_scaling_group within RecorderContext scope
         # (In production, coordinator opens the scope before calling provisioner)
+        provision_time = datetime.now(tzutc())
         with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
-            await test_provisioner.schedule_scaling_group("test-sg", scheduling_data)
+            await test_provisioner.schedule_scaling_group(
+                "test-sg", scheduling_data, provision_time
+            )
 
         # Then: The selector for the specified strategy was used
         used_selector = mock_selector_pool[strategy]

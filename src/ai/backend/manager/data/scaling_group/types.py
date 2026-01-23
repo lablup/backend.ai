@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 
 
 class SchedulerType(StrEnum):
@@ -91,6 +96,7 @@ class ScalingGroupData:
     network: ScalingGroupNetworkConfig
     driver: ScalingGroupDriverConfig
     scheduler: ScalingGroupSchedulerConfig
+    fair_share_spec: FairShareScalingGroupSpec
 
 
 @dataclass
