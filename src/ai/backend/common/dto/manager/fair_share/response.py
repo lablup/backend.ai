@@ -363,3 +363,26 @@ class UpdateResourceGroupFairShareSpecResponse(BaseResponseModel):
     fair_share_spec: ResourceGroupFairShareSpecDTO = Field(
         description="Updated fair share specification"
     )
+
+
+class GetResourceGroupFairShareSpecResponse(BaseResponseModel):
+    """Response for getting resource group fair share spec."""
+
+    resource_group: str = Field(description="Name of the resource group")
+    fair_share_spec: ResourceGroupFairShareSpecDTO = Field(description="Fair share specification")
+
+
+class ResourceGroupFairShareSpecItemDTO(BaseModel):
+    """Resource group with its fair share specification."""
+
+    resource_group: str = Field(description="Name of the resource group")
+    fair_share_spec: ResourceGroupFairShareSpecDTO = Field(description="Fair share specification")
+
+
+class SearchResourceGroupFairShareSpecsResponse(BaseResponseModel):
+    """Response for searching resource group fair share specs."""
+
+    items: list[ResourceGroupFairShareSpecItemDTO] = Field(
+        description="List of resource group fair share specs"
+    )
+    total_count: int = Field(description="Total count of resource groups")

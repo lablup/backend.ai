@@ -18,9 +18,12 @@ from ai.backend.common.dto.manager.fair_share import (
     GetDomainFairShareResponse,
     GetProjectFairSharePathParam,
     GetProjectFairShareResponse,
+    GetResourceGroupFairShareSpecPathParam,
+    GetResourceGroupFairShareSpecResponse,
     GetUserFairSharePathParam,
     GetUserFairShareResponse,
     PaginationInfo,
+    ResourceGroupFairShareSpecItemDTO,
     SearchDomainFairSharesRequest,
     SearchDomainFairSharesResponse,
     SearchDomainUsageBucketsRequest,
@@ -29,6 +32,7 @@ from ai.backend.common.dto.manager.fair_share import (
     SearchProjectFairSharesResponse,
     SearchProjectUsageBucketsRequest,
     SearchProjectUsageBucketsResponse,
+    SearchResourceGroupFairShareSpecsResponse,
     SearchUserFairSharesRequest,
     SearchUserFairSharesResponse,
     SearchUserUsageBucketsRequest,
@@ -477,6 +481,79 @@ class FairShareAPIHandler:
 
     @auth_required_for_method
     @api_handler
+    async def get_resource_group_fair_share_spec(
+        self,
+        path: PathParam[GetResourceGroupFairShareSpecPathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Get resource group fair share spec."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Get scaling group by name
+        name_spec = StringMatchSpec(
+            value=path.parsed.resource_group,
+            case_insensitive=False,
+            negated=False,
+        )
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
+        )
+        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+            SearchScalingGroupsAction(querier=querier)
+        )
+
+        if not search_result.scaling_groups:
+            raise web.HTTPNotFound(
+                reason=f"Resource group '{path.parsed.resource_group}' not found"
+            )
+
+        scaling_group = search_result.scaling_groups[0]
+
+        resp = GetResourceGroupFairShareSpecResponse(
+            resource_group=scaling_group.name,
+            fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(
+                scaling_group.fair_share_spec
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def search_resource_group_fair_share_specs(
+        self,
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search all resource groups with their fair share specs."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Get all scaling groups
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[],
+        )
+        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+            SearchScalingGroupsAction(querier=querier)
+        )
+
+        items = [
+            ResourceGroupFairShareSpecItemDTO(
+                resource_group=sg.name,
+                fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(sg.fair_share_spec),
+            )
+            for sg in search_result.scaling_groups
+        ]
+
+        resp = SearchResourceGroupFairShareSpecsResponse(
+            items=items,
+            total_count=len(items),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
     async def update_resource_group_fair_share_spec(
         self,
         path: PathParam[UpdateResourceGroupFairShareSpecPathParam],
@@ -640,7 +717,21 @@ def create_app(
         )
     )
 
-    # Resource group spec update route
+    # Resource group spec routes
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/resource-groups/{resource_group}/spec",
+            api_handler.get_resource_group_fair_share_spec,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/resource-groups/specs",
+            api_handler.search_resource_group_fair_share_specs,
+        )
+    )
     cors.add(
         app.router.add_route(
             "PATCH",

@@ -247,6 +247,80 @@ class FairShareDBSource:
                 )
             return row.to_data()
 
+    async def get_user_project_info(
+        self,
+        project_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if user exists in project.
+
+        Returns:
+            domain_name if user is member of project, None otherwise.
+        """
+        from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(GroupRow.domain_name)
+                .select_from(AssocGroupUserRow)
+                .join(GroupRow, GroupRow.id == AssocGroupUserRow.group_id)
+                .where(
+                    sa.and_(
+                        AssocGroupUserRow.group_id == project_id,
+                        AssocGroupUserRow.user_id == user_uuid,
+                    )
+                )
+            )
+            result = await db_sess.execute(query)
+            return result.scalar_one_or_none()
+
+    async def get_project_info(
+        self,
+        project_id: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if project exists.
+
+        Returns:
+            domain_name if project exists, None otherwise.
+        """
+        from ai.backend.manager.models.group import GroupRow
+
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
+            result = await db_sess.execute(query)
+            return result.scalar_one_or_none()
+
+    async def get_domain_exists(
+        self,
+        domain_name: str,
+    ) -> bool:
+        """Check if domain exists.
+
+        Returns:
+            True if domain exists, False otherwise.
+        """
+        from ai.backend.manager.models.domain import DomainRow
+
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(sa.literal(1)).where(DomainRow.name == domain_name)
+            result = await db_sess.execute(query)
+            return result.scalar_one_or_none() is not None
+
+    async def get_scaling_group_fair_share_spec(
+        self,
+        scaling_group: str,
+    ) -> FairShareScalingGroupSpec:
+        """Get fair share spec for scaling group.
+
+        Returns:
+            FairShareScalingGroupSpec with defaults if not configured.
+
+        Raises:
+            ScalingGroupNotFound: If scaling group doesn't exist.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await self._fetch_fair_share_spec(db_sess, scaling_group)
+
     async def search_user_fair_shares(
         self,
         querier: BatchQuerier,

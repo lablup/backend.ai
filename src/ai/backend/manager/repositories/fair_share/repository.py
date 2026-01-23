@@ -27,6 +27,7 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareFactors,
     UserFairShareSearchResult,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
 
 from .db_source import FairShareDBSource
@@ -185,6 +186,60 @@ class FairShareRepository:
     ) -> UserFairShareSearchResult:
         """Search user fair shares with pagination."""
         return await self._db_source.search_user_fair_shares(querier)
+
+    # ==================== Entity Info & Spec ====================
+
+    @fair_share_repository_resilience.apply()
+    async def get_user_project_info(
+        self,
+        project_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if user exists in project.
+
+        Returns:
+            domain_name if user is member of project, None otherwise.
+        """
+        return await self._db_source.get_user_project_info(project_id, user_uuid)
+
+    @fair_share_repository_resilience.apply()
+    async def get_project_info(
+        self,
+        project_id: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if project exists.
+
+        Returns:
+            domain_name if project exists, None otherwise.
+        """
+        return await self._db_source.get_project_info(project_id)
+
+    @fair_share_repository_resilience.apply()
+    async def get_domain_exists(
+        self,
+        domain_name: str,
+    ) -> bool:
+        """Check if domain exists.
+
+        Returns:
+            True if domain exists, False otherwise.
+        """
+        return await self._db_source.get_domain_exists(domain_name)
+
+    @fair_share_repository_resilience.apply()
+    async def get_scaling_group_fair_share_spec(
+        self,
+        scaling_group: str,
+    ) -> FairShareScalingGroupSpec:
+        """Get fair share spec for scaling group.
+
+        Returns:
+            FairShareScalingGroupSpec with defaults if not configured.
+
+        Raises:
+            ScalingGroupNotFound: If scaling group doesn't exist.
+        """
+        return await self._db_source.get_scaling_group_fair_share_spec(scaling_group)
 
     @fair_share_repository_resilience.apply()
     async def get_user_scheduling_ranks_batch(
