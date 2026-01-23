@@ -4,7 +4,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self, override
 
 import sqlalchemy as sa
 from pydantic import BaseModel
@@ -13,10 +13,11 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.repository.base import CreateSpec, UpdateSpec
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
-    Base,
+    BaseRow,
     StrEnumType,
 )
 
@@ -53,7 +54,24 @@ def _get_endpoint_join_condition():
     return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentPolicyRow(Base):
+class DeploymentPolicySpec(CreateSpec):
+    """Specification for creating or updating a DeploymentPolicyRow."""
+
+    endpoint: uuid.UUID
+    strategy: DeploymentStrategy
+    strategy_spec: BaseModel
+    rollback_on_failure: bool = False
+
+
+class DeploymentPolicyUpdateSpec(UpdateSpec):
+    """Specification for updating a DeploymentPolicyRow."""
+
+    strategy: DeploymentStrategy | None = None
+    strategy_spec: BaseModel | None = None
+    rollback_on_failure: bool | None = None
+
+
+class DeploymentPolicyRow(BaseRow[DeploymentPolicySpec, DeploymentPolicyUpdateSpec]):
     """
     Represents a deployment policy for a deployment.
 
@@ -119,6 +137,17 @@ class DeploymentPolicyRow(Base):
         primaryjoin=_get_endpoint_join_condition,
         uselist=False,
     )
+
+    @override
+    @classmethod
+    def build(cls, spec: DeploymentPolicySpec) -> Self:
+        """Build DeploymentPolicyRow from spec."""
+        return cls(
+            endpoint=spec.endpoint,
+            strategy=spec.strategy,
+            strategy_spec=spec.strategy_spec.model_dump(),
+            rollback_on_failure=spec.rollback_on_failure,
+        )
 
     def to_data(self) -> DeploymentPolicyData:
         """Convert to DeploymentPolicyData dataclass."""
