@@ -49,12 +49,22 @@ jobs:
         echo "JIRA API Response: $JIRA_RESPONSE"
 
         # Extract issue number from GitHub Issue URL field
-        # Find field that exactly matches "GitHub Issue URL" in JIRA
-        GITHUB_ISSUE_URL=$(echo "$JIRA_RESPONSE" | jq -r '.fields | to_entries[] | select(.key == "GitHub Issue URL") | .value' 2>/dev/null | head -1)
+        # Search for fields containing GitHub issue URLs (customfield_* or regular fields)
+        GITHUB_ISSUE_URL=$(echo "$JIRA_RESPONSE" | jq -r '
+          .fields
+          | to_entries[]
+          | select(.value != null and .value != "")
+          | select(
+              (.value | type == "string" and test("github.com/.*/issues/[0-9]+"))
+            )
+          | .value
+        ' 2>/dev/null | head -1)
 
         # Fail immediately if GitHub Issue URL is not found
         if [ -z "$GITHUB_ISSUE_URL" ] || [ "$GITHUB_ISSUE_URL" = "null" ]; then
-          echo "No GitHub Issue URL found in JIRA ticket"
+          echo "❌ No GitHub Issue URL found in JIRA ticket $TICKET_NUMBER"
+          echo "Available fields (first 20):"
+          echo "$JIRA_RESPONSE" | jq -r '.fields | keys[]' 2>/dev/null | head -20
           exit 1
         fi
 
@@ -63,12 +73,12 @@ jobs:
         GITHUB_ISSUE_NUMBER=$(echo "$GITHUB_ISSUE_URL" | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+' | head -1)
 
         if [ -n "$GITHUB_ISSUE_NUMBER" ]; then
-          echo "Extracted GitHub Issue Number: $GITHUB_ISSUE_NUMBER"
+          echo "✅ Extracted GitHub Issue Number: $GITHUB_ISSUE_NUMBER"
           echo "github_issue_number=$GITHUB_ISSUE_NUMBER" >> $GITHUB_OUTPUT
           echo "has_github_issue=true" >> $GITHUB_OUTPUT
         else
           echo "❌ Could not extract issue number from GitHub Issue URL: $GITHUB_ISSUE_URL"
-          echo "Please verify the GitHub Issue URL format is correct."
+          echo "Please verify the GitHub Issue URL format is correct (expected: https://github.com/owner/repo/issues/NUMBER)"
           exit 1
         fi
 
@@ -83,7 +93,7 @@ jobs:
         # Get current PR body
         PR_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pulls/${{ github.event.pull_request.number }}" | \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" | \
           jq -r '.body // ""')
 
         echo "Current PR body: $PR_BODY"
@@ -93,13 +103,13 @@ jobs:
         echo "Generated resolves clause: $RESOLVES_CLAUSE"
 
         # Replace existing resolves clause or add new one
-        if echo "$PR_BODY" | grep -qi "resolves #.*("; then
-          # Replace existing resolves clause
-          NEW_BODY=$(echo "$PR_BODY" | sed -E "s/resolves #[0-9]+ \([^)]+\)/$RESOLVES_CLAUSE/gi")
+        if echo "$PR_BODY" | grep -qiE "resolves #[0-9]+ ?\("; then
+          # Replace existing resolves clause (case-insensitive)
+          NEW_BODY=$(echo "$PR_BODY" | sed -E "s/[Rr]esolves #[0-9]+ ?\([^)]+\)/$RESOLVES_CLAUSE/g")
           echo "Replaced existing resolves clause"
         else
-          # Add new resolves clause
-          NEW_BODY=$(printf "%s\n\n%s" "$PR_BODY" "$RESOLVES_CLAUSE")
+          # Add new resolves clause at the beginning
+          NEW_BODY=$(printf "%s\n\n%s" "$RESOLVES_CLAUSE" "$PR_BODY")
           echo "Added new resolves clause"
         fi
 
@@ -108,7 +118,7 @@ jobs:
           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           -H "Content-Type: application/json" \
-          "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pulls/${{ github.event.pull_request.number }}" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
           -d "{\"body\": $(echo "$NEW_BODY" | jq -R -s .)}"
 
         echo "✅ Added resolves clause: $RESOLVES_CLAUSE"
