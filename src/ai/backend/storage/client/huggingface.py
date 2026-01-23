@@ -33,7 +33,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
     ModelMetadataInfo,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.errors import HuggingFaceAPIError
+from ai.backend.storage.errors import HuggingFaceAPIError, HuggingFaceGatedRepoError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -133,7 +133,10 @@ class HuggingFaceClient:
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             return await asyncio.get_event_loop().run_in_executor(
-                None, lambda: model_info(model_id, revision=revision, token=self._token)
+                None,
+                lambda: model_info(
+                    model_id, revision=revision, token=self._token, expand=["gated"]
+                ),
             )
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {e!s}") from e
@@ -165,6 +168,10 @@ class HuggingFaceClient:
 
         Returns:
             List of file paths
+
+        Raises:
+            GatedRepoError: If the repository is gated and access is denied
+            HuggingFaceAPIError: If API call fails
         """
         model_id = model.model_id
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
@@ -305,6 +312,15 @@ class HuggingFaceScanner:
         try:
             log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
+
+            # For gated repos, verify access by checking if we can access a file
+            if model_info.gated:
+                has_access = await self._check_gated_repo_access(model)
+                if not has_access:
+                    raise HuggingFaceGatedRepoError(
+                        f"Model {model.model_id} is a gated repository and requires authorization to access"
+                    )
+
             total_size = await self._calculate_model_size(model)
             readme_content = await self._download_readme(model)
 
@@ -328,6 +344,8 @@ class HuggingFaceScanner:
             )
             return result
 
+        except HuggingFaceGatedRepoError:
+            raise
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
@@ -343,6 +361,14 @@ class HuggingFaceScanner:
         try:
             log.info(f"Scanning HuggingFace model without metadata: {model}")
             model_info = await self._client.scan_model(model)
+
+            # For gated repos, verify access by checking if we can access a file
+            if model_info.gated:
+                has_access = await self._check_gated_repo_access(model)
+                if not has_access:
+                    raise HuggingFaceGatedRepoError(
+                        f"Model {model.model_id} is a gated repository and requires authorization to access"
+                    )
 
             model_id = model.model_id
             result = ModelData(
@@ -363,7 +389,6 @@ class HuggingFaceScanner:
                 f"Successfully scanned HuggingFace model without metadata: {model}",
             )
             return result
-
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
@@ -506,6 +531,39 @@ class HuggingFaceScanner:
 
         except Exception:
             return None
+
+    async def _check_gated_repo_access(self, model: ModelTarget) -> bool:
+        """Check if we have access to a gated repository by making a HEAD request.
+
+        Args:
+            model: HuggingFace model to check access for
+
+        Returns:
+            True if access is granted, False otherwise
+        """
+        try:
+            # Get file list to find a file to check
+            filepaths = await self._client.list_model_filepaths(model)
+            if not filepaths:
+                return True  # No files to check, assume access is granted
+
+            # Try HEAD request on the first file to check access
+            test_file = filepaths[0]
+            download_url = self._client.get_download_url(model, test_file)
+
+            headers = {}
+            if self._client._token:
+                headers["Authorization"] = f"Bearer {self._client._token}"
+
+            async with aiohttp.ClientSession() as session:
+                async with session.head(
+                    download_url, headers=headers, allow_redirects=True
+                ) as resp:
+                    # 200 or 302 means access granted, 401/403 means denied
+                    return resp.status not in (401, 403)
+        except Exception as e:
+            log.warning(f"Failed to check gated repo access for {model}: {e!s}")
+            return False
 
     async def _calculate_model_size(self, model: ModelTarget) -> int:
         try:

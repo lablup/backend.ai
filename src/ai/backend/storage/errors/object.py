@@ -202,6 +202,20 @@ class HuggingFaceModelNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class HuggingFaceGatedRepoError(BackendAIError, web.HTTPForbidden):
+    """Raised when trying to access a gated HuggingFace repository without proper authorization."""
+
+    error_type = "https://api.backend.ai/probs/registries/huggingface/gated-repo"
+    error_title = "HuggingFace Gated Repository"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ArtifactStorageEmptyError(BackendAIError, web.HTTPNotFound):
     """Raised when artifact storage is empty."""
 

@@ -121,6 +121,12 @@ class StorageProxyHTTPClient:
                 self._handle_vfolder_failure(HTTPStatus(resp.status))
             case ErrorDomain.QUOTA_SCOPE:
                 self._handle_quota_scope_failure(HTTPStatus(resp.status))
+            case ErrorDomain.ARTIFACT_REGISTRY:
+                raise PassthroughError(
+                    status_code=resp.status,
+                    error_code=err_code,
+                    error_message=data.get("msg", "Artifact registry error"),
+                )
             case _:
                 raise UnexpectedStorageProxyResponseError(
                     extra_msg=f"Unexpected error {resp.status} from storage proxy",
