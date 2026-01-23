@@ -44,6 +44,10 @@ from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
 )
+from ai.backend.manager.services.agent.actions.load_agent_resources import (
+    LoadAgentResourcesAction,
+    LoadAgentResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
@@ -335,3 +339,11 @@ class AgentService:
             agent_ids=action.agent_ids
         )
         return LoadContainerCountsActionResult(container_counts=container_counts)
+
+    async def load_agent_resources(
+        self, action: LoadAgentResourcesAction
+    ) -> LoadAgentResourcesActionResult:
+        agent_resources = await self._agent_repository.get_agent_resources(
+            agent_ids=action.agent_ids
+        )
+        return LoadAgentResourcesActionResult(agent_resources=agent_resources)

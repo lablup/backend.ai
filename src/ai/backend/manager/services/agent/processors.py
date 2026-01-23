@@ -15,6 +15,10 @@ from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
 )
+from ai.backend.manager.services.agent.actions.load_agent_resources import (
+    LoadAgentResourcesAction,
+    LoadAgentResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
@@ -85,6 +89,7 @@ class AgentProcessors(AbstractProcessorPackage):
     load_container_counts: ActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
+    load_agent_resources: ActionProcessor[LoadAgentResourcesAction, LoadAgentResourcesActionResult]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
@@ -105,6 +110,7 @@ class AgentProcessors(AbstractProcessorPackage):
         )
         self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
+        self.load_agent_resources = ActionProcessor(service.load_agent_resources, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -121,4 +127,5 @@ class AgentProcessors(AbstractProcessorPackage):
             RemoveAgentFromImagesByCanonicalsAction.spec(),
             SearchAgentsAction.spec(),
             LoadContainerCountsAction.spec(),
+            LoadAgentResourcesAction.spec(),
         ]

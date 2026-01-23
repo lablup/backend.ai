@@ -6,6 +6,7 @@ from typing import Optional
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.resource.types import AgentResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
@@ -24,7 +25,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
 
-from .agent.loader import load_container_counts
+from .agent.loader import load_agent_resources, load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
@@ -166,3 +167,9 @@ class DataLoaders:
         self,
     ) -> DataLoader[AgentId, int]:
         return DataLoader(load_fn=partial(load_container_counts, self._processors.agent))
+
+    @cached_property
+    def agent_resource_loader(
+        self,
+    ) -> DataLoader[AgentId, AgentResourceData]:
+        return DataLoader(load_fn=partial(load_agent_resources, self._processors.agent))
