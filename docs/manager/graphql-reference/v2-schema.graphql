@@ -2771,7 +2771,6 @@ input KernelOrderBy {
 """Added in 26.1.0. Fields available for ordering kernels."""
 enum KernelOrderField {
   CREATED_AT
-  ID
 }
 
 """Added in 26.1.0. Resource allocation information for a kernel."""
@@ -2843,7 +2842,7 @@ type KernelSessionInfo {
   name: String
 
   """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
-  sessionType: SessionType!
+  sessionType: SessionTypes!
 }
 
 """
@@ -3314,7 +3313,6 @@ input ModelTarget {
   revision: String = null
 }
 
-"""Added in 26.1.0. Permission level for virtual folder mounts."""
 enum MountPermission {
   READ_ONLY
   READ_WRITE
@@ -5716,7 +5714,7 @@ type ServicePortEntry {
   name: String!
 
   """Protocol type for this service port (http, tcp, preopen, internal)."""
-  protocol: ServicePortProtocol!
+  protocol: ServicePortProtocols!
 
   """Port numbers inside the container."""
   containerPorts: [Int!]!
@@ -5728,8 +5726,7 @@ type ServicePortEntry {
   isInference: Boolean!
 }
 
-"""Added in 26.1.0. Protocol types for service ports."""
-enum ServicePortProtocol {
+enum ServicePortProtocols {
   HTTP
   TCP
   PREOPEN
@@ -5744,7 +5741,6 @@ type ServicePorts {
   entries: [ServicePortEntry!]!
 }
 
-"""Added in 26.1.0. Result status of a session execution."""
 enum SessionResult {
   UNDEFINED
   SUCCESS
@@ -7064,7 +7060,6 @@ type VFolderMount {
   usageMode: VFolderUsageMode!
 }
 
-"""Added in 26.1.0. Usage mode of a virtual folder."""
 enum VFolderUsageMode {
   GENERAL
   MODEL

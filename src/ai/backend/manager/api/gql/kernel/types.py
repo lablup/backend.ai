@@ -13,7 +13,7 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId, SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.common.types import (
     DotfileInfoGQL,
@@ -24,8 +24,6 @@ from ai.backend.manager.api.gql.common.types import (
     SchedulerPredicateGQL,
     ServicePortEntryGQL,
     ServicePortsGQL,
-    SessionResultGQL,
-    SessionTypesGQL,
     SSHKeypairGQL,
     VFolderMountGQL,
 )
@@ -482,7 +480,7 @@ class KernelSessionInfoGQL:
         description="The creation ID used when creating the session."
     )
     name: str | None = strawberry.field(description="The name of the session.")
-    session_type: SessionTypesGQL = strawberry.field(
+    session_type: SessionTypes = strawberry.field(
         description="The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."
     )
 
@@ -720,7 +718,7 @@ class KernelLifecycleInfoGQL:
             Indicates the kernel's position in its lifecycle.
         """)
     )
-    result: SessionResultGQL = strawberry.field(
+    result: SessionResult = strawberry.field(
         description="The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."
     )
     status_changed: datetime | None = strawberry.field(
@@ -878,7 +876,7 @@ class KernelV2GQL(Node):
                 session_id=UUID(kernel_info.session.session_id),
                 creation_id=kernel_info.session.creation_id,
                 name=kernel_info.session.name,
-                session_type=SessionTypesGQL(kernel_info.session.session_type),
+                session_type=SessionTypes(kernel_info.session.session_type),
             ),
             user_permission=KernelUserPermissionInfoGQL(
                 user_uuid=kernel_info.user_permission.user_uuid,
@@ -932,7 +930,7 @@ class KernelV2GQL(Node):
             ),
             lifecycle=KernelLifecycleInfoGQL(
                 status=KernelStatusGQL(kernel_info.lifecycle.status),
-                result=SessionResultGQL(kernel_info.lifecycle.result),
+                result=SessionResult(kernel_info.lifecycle.result),
                 status_changed=kernel_info.lifecycle.status_changed,
                 status_info=kernel_info.lifecycle.status_info,
                 status_data=status_data,

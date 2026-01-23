@@ -10,43 +10,9 @@ import strawberry
 from ai.backend.common.types import (
     MountPermission,
     ServicePortProtocols,
-    SessionResult,
-    SessionTypes,
     VFolderUsageMode,
 )
 
-# ========== Common Enums ==========
-
-
-SessionTypesGQL = strawberry.enum(
-    SessionTypes,
-    name="SessionType",
-    description="Added in 26.1.0. Type of compute session.",
-)
-
-SessionResultGQL = strawberry.enum(
-    SessionResult,
-    name="SessionResult",
-    description="Added in 26.1.0. Result status of a session execution.",
-)
-
-MountPermissionGQL = strawberry.enum(
-    MountPermission,
-    name="MountPermission",
-    description="Added in 26.1.0. Permission level for virtual folder mounts.",
-)
-
-VFolderUsageModeGQL = strawberry.enum(
-    VFolderUsageMode,
-    name="VFolderUsageMode",
-    description="Added in 26.1.0. Usage mode of a virtual folder.",
-)
-
-ServicePortProtocolGQL = strawberry.enum(
-    ServicePortProtocols,
-    name="ServicePortProtocol",
-    description="Added in 26.1.0. Protocol types for service ports.",
-)
 
 
 # ========== Resource Options Types ==========
@@ -126,7 +92,7 @@ class ServicePortEntryGQL:
     name: str = strawberry.field(
         description="Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."
     )
-    protocol: ServicePortProtocolGQL = strawberry.field(
+    protocol: ServicePortProtocols = strawberry.field(
         description="Protocol type for this service port (http, tcp, preopen, internal)."
     )
     container_ports: list[int] = strawberry.field(description="Port numbers inside the container.")
@@ -142,7 +108,7 @@ class ServicePortEntryGQL:
         """Convert a dict to ServicePortEntryGQL."""
         return cls(
             name=data["name"],
-            protocol=ServicePortProtocolGQL(data["protocol"]),
+            protocol=ServicePortProtocols(data["protocol"]),
             container_ports=list(data["container_ports"]),
             host_ports=list(data["host_ports"]),
             is_inference=data["is_inference"],
@@ -278,10 +244,10 @@ class VFolderMountGQL:
     kernel_path: str = strawberry.field(
         description="Path inside the container where the folder is mounted."
     )
-    mount_perm: MountPermissionGQL = strawberry.field(
+    mount_perm: MountPermission = strawberry.field(
         description="Permission level for this mount (ro, rw, wd)."
     )
-    usage_mode: VFolderUsageModeGQL = strawberry.field(
+    usage_mode: VFolderUsageMode = strawberry.field(
         description="Usage mode of the virtual folder (general, model, data)."
     )
 
@@ -294,8 +260,8 @@ class VFolderMountGQL:
             vfsubpath=str(data["vfsubpath"]),
             host_path=str(data["host_path"]),
             kernel_path=str(data["kernel_path"]),
-            mount_perm=MountPermissionGQL(data["mount_perm"]),
-            usage_mode=VFolderUsageModeGQL(data["usage_mode"]),
+            mount_perm=MountPermission(data["mount_perm"]),
+            usage_mode=VFolderUsageMode(data["usage_mode"]),
         )
 
 
