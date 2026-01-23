@@ -18,13 +18,11 @@ from typing import (
 
 import aiohttp_cors
 import trafaret as t
-import yarl
 from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
@@ -85,22 +83,19 @@ async def list_presets(request: web.Request) -> web.Response:
         t.Key("group", default="default"): t.String,
     })
 )
-async def check_presets(request: web.Request, params: Any) -> web.Response:
+async def check_presets_legacy(request: web.Request, params: Any) -> web.Response:
     """
     Returns the list of all resource presets in the current scaling group,
     with additional information including allocatability of each preset,
     amount of total remaining resources, and the current keypair resource limits.
+
+    .. deprecated::
+        Use GET /check-presets instead. This POST endpoint is kept for backward compatibility.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    try:
-        access_key = request["keypair"]["access_key"]
-        resource_policy = request["keypair"]["resource_policy"]
-        domain_name = request["user"]["domain_name"]
-        # TODO: uncomment when we implement scaling group.
-        # scaling_group = request.query.get('scaling_group')
-        # assert scaling_group is not None, 'scaling_group parameter is missing.'
-    except (json.decoder.JSONDecodeError, AssertionError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+    access_key = request["keypair"]["access_key"]
+    resource_policy = request["keypair"]["resource_policy"]
+    domain_name = request["user"]["domain_name"]
 
     log.info(
         "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
@@ -120,7 +115,65 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
     )
 
-    # Convert ResourceSlot objects to JSON for API response
+    scaling_groups_json = {}
+    for sgname, sg_data in result.scaling_groups.items():
+        scaling_groups_json[sgname] = {
+            ResourceSlotState.OCCUPIED: sg_data[ResourceSlotState.OCCUPIED].to_json(),
+            ResourceSlotState.AVAILABLE: sg_data[ResourceSlotState.AVAILABLE].to_json(),
+        }
+
+    resp = {
+        "presets": result.presets,
+        "keypair_limits": result.keypair_limits.to_json(),
+        "keypair_using": result.keypair_using.to_json(),
+        "keypair_remaining": result.keypair_remaining.to_json(),
+        "group_limits": result.group_limits.to_json(),
+        "group_using": result.group_using.to_json(),
+        "group_remaining": result.group_remaining.to_json(),
+        "scaling_group_remaining": result.scaling_group_remaining.to_json(),
+        "scaling_groups": scaling_groups_json,
+    }
+
+    return web.json_response(resp, status=HTTPStatus.OK)
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict({
+        t.Key("scaling_group"): t.String,
+        t.Key("group", default="default"): t.String,
+    })
+)
+async def check_presets(request: web.Request, params: Any) -> web.Response:
+    """
+    Returns the list of all resource presets in the specified scaling group,
+    with additional information including allocatability of each preset,
+    amount of total remaining resources, and the current keypair resource limits.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    resource_policy = request["keypair"]["resource_policy"]
+    domain_name = request["user"]["domain_name"]
+
+    log.info(
+        "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
+        access_key,
+        params["group"],
+        params["scaling_group"],
+    )
+
+    result = await root_ctx.processors.resource_preset.check_presets.wait_for_complete(
+        CheckResourcePresetsAction(
+            access_key=access_key,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
+            user_id=request["user"]["uuid"],
+            group=params["group"],
+            scaling_group=params["scaling_group"],
+        )
+    )
+
     scaling_groups_json = {}
     for sgname, sg_data in result.scaling_groups.items():
         scaling_groups_json[sgname] = {
@@ -259,32 +312,6 @@ async def admin_month_stats(request: web.Request) -> web.Response:
     return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
-# TODO: get_watcher_info overlaps with service-side method.
-# Keeping it because it's used by vfolder.
-async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
-    """
-    Get watcher information.
-
-    :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
-    :return token: agent watcher token ("insecure" if not set in config server)
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-    token = root_ctx.config_provider.config.watcher.token
-    if token is None:
-        token = "insecure"
-    agent_ip = await root_ctx.etcd.get(f"nodes/agents/{agent_id}/ip")
-    raw_watcher_port = await root_ctx.etcd.get(
-        f"nodes/agents/{agent_id}/watcher_port",
-    )
-    watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
-    # TODO: watcher scheme is assumed to be http
-    addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
-    return {
-        "addr": addr,
-        "token": token,
-    }
-
-
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
@@ -385,7 +412,8 @@ def create_app(
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
     cors.add(add_route("GET", "/container-registries", get_container_registries))
-    cors.add(add_route("POST", "/check-presets", check_presets))
+    cors.add(add_route("GET", "/check-presets", check_presets))
+    cors.add(add_route("POST", "/check-presets", check_presets_legacy))
     cors.add(add_route("POST", "/recalculate-usage", recalculate_usage))
     cors.add(add_route("GET", "/usage/month", usage_per_month))
     cors.add(add_route("GET", "/usage/period", usage_per_period))
