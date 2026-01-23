@@ -7877,8 +7877,44 @@
       }
     },
     "/resource/check-presets": {
-      "post": {
+      "get": {
         "operationId": "resource.check_presets",
+        "tags": [
+          "resource"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scaling_group",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "in": "query"
+          },
+          {
+            "name": "group",
+            "schema": {
+              "type": "string",
+              "default": "default"
+            },
+            "required": true,
+            "in": "query"
+          }
+        ],
+        "description": "\nReturns the list of all resource presets in the specified scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      },
+      "post": {
+        "operationId": "resource.check_presets_legacy",
         "tags": [
           "resource"
         ],
@@ -7915,7 +7951,7 @@
           }
         },
         "parameters": [],
-        "description": "\nReturns the list of all resource presets in the current scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\nReturns the list of all resource presets in the current scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n.. deprecated::\n    Use GET /check-presets instead. This POST endpoint is kept for backward compatibility.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/recalculate-usage": {
