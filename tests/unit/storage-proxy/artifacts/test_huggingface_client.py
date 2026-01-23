@@ -1,7 +1,7 @@
 """Tests for HuggingFace Client and Scanner implementation."""
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
@@ -26,6 +26,19 @@ def mock_hf_model_info() -> MagicMock:
     mock_model.created_at = datetime(2021, 1, 1, tzinfo=UTC)
     mock_model.last_modified = datetime(2023, 6, 15, tzinfo=UTC)
     mock_model.gated = None
+    return mock_model
+
+
+@pytest.fixture
+def mock_hf_gated_model_info() -> MagicMock:
+    """Mock HuggingFace gated ModelInfo object."""
+    mock_model = MagicMock(spec=HfModelInfo)
+    mock_model.id = "meta-llama/Llama-3.2-1B"
+    mock_model.author = "meta-llama"
+    mock_model.tags = ["pytorch"]
+    mock_model.created_at = datetime(2024, 1, 1, tzinfo=UTC)
+    mock_model.last_modified = datetime(2024, 6, 15, tzinfo=UTC)
+    mock_model.gated = "manual"
     return mock_model
 
 
@@ -133,7 +146,7 @@ class TestHuggingFaceClient:
         assert model.id == "microsoft/DialoGPT-medium"
         assert model.author == "microsoft"
         mock_model_info.assert_called_once_with(
-            "microsoft/DialoGPT-medium", revision="main", token="test_token"
+            "microsoft/DialoGPT-medium", revision="main", token="test_token", expand=["gated"]
         )
 
     @pytest.mark.asyncio
@@ -348,7 +361,7 @@ class TestHuggingFaceScanner:
         assert model_info.tags == ["pytorch", "text-generation"]
 
         mock_model_info.assert_called_once_with(
-            "microsoft/DialoGPT-medium", revision="main", token="test_token"
+            "microsoft/DialoGPT-medium", revision="main", token="test_token", expand=["gated"]
         )
 
     @pytest.mark.asyncio
@@ -491,3 +504,22 @@ class TestHuggingFaceScanner:
             await hf_scanner.list_model_files_info(
                 ModelTarget(model_id="microsoft/DialoGPT-medium")
             )
+
+    @patch("ai.backend.storage.client.huggingface.model_info")
+    async def test_scan_model_without_metadata_gated_repo_no_access(
+        self,
+        mock_model_info: MagicMock,
+        hf_scanner: HuggingFaceScanner,
+        mock_hf_gated_model_info: MagicMock,
+    ) -> None:
+        """Test scanning gated repository without access raises error."""
+        mock_model_info.return_value = mock_hf_gated_model_info
+
+        # Mock _check_gated_repo_access to return False (no access)
+        with patch.object(
+            hf_scanner, "_check_gated_repo_access", new_callable=AsyncMock, return_value=False
+        ):
+            with pytest.raises(HuggingFaceAPIError):
+                await hf_scanner.scan_model_without_metadata(
+                    ModelTarget(model_id="meta-llama/Llama-3.2-1B")
+                )
