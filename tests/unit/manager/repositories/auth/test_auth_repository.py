@@ -69,6 +69,23 @@ class ResourcePolicyTestData:
     name: str
 
 
+@dataclass
+class UserWithAccessKey:
+    user_data: UserTestData
+    main_access_key: str
+    secondary_access_key: str
+
+
+@dataclass
+class BaseUserFixtureData:
+    """Base user data for fixture chaining"""
+
+    uuid: UUID
+    email: str
+    domain_name: str
+    resource_policy: str
+
+
 class TestAuthRepository:
     """Test cases for AuthRepository with real database"""
 
@@ -534,20 +551,17 @@ class TestAuthRepository:
         assert time_diff < 1.0
 
     @pytest.fixture
-    async def user_without_main_keypair(
+    async def base_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         default_domain: DomainTestData,
         user_resource_policy: ResourcePolicyTestData,
-        keypair_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncIterator[UserTestData]:
-        """Create user with main_access_key=None and one keypair"""
+    ) -> AsyncIterator[BaseUserFixtureData]:
+        """Create base user without keypairs (main_access_key=None)"""
         user_uuid = uuid.uuid4()
-        email = f"test-no-main-{uuid.uuid4()}@example.com"
-        access_key = f"AKIATEST{uuid.uuid4().hex[:10]}"
+        email = f"test-base-{uuid.uuid4()}@example.com"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            # Create user WITHOUT main_access_key
             password_info = PasswordInfo(
                 password="test_password",
                 algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
@@ -562,23 +576,42 @@ class TestAuthRepository:
                 domain_name=default_domain.name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
-                main_access_key=None,  # Explicitly set to None
+                main_access_key=None,
             )
             db_sess.add(user)
-            await db_sess.flush()
+            await db_sess.commit()
 
-            # Create keypair
+        yield BaseUserFixtureData(
+            uuid=user_uuid,
+            email=email,
+            domain_name=default_domain.name,
+            resource_policy=user_resource_policy.name,
+        )
+
+    @pytest.fixture
+    async def user_without_main_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        base_user: BaseUserFixtureData,
+        keypair_resource_policy: ResourcePolicyTestData,
+    ) -> AsyncIterator[UserTestData]:
+        """Add one keypair to base_user (main_access_key remains None)"""
+        access_key = f"AKIATEST{uuid.uuid4().hex[:10]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key="test_secret_key",
-                user_id=email,
-                user=user_uuid,
+                user_id=base_user.email,
+                user=base_user.uuid,
                 is_active=True,
                 resource_policy=keypair_resource_policy.name,
             )
             db_sess.add(keypair)
             await db_sess.flush()
-            await db_sess.refresh(user)
+
+            user = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == base_user.uuid))
+            assert user is not None
 
             user_data = UserTestData(
                 uuid=user.uuid,
@@ -606,70 +639,41 @@ class TestAuthRepository:
 
         yield user_data
 
-        # Cleanup
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(sa.delete(KeyPairRow).where(KeyPairRow.access_key == access_key))
-            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
-
     @pytest.fixture
     async def user_with_multiple_keypairs(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        default_domain: DomainTestData,
-        user_resource_policy: ResourcePolicyTestData,
+        base_user: BaseUserFixtureData,
         keypair_resource_policy: ResourcePolicyTestData,
-    ) -> AsyncIterator[tuple[UserTestData, str, str]]:
-        """Create user with main_access_key and multiple keypairs"""
-        user_uuid = uuid.uuid4()
-        email = f"test-multi-keys-{uuid.uuid4()}@example.com"
+    ) -> AsyncIterator[UserWithAccessKey]:
+        """Add multiple keypairs to base_user and set main_access_key"""
         main_access_key = f"AKIAMAIN{uuid.uuid4().hex[:10]}"
         secondary_access_key = f"AKIASECOND{uuid.uuid4().hex[:10]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            # Create user WITHOUT main_access_key first (to avoid FK violation)
-            password_info = PasswordInfo(
-                password="test_password",
-                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                rounds=100_000,
-                salt_size=32,
-            )
-            user = UserRow(
-                uuid=user_uuid,
-                username=email,
-                email=email,
-                password=password_info,
-                domain_name=default_domain.name,
-                role=UserRole.USER,
-                resource_policy=user_resource_policy.name,
-                main_access_key=None,  # Set to None first
-            )
-            db_sess.add(user)
-            await db_sess.flush()
-
-            # Create main keypair
+            # Create keypairs
             main_keypair = KeyPairRow(
                 access_key=main_access_key,
                 secret_key="main_secret_key",
-                user_id=email,
-                user=user_uuid,
+                user_id=base_user.email,
+                user=base_user.uuid,
                 is_active=True,
                 resource_policy=keypair_resource_policy.name,
             )
-            db_sess.add(main_keypair)
-
-            # Create secondary keypair
             secondary_keypair = KeyPairRow(
                 access_key=secondary_access_key,
                 secret_key="secondary_secret_key",
-                user_id=email,
-                user=user_uuid,
+                user_id=base_user.email,
+                user=base_user.uuid,
                 is_active=True,
                 resource_policy=keypair_resource_policy.name,
             )
-            db_sess.add(secondary_keypair)
+            db_sess.add_all([main_keypair, secondary_keypair])
             await db_sess.flush()
 
-            # Update user with main_access_key after keypairs are created
+            # Update user with main_access_key
+            user = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == base_user.uuid))
+            assert user is not None
             user.main_access_key = main_access_key
             await db_sess.flush()
             await db_sess.refresh(user)
@@ -698,16 +702,11 @@ class TestAuthRepository:
                 ssh_private_key="",
             )
 
-        yield user_data, main_access_key, secondary_access_key
-
-        # Cleanup
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.delete(KeyPairRow).where(
-                    KeyPairRow.access_key.in_([main_access_key, secondary_access_key])
-                )
-            )
-            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        yield UserWithAccessKey(
+            user_data=user_data,
+            main_access_key=main_access_key,
+            secondary_access_key=secondary_access_key,
+        )
 
     @pytest.mark.asyncio
     async def test_get_credentials_by_access_key_without_main_keypair(
@@ -740,10 +739,12 @@ class TestAuthRepository:
     async def test_get_credentials_by_access_key_with_multiple_keypairs(
         self,
         auth_repository: AuthRepository,
-        user_with_multiple_keypairs: tuple[UserTestData, str, str],
+        user_with_multiple_keypairs: UserWithAccessKey,
     ) -> None:
         """Test fetching credentials with multiple keypairs"""
-        user_data, main_access_key, secondary_access_key = user_with_multiple_keypairs
+        user_data = user_with_multiple_keypairs.user_data
+        main_access_key = user_with_multiple_keypairs.main_access_key
+        secondary_access_key = user_with_multiple_keypairs.secondary_access_key
 
         # Test 1: Query with main access key
         result_main = await auth_repository.get_credentials_by_access_key(main_access_key)
