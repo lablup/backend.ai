@@ -53,11 +53,14 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.repository.base import (
+    BatchQuerier,
+    BatchQuerierResult,
     CreateSpec,
     Querier,
     UpdateSpec,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.hasher.types import PasswordInfo
 
@@ -121,97 +124,82 @@ class BaseRow(Base, Generic[TCreateSpec, TUpdateSpec], metaclass=ABCDeclarativeM
         row = await db_sess.scalar(stmt)
         return row
 
-    # @classmethod
-    # def _apply_batch_querier(
-    #     cls,
-    #     query: sa.sql.Select[Any],
-    #     querier: BatchQuerier,
-    # ) -> sa.sql.Select[Any]:
-    #     """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
+    @classmethod
+    def _apply_batch_querier(
+        cls,
+        query: sa.sql.Select[Any],
+        querier: BatchQuerier,
+    ) -> sa.sql.Select[Any]:
+        # Apply all conditions
+        for condition in querier.conditions:
+            query = query.where(condition())
 
-    #     Args:
-    #         query: The base SELECT statement
-    #         querier: BatchQuerier containing conditions, orders, and pagination to apply
+        # Apply pagination (includes cursor condition and cursor_order for cursor pagination)
+        query = querier.pagination.apply(query)
 
-    #     Returns:
-    #         The modified SELECT statement with conditions, orders, and pagination applied
+        # Apply user orders AFTER default order from pagination
+        for order in querier.orders:
+            query = query.order_by(order)
 
-    #     Note:
-    #         For cursor-based pagination, the pagination.apply() method applies
-    #         cursor_order first. User-specified orders are applied after,
-    #         serving as secondary sort criteria.
-    #     """
-    #     # Apply all conditions
-    #     for condition in querier.conditions:
-    #         query = query.where(condition())
+        return query
 
-    #     # Apply pagination (includes cursor condition and cursor_order for cursor pagination)
-    #     query = querier.pagination.apply(query)
+    @classmethod
+    async def batch_query(
+        cls, db_sess: SASession, query: sa.sql.Select, querier: BatchQuerier
+    ) -> BatchQuerierResult[Self]:
+        initial_query = query
 
-    #     # Apply user orders AFTER default order from pagination
-    #     for order in querier.orders:
-    #         query = query.order_by(order)
+        # Add window function for offset pagination
+        if querier.pagination.uses_window_function:
+            query = query.add_columns(sa.func.count().over().label("total_count"))
 
-    #     return query
+        # Apply conditions and pagination to get data rows
+        query = cls._apply_batch_querier(query, querier)
+        result = await db_sess.execute(query)
+        rows: list[Self] = list(result.all())
 
-    # @classmethod
-    # async def batch_query(cls, db_sess: SASession, query: sa.sql.Select, querier: BatchQuerier) -> BatchQuerierResult[Self]:
-    #     initial_query = query
+        total_count: int
+        if querier.pagination.uses_window_function and rows:
+            # Offset pagination with results: use window function from rows
+            total_count = rows[0].total_count
+        else:
+            # Cursor pagination or offset fallback (rows empty):
+            # Execute pure count query with filter conditions only
+            count_query = sa.select(sa.func.count()).select_from(initial_query.froms[0])
+            for condition in querier.conditions:
+                count_query = count_query.where(condition())
 
-    #     # Add window function for offset pagination
-    #     if querier.pagination.uses_window_function:
-    #         query = query.add_columns(sa.func.count().over().label("total_count"))
+            count_result = await db_sess.execute(count_query)
+            total_count = count_result.scalar() or 0
 
-    #     # Apply conditions and pagination to get data rows
-    #     query = cls._apply_batch_querier(query, querier)
-    #     result = await db_sess.execute(query)
-    #     rows: list[Self] = list(result.all())
+        # Calculate pagination info
+        page_info = querier.pagination.compute_page_info(rows, total_count)
 
-    #     total_count: int
-    #     if querier.pagination.uses_window_function and rows:
-    #         # Offset pagination with results: use window function from rows
-    #         total_count = rows[0].total_count
-    #     else:
-    #         # Cursor pagination or offset fallback (rows empty):
-    #         # Execute pure count query with filter conditions only
-    #         count_query = sa.select(sa.func.count()).select_from(initial_query.froms[0])
-    #         for condition in querier.conditions:
-    #             count_query = count_query.where(condition())
+        return BatchQuerierResult(
+            rows=rows,
+            total_count=total_count,
+            has_next_page=page_info.has_next_page,
+            has_previous_page=page_info.has_previous_page,
+        )
 
-    #         count_result = await db_sess.execute(count_query)
-    #         total_count = count_result.scalar() or 0
+    @classmethod
+    async def update(cls, db_sess: SASession, spec: TUpdateSpec) -> Self | None:
+        pk_columns = list(cls.primary_key.columns)
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                f"Querier only supports single-column primary keys (table: {cls.name})",
+            )
 
-    #     # Calculate pagination info
-    #     page_info = querier.pagination.compute_page_info(rows, total_count)
+        values = spec.model_dump()
+        if not values:
+            return None
 
-    #     return BatchQuerierResult(
-    #         rows=rows,
-    #         total_count=total_count,
-    #         has_next_page=page_info.has_next_page,
-    #         has_previous_page=page_info.has_previous_page,
-    #     )
-
-    # @classmethod
-    # async def update(cls, db_sess: SASession, spec: TUpdateSpec) -> Self | None:
-    #     pk_columns = list(cls.primary_key.columns)
-    #     if len(pk_columns) != 1:
-    #         raise UnsupportedCompositePrimaryKeyError(
-    #             f"Querier only supports single-column primary keys (table: {cls.name})",
-    #         )
-
-    #     values = spec.model_dump()
-    #     if not values:
-    #         return None
-
-    #     update_stmt = (
-    #         sa.update(cls)
-    #         .values(values)
-    #         .where(pk_columns[0] == spec.pk_value)
-    #         .returning(cls)
-    #     )
-    #     select_stmt = sa.select(cls).from_statement(update_stmt)
-    #     result = await db_sess.scalar(select_stmt)
-    #     return result
+        update_stmt = (
+            sa.update(cls).values(values).where(pk_columns[0] == spec.pk_value).returning(cls)
+        )
+        select_stmt = sa.select(cls).from_statement(update_stmt)
+        result = await db_sess.scalar(select_stmt)
+        return result
 
 
 # Subpackages to skip when dynamically importing model modules
