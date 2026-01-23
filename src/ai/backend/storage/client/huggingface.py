@@ -343,9 +343,6 @@ class HuggingFaceScanner:
                 f"Successfully scanned HuggingFace model: {model}",
             )
             return result
-
-        except HuggingFaceGatedRepoError:
-            raise
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
@@ -389,6 +386,7 @@ class HuggingFaceScanner:
                 f"Successfully scanned HuggingFace model without metadata: {model}",
             )
             return result
+
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to scan model {model}: {e!s}") from e
 
