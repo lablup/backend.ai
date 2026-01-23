@@ -52,3 +52,33 @@ class TotalResourceData:
             total_free_slots=ResourceSlot.from_json(data["total_free_slots"]),
             total_capacity_slots=ResourceSlot.from_json(data["total_capacity_slots"]),
         )
+
+
+@dataclass
+class AgentResourceData:
+    used_slots: ResourceSlot
+    free_slots: ResourceSlot
+    capacity_slots: ResourceSlot
+
+    def to_json(self) -> Mapping[str, Mapping[str, str]]:
+        return {
+            "used_slots": self.used_slots.to_json(),
+            "free_slots": self.free_slots.to_json(),
+            "capacity_slots": self.capacity_slots.to_json(),
+        }
+
+    @classmethod
+    def from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            used_slots=ResourceSlot.from_json(data["used_slots"]),
+            free_slots=ResourceSlot.from_json(data["free_slots"]),
+            capacity_slots=ResourceSlot.from_json(data["capacity_slots"]),
+        )
+
+    @classmethod
+    def empty(cls) -> Self:
+        return cls(
+            used_slots=ResourceSlot(),
+            free_slots=ResourceSlot(),
+            capacity_slots=ResourceSlot(),
+        )

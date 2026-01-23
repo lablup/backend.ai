@@ -10,6 +10,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.resource.types import AgentResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -180,6 +181,14 @@ class AgentResourceGQL:
         """)
     )
 
+    @classmethod
+    def from_resource_data(cls, data: AgentResourceData) -> Self:
+        return cls(
+            capacity=data.capacity_slots.to_json(),
+            used=data.used_slots.to_json(),
+            free=data.free_slots.to_json(),
+        )
+
 
 @strawberry.type(name="AgentStats", description="Added in 25.15.0")
 class AgentStatsGQL:
@@ -336,13 +345,6 @@ class AgentNetworkInfoGQL:
 class AgentV2GQL(Node):
     _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
-    resource_info: AgentResourceGQL = strawberry.field(
-        description=dedent_strip("""
-            Hardware resource capacity, usage, and availability information.
-            Contains capacity (total), used (occupied by sessions), and free (available) resource slots
-            including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
-        """)
-    )
     status_info: AgentStatusInfoGQL = strawberry.field(
         description=dedent_strip("""
             Current operational status and lifecycle timestamps.
@@ -378,6 +380,23 @@ class AgentV2GQL(Node):
         """)
     )
 
+    @strawberry.field(  # type: ignore[misc]
+        description=dedent_strip("""
+            Hardware resource capacity, usage, and availability information.
+            Contains capacity (total), used (occupied by sessions), and free (available) resource slots
+            including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
+        """)
+    )
+    async def resource_info(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> AgentResourceGQL:
+        """
+        Get the resource information for a specific agent.
+        """
+        resource_data = await info.context.data_loaders.agent_resource_loader.load(self._agent_id)
+        return AgentResourceGQL.from_resource_data(resource_data)
+
     @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")  # type: ignore[misc]
     async def container_count(
         self,
@@ -395,11 +414,6 @@ class AgentV2GQL(Node):
         return cls(
             _agent_id=data.id,
             id=ID(data.id),
-            resource_info=AgentResourceGQL(
-                capacity=data.available_slots.to_json(),
-                used=data.actual_occupied_slots.to_json(),
-                free=(data.available_slots - data.actual_occupied_slots).to_json(),
-            ),
             status_info=AgentStatusInfoGQL(
                 status=data.status,
                 status_changed=data.status_changed,
