@@ -83,8 +83,9 @@ When users perform vfolder operations, the storage backend (volume host) hosting
 │  └─────────────────────────────────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │
 │  │ Volume Health:                                                                  │ │
-│  │   proxy1:volume1  -> healthy  (backend: gpfs, info: "8/8 nodes online")         │ │
-│  │   proxy1:volume2  -> offline  (backend: cephfs, info: "cluster unreachable")    │ │
+│  │   proxy1:volume1  -> healthy   (backend: gpfs, info: "8/8 nodes online")        │ │
+│  │   proxy1:volume2  -> degraded  (backend: cephfs, info: "2 OSDs down")           │ │
+│  │   proxy1:volume3  -> offline   (backend: netapp, info: "API unreachable")       │ │
 │  │   proxy2:volume1  -> (unknown, proxy unreachable)                               │ │
 │  └─────────────────────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────────────────┘
@@ -107,9 +108,12 @@ Checks if the proxy service itself is responding to HTTP requests.
 
 Checks if the actual storage backend is accessible (via `get_hwinfo()`).
 
+Uses `HardwareMetadata.status` as defined in `ai.backend.common.types`:
+
 | Status | Description |
 |--------|-------------|
 | healthy | Backend is fully operational |
+| degraded | Backend is operational but with reduced capacity or performance |
 | offline | Backend is not accessible |
 | unavailable | Backend connectivity cannot be determined |
 
@@ -118,6 +122,7 @@ Checks if the actual storage backend is accessible (via `get_hwinfo()`).
 | Proxy Status | Volume Status | User Impact |
 |--------------|---------------|-------------|
 | HEALTHY | healthy | Normal operation |
+| HEALTHY | degraded | Operations may be slower or partially limited |
 | HEALTHY | offline | Vfolder operations on this volume fail |
 | HEALTHY | unavailable | Vfolder operations may fail |
 | UNHEALTHY | (unknown) | All vfolder operations on this proxy fail |
@@ -145,7 +150,7 @@ All backends implement `AbstractVolume.get_hwinfo()` which returns:
 
 ```
 HardwareMetadata {
-    status: "healthy" | "offline" | "unavailable"
+    status: "healthy" | "degraded" | "offline" | "unavailable"
     status_info: string | null    # Human-readable description
     metadata: dict                # Backend-specific details
 }
@@ -227,9 +232,15 @@ HardwareMetadata {
             "last_checked_at": "2026-01-22T10:00:00Z"
         },
         "volume2": {
-            "status": "offline",
-            "status_info": "Ceph cluster unreachable",
+            "status": "degraded",
+            "status_info": "Ceph cluster degraded: 2 OSDs down",
             "backend": "cephfs",
+            "last_checked_at": "2026-01-22T10:00:00Z"
+        },
+        "volume3": {
+            "status": "offline",
+            "status_info": "NetApp API unreachable",
+            "backend": "netapp",
             "last_checked_at": "2026-01-22T10:00:00Z"
         }
     }
@@ -256,7 +267,7 @@ query {
         proxyName
         volumeId
         backendType     # "gpfs", "cephfs", "vfs", etc.
-        status          # HEALTHY | OFFLINE | UNAVAILABLE | UNKNOWN
+        status          # HEALTHY | DEGRADED | OFFLINE | UNAVAILABLE | UNKNOWN
         statusInfo
         isHealthy
         lastCheckedAt

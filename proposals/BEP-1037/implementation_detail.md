@@ -26,14 +26,14 @@ Response: {
     "version": "...",
     "volumes": {
         "volume1": {
-            "status": "healthy" | "offline" | "unavailable",
+            "status": "healthy" | "degraded" | "offline" | "unavailable",
             "status_info": "GPFS cluster healthy, 8/8 nodes online",
             "backend": "gpfs",
             "last_checked_at": "2026-01-22T10:00:00Z"
         },
         "volume2": {
-            "status": "offline",
-            "status_info": "Ceph cluster unreachable",
+            "status": "degraded",
+            "status_info": "Ceph cluster degraded: 2 OSDs down",
             "backend": "cephfs",
             "last_checked_at": "2026-01-22T10:00:00Z"
         }
@@ -172,13 +172,14 @@ class ProxyHealthStatusEnum(Enum):
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
 
-# Volume backend health status
+# Volume backend health status (matches HardwareMetadata.status)
 @strawberry.enum
 class VolumeHealthStatusEnum(Enum):
     HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
     OFFLINE = "OFFLINE"
     UNAVAILABLE = "UNAVAILABLE"
-    UNKNOWN = "UNKNOWN"
+    UNKNOWN = "UNKNOWN"  # When proxy is unreachable
 
 @strawberry.type
 class VolumeHealth:
@@ -309,6 +310,8 @@ health_check_interval = "1m"
 ### Volume Backend Health Tests
 
 - GPFS volume returns healthy when cluster is healthy
+- GPFS volume returns degraded when some nodes are down
+- Ceph volume returns degraded when OSDs are down
 - Ceph volume returns offline when cluster is unreachable
 - VFS volume returns healthy when filesystem is accessible
 - NetApp volume returns unavailable when API is unreachable
