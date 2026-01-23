@@ -17,7 +17,8 @@
 //     "pytest-dependency>=0.6.0",
 //     "pytest-mock>=3.14.0",
 //     "pytest-timeout>=2.3.1",
-//     "pytest~=8.3.3"
+//     "pytest~=8.3.3",
+//     "sniffio~=1.3.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -1137,6 +1138,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+              "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc",
+              "url": "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz"
+            }
+          ],
+          "project_name": "sniffio",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.3.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "1380560bdba02b6b6c90de54133c81c9f2a453dee9912fe58c1dcced1edb7cff",
               "url": "https://files.pythonhosted.org/packages/73/ae/b48f95715333080afb75a4504487cbe142cae1268afc482d06692d605ae6/yarl-1.22.0-py3-none-any.whl"
             },
@@ -1305,7 +1324,8 @@
     "pytest-dependency>=0.6.0",
     "pytest-mock>=3.14.0",
     "pytest-timeout>=2.3.1",
-    "pytest~=8.3.3"
+    "pytest~=8.3.3",
+    "sniffio~=1.3.1"
   ],
   "requires_python": [
     "==3.13.7"
