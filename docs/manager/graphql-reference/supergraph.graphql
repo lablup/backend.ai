@@ -4596,7 +4596,6 @@ enum KernelOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  ID @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.1.0. Resource allocation information for a kernel."""
@@ -4674,7 +4673,7 @@ type KernelSessionInfo
   name: String
 
   """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
-  sessionType: SessionType!
+  sessionType: SessionTypes!
 }
 
 """
@@ -5961,7 +5960,6 @@ input ModifyUserResourcePolicyInput
   max_customized_image_count: Int
 }
 
-"""Added in 26.1.0. Permission level for virtual folder mounts."""
 enum MountPermission
   @join__type(graph: STRAWBERRY)
 {
@@ -8971,7 +8969,7 @@ type ServicePortEntry
   name: String!
 
   """Protocol type for this service port (http, tcp, preopen, internal)."""
-  protocol: ServicePortProtocol!
+  protocol: ServicePortProtocols!
 
   """Port numbers inside the container."""
   containerPorts: [Int!]!
@@ -8983,8 +8981,7 @@ type ServicePortEntry
   isInference: Boolean!
 }
 
-"""Added in 26.1.0. Protocol types for service ports."""
-enum ServicePortProtocol
+enum ServicePortProtocols
   @join__type(graph: STRAWBERRY)
 {
   HTTP @join__enumValue(graph: STRAWBERRY)
@@ -9036,7 +9033,6 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
 
-"""Added in 26.1.0. Result status of a session execution."""
 enum SessionResult
   @join__type(graph: STRAWBERRY)
 {
@@ -9121,8 +9117,7 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.1.0. Type of compute session."""
-enum SessionType
+enum SessionTypes
   @join__type(graph: STRAWBERRY)
 {
   INTERACTIVE @join__enumValue(graph: STRAWBERRY)
@@ -10441,7 +10436,6 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
 
-"""Added in 26.1.0. Usage mode of a virtual folder."""
 enum VFolderUsageMode
   @join__type(graph: STRAWBERRY)
 {
