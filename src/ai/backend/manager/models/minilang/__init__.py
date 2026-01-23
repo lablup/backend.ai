@@ -15,7 +15,7 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.orm.attributes.InstrumentedAttribute
+    column: sa.orm.attributes.InstrumentedAttribute | sa.Column
 
 
 TEnum = TypeVar("TEnum", bound=Enum)
@@ -54,7 +54,7 @@ class ExternalTableFilterSpec:
         field_name: str,
         target_table: sa.Table,
         target_column: str,
-        join_builder: Callable[[sa.Table], sa.sql.Join],
+        join_builder: Callable[[sa.Table | sa.sql.Join], sa.sql.Join],
         transform: Callable[[str], Any] | None = None,
     ) -> None:
         """
@@ -62,7 +62,7 @@ class ExternalTableFilterSpec:
             field_name: Name of the field in the filter expression (e.g., "project_name")
             target_table: SQLAlchemy table to apply the filter on (e.g., GroupRow.__table__)
             target_column: Column name in the target table (e.g., "name")
-            join_builder: Function that builds the JOIN clause given the base table
+            join_builder: Function that builds the JOIN clause given the base table or existing join
             transform: Optional transform function for the field value
         """
         self.field_name = field_name

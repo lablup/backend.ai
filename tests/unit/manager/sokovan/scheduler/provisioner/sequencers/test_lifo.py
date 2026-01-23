@@ -19,6 +19,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
 
 class TestLIFOSequencer:
     @pytest.fixture
+    def scaling_group(self) -> str:
+        return "default"
+
+    @pytest.fixture
     def sequencer(self) -> LIFOSequencer:
         return LIFOSequencer()
 
@@ -58,14 +62,14 @@ class TestLIFOSequencer:
 
     @pytest.mark.asyncio
     async def test_empty_workload(
-        self, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
-        result = sequencer.sequence(system_snapshot, [])
+        result = await sequencer.sequence(scaling_group, system_snapshot, [])
         assert result == []
 
     @pytest.mark.asyncio
     async def test_reverses_order(
-        self, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -100,7 +104,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
 
         # LIFO should reverse the order
         assert len(result) == 3
@@ -110,7 +114,7 @@ class TestLIFOSequencer:
 
     @pytest.mark.asyncio
     async def test_single_workload(
-        self, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -125,14 +129,16 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
 
         # Single item should remain the same
         assert len(result) == 1
         assert result[0] == workloads[0]
 
     @pytest.mark.asyncio
-    async def test_ignores_system_snapshot(self, sequencer: LIFOSequencer) -> None:
+    async def test_ignores_system_snapshot(
+        self, scaling_group: str, sequencer: LIFOSequencer
+    ) -> None:
         # LIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -206,7 +212,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = sequencer.sequence(snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(scaling_group, snapshot_with_allocations, workloads)
 
         # Should still reverse order despite different allocations
         assert len(result) == 3

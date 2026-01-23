@@ -1,6 +1,18 @@
 #! /bin/bash
-# implementation: backend.ai monorepo standard pre-commit hook
-set -e  # Exit on error
+
+# Make it interruptible.
+PGID="$(ps -o pgid= $$ | tr -d ' ')"
+cleanup() {
+  local sig="$1"
+  trap - SIGINT SIGTERM
+  echo -e "Pre-commit hook is interrupted ($sig)." >&2
+  kill -s "${sig}" -- "-${PGID}"
+}
+trap 'cleanup INT' SIGINT
+trap 'cleanup TERM' SIGTERM
+
+# --- Hook Body ---
+set -Eeuo pipefail
 
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 cd "$BASE_PATH"
@@ -16,19 +28,27 @@ EXIT_CODE=0
 # 1. Linting
 echo "Running pre-commit checks..."
 echo "✓ Linting..."
-if ! pants lint --changed-since="HEAD"; then
+
+if ! pants lint --changed-since="HEAD" --changed-dependents=transitive; then
   echo "❌ Linting failed"
   EXIT_CODE=1
 fi
 
 # 2. Type checking
 echo "✓ Type checking..."
-if ! pants check --changed-since="HEAD"; then
+if ! pants check --changed-since="HEAD" --changed-dependents=transitive; then
   echo "❌ Type checking failed"
   EXIT_CODE=1
 fi
 
-# 3. Direct tests (only tests that were directly changed)
+# 3. BUILD files check
+echo "✓ Checking BUILD files..."
+if ! pants tailor --check; then
+  echo "❌ BUILD files out of date. Run 'pants tailor' to fix."
+  EXIT_CODE=1
+fi
+
+# 4. Direct tests (only tests that were directly changed)
 echo "✓ Testing changed files..."
 if ! pants test --changed-since="HEAD"; then
   echo "❌ Tests failed"

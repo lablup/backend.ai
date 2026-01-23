@@ -88,6 +88,7 @@ class ObjectPermissionCreatorSpec(CreatorSpec[ObjectPermissionRow]):
     """CreatorSpec for object permissions."""
 
     role_id: uuid.UUID
+    permission_group_id: uuid.UUID
     entity_type: EntityType
     entity_id: str
     operation: OperationType
@@ -97,6 +98,7 @@ class ObjectPermissionCreatorSpec(CreatorSpec[ObjectPermissionRow]):
     def build_row(self) -> ObjectPermissionRow:
         return ObjectPermissionRow(
             role_id=self.role_id,
+            permission_group_id=self.permission_group_id,
             entity_type=self.entity_type,
             entity_id=self.entity_id,
             operation=self.operation,

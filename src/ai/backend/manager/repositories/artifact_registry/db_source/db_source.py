@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
@@ -26,7 +28,7 @@ class ArtifactRegistryDBSource:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.registry_id == registry_id)
             )
-            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
@@ -36,7 +38,7 @@ class ArtifactRegistryDBSource:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.name == registry_name)
             )
-            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {registry_name} not found")
             return row.to_dataclass()
@@ -53,7 +55,7 @@ class ArtifactRegistryDBSource:
                     ArtifactRegistryRow.registry_id.in_(registry_ids)
                 )
             )
-            rows: list[ArtifactRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def get_artifact_registry_type(self, registry_id: uuid.UUID) -> ArtifactRegistryType:
@@ -71,7 +73,7 @@ class ArtifactRegistryDBSource:
     async def list_artifact_registry_data(self) -> list[ArtifactRegistryData]:
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(sa.select(ArtifactRegistryRow))
-            rows: list[ArtifactRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def search_artifact_registries(

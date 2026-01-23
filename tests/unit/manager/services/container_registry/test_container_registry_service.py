@@ -25,9 +25,6 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.container_registry.admin_repository import (
-    AdminContainerRegistryRepository,
-)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -62,22 +59,14 @@ def mock_container_registry_repository() -> MagicMock:
 
 
 @pytest.fixture
-def mock_admin_container_registry_repository() -> MagicMock:
-    """Create mocked admin container registry repository."""
-    return MagicMock(spec=AdminContainerRegistryRepository)
-
-
-@pytest.fixture
 def container_registry_service(
     mock_db_engine: MagicMock,
     mock_container_registry_repository: MagicMock,
-    mock_admin_container_registry_repository: MagicMock,
 ) -> ContainerRegistryService:
     """Create ContainerRegistryService with mocked dependencies."""
     return ContainerRegistryService(
         db=mock_db_engine,
         container_registry_repository=mock_container_registry_repository,
-        admin_container_registry_repository=mock_admin_container_registry_repository,
     )
 
 
@@ -294,82 +283,56 @@ class TestClearImages:
     async def test_success(
         self,
         container_registry_service: ContainerRegistryService,
-        mock_admin_container_registry_repository: MagicMock,
+        mock_container_registry_repository: MagicMock,
         sample_registry_data: ContainerRegistryData,
     ) -> None:
         """Test successful image clearing"""
-        mock_admin_container_registry_repository.clear_images_force.return_value = (
-            sample_registry_data
-        )
+        mock_container_registry_repository.clear_images.return_value = sample_registry_data
 
         action = ClearImagesAction(registry="registry.example.com", project="test-project")
         result = await container_registry_service.clear_images(action)
 
         assert result.registry == sample_registry_data
-        mock_admin_container_registry_repository.clear_images_force.assert_called_once_with(
+        mock_container_registry_repository.clear_images.assert_called_once_with(
             "registry.example.com", "test-project"
         )
 
     async def test_without_project(
         self,
         container_registry_service: ContainerRegistryService,
-        mock_admin_container_registry_repository: MagicMock,
+        mock_container_registry_repository: MagicMock,
         sample_registry_data: ContainerRegistryData,
     ) -> None:
         """Test clearing images without project filter"""
-        mock_admin_container_registry_repository.clear_images_force.return_value = (
-            sample_registry_data
-        )
+        mock_container_registry_repository.clear_images.return_value = sample_registry_data
 
         action = ClearImagesAction(registry="registry.example.com", project=None)
         result = await container_registry_service.clear_images(action)
 
         assert result.registry == sample_registry_data
-        mock_admin_container_registry_repository.clear_images_force.assert_called_once_with(
+        mock_container_registry_repository.clear_images.assert_called_once_with(
             "registry.example.com", None
         )
 
     async def test_registry_not_found(
         self,
         container_registry_service: ContainerRegistryService,
-        mock_admin_container_registry_repository: MagicMock,
+        mock_container_registry_repository: MagicMock,
     ) -> None:
         """Test clearing images when registry not found"""
-        mock_admin_container_registry_repository.clear_images_force.side_effect = (
-            ContainerRegistryNotFound()
-        )
+        mock_container_registry_repository.clear_images.side_effect = ContainerRegistryNotFound()
 
         action = ClearImagesAction(registry="non-existent", project="test-project")
         with pytest.raises(ContainerRegistryNotFound):
             await container_registry_service.clear_images(action)
 
-    async def test_delegates_to_admin_repository(
-        self,
-        container_registry_service: ContainerRegistryService,
-        mock_admin_container_registry_repository: MagicMock,
-        mock_container_registry_repository: MagicMock,
-        sample_registry_data: ContainerRegistryData,
-    ) -> None:
-        """Test that clear_images uses admin repository, not regular repository"""
-        mock_admin_container_registry_repository.clear_images_force.return_value = (
-            sample_registry_data
-        )
-
-        action = ClearImagesAction(registry="registry.example.com", project="test-project")
-        await container_registry_service.clear_images(action)
-
-        mock_admin_container_registry_repository.clear_images_force.assert_called_once()
-        mock_container_registry_repository.clear_images.assert_not_called()
-
     async def test_error_propagation(
         self,
         container_registry_service: ContainerRegistryService,
-        mock_admin_container_registry_repository: MagicMock,
+        mock_container_registry_repository: MagicMock,
     ) -> None:
         """Test that errors are properly propagated"""
-        mock_admin_container_registry_repository.clear_images_force.side_effect = Exception(
-            "Database error"
-        )
+        mock_container_registry_repository.clear_images.side_effect = Exception("Database error")
 
         action = ClearImagesAction(registry="registry.example.com", project="test-project")
         with pytest.raises(Exception) as exc_info:

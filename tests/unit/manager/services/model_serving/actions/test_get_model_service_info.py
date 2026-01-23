@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import HttpUrl
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.manager.data.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
+from ai.backend.manager.data.model_serving.types import ServiceInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
@@ -19,10 +20,10 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_check_requester_access_get_info(mocker, model_serving_service):
+def mock_check_user_access_get_info(mocker, model_serving_service):
     mock = mocker.patch.object(
         model_serving_service,
-        "check_requester_access",
+        "check_user_access",
         new_callable=AsyncMock,
     )
     mock.return_value = None
@@ -30,19 +31,19 @@ def mock_check_requester_access_get_info(mocker, model_serving_service):
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_force_get_info(mocker, mock_repositories):
+def mock_get_endpoint_by_id_get_info(mocker, mock_repositories):
     return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
+        mock_repositories.repository,
+        "get_endpoint_by_id",
         new_callable=AsyncMock,
     )
 
 
 @pytest.fixture
-def mock_get_endpoint_by_id_validated_get_info(mocker, mock_repositories):
+def mock_get_endpoint_access_validation_data_get_info(mocker, mock_repositories):
     return mocker.patch.object(
         mock_repositories.repository,
-        "get_endpoint_by_id_validated",
+        "get_endpoint_access_validation_data",
         new_callable=AsyncMock,
     )
 
@@ -52,14 +53,8 @@ class TestGetModelServiceInfo:
         "scenario",
         [
             ScenarioBase.success(
-                "full info lookup",
+                "get model service info",
                 GetModelServiceInfoAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
                 ),
                 GetModelServiceInfoActionResult(
@@ -80,54 +75,28 @@ class TestGetModelServiceInfo:
                     ),
                 ),
             ),
-            ScenarioBase.success(
-                "SUPERADMIN permission lookup",
-                GetModelServiceInfoAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
-                        domain_name="default",
-                    ),
-                    service_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                ),
-                GetModelServiceInfoActionResult(
-                    data=ServiceInfo(
-                        endpoint_id=uuid.UUID("44444444-5555-6666-7777-888888888888"),
-                        model_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
-                        extra_mounts=[],
-                        name="admin-model-v2.0",
-                        model_definition_path="/path/to/model",
-                        replicas=2,
-                        desired_session_count=2,
-                        active_routes=[
-                            RouteInfo(
-                                route_id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                                session_id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-                                traffic_ratio=100.0,
-                            )
-                        ],
-                        service_endpoint=HttpUrl(
-                            "https://api.example.com/v1/models/admin-model/v2.0"
-                        ),
-                        is_public=True,
-                        runtime_variant=RuntimeVariant.CUSTOM,
-                    ),
-                ),
-            ),
         ],
     )
     @pytest.mark.asyncio
     async def test_get_model_service_info(
         self,
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_get_info,
-        mock_get_endpoint_by_id_force_get_info,
-        mock_get_endpoint_by_id_validated_get_info,
-    ):
+        mock_check_user_access_get_info,
+        mock_get_endpoint_by_id_get_info,
+        mock_get_endpoint_access_validation_data_get_info,
+    ) -> None:
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
+
+        mock_validation_data = MagicMock(
+            session_owner_id=user_data.user_id,
+            session_owner_role=UserRole(user_data.role),
+            domain=user_data.domain_name,
+        )
+        mock_get_endpoint_access_validation_data_get_info.return_value = mock_validation_data
+
         mock_endpoint = MagicMock(
             id=expected.data.endpoint_id,
             model=expected.data.model_id,
@@ -153,11 +122,8 @@ class TestGetModelServiceInfo:
         )
         mock_endpoint.name = expected.data.name
 
-        # Mock repository based on user role
-        if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_get_info.return_value = mock_endpoint
-        else:
-            mock_get_endpoint_by_id_validated_get_info.return_value = mock_endpoint
+        # Now uses single repository for all roles
+        mock_get_endpoint_by_id_get_info.return_value = mock_endpoint
 
         async def get_model_service_info(action: GetModelServiceInfoAction):
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)

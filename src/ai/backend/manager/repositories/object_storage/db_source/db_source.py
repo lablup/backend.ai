@@ -32,7 +32,7 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow).where(ObjectStorageRow.name == storage_name)
             result = await db_session.execute(query)
-            row: ObjectStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
@@ -46,7 +46,7 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
             result = await db_session.execute(query)
-            row: ObjectStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
             return row.to_dataclass()
@@ -62,10 +62,14 @@ class ObjectStorageDBSource:
                 .options(selectinload(StorageNamespaceRow.object_storage_row))
             )
             result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with namespace ID {storage_namespace_id} not found."
+                )
+            if row.object_storage_row is None:
+                raise ObjectStorageNotFoundError(
+                    f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
             return row.object_storage_row.to_dataclass()
 
@@ -100,7 +104,10 @@ class ObjectStorageDBSource:
                 .returning(ObjectStorageRow.id)
             )
             result = await db_session.execute(delete_query)
-            return result.scalar()
+            deleted_id = result.scalar()
+            if deleted_id is None:
+                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
+            return deleted_id
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """
@@ -109,7 +116,7 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
-            rows: list[ObjectStorageRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def search(

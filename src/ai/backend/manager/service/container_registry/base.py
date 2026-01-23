@@ -4,7 +4,7 @@ import abc
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
@@ -48,13 +48,13 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
         self.db = db
 
     @classmethod
-    def _is_valid_group_row(cls, group_row: GroupRow) -> bool:
-        return (
-            group_row
-            and group_row.container_registry
-            and "registry" in group_row.container_registry
-            and "project" in group_row.container_registry
-        )
+    def _is_valid_group_row(cls, group_row: GroupRow | None) -> bool:
+        if group_row is None:
+            return False
+        container_registry = group_row.container_registry
+        if not container_registry:
+            return False
+        return "registry" in container_registry and "project" in container_registry
 
     @override
     async def fetch_container_registry_row(
@@ -75,9 +75,13 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
                     f"Container registry info does not exist or is invalid in the group. (group: {project_id})"
                 )
 
+            # After _is_valid_group_row check, group_row and container_registry are not None
+            assert group_row is not None
+            container_registry = group_row.container_registry
+            assert container_registry is not None
             registry_name, project = (
-                group_row.container_registry["registry"],
-                group_row.container_registry["project"],
+                container_registry["registry"],
+                container_registry["project"],
             )
 
             registry_query = sa.select(ContainerRegistryRow).where(
@@ -97,8 +101,8 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
                 id=registry.id,
                 url=registry.url,
                 registry_name=registry.registry_name,
-                type=registry.type,
-                project=registry.project,
+                type=cast(ContainerRegistryType, registry.type),
+                project=registry.project or "",
                 username=registry.username,
                 password=registry.password,
                 ssl_verify=registry.ssl_verify,

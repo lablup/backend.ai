@@ -44,6 +44,10 @@ from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
 )
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+    LoadContainerCountsActionResult,
+)
 from ai.backend.manager.services.agent.actions.mark_agent_exit import (
     MarkAgentExitAction,
     MarkAgentExitActionResult,
@@ -63,6 +67,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
 from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -230,6 +238,19 @@ class AgentService:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
 
+    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
+        """Searches agents. It is used by superadmin only."""
+        result = await self._agent_repository.search_agents(
+            querier=action.querier,
+        )
+
+        return SearchAgentsActionResult(
+            agents=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         reported_agent_info = action.agent_info
 
@@ -306,3 +327,11 @@ class AgentService:
         )
 
         return RemoveAgentFromImagesByCanonicalsActionResult(agent_id=action.agent_id)
+
+    async def load_container_counts(
+        self, action: LoadContainerCountsAction
+    ) -> LoadContainerCountsActionResult:
+        container_counts = await self._agent_repository.load_agent_container_counts(
+            agent_ids=action.agent_ids
+        )
+        return LoadContainerCountsActionResult(container_counts=container_counts)

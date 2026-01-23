@@ -519,8 +519,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
-        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-        >> "architecture": t.String,
+        tx.AliasedKey(["arch", "architecture"], default=None) >> "architecture": t.Null | t.String,
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "session_type": tx.Enum(
             SessionTypes
         ),
@@ -600,13 +599,16 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
         params["image"],
         params["session_name"],
     )
+    architecture = (
+        params["architecture"] if params["architecture"] is not None else DEFAULT_IMAGE_ARCH
+    )
 
     result = await root_ctx.processors.session.create_from_params.wait_for_complete(
         CreateFromParamsAction(
             params=CreateFromParamsActionParams(
                 session_name=params["session_name"],
                 image=params["image"],
-                architecture=params["architecture"],
+                architecture=architecture,
                 session_type=params["session_type"],
                 group_name=params["group"],
                 domain_name=domain_name,
@@ -964,14 +966,14 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
         )
 
-        all_inst_ids = [inst_id async for inst_id in root_ctx.registry.enumerate_instances()]
+        all_inst_ids = await root_ctx.registry.enumerate_instances()
         await stats_monitor.report_metric(
             GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
         )
 
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(kernels)
                 .where(
                     (kernels.c.cluster_role == DEFAULT_ROLE)
@@ -981,22 +983,22 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
             subquery = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(keypairs)
                 .where(keypairs.c.is_active == true())
                 .group_by(keypairs.c.user_id)
             )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
 
             subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
 
             """
-            query = sa.select([sa.func.count()]).select_from(usage)
+            query = sa.select(sa.func.count()).select_from(usage)
             n = await conn.scalar(query)
             await stats_monitor.report_metric(
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
@@ -1344,26 +1346,24 @@ async def _find_dependency_sessions(
         raise InvalidSessionData("Invalid session_name type")
 
     kernel_query = (
-        sa.select([
+        sa.select(
             kernels.c.status,
             kernels.c.status_changed,
-        ])
+        )
         .select_from(kernels)
         .where(kernels.c.session_id == session_id)
     )
 
-    dependency_session_ids: list[SessionDependencyRow] = (
-        await db_session.execute(
-            sa.select(SessionDependencyRow.depends_on).where(
-                SessionDependencyRow.session_id == session_id
-            )
+    dependency_result = await db_session.execute(
+        sa.select(SessionDependencyRow.depends_on).where(
+            SessionDependencyRow.session_id == session_id
         )
-    ).first()
-
-    if not dependency_session_ids:
-        dependency_session_ids = []
+    )
+    dependency_session_ids = [row[0] for row in dependency_result.fetchall()]
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
+    if kernel_query_result is None:
+        raise ValueError(f"Kernel not found for session {session_id}")
 
     session_info: dict[str, list | str] = {
         "session_id": session_id,

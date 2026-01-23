@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -61,6 +61,20 @@ class RunningRouteHandler(RouteHandler):
     def stale_status(cls) -> Optional[RouteStatus]:
         """Get the stale route status if applicable."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for running route handler (BEP-1030).
+
+        - success: None (stays in current status)
+        - failure: Route → TERMINATING (session died or failed)
+        - stale: None
+        """
+        return RouteStatusTransitions(
+            success=None,
+            failure=RouteStatus.TERMINATING,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for running routes."""

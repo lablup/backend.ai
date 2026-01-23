@@ -33,6 +33,7 @@ from .defs import (
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
 )
+from .meta import BackendAIConfigMeta, ConfigExample
 
 TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
 
@@ -194,23 +195,32 @@ VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
 
 
 class HostPortPair(BaseModel):
-    host: str = Field(
-        description="""
-        Host address of the service.
-        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
-        """,
-        examples=["127.0.0.1"],
-    )
-    port: int = Field(
-        ge=1,
-        le=65535,
-        description="""
-        Port number of the service.
-        Must be between 1 and 65535.
-        Ports below 1024 require root/admin privileges.
-        """,
-        examples=[8080],
-    )
+    host: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Host address of the service. "
+                "Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to "
+                "all interfaces."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="127.0.0.1", prod="server.example.com"),
+        ),
+    ]
+    port: Annotated[
+        int,
+        Field(ge=1, le=65535),
+        BackendAIConfigMeta(
+            description=(
+                "Port number of the service. "
+                "Must be between 1 and 65535. "
+                "Ports below 1024 require root/admin privileges."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="8080", prod="8080"),
+        ),
+    ]
 
     _allow_blank_host: ClassVar[bool] = True
 

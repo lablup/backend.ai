@@ -5,7 +5,8 @@ import os
 import secrets
 import uuid
 from collections.abc import Sequence
-from typing import Any, Optional, Self, TypedDict
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional, Self, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -15,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.hashes import SHA256
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
@@ -23,11 +24,15 @@ from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    ForeignKeyIDColumn,
-    mapper_registry,
 )
-from ai.backend.manager.models.session import SessionRow
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+    from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
+    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
@@ -42,62 +47,78 @@ __all__: Sequence[str] = (
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
-keypairs = sa.Table(
-    "keypairs",
-    mapper_registry.metadata,
-    sa.Column("user_id", sa.String(length=256), index=True),
-    sa.Column("access_key", sa.String(length=20), primary_key=True),
-    sa.Column("secret_key", sa.String(length=40)),
-    sa.Column("is_active", sa.Boolean, index=True),
-    sa.Column("is_admin", sa.Boolean, index=True, default=False, server_default=false()),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
+
+# Defined for avoiding circular import
+def _get_session_row_join_condition():
+    from ai.backend.manager.models.session import SessionRow
+
+    return KeyPairRow.access_key == foreign(SessionRow.access_key)
+
+
+class KeyPairRow(Base):
+    __tablename__ = "keypairs"
+
+    user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
+    access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
+    secret_key: Mapped[str | None] = mapped_column("secret_key", sa.String(length=40))
+    is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
+    is_admin: Mapped[bool | None] = mapped_column(
+        "is_admin", sa.Boolean, index=True, default=False, server_default=false()
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         onupdate=sa.func.current_timestamp(),
-    ),
-    sa.Column("last_used", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("rate_limit", sa.Integer),
-    sa.Column("num_queries", sa.Integer, server_default="0"),
+    )
+    last_used: Mapped[datetime | None] = mapped_column(
+        "last_used", sa.DateTime(timezone=True), nullable=True
+    )
+    rate_limit: Mapped[int | None] = mapped_column("rate_limit", sa.Integer)
+    num_queries: Mapped[int | None] = mapped_column("num_queries", sa.Integer, server_default="0")
     # SSH Keypairs.
-    sa.Column("ssh_public_key", sa.Text, nullable=True),
-    sa.Column("ssh_private_key", sa.Text, nullable=True),
-    ForeignKeyIDColumn("user", "users.uuid", nullable=False),
-    sa.Column(
+    ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
+    ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
+    user: Mapped[uuid.UUID] = mapped_column(
+        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    )
+    resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),
         sa.ForeignKey("keypair_resource_policies.name"),
         nullable=False,
-    ),
+    )
     # dotfiles column, \x90 means empty list in msgpack
-    sa.Column(
+    dotfiles: Mapped[bytes] = mapped_column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
-    ),
-    sa.Column(
+    )
+    bootstrap_script: Mapped[str] = mapped_column(
         "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
-    ),
-)
+    )
 
-
-class KeyPairRow(Base):
-    __table__ = keypairs
-    sessions = relationship(
+    # Relationships
+    sessions: Mapped[list[SessionRow]] = relationship(
         "SessionRow",
-        primaryjoin=lambda: keypairs.c.access_key == foreign(SessionRow.access_key),
+        primaryjoin=_get_session_row_join_condition,
         foreign_keys="SessionRow.access_key",
         back_populates="access_key_row",
     )
-    resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
-    sgroup_for_keypairs_rows = relationship(
+    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
+        "KeyPairResourcePolicyRow", back_populates="keypairs"
+    )
+    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
         back_populates="keypair_row",
     )
-
-    user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+    user_row: Mapped[UserRow] = relationship(
+        "UserRow", back_populates="keypairs", foreign_keys=[user]
+    )
 
     @property
-    def mapping(self) -> dict[str, Any]:
+    def mapping(self) -> dict[str, object]:
         return {
             "user_id": self.user_id,
             "access_key": self.access_key,
@@ -140,21 +161,28 @@ class KeyPairRow(Base):
         )
 
     def to_data(self) -> KeyPairData:
+        if self.secret_key is None:
+            raise ValueError("secret_key is required for KeyPairData")
         return KeyPairData(
             user_id=self.user,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            is_active=self.is_active,
-            is_admin=self.is_admin,
+            access_key=AccessKey(self.access_key),
+            secret_key=SecretKey(self.secret_key),
+            is_active=self.is_active if self.is_active is not None else True,
+            is_admin=self.is_admin if self.is_admin is not None else False,
             created_at=self.created_at,
             modified_at=self.modified_at,
             resource_policy_name=self.resource_policy,
-            rate_limit=self.rate_limit,
+            rate_limit=self.rate_limit if self.rate_limit is not None else 0,
             ssh_public_key=self.ssh_public_key,
             ssh_private_key=self.ssh_private_key,
-            dotfiles=self.dotfiles,
+            dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
         )
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use KeyPairRow class directly for new code.
+keypairs = KeyPairRow.__table__
 
 
 class Dotfile(TypedDict):
@@ -199,7 +227,7 @@ def generate_ssh_keypair() -> tuple[str, str]:
     return (public_key, private_key)
 
 
-def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, Any]:
+def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, object]:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
     return {
@@ -307,11 +335,13 @@ async def query_owned_dotfiles(
     access_key: AccessKey,
 ) -> tuple[list[Dotfile], int]:
     query = (
-        sa.select([keypairs.c.dotfiles])
-        .select_from(keypairs)
-        .where(keypairs.c.access_key == access_key)
+        sa.select(KeyPairRow.dotfiles)
+        .select_from(KeyPairRow)
+        .where(KeyPairRow.access_key == access_key)
     )
     packed_dotfile = (await conn.execute(query)).scalar()
+    if packed_dotfile is None:
+        return [], MAXIMUM_DOTFILE_SIZE
     rows = msgpack.unpackb(packed_dotfile)
     return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
 
@@ -321,11 +351,13 @@ async def query_bootstrap_script(
     access_key: AccessKey,
 ) -> tuple[str, int]:
     query = (
-        sa.select([keypairs.c.bootstrap_script])
-        .select_from(keypairs)
-        .where(keypairs.c.access_key == access_key)
+        sa.select(KeyPairRow.bootstrap_script)
+        .select_from(KeyPairRow)
+        .where(KeyPairRow.access_key == access_key)
     )
     script = (await conn.execute(query)).scalar()
+    if script is None:
+        return "", MAXIMUM_DOTFILE_SIZE
     return script, MAXIMUM_DOTFILE_SIZE - len(script)
 
 

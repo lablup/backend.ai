@@ -14,6 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
@@ -195,6 +196,7 @@ class TestAuthRepository:
                 domain_name=default_domain.name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
+                need_password_change=False,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -214,6 +216,9 @@ class TestAuthRepository:
             await db_sess.flush()
             await db_sess.refresh(user)
 
+            assert user.need_password_change is not None
+            assert user.domain_name is not None
+            assert user.role is not None
             user_data = UserTestData(
                 uuid=user.uuid,
                 username=user.username,
@@ -303,7 +308,7 @@ class TestAuthRepository:
                 integration_id=group.integration_id,
                 domain_name=group.domain_name,
                 total_resource_slots=group.total_resource_slots,
-                allowed_vfolder_hosts=group.allowed_vfolder_hosts,
+                allowed_vfolder_hosts=VFolderHostPermissionMap(group.allowed_vfolder_hosts),
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,

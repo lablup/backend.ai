@@ -62,6 +62,8 @@ class VFolderInviteService:
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, action.user_uuid, user.domain_name
         )
@@ -129,8 +131,6 @@ class VFolderInviteService:
 
         # Get target vfolder
         vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
-        if not vfolder_data:
-            raise VFolderNotFound
 
         # Prevent accepting vfolder with duplicated name
         count = await self._vfolder_repository.count_vfolder_with_name_for_user(
@@ -245,6 +245,8 @@ class VFolderInviteService:
     ) -> LeaveInvitedVFolderActionResult:
         # Get vfolder info
         user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )

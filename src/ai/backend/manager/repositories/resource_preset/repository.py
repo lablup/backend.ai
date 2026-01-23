@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import trafaret as t
@@ -192,7 +192,7 @@ class ResourcePresetRepository:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
+        resource_policy: Mapping[str, Any],
         scaling_group: Optional[str] = None,
     ) -> CheckPresetsResult:
         """

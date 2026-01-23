@@ -3,8 +3,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
     Self,
@@ -21,7 +22,15 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
@@ -33,8 +42,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
+    PydanticColumn,
     StructuredJSONObjectColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
@@ -50,9 +60,18 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermission
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.agent import AgentRow
+    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.resource_preset import ResourcePresetRow
+    from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -136,14 +155,16 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 class ScalingGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    domain = sa.Column(
+    domain: Mapped[str] = mapped_column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -153,11 +174,11 @@ class ScalingGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_domains_rows",
     )
-    domain_row = relationship(
+    domain_row: Mapped[DomainRow] = relationship(
         "DomainRow",
         back_populates="sgroup_for_domains_rows",
     )
@@ -169,14 +190,16 @@ sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 class ScalingGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    group = sa.Column(
+    group: Mapped[uuid.UUID] = mapped_column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -187,11 +210,11 @@ class ScalingGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_groups_rows",
     )
-    project_row = relationship(
+    project_row: Mapped[GroupRow] = relationship(
         "GroupRow",
         back_populates="sgroup_for_groups_rows",
     )
@@ -203,14 +226,16 @@ sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 class ScalingGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
-    id = IDColumn()
-    scaling_group = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    access_key = sa.Column(
+    access_key: Mapped[str] = mapped_column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
@@ -220,11 +245,11 @@ class ScalingGroupForKeypairsRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
     )
-    sgroup_row = relationship(
+    sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
         back_populates="sgroup_for_keypairs_rows",
     )
-    keypair_row = relationship(
+    keypair_row: Mapped[KeyPairRow] = relationship(
         "KeyPairRow",
         back_populates="sgroup_for_keypairs_rows",
     )
@@ -234,47 +259,71 @@ class ScalingGroupForKeypairsRow(Base):
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
+def _get_resource_preset_join_condition():
+    from ai.backend.manager.models.resource_preset import ResourcePresetRow
+
+    return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
+
+
 class ScalingGroupRow(Base):
     __tablename__ = "scaling_groups"
-    name = sa.Column("name", sa.String(length=64), primary_key=True)
-    description = sa.Column("description", sa.String(length=512))
-    is_active = sa.Column("is_active", sa.Boolean, index=True, default=True)
-    is_public = sa.Column(
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
+    description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
+    is_active: Mapped[bool | None] = mapped_column(
+        "is_active", sa.Boolean, index=True, default=True
+    )
+    is_public: Mapped[bool] = mapped_column(
         "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
     )
-    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
-    wsproxy_addr = sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True)
-    wsproxy_api_token = sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True)
-    driver = sa.Column("driver", sa.String(length=64), nullable=False)
-    driver_opts = sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={})
-    scheduler = sa.Column("scheduler", sa.String(length=64), nullable=False)
-    use_host_network = sa.Column("use_host_network", sa.Boolean, nullable=False, default=False)
-    scheduler_opts = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    wsproxy_addr: Mapped[str | None] = mapped_column(
+        "wsproxy_addr", sa.String(length=1024), nullable=True
+    )
+    wsproxy_api_token: Mapped[str | None] = mapped_column(
+        "wsproxy_api_token", sa.String(length=128), nullable=True
+    )
+    driver: Mapped[str] = mapped_column("driver", sa.String(length=64), nullable=False)
+    driver_opts: Mapped[dict[str, Any]] = mapped_column(
+        "driver_opts", pgsql.JSONB(), nullable=False, default={}
+    )
+    scheduler: Mapped[str] = mapped_column("scheduler", sa.String(length=64), nullable=False)
+    use_host_network: Mapped[bool] = mapped_column(
+        "use_host_network", sa.Boolean, nullable=False, default=False
+    )
+    scheduler_opts: Mapped[ScalingGroupOpts] = mapped_column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
         nullable=False,
         default={},
     )
+    fair_share_spec: Mapped[FairShareScalingGroupSpec | None] = mapped_column(
+        "fair_share_spec",
+        PydanticColumn(FairShareScalingGroupSpec),
+        nullable=True,
+        default=None,
+    )
 
-    sessions = relationship("SessionRow", back_populates="scaling_group")
-    agents = relationship("AgentRow", back_populates="scaling_group_row")
+    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
+    agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
 
-    sgroup_for_domains_rows = relationship(
+    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
         back_populates="sgroup_row",
     )
-    sgroup_for_groups_rows = relationship(
+    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
         "ScalingGroupForProjectRow",
         back_populates="sgroup_row",
     )
-    sgroup_for_keypairs_rows = relationship(
+    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
         back_populates="sgroup_row",
     )
-    resource_preset_rows = relationship(
+    resource_preset_rows: Mapped[list[ResourcePresetRow]] = relationship(
         "ResourcePresetRow",
         back_populates="scaling_group_row",
-        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
+        primaryjoin=_get_resource_preset_join_condition,
     )
 
     def to_dataclass(self) -> ScalingGroupData:
@@ -292,16 +341,16 @@ class ScalingGroupRow(Base):
         return ScalingGroupData(
             name=self.name,
             status=ScalingGroupStatus(
-                is_active=self.is_active,
+                is_active=self.is_active if self.is_active is not None else True,
                 is_public=self.is_public,
             ),
             metadata=ScalingGroupMetadata(
-                description=self.description,
-                created_at=self.created_at,
+                description=self.description or "",
+                created_at=self.created_at or datetime.now(UTC),
             ),
             network=ScalingGroupNetworkConfig(
-                wsproxy_addr=self.wsproxy_addr,
-                wsproxy_api_token=self.wsproxy_api_token,
+                wsproxy_addr=self.wsproxy_addr or "",
+                wsproxy_api_token=self.wsproxy_api_token or "",
                 use_host_network=self.use_host_network,
             ),
             driver=ScalingGroupDriverConfig(
@@ -321,6 +370,7 @@ class ScalingGroupRow(Base):
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                 ),
             ),
+            fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
         )
 
     @classmethod
@@ -334,7 +384,7 @@ class ScalingGroupRow(Base):
         for cond in conditions:
             stmt = cond(stmt)
         async with db.begin_readonly_session() as db_session:
-            return await db_session.scalars(stmt)
+            return list((await db_session.scalars(stmt)).all())
 
 
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
@@ -373,9 +423,9 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
         return cls(
             name=row.name,
             description=row.description,
-            is_active=row.is_active,
+            is_active=row.is_active if row.is_active is not None else True,
             is_public=row.is_public,
-            created_at=row.created_at,
+            created_at=row.created_at or datetime.now(UTC),
             wsproxy_addr=row.wsproxy_addr,
             wsproxy_api_token=row.wsproxy_api_token,
             driver=row.driver,
@@ -430,9 +480,9 @@ async def query_allowed_sgroups(
     group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
-    query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
+    query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
-    from_domain = {row["scaling_group"] for row in result}
+    from_domain = {row.scaling_group for row in result}
 
     group_ids: Iterable[uuid.UUID] = []
     match group:
@@ -448,17 +498,17 @@ async def query_allowed_sgroups(
         from_group = set()  # empty
     else:
         group_cond = sgroups_for_groups.c.group.in_(group_ids)
-        query = sa.select([sgroups_for_groups]).where(group_cond)
+        query = sa.select(sgroups_for_groups).where(group_cond)
         result = await db_conn.execute(query)
-        from_group = {row["scaling_group"] for row in result}
+        from_group = {row.scaling_group for row in result}
 
-    query = sa.select([sgroups_for_keypairs]).where(sgroups_for_keypairs.c.access_key == access_key)
+    query = sa.select(sgroups_for_keypairs).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
-    from_keypair = {row["scaling_group"] for row in result}
+    from_keypair = {row.scaling_group for row in result}
 
     sgroups = from_domain | from_group | from_keypair
     query = (
-        sa.select([scaling_groups])
+        sa.select(scaling_groups)
         .where(
             (scaling_groups.c.name.in_(sgroups)) & (scaling_groups.c.is_active),
         )

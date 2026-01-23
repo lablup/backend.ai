@@ -245,6 +245,8 @@ class DomainNode(graphene.ObjectType):
             if cond is None:
                 return None
             row = await db_session.scalar(sa.select(DomainRow).where(DomainRow.name == domain_name))
+            if row is None:
+                return None
             permissions = await permission_ctx.calculate_final_permission(row)
 
             return cls.from_rbac_model(graph_ctx, DomainModel.from_row(row, permissions))
@@ -556,19 +558,17 @@ class Domain(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            name=row["name"],
-            description=row["description"],
-            is_active=row["is_active"],
-            created_at=row["created_at"],
-            modified_at=row["modified_at"],
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
             total_resource_slots=(
-                row["total_resource_slots"].to_json()
-                if row["total_resource_slots"] is not None
-                else {}
+                row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
-            allowed_docker_registries=row["allowed_docker_registries"],
-            integration_id=row["integration_id"],
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=row.allowed_docker_registries,
+            integration_id=row.integration_id,
         )
 
     @classmethod
@@ -595,7 +595,7 @@ class Domain(graphene.ObjectType):
         is_active: Optional[bool] = None,
     ) -> Sequence[Domain]:
         async with ctx.db.begin_readonly() as conn:
-            query = sa.select([domains]).select_from(domains)
+            query = sa.select(domains).select_from(domains)
             if is_active is not None:
                 query = query.where(domains.c.is_active == is_active)
             return [
@@ -613,7 +613,7 @@ class Domain(graphene.ObjectType):
         is_active: Optional[bool] = None,
     ) -> Sequence[Optional[Domain]]:
         async with ctx.db.begin_readonly() as conn:
-            query = sa.select([domains]).select_from(domains).where(domains.c.name.in_(names))
+            query = sa.select(domains).select_from(domains).where(domains.c.name.in_(names))
             if is_active is not None:
                 query = query.where(domains.c.is_active == is_active)
             return await batch_result(
@@ -622,7 +622,7 @@ class Domain(graphene.ObjectType):
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
 

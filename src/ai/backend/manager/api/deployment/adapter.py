@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID, uuid4
@@ -213,8 +214,8 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
-                vfolder_id=data.model_mount_config.vfolder_id,
-                mount_destination=data.model_mount_config.mount_destination,
+                vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
+                mount_destination=data.model_mount_config.mount_destination or "",
                 definition_path=data.model_mount_config.definition_path,
             ),
             created_at=data.created_at,
@@ -285,7 +286,7 @@ class RouteAdapter(BaseFilterAdapter):
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at,
+            created_at=data.created_at or datetime.now(tz=UTC),
             revision_id=data.revision_id,
             traffic_status=CommonRouteTrafficStatus(data.traffic_status.value),
             error_data=data.error_data,

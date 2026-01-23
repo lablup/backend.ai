@@ -24,7 +24,7 @@ from .loader.toml_loader import TomlConfigLoader
 # TODO: Remove useless config fields from this
 class BootstrapConfig(BaseModel):
     db: DatabaseConfig = Field(
-        default_factory=DatabaseConfig,
+        default_factory=DatabaseConfig,  # type: ignore[arg-type]
         description="""
         Database configuration settings.
         Defines how the manager connects to its PostgreSQL database.
@@ -40,7 +40,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     manager: ManagerConfig = Field(
-        default_factory=ManagerConfig,
+        default_factory=ManagerConfig,  # type: ignore[arg-type]
         description="""
         Core manager service configuration.
         Controls how the manager operates, communicates, and scales.
@@ -48,7 +48,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     logging: LoggingConfig = Field(
-        default_factory=LoggingConfig,
+        default_factory=LoggingConfig,  # type: ignore[arg-type]
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -64,7 +64,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     debug: DebugConfig = Field(
-        default_factory=DebugConfig,
+        default_factory=DebugConfig,  # type: ignore[arg-type]
         description="""
         Debugging options configuration.
         Controls various debugging features and tools.

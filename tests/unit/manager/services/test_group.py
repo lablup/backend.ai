@@ -20,7 +20,6 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -49,18 +48,12 @@ class TestCreateGroup:
         return MagicMock(spec=GroupRepository)
 
     @pytest.fixture
-    def mock_admin_group_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminGroupRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_group_repository: MagicMock,
-        mock_admin_group_repository: MagicMock,
     ) -> GroupService:
         group_repositories = GroupRepositories(
             repository=mock_group_repository,
-            admin_repository=mock_admin_group_repository,
         )
         return GroupService(
             storage_manager=MagicMock(),
@@ -179,18 +172,12 @@ class TestModifyGroup:
         return MagicMock(spec=GroupRepository)
 
     @pytest.fixture
-    def mock_admin_group_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminGroupRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_group_repository: MagicMock,
-        mock_admin_group_repository: MagicMock,
     ) -> GroupService:
         group_repositories = GroupRepositories(
             repository=mock_group_repository,
-            admin_repository=mock_admin_group_repository,
         )
         return GroupService(
             storage_manager=MagicMock(),
@@ -228,6 +215,7 @@ class TestModifyGroup:
         mock_group_repository.modify_validated = AsyncMock(return_value=modified_group_data)
         assert modified_group_data.description is not None
 
+        assert modified_group_data.is_active is not None
         action = ModifyGroupAction(
             updater=Updater(
                 spec=GroupUpdaterSpec(
@@ -279,18 +267,12 @@ class TestDeleteGroup:
         return MagicMock(spec=GroupRepository)
 
     @pytest.fixture
-    def mock_admin_group_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminGroupRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_group_repository: MagicMock,
-        mock_admin_group_repository: MagicMock,
     ) -> GroupService:
         group_repositories = GroupRepositories(
             repository=mock_group_repository,
-            admin_repository=mock_admin_group_repository,
         )
         return GroupService(
             storage_manager=MagicMock(),
@@ -324,18 +306,12 @@ class TestPurgeGroup:
         return MagicMock(spec=GroupRepository)
 
     @pytest.fixture
-    def mock_admin_group_repository(self) -> MagicMock:
-        return MagicMock(spec=AdminGroupRepository)
-
-    @pytest.fixture
     def service(
         self,
         mock_group_repository: MagicMock,
-        mock_admin_group_repository: MagicMock,
     ) -> GroupService:
         group_repositories = GroupRepositories(
             repository=mock_group_repository,
-            admin_repository=mock_admin_group_repository,
         )
         return GroupService(
             storage_manager=MagicMock(),
@@ -344,18 +320,18 @@ class TestPurgeGroup:
             group_repositories=group_repositories,
         )
 
-    async def test_purge_group_calls_admin_repository(
+    async def test_purge_group_calls_repository(
         self,
         service: GroupService,
-        mock_admin_group_repository: MagicMock,
+        mock_group_repository: MagicMock,
     ) -> None:
-        """Purge group should call admin repository purge_group_force."""
+        """Purge group should call repository purge_group."""
         group_id = uuid.uuid4()
-        mock_admin_group_repository.purge_group_force = AsyncMock(return_value=None)
+        mock_group_repository.purge_group = AsyncMock(return_value=None)
 
         action = PurgeGroupAction(group_id=group_id)
 
         result = await service.purge_group(action)
 
         assert result.group_id == group_id
-        mock_admin_group_repository.purge_group_force.assert_called_once_with(group_id)
+        mock_group_repository.purge_group.assert_called_once_with(group_id)

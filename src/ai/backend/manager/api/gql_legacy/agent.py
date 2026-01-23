@@ -483,7 +483,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([sa.func.count()]).select_from(agents)
+        query = sa.select(sa.func.count()).select_from(agents)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -493,7 +493,7 @@ class Agent(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -511,7 +511,7 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
+        query = sa.select(agents).select_from(agents).limit(limit).offset(offset)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
@@ -622,16 +622,19 @@ async def _query_domain_groups_by_ak(
     domain_name: str | None,
 ) -> tuple[str, list[uuid.UUID]]:
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+    group_join: sa.FromClause
     if domain_name is None:
         domain_query = (
-            sa.select([users.c.uuid, users.c.domain_name])
+            sa.select(users.c.uuid, users.c.domain_name)
             .select_from(kp_user_join)
             .where(keypairs.c.access_key == access_key)
         )
         row = (await db_conn.execute(domain_query)).first()
+        if row is None:
+            raise ValueError(f"No user found for access_key: {access_key}")
         user_domain = row.domain_name
         user_id = row.uuid
-        group_join = AssocGroupUserRow
+        group_join = AssocGroupUserRow.__table__
         group_cond = AssocGroupUserRow.user_id == user_id
     else:
         user_domain = domain_name
@@ -661,7 +664,7 @@ async def _append_sgroup_from_clause(
         async with graph_ctx.db.begin_readonly() as conn:
             domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
-            names = [sgroup["name"] for sgroup in sgroups]
+            names = [sgroup.name for sgroup in sgroups]
         query = query.where(AgentRow.scaling_group.in_(names))
     return query
 
@@ -779,7 +782,7 @@ class AgentSummary(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -835,7 +838,7 @@ class AgentSummary(graphene.ObjectType):
             result = await db_session.scalars(query)
             rows = result.unique().all()
             for row in rows:
-                agent_ids.append(row.id)
+                agent_ids.append(AgentId(row.id))
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
@@ -870,13 +873,13 @@ class ModifyAgent(graphene.Mutation):
     @classmethod
     @privileged_mutation(
         UserRole.SUPERADMIN,
-        lambda agent_id, **kwargs: (None, agent_id),
+        lambda id, **kwargs: (None, id),  # noqa: A006
     )
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        agent_id: str,
+        id: str,
         props: ModifyAgentInput,
     ) -> ModifyAgent:
         graph_ctx: GraphQueryContext = info.context
@@ -885,9 +888,9 @@ class ModifyAgent(graphene.Mutation):
         set_if_set(props, data, "scaling_group")
         # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
         if (scaling_group := data.get("scaling_group")) is not None:
-            await graph_ctx.registry.update_scaling_group(agent_id, scaling_group)
+            await graph_ctx.registry.update_scaling_group(AgentId(id), scaling_group)
 
-        update_query = sa.update(agents).values(data).where(agents.c.id == agent_id)
+        update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 

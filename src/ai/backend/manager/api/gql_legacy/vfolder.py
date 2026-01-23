@@ -770,7 +770,7 @@ class ModelCard(graphene.ObjectType):
             model_store_project_gids = (
                 (
                     await db_session.execute(
-                        sa.select([GroupRow.id]).where(
+                        sa.select(GroupRow.id).where(
                             (GroupRow.type == ProjectType.MODEL_STORE)
                             & (GroupRow.domain_name == graph_ctx.user["domain_name"])
                         )
@@ -866,36 +866,29 @@ class VirtualFolder(graphene.ObjectType):
                     cur_size=row.cur_size,
                 )
             case Row():
-
-                def _get_field(name: str) -> Any:
-                    try:
-                        return row[name]
-                    except (KeyError, sa.exc.NoSuchColumnError):
-                        return None
-
                 return cls(
-                    id=row["id"],
-                    host=row["host"],
-                    quota_scope_id=row["quota_scope_id"],
-                    name=row["name"],
-                    user=row["user"],
-                    user_email=_get_field("users_email"),
-                    group=row["group"],
-                    group_name=_get_field("groups_name"),
-                    creator=row["creator"],
-                    domain_name=row["domain_name"],
-                    unmanaged_path=row["unmanaged_path"] or None,
-                    usage_mode=row["usage_mode"],
-                    permission=row["permission"],
-                    ownership_type=row["ownership_type"],
-                    max_files=row["max_files"],
-                    max_size=row["max_size"],  # in MiB
-                    created_at=row["created_at"],
-                    last_used=row["last_used"],
+                    id=row.id,
+                    host=row.host,
+                    quota_scope_id=row.quota_scope_id,
+                    name=row.name,
+                    user=row.user,
+                    user_email=row._mapping.get("users_email"),
+                    group=row.group,
+                    group_name=row._mapping.get("groups_name"),
+                    creator=row.creator,
+                    domain_name=row.domain_name,
+                    unmanaged_path=row.unmanaged_path or None,
+                    usage_mode=row.usage_mode,
+                    permission=row.permission,
+                    ownership_type=row.ownership_type,
+                    max_files=row.max_files,
+                    max_size=row.max_size,  # in MiB
+                    created_at=row.created_at,
+                    last_used=row.last_used,
                     # num_attached=row['num_attached'],
-                    cloneable=row["cloneable"],
-                    status=row["status"],
-                    cur_size=row["cur_size"],
+                    cloneable=row.cloneable,
+                    status=row.status,
+                    cur_size=row.cur_size,
                 )
         raise ValueError(f"Type not allowed to parse (t:{type(row)})")
 
@@ -1002,7 +995,7 @@ class VirtualFolder(graphene.ObjectType):
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select(sa.func.count()).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
@@ -1014,7 +1007,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1036,7 +1029,7 @@ class VirtualFolder(graphene.ObjectType):
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
         query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            sa.select(vfolders, users.c.email, groups.c.name.label("groups_name"))
             .select_from(j)
             .limit(limit)
             .offset(offset)
@@ -1112,7 +1105,7 @@ class VirtualFolder(graphene.ObjectType):
         # TODO: num_attached count group-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
         query = (
-            sa.select([vfolders])
+            sa.select(vfolders)
             .select_from(j)
             .where(vfolders.c.user.in_(user_uuids))
             .order_by(sa.desc(vfolders.c.created_at))
@@ -1128,7 +1121,7 @@ class VirtualFolder(graphene.ObjectType):
                 query,
                 cls,
                 user_uuids,
-                lambda row: row["user"],
+                lambda row: row.user,
             )
 
     @classmethod
@@ -1151,7 +1144,7 @@ class VirtualFolder(graphene.ObjectType):
             vfolder_permissions.c.user == users.c.uuid,
         )
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_id)
@@ -1165,7 +1158,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_invited(
@@ -1190,7 +1183,7 @@ class VirtualFolder(graphene.ObjectType):
             vfolder_permissions.c.user == users.c.uuid,
         )
         query = (
-            sa.select([vfolders, users.c.email])
+            sa.select(vfolders, users.c.email)
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_id)
@@ -1229,7 +1222,7 @@ class VirtualFolder(graphene.ObjectType):
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
@@ -1237,7 +1230,7 @@ class VirtualFolder(graphene.ObjectType):
         grps = result.fetchall()
         group_ids = [g.group_id for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
-        query = sa.select([sa.func.count()]).select_from(j).where(vfolders.c.group.in_(group_ids))
+        query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
 
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
@@ -1246,7 +1239,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_project(
@@ -1264,17 +1257,17 @@ class VirtualFolder(graphene.ObjectType):
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
+        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
         grps = result.fetchall()
         group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
-            sa.select([
+            sa.select(
                 vfolders,
                 groups.c.name.label("groups_name"),
-            ])
+            )
             .select_from(j)
             .where(vfolders.c.group.in_(group_ids))
             .limit(limit)
@@ -1323,11 +1316,11 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            permission=row["permission"],
-            vfolder=row["vfolder"],
-            vfolder_name=row["name"],
-            user=row["user"],
-            user_email=row["email"],
+            permission=row.permission,
+            vfolder=row.vfolder,
+            vfolder_name=row.name,
+            user=row.user,
+            user_email=row.email,
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -1359,7 +1352,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
             users, users.c.uuid == vfolder_permissions.c.user
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select(sa.func.count()).select_from(j)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -1367,7 +1360,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1386,7 +1379,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
             users, users.c.uuid == vfolder_permissions.c.user
         )
         query = (
-            sa.select([vfolder_permissions, vfolders.c.name, users.c.email])
+            sa.select(vfolder_permissions, vfolders.c.name, users.c.email)
             .select_from(j)
             .limit(limit)
             .offset(offset)
@@ -1472,14 +1465,26 @@ class QuotaScope(graphene.ObjectType):
                         .where(UserRow.uuid == qsid.scope_id)
                         .options(selectinload(UserRow.resource_policy_row))
                     )
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"User not found for quota scope id: {self.quota_scope_id}"
+                        )
+                    resource_policy_constraint: int | None = (
+                        result.resource_policy_row.max_quota_scope_size
+                    )
                 else:
                     query = (
                         sa.select(GroupRow)
                         .where(GroupRow.id == qsid.scope_id)
                         .options(selectinload(GroupRow.resource_policy_row))
                     )
-                result = await sess.scalar(query)
-                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"Group not found for quota scope id: {self.quota_scope_id}"
+                        )
+                    resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 

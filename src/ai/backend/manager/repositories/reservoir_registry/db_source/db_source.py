@@ -42,7 +42,7 @@ class ReservoirDBSource:
                 .where(ReservoirRegistryRow.id == reservoir_id)
                 .options(selectinload(ReservoirRegistryRow.meta))
             )
-            row: ReservoirRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
@@ -59,7 +59,7 @@ class ReservoirDBSource:
                 .where(ReservoirRegistryRow.id.in_(reservoir_ids))
                 .options(selectinload(ReservoirRegistryRow.meta))
             )
-            rows: list[ReservoirRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
@@ -73,9 +73,13 @@ class ReservoirDBSource:
                     )
                 )
             )
-            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
+            if row.reservoir_registries is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry not found for registry {name}"
+                )
             return row.reservoir_registries.to_dataclass()
 
     async def get_registry_data_by_artifact_id(
@@ -91,9 +95,13 @@ class ReservoirDBSource:
                     ),
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
+            if row.reservoir_registry is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry not found for artifact {artifact_id}"
+                )
             return row.reservoir_registry.to_dataclass()
 
     async def create(
@@ -171,6 +179,10 @@ class ReservoirDBSource:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+            if deleted_id is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry with ID {reservoir_id} not found"
+                )
 
             delete_meta_query = sa.delete(ArtifactRegistryRow).where(
                 ArtifactRegistryRow.registry_id == reservoir_id
@@ -185,7 +197,7 @@ class ReservoirDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
             result = await db_session.execute(query)
-            rows: list[ReservoirRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def search_registries(

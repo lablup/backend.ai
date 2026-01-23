@@ -61,9 +61,9 @@ async def check_concurrency(
             KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
         )
         result = await db_sess.execute(select_query)
-        return result.scalar()
+        return result.scalar() or 0
 
-    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions) or 0
     if sess_ctx.is_private:
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
@@ -139,6 +139,11 @@ async def check_keypair_resource_limit(
     )
     result = await db_sess.execute(select_query)
     resource_policy = result.scalars().first()
+    if resource_policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
     resource_policy_map = {
         "total_resource_slots": resource_policy.total_resource_slots,
         "default_for_unspecified": resource_policy.default_for_unspecified,
@@ -294,7 +299,7 @@ async def check_pending_session_count_limit(
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
     )
-    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+    pending_sessions = list((await db_sess.scalars(query)).all())
 
     # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
@@ -313,7 +318,12 @@ async def check_pending_session_count_limit(
             ),
         )
     )
-    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+    policy = (await db_sess.scalars(policy_stmt)).first()
+    if policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
 
     pending_count_limit: int | None = policy.max_pending_session_count
     if pending_count_limit is not None:
@@ -350,7 +360,7 @@ async def check_pending_session_resource_limit(
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
     )
-    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+    pending_sessions = list((await db_sess.scalars(query)).all())
 
     # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
@@ -369,7 +379,12 @@ async def check_pending_session_resource_limit(
             ),
         )
     )
-    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+    policy = (await db_sess.scalars(policy_stmt)).first()
+    if policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
 
     pending_resource_limit: ResourceSlot | None = policy.max_pending_session_resource_slots
     if pending_resource_limit is not None and pending_resource_limit:

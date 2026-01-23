@@ -9,8 +9,11 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
-from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
-from ai.backend.common.data.notification import WebhookConfig as WebhookConfigData
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookSpec,
+)
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelDTO,
     NotificationChannelFilter,
@@ -24,7 +27,7 @@ from ai.backend.common.dto.manager.notification import (
     StringFilter,
     UpdateNotificationChannelRequest,
     UpdateNotificationRuleRequest,
-    WebhookConfigResponse,
+    WebhookSpecResponse,
 )
 from ai.backend.common.dto.manager.notification.request import (
     SearchNotificationChannelsRequest,
@@ -172,10 +175,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -186,10 +191,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -200,10 +207,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.CREATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.CREATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -214,10 +223,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.CREATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.CREATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -228,10 +239,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.UPDATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.UPDATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -242,10 +255,12 @@ class TestNotificationChannelAdapter:
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
         request = SearchNotificationChannelsRequest(
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.UPDATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.UPDATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
@@ -271,10 +286,12 @@ class TestNotificationChannelAdapter:
                 name=StringFilter(contains="Test"),
                 enabled=True,
             ),
-            order=NotificationChannelOrder(
-                field=NotificationChannelOrderField.NAME,
-                direction=OrderDirection.ASC,
-            ),
+            order=[
+                NotificationChannelOrder(
+                    field=NotificationChannelOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ],
             limit=20,
             offset=10,
         )
@@ -415,10 +432,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -429,10 +448,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -443,10 +464,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.CREATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.CREATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -457,10 +480,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.CREATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.CREATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -471,10 +496,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.UPDATED_AT,
-                direction=OrderDirection.ASC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.UPDATED_AT,
+                    direction=OrderDirection.ASC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -485,10 +512,12 @@ class TestNotificationRuleAdapter:
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
         request = SearchNotificationRulesRequest(
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.UPDATED_AT,
-                direction=OrderDirection.DESC,
-            )
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.UPDATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ]
         )
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
@@ -514,10 +543,12 @@ class TestNotificationRuleAdapter:
                 name=StringFilter(contains="Test"),
                 enabled=True,
             ),
-            order=NotificationRuleOrder(
-                field=NotificationRuleOrderField.NAME,
-                direction=OrderDirection.ASC,
-            ),
+            order=[
+                NotificationRuleOrder(
+                    field=NotificationRuleOrderField.NAME,
+                    direction=OrderDirection.ASC,
+                )
+            ],
             limit=20,
             offset=10,
         )
@@ -546,7 +577,7 @@ class TestNotificationChannelAdapterConversion:
             name="Test Channel",
             description="Test description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookConfigData(url="https://example.com/webhook"),
+            spec=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,
@@ -561,8 +592,8 @@ class TestNotificationChannelAdapterConversion:
         assert dto.name == "Test Channel"
         assert dto.description == "Test description"
         assert dto.channel_type == NotificationChannelType.WEBHOOK
-        assert isinstance(dto.config, WebhookConfigResponse)
-        assert dto.config.url == "https://example.com/webhook"
+        assert isinstance(dto.spec, WebhookSpecResponse)
+        assert dto.spec.url == "https://example.com/webhook"
         assert dto.enabled is True
         assert dto.created_by == user_id
         assert dto.created_at == now
@@ -574,7 +605,7 @@ class TestNotificationChannelAdapterConversion:
         request = UpdateNotificationChannelRequest(
             name="Updated Name",
             description="Updated description",
-            config=WebhookConfigData(url="https://new-url.com"),
+            spec=WebhookSpec(url="https://new-url.com"),
             enabled=False,
         )
 
@@ -584,7 +615,9 @@ class TestNotificationChannelAdapterConversion:
 
         assert spec.name.value() == "Updated Name"
         assert spec.description.value() == "Updated description"
-        assert spec.config.value().url == "https://new-url.com"
+        config_value = spec.spec.value()
+        assert isinstance(config_value, WebhookSpec)
+        assert config_value.url == "https://new-url.com"
         assert spec.enabled.value() is False
         assert updater.pk_value == channel_id
 
@@ -602,7 +635,7 @@ class TestNotificationChannelAdapterConversion:
 
         assert spec.name.value() == "Updated Name"
         assert spec.description.optional_value() is None
-        assert spec.config.optional_value() is None
+        assert spec.spec.optional_value() is None
         assert spec.enabled.value() is False
         assert updater.pk_value == channel_id
 
@@ -622,7 +655,7 @@ class TestNotificationRuleAdapterConversion:
             name="Test Channel",
             description="Channel description",
             channel_type=NotificationChannelType.WEBHOOK,
-            config=WebhookConfigData(url="https://example.com/webhook"),
+            spec=WebhookSpec(url="https://example.com/webhook"),
             enabled=True,
             created_by=user_id,
             created_at=now,

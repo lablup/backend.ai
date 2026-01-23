@@ -224,7 +224,8 @@ class TestSyncInstalledImagesIntegration:
             db_session.add(registry)
             await db_session.flush()
 
-            # Create images
+            # Create images - use add_all with single flush for efficiency
+            images: list[ImageRow] = []
             for img_data in images_data:
                 image = ImageRow(
                     name=img_data.name,
@@ -241,13 +242,18 @@ class TestSyncInstalledImagesIntegration:
                     resources={},
                     labels={},
                 )
-                db_session.add(image)
-                await db_session.flush()
+                images.append(image)
+
+            db_session.add_all(images)
+            await db_session.flush()
+
+            # Build test data from flushed images (IDs are now populated)
+            for image in images:
                 test_images.append(
                     _TestImageData(
                         id=str(image.id),
-                        name=img_data.name,
-                        architecture=img_data.architecture,
+                        name=image.name,
+                        architecture=image.architecture,
                     )
                 )
 

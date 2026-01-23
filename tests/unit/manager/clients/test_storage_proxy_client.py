@@ -129,8 +129,8 @@ class TestStorageProxyClient:
         http_client = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with custom very short timeout for get_volumes
-        custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)
-        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)
+        custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)  # type: ignore[call-arg]
+        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
             timeout_config=timeout_config,
@@ -157,8 +157,8 @@ class TestStorageProxyClient:
         http_client = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with sufficient timeout for get_volumes
-        custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)
-        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)
+        custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)  # type: ignore[call-arg]
+        timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
             timeout_config=timeout_config,

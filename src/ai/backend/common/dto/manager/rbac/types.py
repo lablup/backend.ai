@@ -23,6 +23,7 @@ __all__ = (
     "RoleOrderField",
     "RoleSource",
     "RoleStatus",
+    "ScopeOrderField",
 )
 
 
@@ -47,3 +48,10 @@ class AssignedUserOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
     GRANTED_AT = "granted_at"
+
+
+class ScopeOrderField(StrEnum):
+    """Fields available for ordering scope IDs."""
+
+    NAME = "name"
+    CREATED_AT = "created_at"

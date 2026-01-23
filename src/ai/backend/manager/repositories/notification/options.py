@@ -5,8 +5,8 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.api.gql.base import StringMatchSpec
-from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 

@@ -11,10 +11,10 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
-    JSONString,
     OrderDirection,
     to_global_id,
 )
@@ -68,10 +68,10 @@ class Route(Node):
     traffic_ratio: float = strawberry.field(
         description="The traffic ratio for load balancing.",
     )
-    created_at: datetime = strawberry.field(
+    created_at: Optional[datetime] = strawberry.field(
         description="The timestamp when the route was created.",
     )
-    error_data: Optional[JSONString] = strawberry.field(
+    error_data: Optional[JSON] = strawberry.field(
         description="Error data if the route is in a failed state.",
     )
 
@@ -126,7 +126,7 @@ class Route(Node):
             traffic_status=RouteTrafficStatusGQL(data.traffic_status),
             traffic_ratio=data.traffic_ratio,
             created_at=data.created_at,
-            error_data=JSONString.serialize(data.error_data) if data.error_data else None,
+            error_data=data.error_data,
         )
 
 

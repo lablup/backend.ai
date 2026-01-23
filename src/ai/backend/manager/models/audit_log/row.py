@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
@@ -14,7 +15,6 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
@@ -42,19 +42,21 @@ class AuditLogEntityType(enum.StrEnum):
 class AuditLogRow(Base):
     __tablename__ = "audit_logs"
 
-    id = IDColumn("id")
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    entity_type = sa.Column("entity_type", sa.String, index=True, nullable=False)
-    operation = sa.Column("operation", sa.String, index=True, nullable=False)
+    entity_type: Mapped[str] = mapped_column("entity_type", sa.String, index=True, nullable=False)
+    operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
 
-    entity_id = sa.Column(
+    entity_id: Mapped[str | None] = mapped_column(
         "entity_id",
         sa.String,
         nullable=True,
         index=True,
     )
 
-    created_at = sa.Column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
@@ -62,13 +64,13 @@ class AuditLogRow(Base):
         index=True,
     )
 
-    action_id = sa.Column("action_id", GUID, nullable=False)
-    request_id = sa.Column("request_id", sa.String, nullable=True)
-    triggered_by = sa.Column("triggered_by", sa.String, nullable=True)
-    description = sa.Column("description", sa.String, nullable=False)
-    duration = sa.Column("duration", sa.Interval, nullable=True)
+    action_id: Mapped[uuid.UUID] = mapped_column("action_id", GUID, nullable=False)
+    request_id: Mapped[str | None] = mapped_column("request_id", sa.String, nullable=True)
+    triggered_by: Mapped[str | None] = mapped_column("triggered_by", sa.String, nullable=True)
+    description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
+    duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
 
-    status = sa.Column(
+    status: Mapped[OperationStatus] = mapped_column(
         "status",
         StrEnumType(OperationStatus),
         nullable=False,

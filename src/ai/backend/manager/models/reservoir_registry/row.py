@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact import ArtifactRow
+    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -33,19 +39,21 @@ def _get_registry_meta_join_condition():
 class ReservoirRegistryRow(Base):
     __tablename__ = "reservoir_registries"
 
-    id = IDColumn("id")
-    endpoint = sa.Column("endpoint", sa.String, nullable=False)
-    access_key = sa.Column("access_key", sa.String, nullable=False)
-    secret_key = sa.Column("secret_key", sa.String, nullable=False)
-    api_version = sa.Column("api_version", sa.String, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    endpoint: Mapped[str] = mapped_column("endpoint", sa.String, nullable=False)
+    access_key: Mapped[str] = mapped_column("access_key", sa.String, nullable=False)
+    secret_key: Mapped[str] = mapped_column("secret_key", sa.String, nullable=False)
+    api_version: Mapped[str] = mapped_column("api_version", sa.String, nullable=False)
 
-    artifacts = relationship(
+    artifacts: Mapped[list[ArtifactRow]] = relationship(
         "ArtifactRow",
         back_populates="reservoir_registry",
         primaryjoin=_get_registry_artifact_join_condition,
         viewonly=True,
     )
-    meta = relationship(
+    meta: Mapped[ArtifactRegistryRow | None] = relationship(
         "ArtifactRegistryRow",
         back_populates="reservoir_registries",
         primaryjoin=_get_registry_meta_join_condition,
@@ -60,14 +68,13 @@ class ReservoirRegistryRow(Base):
         return self.__str__()
 
     def to_dataclass(self) -> ReservoirRegistryData:
-        try:
-            return ReservoirRegistryData(
-                id=self.id,
-                name=self.meta.name,
-                endpoint=self.endpoint,
-                access_key=self.access_key,
-                secret_key=self.secret_key,
-                api_version=self.api_version,
-            )
-        except Exception:
+        if self.meta is None:
             raise RelationNotLoadedError()
+        return ReservoirRegistryData(
+            id=self.id,
+            name=self.meta.name,
+            endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
+        )

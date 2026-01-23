@@ -107,3 +107,9 @@ class RouteOrders:
         if ascending:
             return RoutingRow.traffic_ratio.asc()
         return RoutingRow.traffic_ratio.desc()
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return RoutingRow.id.asc()
+        return RoutingRow.id.desc()

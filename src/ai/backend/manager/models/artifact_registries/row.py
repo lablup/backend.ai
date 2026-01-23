@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.logging import BraceStyleAdapter
@@ -11,8 +13,11 @@ from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryDa
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+    from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -38,19 +43,21 @@ class ArtifactRegistryRow(Base):
 
     __tablename__ = "artifact_registries"
 
-    id = IDColumn("id")
-    name = sa.Column("name", sa.String, nullable=False, unique=True)
-    registry_id = sa.Column("registry_id", GUID, nullable=False, unique=True)
-    type = sa.Column("type", sa.String, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String, nullable=False, unique=True)
+    registry_id: Mapped[uuid.UUID] = mapped_column("registry_id", GUID, nullable=False, unique=True)
+    type: Mapped[str] = mapped_column("type", sa.String, nullable=False)
 
-    huggingface_registries = relationship(
+    huggingface_registries: Mapped[HuggingFaceRegistryRow | None] = relationship(
         "HuggingFaceRegistryRow",
         back_populates="meta",
         primaryjoin=_get_huggingface_registry_join_condition,
         uselist=False,
         viewonly=True,
     )
-    reservoir_registries = relationship(
+    reservoir_registries: Mapped[ReservoirRegistryRow | None] = relationship(
         "ReservoirRegistryRow",
         back_populates="meta",
         primaryjoin=_get_reservoir_registry_join_condition,

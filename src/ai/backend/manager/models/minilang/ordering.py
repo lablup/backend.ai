@@ -37,7 +37,7 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column
+    column: sa.Column | sa.orm.attributes.InstrumentedAttribute
     order_direction: OrderDirection
 
 

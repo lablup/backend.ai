@@ -138,12 +138,12 @@ async def push_session_events(
         group_id = WILDCARD
     else:
         async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
-            query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
+            query = sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
             if row is None:
                 raise ProjectNotFound
-            group_id = row["id"]
+            group_id = row.id
 
     filters = {
         "user_role": user_role,

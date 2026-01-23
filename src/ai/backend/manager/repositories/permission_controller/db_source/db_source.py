@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -28,9 +29,16 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ai.backend.manager.data.permission.types import OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    OperationType,
+    ScopeData,
+    ScopeListResult,
+    ScopeType,
+)
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -79,6 +87,12 @@ class PermissionDBSource:
         Returns:
             Created role row
         """
+        # TODO: Object permissions require a permission group for the scope they reference.
+        # When creating object permissions during role creation, the corresponding permission group
+        # for each object permission's scope MUST be included in `permission_groups`.
+        # This acts as a "guest permission group" providing scope visibility (see BEP-1012-main.md).
+        # Currently, ObjectPermissionCreateInputBeforeRoleCreation does not include scope_id,
+        # so the caller must ensure the correct permission group is provided in `permission_groups`.
 
         async with self._db.begin_session() as db_session:
             # 1. Create role
@@ -109,19 +123,6 @@ class PermissionDBSource:
                         )
                     )
                     await self._add_permission_to_group(db_session, perm_creator)
-
-            # 3. Create object permissions
-            for obj_perm_input in input_data.object_permissions:
-                obj_perm_creator = Creator(
-                    spec=ObjectPermissionCreatorSpec(
-                        role_id=role_id,
-                        entity_type=obj_perm_input.entity_type,
-                        entity_id=obj_perm_input.entity_id,
-                        operation=obj_perm_input.operation,
-                        status=obj_perm_input.status,
-                    )
-                )
-                await self._add_object_permission_to_role(db_session, obj_perm_creator)
 
             await db_session.refresh(role_row)
             return role_row
@@ -568,6 +569,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
+                        permission_group_id=obj_perm_input.permission_group_id,
                         entity_type=obj_perm_input.entity_type,
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
@@ -627,18 +629,18 @@ class PermissionDBSource:
             )
 
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def get_entity_mapped_scopes(
         self, target_object_id: ObjectId
     ) -> list[AssociationScopesEntitiesRow]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            stmt = sa.select(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
                 AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
             )
             result = await db_session.scalars(stmt)
-            return result.all()
+            return list(result.all())
 
     async def check_scope_permission_exist(
         self,
@@ -671,7 +673,8 @@ class PermissionDBSource:
             )
         )
         async with self._db.begin_readonly_session() as db_session:
-            return await db_session.scalar(role_query)
+            result = await db_session.scalar(role_query)
+            return result or False
 
     def _make_query_statement_for_object_permission(
         self,
@@ -783,8 +786,8 @@ class PermissionDBSource:
             user_id, object_ids, operation
         )
         async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
+            role_rows_result = await db_session.scalars(role_query)
+            role_rows = list(role_rows_result.all())
 
             for role in role_rows:
                 for op in role.object_permission_rows:
@@ -886,6 +889,135 @@ class PermissionDBSource:
             ]
 
             return AssignedUserListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_domain_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all domains using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DomainRow.name)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.name),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_project_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all projects using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow.id, GroupRow.name)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.id)),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_user_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        """Search all users using BatchQuerier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserRow.uuid, UserRow.username, UserRow.email)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.uuid)),
+                    name=row.username if row.username is not None else row.email,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_entities_in_scope(
+        self,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Queries the association_scopes_entities table for entity IDs matching
+        the conditions in the querier (scope_type, scope_id, entity_type).
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            EntityListResult containing entity data
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                AssociationScopesEntitiesRow.entity_type,
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                EntityData(
+                    entity_type=row.entity_type,
+                    entity_id=row.entity_id,
+                )
+                for row in result.rows
+            ]
+
+            return EntityListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

@@ -153,12 +153,16 @@ class RoleManager:
         permission_group = await db_session.scalar(
             sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
         )
+        if permission_group is None:
+            raise ValueError(f"Permission group not found for user_id={user_id}")
         role_id = permission_group.role_id
+        permission_group_id = permission_group.id
 
         creators = [
             Creator(
                 spec=ObjectPermissionCreatorSpec(
                     role_id=role_id,
+                    permission_group_id=permission_group_id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=operation,
@@ -179,6 +183,8 @@ class RoleManager:
         permission_group = await db_session.scalar(
             sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
         )
+        if permission_group is None:
+            raise ValueError(f"Permission group not found for user_id={user_id}")
         role_id = permission_group.role_id
         await db_session.execute(
             sa.delete(ObjectPermissionRow).where(

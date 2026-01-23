@@ -2,11 +2,13 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
@@ -60,9 +62,9 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
 
     def apply_entity_filters(
         self, stmt: Select, filters: ArtifactFilterOptions
-    ) -> tuple[list[Any], Select]:
+    ) -> tuple[list[sa.sql.expression.ColumnElement[bool]], Select]:
         """Apply artifact-specific filters and return list of conditions and updated statement"""
-        conditions = []
+        conditions: list[sa.sql.expression.ColumnElement[bool]] = []
 
         # Handle basic filters
         if filters.artifact_type:
@@ -121,7 +123,7 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
 class ArtifactOrderingApplier(BaseOrderingApplier[ArtifactOrderingOptions]):
     """Applies artifact-specific ordering to queries"""
 
-    def get_order_column(self, field) -> sa.Column:
+    def get_order_column(self, field: Any) -> Any:
         """Get the SQLAlchemy column for the given artifact field"""
         return getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)
 
@@ -182,7 +184,7 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
 class ArtifactRevisionOrderingApplier(BaseOrderingApplier[ArtifactRevisionOrderingOptions]):
     """Applies artifact revision-specific ordering to queries"""
 
-    def get_order_column(self, field) -> sa.Column:
+    def get_order_column(self, field: Any) -> Any:
         """Get the SQLAlchemy column for the given artifact revision field"""
         return getattr(ArtifactRevisionRow, field.value.lower(), ArtifactRevisionRow.created_at)
 
@@ -208,7 +210,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
@@ -218,7 +220,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
-            row: ArtifactRevisionRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError(
                     f"Artifact revision with ID {revision_id} not found"
@@ -232,7 +234,7 @@ class ArtifactDBSource:
                     sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(
                     f"Artifact with model ID {model_id} not found under registry {registry_id}"
@@ -251,7 +253,7 @@ class ArtifactDBSource:
                     )
                 )
             )
-            row: ArtifactRevisionRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
@@ -280,7 +282,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
             )
-            rows: list[ArtifactRevisionRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     # TODO: Refactor using on_conflict_do_update?
@@ -301,7 +303,7 @@ class ArtifactDBSource:
                         )
                     )
                 )
-                existing_artifact: ArtifactRow = artifact_query_result.scalar_one_or_none()
+                existing_artifact = artifact_query_result.scalar_one_or_none()
 
                 if existing_artifact is None:
                     # Create new artifact
@@ -363,7 +365,7 @@ class ArtifactDBSource:
                         )
                     )
                 )
-                existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
+                existing_revision = revision_query_result.scalar_one_or_none()
 
                 if existing_revision is None:
                     # Create new revision
@@ -448,7 +450,7 @@ class ArtifactDBSource:
                         )
                     )
                 )
-                artifact_row: ArtifactRow = artifact_query_result.scalar_one_or_none()
+                artifact_row = artifact_query_result.scalar_one_or_none()
 
                 if artifact_row is None:
                     # Create new artifact
@@ -486,7 +488,7 @@ class ArtifactDBSource:
                     )
                 )
 
-                existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
+                existing_revision = revision_query_result.scalar_one_or_none()
                 if existing_revision is not None:
                     # Update existing revision only if there are changes
                     has_changes = existing_revision.digest != model.sha
@@ -570,7 +572,7 @@ class ArtifactDBSource:
             )
 
             result = await db_sess.execute(insert_stmt)
-            existing = result.scalar_one_or_none()
+            existing = result.scalar_one()
 
             return AssociationArtifactsStoragesData(
                 id=existing,
@@ -590,7 +592,7 @@ class ArtifactDBSource:
                     )
                 )
             )
-            existing_row: AssociationArtifactsStorageRow = select_result.scalar_one_or_none()
+            existing_row = select_result.scalar_one_or_none()
             if existing_row is None:
                 raise ArtifactAssociationNotFoundError(
                     f"Association between artifact {artifact_revision_id} and storage {storage_namespace_id} does not exist"
@@ -613,7 +615,7 @@ class ArtifactDBSource:
                 )
             )
 
-            if delete_result.rowcount == 0:
+            if cast(CursorResult, delete_result).rowcount == 0:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
             return association_data
@@ -623,7 +625,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
-            row: ArtifactRevisionRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError()
 
@@ -645,11 +647,7 @@ class ArtifactDBSource:
             )
 
             result = await db_sess.execute(update_stmt)
-            updated_id = result.scalar_one_or_none()
-            if updated_id is None:
-                raise ArtifactUpdateError()
-
-            updated_row = await db_sess.get(ArtifactRevisionRow, updated_id)
+            updated_row = result.scalars().one_or_none()
             if updated_row is None:
                 raise ArtifactUpdateError()
 
@@ -660,7 +658,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
-            row: ArtifactRevisionRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRevisionNotFoundError()
 
@@ -672,11 +670,7 @@ class ArtifactDBSource:
             )
 
             result = await db_sess.execute(update_stmt)
-            updated_id = result.scalar_one_or_none()
-            if updated_id is None:
-                raise ArtifactUpdateError()
-
-            updated_row = await db_sess.get(ArtifactRevisionRow, updated_id)
+            updated_row = result.scalars().one_or_none()
             if updated_row is None:
                 raise ArtifactUpdateError()
 
@@ -734,7 +728,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
-            rows: list[ArtifactRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
@@ -755,7 +749,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
-            rows: list[ArtifactRow] = result.scalars().all()
+            rows = list(result.scalars().all())
             return [row.to_dataclass() for row in rows]
 
     async def update_artifact_revision_bytesize(
@@ -808,7 +802,7 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow.readme).where(
@@ -823,7 +817,7 @@ class ArtifactDBSource:
         pagination: Optional[PaginationOptions] = None,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
-    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+    ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
         """List artifacts with their revisions using pagination and filtering.
 
         Args:
@@ -996,9 +990,8 @@ class ArtifactDBSource:
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()

@@ -182,12 +182,14 @@ class TestAuditLogRepository:
                     duration=data.duration,
                 )
             )
-            result = await audit_log_repository.create(creator)
-            assert result.status == status
+            create_result = await audit_log_repository.create(creator)
+            assert create_result.status == status
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(sa.select(sa.func.count()).select_from(AuditLogRow))
-            count = result.scalar()
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(AuditLogRow)
+            )
+            count = count_result.scalar()
             assert count == 3
 
     # =========================================================================

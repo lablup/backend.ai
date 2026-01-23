@@ -1325,7 +1325,9 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        return cls(**cls.as_trafaret().check(obj))
+        return cls({
+            host: {VFolderHostPermission(perm) for perm in perms} for host, perms in obj.items()
+        })
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:

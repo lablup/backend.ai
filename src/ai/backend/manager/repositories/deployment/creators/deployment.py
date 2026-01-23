@@ -18,6 +18,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 
 # ========== Field groups for DeploymentCreatorSpec ==========
 
@@ -171,3 +172,22 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
         )
+
+
+@dataclass
+class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
+    """BatchUpdaterSpec for batch updating endpoint lifecycle status.
+
+    Used for transitioning multiple endpoints between lifecycle states.
+    """
+
+    lifecycle_stage: EndpointLifecycle
+
+    @property
+    @override
+    def row_class(self) -> type[EndpointRow]:
+        return EndpointRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"lifecycle_stage": self.lifecycle_stage}

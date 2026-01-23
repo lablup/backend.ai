@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
 from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
@@ -67,13 +68,17 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointStatistics, EndpointTokenRow
-from ai.backend.manager.models.kernel import KernelStatistics
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scheduling_history import (
+    DeploymentHistoryRow,
+    RouteHistoryRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
@@ -220,6 +225,28 @@ class DeploymentRepository:
         """Update lifecycle status for multiple endpoints."""
         await self._db_source.update_endpoint_lifecycle_bulk(
             endpoint_ids, prevoius_status, new_status
+        )
+
+    @deployment_repository_resilience.apply()
+    async def update_endpoint_lifecycle_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> int:
+        """Update lifecycle status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        return await self._db_source.update_endpoint_lifecycle_bulk_with_history(
+            batch_updaters, bulk_creator
         )
 
     @deployment_repository_resilience.apply()
@@ -554,6 +581,28 @@ class DeploymentRepository:
             new_status: New status to set
         """
         await self._db_source.update_route_status_bulk(route_ids, previous_statuses, new_status)
+
+    @deployment_repository_resilience.apply()
+    async def update_route_status_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[RoutingRow]],
+        bulk_creator: BulkCreator[RouteHistoryRow],
+    ) -> int:
+        """Update route status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        return await self._db_source.update_route_status_bulk_with_history(
+            batch_updaters, bulk_creator
+        )
 
     @deployment_repository_resilience.apply()
     async def mark_terminating_route_status_bulk(

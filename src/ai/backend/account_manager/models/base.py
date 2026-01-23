@@ -117,17 +117,17 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
 
     def process_result_value(
         self,
-        value: str,
+        value: Any | None,
         dialect: Dialect,
     ) -> T_StrEnum | None:
         return self._enum_cls(value) if value is not None else None
 
-    def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, **self._opts)
+    def copy(self, **kw) -> Self:
+        return StrEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> T_StrEnum:
-        return self._enum_class
+    def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
 
 
 class PasswordColumn(TypeDecorator):

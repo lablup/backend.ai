@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
-from ai.backend.common.data.notification import NotifiableMessage
+from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec

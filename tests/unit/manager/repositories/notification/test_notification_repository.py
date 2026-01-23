@@ -11,10 +11,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ai.backend.common.types import BinarySize
-from ai.backend.manager.data.notification import (
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
     NotificationRuleType,
+    WebhookSpec,
 )
+from ai.backend.common.types import BinarySize
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -31,9 +33,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
-    NotificationChannelType,
     NotificationRuleRow,
-    WebhookConfig,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -198,7 +198,7 @@ class TestNotificationRepository:
     ) -> uuid.UUID:
         """Create sample notification channel directly in DB and return its ID"""
         channel_id = uuid.uuid4()
-        config = WebhookConfig(url="https://example.com/webhook", method="POST")
+        config = WebhookSpec(url="https://example.com/webhook", method="POST")
 
         async with db_with_cleanup.begin_session() as db_sess:
             channel = NotificationChannelRow(
@@ -256,7 +256,7 @@ class TestNotificationRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                config = WebhookSpec(url=f"https://example{i}.com/webhook")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel {i:02d}",
@@ -285,7 +285,7 @@ class TestNotificationRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(5):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                config = WebhookSpec(url=f"https://example{i}.com/webhook")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel {i}",
@@ -314,7 +314,7 @@ class TestNotificationRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(20):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                config = WebhookSpec(url=f"https://example{i}.com/webhook")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel {i:02d}",
@@ -343,7 +343,7 @@ class TestNotificationRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(15):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                config = WebhookSpec(url=f"https://example{i}.com/webhook")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel {i}",
@@ -376,7 +376,7 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test creating notification channel"""
-        config = WebhookConfig(
+        config = WebhookSpec(
             url="https://example.com/webhook",
             method="POST",
             headers={"Authorization": "Bearer token123"},
@@ -388,7 +388,7 @@ class TestNotificationRepository:
             spec=NotificationChannelCreatorSpec(
                 name="Test Webhook",
                 channel_type=NotificationChannelType.WEBHOOK,
-                config=config,
+                spec=config,
                 created_by=test_user,
                 description="Test webhook channel",
                 enabled=True,
@@ -399,9 +399,10 @@ class TestNotificationRepository:
 
         assert channel.name == "Test Webhook"
         assert channel.channel_type == NotificationChannelType.WEBHOOK
-        assert channel.config.url == "https://example.com/webhook"
-        assert channel.config.method == "POST"
-        assert channel.config.timeout == 30
+        assert isinstance(channel.spec, WebhookSpec)
+        assert channel.spec.url == "https://example.com/webhook"
+        assert channel.spec.method == "POST"
+        assert channel.spec.timeout == 30
         assert channel.enabled is True
         assert channel.description == "Test webhook channel"
 
@@ -427,14 +428,14 @@ class TestNotificationRepository:
         """Test updating notification channel"""
         from ai.backend.manager.types import OptionalState
 
-        new_config = WebhookConfig(
+        new_config = WebhookSpec(
             url="https://example.com/new-webhook",
             method="GET",
         )
 
         updater_spec = NotificationChannelUpdaterSpec(
             name=OptionalState.update("Updated Name"),
-            config=OptionalState.update(new_config),
+            spec=OptionalState.update(new_config),
             enabled=OptionalState.update(False),
         )
         updater = Updater(spec=updater_spec, pk_value=sample_channel_id)
@@ -443,8 +444,9 @@ class TestNotificationRepository:
 
         assert updated_channel is not None
         assert updated_channel.name == "Updated Name"
-        assert updated_channel.config.url == "https://example.com/new-webhook"
-        assert updated_channel.config.method == "GET"
+        assert isinstance(updated_channel.spec, WebhookSpec)
+        assert updated_channel.spec.url == "https://example.com/new-webhook"
+        assert updated_channel.spec.method == "GET"
         assert updated_channel.enabled is False
 
     @pytest.mark.asyncio
@@ -469,7 +471,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test listing all channels"""
 
-        config = WebhookConfig(url="https://example.com/webhook")
+        config = WebhookSpec(url="https://example.com/webhook")
 
         # Create channels directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
@@ -523,13 +525,13 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test creating notification rule"""
-        config = WebhookConfig(url="https://example.com/webhook")
+        config = WebhookSpec(url="https://example.com/webhook")
 
         channel_creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name="Test Channel",
                 channel_type=NotificationChannelType.WEBHOOK,
-                config=config,
+                spec=config,
                 created_by=test_user,
             )
         )
@@ -758,7 +760,7 @@ class TestNotificationRepository:
     ) -> None:
         """Test deleting a channel that has associated rules"""
 
-        config = WebhookConfig(url="https://example.com/webhook")
+        config = WebhookSpec(url="https://example.com/webhook")
         channel_id = uuid.uuid4()
         rule_id = uuid.uuid4()
 

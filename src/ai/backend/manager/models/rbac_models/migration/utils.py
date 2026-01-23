@@ -21,14 +21,16 @@ from .types import (
 )
 
 
-def insert_if_data_exists(db_conn: Connection, row_type, data: Collection) -> None:
+def insert_if_data_exists(db_conn: Connection, row_type, data: Collection[dict[str, Any]]) -> None:
     if data:
-        db_conn.execute(sa.insert(row_type), data)
+        db_conn.execute(sa.insert(row_type), list(data))
 
 
-def insert_skip_on_conflict(db_conn: Connection, row_type, data: Collection) -> None:
+def insert_skip_on_conflict(
+    db_conn: Connection, row_type, data: Collection[dict[str, Any]]
+) -> None:
     if data:
-        stmt = pg_insert(row_type, data).on_conflict_do_nothing()
+        stmt = pg_insert(row_type).values(list(data)).on_conflict_do_nothing()
         db_conn.execute(stmt)
 
 
@@ -42,13 +44,13 @@ def insert_and_returning_id(
     return result.scalar_one()
 
 
-def query_role_rows_by_name(db_conn: Connection, role_names: Collection[str]) -> list[Row]:
+def query_role_rows_by_name(db_conn: Connection, role_names: Collection[str]) -> list[Row[Any]]:
     """
     Query role rows by their names.
     """
     roles_table = get_roles_table()
     role_query = sa.select(roles_table).where(roles_table.c.name.in_(role_names))
-    return db_conn.execute(role_query).all()
+    return list(db_conn.execute(role_query).all())
 
 
 def query_permission_groups_by_scope_ids(
@@ -61,7 +63,7 @@ def query_permission_groups_by_scope_ids(
     query = sa.select(permission_groups_table.c.id).where(
         permission_groups_table.c.scope_id.in_(scope_ids)
     )
-    return db_conn.scalars(query).all()
+    return list(db_conn.scalars(query).all())
 
 
 class PermissionUpdateUtil:

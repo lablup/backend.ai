@@ -23,7 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SchedulingResult
+    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -142,6 +142,41 @@ class RouteTrafficStatus(enum.StrEnum):
 
     ACTIVE = "active"
     INACTIVE = "inactive"
+
+
+# ========== Status Transition Types (BEP-1030) ==========
+
+
+@dataclass(frozen=True)
+class DeploymentStatusTransitions:
+    """Status transitions for deployment handlers.
+
+    Deployment handlers only have success/failure outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target lifecycle when handler succeeds, None means no change
+        failure: Target lifecycle when handler fails, None means no change
+    """
+
+    success: EndpointLifecycle | None = None
+    failure: EndpointLifecycle | None = None
+
+
+@dataclass(frozen=True)
+class RouteStatusTransitions:
+    """Status transitions for route handlers.
+
+    Route handlers have success/failure/stale outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target status when handler succeeds, None means no change
+        failure: Target status when handler fails, None means no change
+        stale: Target status when route becomes stale, None means no change
+    """
+
+    success: RouteStatus | None = None
+    failure: RouteStatus | None = None
+    stale: RouteStatus | None = None
 
 
 @dataclass
@@ -325,7 +360,7 @@ class RouteInfo:
     session_id: Optional[SessionId]
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime
+    created_at: datetime | None
     revision_id: Optional[UUID]
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -382,7 +417,6 @@ class ModelReplicaData:
     weight: int
     detail: dict[str, Any]
     created_at: datetime
-    live_stat: dict[str, Any]
 
 
 @dataclass
@@ -407,15 +441,15 @@ class ModelRuntimeConfigData:
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID
-    mount_destination: str
+    vfolder_id: UUID | None
+    mount_destination: str | None
     definition_path: str
 
 
 @dataclass
 class ExtraVFolderMountData:
     vfolder_id: UUID
-    mount_destination: str
+    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass
@@ -504,6 +538,8 @@ class DeploymentHistoryData:
     error_code: Optional[str]
     message: str
 
+    sub_steps: list[SubStepResult]
+
     attempts: int
     created_at: datetime
     updated_at: datetime
@@ -524,6 +560,8 @@ class RouteHistoryData:
     result: SchedulingResult
     error_code: Optional[str]
     message: str
+
+    sub_steps: list[SubStepResult]
 
     attempts: int
     created_at: datetime

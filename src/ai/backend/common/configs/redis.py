@@ -1,7 +1,10 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Annotated, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
 from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
@@ -9,50 +12,74 @@ from ai.backend.common.types import RedisTarget as _RedisTarget
 
 
 class RedisHelperConfig(BaseModel):
-    socket_timeout: float = Field(
-        default=5.0,
-        description="""
-        Timeout in seconds for Redis socket operations.
-        Controls how long operations wait before timing out.
-        Increase for slow or congested networks.
-        """,
-        examples=[5.0, 10.0],
-        validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
-        serialization_alias="socket_timeout",
-    )
-    socket_connect_timeout: float = Field(
-        default=2.0,
-        description="""
-        Timeout in seconds for establishing Redis connections.
-        Controls how long connection attempts wait before failing.
-        Shorter values fail faster but may be too aggressive for some networks.
-        """,
-        examples=[2.0, 5.0],
-        validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
-        serialization_alias="socket_connect_timeout",
-    )
-    reconnect_poll_timeout: float = Field(
-        default=0.3,
-        description="""
-        Time in seconds to wait between reconnection attempts.
-        Controls the polling frequency when trying to reconnect to Redis.
-        Lower values reconnect faster but may increase network load.
-        """,
-        examples=[0.3, 1.0],
-        validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
-        serialization_alias="reconnect_poll_timeout",
-    )
-    connection_ready_timeout: float = Field(
-        default=20.0,
-        description="""
-        Timeout in seconds to wait for a connection from the blocking connection pool.
-        Used by BlockingConnectionPool for distributed locking scenarios.
-        If no connection is available within this time, a timeout error is raised.
-        """,
-        examples=[20.0, 30.0],
-        validation_alias=AliasChoices("connection_ready_timeout", "connection-ready-timeout"),
-        serialization_alias="connection_ready_timeout",
-    )
+    socket_timeout: Annotated[
+        float,
+        Field(
+            default=5.0,
+            validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
+            serialization_alias="socket_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for Redis socket operations. "
+                "Controls how long operations wait before timing out. "
+                "Increase for slow or congested networks."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="5.0", prod="10.0"),
+        ),
+    ]
+    socket_connect_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
+            serialization_alias="socket_connect_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for establishing Redis connections. "
+                "Controls how long connection attempts wait before failing. "
+                "Shorter values fail faster but may be too aggressive for some networks."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="2.0", prod="5.0"),
+        ),
+    ]
+    reconnect_poll_timeout: Annotated[
+        float,
+        Field(
+            default=0.3,
+            validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
+            serialization_alias="reconnect_poll_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Time in seconds to wait between reconnection attempts. "
+                "Controls the polling frequency when trying to reconnect to Redis. "
+                "Lower values reconnect faster but may increase network load."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="0.3", prod="1.0"),
+        ),
+    ]
+    connection_ready_timeout: Annotated[
+        float,
+        Field(
+            default=20.0,
+            validation_alias=AliasChoices("connection_ready_timeout", "connection-ready-timeout"),
+            serialization_alias="connection_ready_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds to wait for a connection from the blocking connection pool. "
+                "Used by BlockingConnectionPool for distributed locking scenarios. "
+                "If no connection is available within this time, a timeout error is raised."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="20.0", prod="30.0"),
+        ),
+    ]
 
     def to_dict(self) -> RedisHelperConfigDict:
         return RedisHelperConfigDict(
@@ -64,82 +91,128 @@ class RedisHelperConfig(BaseModel):
 
 
 class SingleRedisConfig(BaseModel):
-    addr: Optional[HostPortPairModel] = Field(
-        default=None,
-        description="""
-        Network address and port of the Redis server.
-        Redis is used for distributed caching and messaging between managers.
-        Set to None when using Sentinel for high availability.
-        """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
-    )
-    sentinel: Optional[list[HostPortPairModel]] = Field(
-        default=None,
-        description="""
-        List of Redis Sentinel addresses for high availability.
-        If provided, the manager will use Redis Sentinel for automatic failover.
-        When using Sentinel, the addr field is ignored and service_name is required.
-        """,
-        examples=[
-            None,
-            [{"host": "redis-sentinel", "port": 26379}, {"host": "redis-sentinel", "port": 26380}],
-        ],
-    )
-    service_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Service name for Redis Sentinel.
-        Required when using Redis Sentinel for high availability.
-        Identifies which service to monitor for failover.
-        """,
-        examples=[None, "mymaster", "backend-ai"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Password for authenticating with Redis.
-        Set to None if Redis doesn't require authentication.
-        Should be kept secret in production environments.
-        """,
-        examples=[None, "REDIS_PASSWORD"],
-    )
-    request_timeout: Optional[int] = Field(
-        default=None,
-        description="""
-        Timeout in milliseconds for Redis requests.
-        Controls how long operations wait before timing out.
-        If None, uses the default timeout configured in the Redis client.
-        """,
-        examples=[None, 1000],
-        validation_alias=AliasChoices("request_timeout", "request-timeout"),
-        serialization_alias="request-timeout",
-    )
-    redis_helper_config: RedisHelperConfig = Field(
-        default_factory=RedisHelperConfig,
-        description="""
-        Configuration for the Redis helper library.
-        Controls timeouts and reconnection behavior.
-        Adjust based on network conditions and reliability requirements.
-        """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis-helper-config",
-    )
-    use_tls: bool = Field(
-        default=False,
-        description="""
-        Whether to use TLS for Redis connections.""",
-        validation_alias=AliasChoices("use_tls", "use-tls"),
-    )
-    tls_skip_verify: bool = Field(
-        default=False,
-        description="""
-        Whether to skip TLS certificate verification.
-        Set to True for self-signed certificates or development environments.
-        """,
-        validation_alias=AliasChoices("tls_skip_verify", "tls-skip-verify"),
-    )
+    addr: Annotated[
+        Optional[HostPortPairModel],
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Network address and port of the Redis server. "
+                "Redis is used for distributed caching and messaging between managers. "
+                "Set to None when using Sentinel for high availability."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="127.0.0.1:6379", prod="redis-server:6379"),
+        ),
+    ]
+    sentinel: Annotated[
+        Optional[list[HostPortPairModel]],
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "List of Redis Sentinel addresses for high availability. "
+                "If provided, the manager will use Redis Sentinel for automatic failover. "
+                "When using Sentinel, the addr field is ignored and service_name is required."
+            ),
+            added_version="25.13.0",
+            composite=CompositeType.LIST,
+            example=ConfigExample(
+                local="",
+                prod="redis-sentinel:26379",
+            ),
+        ),
+    ]
+    service_name: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            validation_alias=AliasChoices("service_name", "service-name"),
+            serialization_alias="service-name",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Service name for Redis Sentinel. "
+                "Required when using Redis Sentinel for high availability. "
+                "Identifies which service to monitor for failover."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="mymaster", prod="backend-ai"),
+        ),
+    ]
+    password: Annotated[
+        Optional[str],
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Password for authenticating with Redis. "
+                "Set to None if Redis doesn't require authentication. "
+                "Should be kept secret in production environments."
+            ),
+            added_version="25.13.0",
+            secret=True,
+            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
+        ),
+    ]
+    request_timeout: Annotated[
+        Optional[int],
+        Field(
+            default=None,
+            validation_alias=AliasChoices("request_timeout", "request-timeout"),
+            serialization_alias="request-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in milliseconds for Redis requests. "
+                "Controls how long operations wait before timing out. "
+                "If None, uses the default timeout configured in the Redis client."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="1000", prod="5000"),
+        ),
+    ]
+    redis_helper_config: Annotated[
+        RedisHelperConfig,
+        Field(
+            default_factory=RedisHelperConfig,
+            validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
+            serialization_alias="redis-helper-config",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for the Redis helper library. "
+                "Controls timeouts and reconnection behavior. "
+                "Adjust based on network conditions and reliability requirements."
+            ),
+            added_version="25.13.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    use_tls: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("use_tls", "use-tls"),
+        ),
+        BackendAIConfigMeta(
+            description="Whether to use TLS for Redis connections.",
+            added_version="25.13.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    tls_skip_verify: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("tls_skip_verify", "tls-skip-verify"),
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to skip TLS certificate verification. "
+                "Set to True for self-signed certificates or development environments."
+            ),
+            added_version="25.13.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
 
     @field_validator("sentinel", mode="before")
     @classmethod
@@ -206,26 +279,23 @@ class SingleRedisConfig(BaseModel):
 
 
 class RedisConfig(SingleRedisConfig):
-    override_configs: Optional[dict[str, SingleRedisConfig]] = Field(
-        default=None,
-        description="""
-        Optional override configurations for specific Redis contexts.
-        Allows different Redis settings for different services within Backend.AI.
-        Each key represents a context name, and the value is a complete Redis configuration.
-        """,
-        examples=[
-            None,
-            {
-                "live": {
-                    "addr": {"host": "127.0.0.1", "port": 6379},
-                    "password": "different-password",
-                    "redis_helper_config": {"socket_timeout": 10.0},
-                }
-            },
-        ],
-        validation_alias=AliasChoices("override_configs", "override-configs"),
-        serialization_alias="override-configs",
-    )
+    override_configs: Annotated[
+        Optional[dict[str, SingleRedisConfig]],
+        Field(
+            default=None,
+            validation_alias=AliasChoices("override_configs", "override-configs"),
+            serialization_alias="override-configs",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Optional override configurations for specific Redis contexts. "
+                "Allows different Redis settings for different services within Backend.AI. "
+                "Each key represents a context name, and the value is a complete Redis configuration."
+            ),
+            added_version="25.13.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     def to_redis_profile_target(self) -> RedisProfileTarget:
         """

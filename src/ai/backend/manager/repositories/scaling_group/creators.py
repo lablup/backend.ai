@@ -3,12 +3,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
+from uuid import UUID
 
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
@@ -27,6 +32,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
     driver_opts: Mapping[str, Any] = field(default_factory=dict)
     scheduler_opts: Optional[ScalingGroupOpts] = None
     use_host_network: bool = False
+    fair_share_spec: Optional[FairShareScalingGroupSpec] = None
 
     @override
     def build_row(self) -> ScalingGroupRow:
@@ -42,6 +48,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             scheduler=self.scheduler,
             scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
             use_host_network=self.use_host_network,
+            fair_share_spec=self.fair_share_spec,
         )
 
 
@@ -57,4 +64,34 @@ class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
         return ScalingGroupForDomainRow(
             scaling_group=self.scaling_group,
             domain=self.domain,
+        )
+
+
+@dataclass
+class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]):
+    """CreatorSpec for associating a scaling group with a keypair."""
+
+    scaling_group: str
+    access_key: AccessKey
+
+    @override
+    def build_row(self) -> ScalingGroupForKeypairsRow:
+        return ScalingGroupForKeypairsRow(
+            scaling_group=self.scaling_group,
+            access_key=self.access_key,
+        )
+
+
+@dataclass
+class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
+    """CreatorSpec for associating a scaling group with a project (user group)."""
+
+    scaling_group: str
+    project: UUID
+
+    @override
+    def build_row(self) -> ScalingGroupForProjectRow:
+        return ScalingGroupForProjectRow(
+            scaling_group=self.scaling_group,
+            group=self.project,
         )

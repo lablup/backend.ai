@@ -3,13 +3,15 @@ Tests for ScalingGroupService functionality.
 Tests the service layer with mocked repository operations.
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AccessKey, AgentSelectionStrategy, SessionTypes
+from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -27,20 +29,28 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
+    ScalingGroupForKeypairsCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_domain_purger,
+    create_scaling_group_for_keypairs_purger,
+    create_scaling_group_for_project_purger,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
@@ -50,9 +60,21 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
+    AssociateScalingGroupWithKeypairsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupsAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
     DisassociateScalingGroupWithDomainsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
+    DisassociateScalingGroupWithKeypairsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
+    DisassociateScalingGroupWithUserGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -115,6 +137,13 @@ class TestScalingGroupService:
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
+            ),
+            fair_share_spec=FairShareScalingGroupSpec(
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                default_weight=Decimal("1.0"),
+                resource_weights=ResourceSlot(),
             ),
         )
 
@@ -242,6 +271,13 @@ class TestScalingGroupService:
                         allow_fractional_resource_fragmentation=True,
                         route_cleanup_target_statuses=["unhealthy"],
                     ),
+                ),
+                fair_share_spec=FairShareScalingGroupSpec(
+                    half_life_days=7,
+                    lookback_days=28,
+                    decay_unit_days=1,
+                    default_weight=Decimal("1.0"),
+                    resource_weights=ResourceSlot(),
                 ),
             )
             for i in range(3)
@@ -375,7 +411,7 @@ class TestScalingGroupService:
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_service.modify_scaling_group(action)
 
-    # Associate Tests
+    # Associate with Domain Tests
 
     async def test_associate_scaling_group_with_domains_success(
         self,
@@ -399,7 +435,7 @@ class TestScalingGroupService:
         assert result is not None
         mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
 
-    # Disassociate Tests
+    # Disassociate with Domain Tests
 
     async def test_disassociate_scaling_group_with_domains_success(
         self,
@@ -419,6 +455,104 @@ class TestScalingGroupService:
         assert result is not None
         mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(purger)
 
+    # Associate/Disassociate with Keypair Tests
+
+    async def test_associate_scaling_group_with_keypairs_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test associating a scaling group with keypairs"""
+        mock_repository.associate_scaling_group_with_keypairs = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        access_key = AccessKey("AKTEST1234567890")
+
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow] = BulkCreator(
+            specs=[
+                ScalingGroupForKeypairsCreatorSpec(
+                    scaling_group=scaling_group_name,
+                    access_key=access_key,
+                )
+            ]
+        )
+        action = AssociateScalingGroupWithKeypairsAction(bulk_creator=bulk_creator)
+        result = await scaling_group_service.associate_scaling_group_with_keypairs(action)
+
+        assert result is not None
+        mock_repository.associate_scaling_group_with_keypairs.assert_called_once_with(bulk_creator)
+
+    async def test_disassociate_scaling_group_with_keypairs_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from keypairs"""
+        mock_repository.disassociate_scaling_group_with_keypairs = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        access_key = AccessKey("AKTEST1234567890")
+
+        purger: BatchPurger[ScalingGroupForKeypairsRow] = create_scaling_group_for_keypairs_purger(
+            scaling_group=scaling_group_name,
+            access_key=access_key,
+        )
+        action = DisassociateScalingGroupWithKeypairsAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_keypairs(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_keypairs.assert_called_once_with(purger)
+
+    # Associate/Disassociate with User Group (Project) Tests
+
+    async def test_associate_scaling_group_with_user_groups_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test associating a scaling group with user groups (projects)"""
+        mock_repository.associate_scaling_group_with_user_groups = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        project_id = uuid.uuid4()
+
+        bulk_creator: BulkCreator[ScalingGroupForProjectRow] = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=scaling_group_name,
+                    project=project_id,
+                )
+            ]
+        )
+        action = AssociateScalingGroupWithUserGroupsAction(bulk_creator=bulk_creator)
+        result = await scaling_group_service.associate_scaling_group_with_user_groups(action)
+
+        assert result is not None
+        mock_repository.associate_scaling_group_with_user_groups.assert_called_once_with(
+            bulk_creator
+        )
+
+    async def test_disassociate_scaling_group_with_user_group_success(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Test disassociating a scaling group from a user group (project)"""
+        mock_repository.disassociate_scaling_group_with_user_group = AsyncMock(return_value=None)
+
+        scaling_group_name = "test-scaling-group"
+        project_id = uuid.uuid4()
+
+        purger: BatchPurger[ScalingGroupForProjectRow] = create_scaling_group_for_project_purger(
+            scaling_group=scaling_group_name,
+            project=project_id,
+        )
+        action = DisassociateScalingGroupWithUserGroupsAction(purger=purger)
+        result = await scaling_group_service.disassociate_scaling_group_with_user_groups(action)
+
+        assert result is not None
+        mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(purger)
+
 
 class TestCheckScalingGroup:
     """Test cases for check_scaling_group function"""
@@ -434,12 +568,11 @@ class TestCheckScalingGroup:
     ) -> None:
         """Test that check_scaling_group raises ScalingGroupSessionTypeNotAllowed (422)
         when requesting BATCH session on INTERACTIVE-only scaling group"""
-        mock_sgroup = {
-            "name": "test-sgroup",
-            "scheduler_opts": ScalingGroupOpts(
-                allowed_session_types=[SessionTypes.INTERACTIVE],
-            ),
-        }
+        mock_sgroup = MagicMock()
+        mock_sgroup.name = "test-sgroup"
+        mock_sgroup.scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE],
+        )
 
         with patch(
             "ai.backend.manager.registry.query_allowed_sgroups",
@@ -462,12 +595,11 @@ class TestCheckScalingGroup:
         mock_conn: MagicMock,
     ) -> None:
         """Test that check_scaling_group succeeds when session type is allowed"""
-        mock_sgroup = {
-            "name": "test-sgroup",
-            "scheduler_opts": ScalingGroupOpts(
-                allowed_session_types=[SessionTypes.INTERACTIVE],
-            ),
-        }
+        mock_sgroup = MagicMock()
+        mock_sgroup.name = "test-sgroup"
+        mock_sgroup.scheduler_opts = ScalingGroupOpts(
+            allowed_session_types=[SessionTypes.INTERACTIVE],
+        )
 
         with patch(
             "ai.backend.manager.registry.query_allowed_sgroups",

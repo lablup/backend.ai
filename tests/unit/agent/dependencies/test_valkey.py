@@ -12,7 +12,7 @@ class TestValkeyDependency:
     async def redis_config(self, redis_container) -> RedisConfig:
         """Redis config fixture using testcontainer."""
         redis_addr = redis_container[1]
-        return RedisConfig(
+        return RedisConfig(  # type: ignore[call-arg]
             addr=HostPortPair(host=redis_addr.host, port=redis_addr.port),
             password=None,
         )

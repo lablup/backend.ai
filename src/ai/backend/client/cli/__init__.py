@@ -43,6 +43,23 @@ def network():
     """Set of inter-container network operations"""
 
 
+@cli_main.group(
+    cls=LazyGroup, import_name="ai.backend.client.cli.scheduling_history:scheduling_history"
+)
+def scheduling_history():
+    """Scheduling history operations (superadmin only)"""
+
+
+@cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.fair_share:fair_share")
+def fair_share():
+    """Fair share scheduler operations (superadmin only)"""
+
+
+@cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.resource_usage:resource_usage")
+def resource_usage():
+    """Resource usage history operations (superadmin only)"""
+
+
 # Groups with aliases in subcommands - still eager load
 from . import admin  # noqa  # type: ignore
 from . import vfolder  # noqa  # type: ignore

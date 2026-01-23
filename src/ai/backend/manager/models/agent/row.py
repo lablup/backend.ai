@@ -2,15 +2,25 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, TypeAlias, cast, override
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Optional, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, with_loader_criteria
+from sqlalchemy.orm import (
+    Mapped,
+    joinedload,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+    with_loader_criteria,
+)
 from sqlalchemy.sql.expression import false, true
 
+from ai.backend.common.auth import PublicKey
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -23,7 +33,6 @@ from ai.backend.manager.models.base import (
     CurvePublicKeyColumn,
     EnumType,
     ResourceSlotColumn,
-    mapper_registry,
 )
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -41,6 +50,9 @@ from ai.backend.manager.models.rbac.permission_defs import AgentPermission, Scal
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.scaling_group import ScalingGroupRow
+
 __all__: Sequence[str] = (
     "AgentRow",
     "agents",
@@ -49,48 +61,64 @@ __all__: Sequence[str] = (
 )
 
 
-agents = sa.Table(
-    "agents",
-    mapper_registry.metadata,
-    sa.Column("id", sa.String(length=64), primary_key=True),
-    sa.Column(
+class AgentRow(Base):
+    __tablename__ = "agents"
+
+    id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
+    status: Mapped[AgentStatus] = mapped_column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
-    ),
-    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("region", sa.String(length=64), index=True, nullable=False),
-    sa.Column(
+    )
+    status_changed: Mapped[datetime | None] = mapped_column(
+        "status_changed", sa.DateTime(timezone=True), nullable=True
+    )
+    region: Mapped[str] = mapped_column("region", sa.String(length=64), index=True, nullable=False)
+    scaling_group: Mapped[str] = mapped_column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name"),
         index=True,
         nullable=False,
         server_default="default",
         default="default",
-    ),
-    sa.Column("schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True),
-    sa.Column("available_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("addr", sa.String(length=128), nullable=False),
-    sa.Column("public_host", sa.String(length=256), nullable=True),
-    sa.Column("public_key", CurvePublicKeyColumn(), nullable=True),
-    sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("version", sa.String(length=64), nullable=False),
-    sa.Column("architecture", sa.String(length=32), nullable=False),
-    sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column(
+    )
+    schedulable: Mapped[bool] = mapped_column(
+        "schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True
+    )
+    available_slots: Mapped[ResourceSlot] = mapped_column(
+        "available_slots", ResourceSlotColumn(), nullable=False
+    )
+    occupied_slots: Mapped[ResourceSlot] = mapped_column(
+        "occupied_slots", ResourceSlotColumn(), nullable=False
+    )
+    addr: Mapped[str] = mapped_column("addr", sa.String(length=128), nullable=False)
+    public_host: Mapped[str | None] = mapped_column(
+        "public_host", sa.String(length=256), nullable=True
+    )
+    public_key: Mapped[PublicKey | None] = mapped_column(
+        "public_key", CurvePublicKeyColumn(), nullable=True
+    )
+    first_contact: Mapped[datetime | None] = mapped_column(
+        "first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    lost_at: Mapped[datetime | None] = mapped_column(
+        "lost_at", sa.DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[str] = mapped_column("version", sa.String(length=64), nullable=False)
+    architecture: Mapped[str] = mapped_column("architecture", sa.String(length=32), nullable=False)
+    compute_plugins: Mapped[dict[str, Any]] = mapped_column(
+        "compute_plugins", pgsql.JSONB(), nullable=False, default={}
+    )
+    auto_terminate_abusing_kernel: Mapped[bool] = mapped_column(
         "auto_terminate_abusing_kernel",
         sa.Boolean(),
         nullable=False,
         server_default=false(),
         default=False,
-    ),
-)
+    )
 
-
-class AgentRow(Base):
-    __table__ = agents
-    kernels = relationship("KernelRow", back_populates="agent_row")
-    scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
+    scaling_group_row: Mapped[ScalingGroupRow] = relationship(
+        "ScalingGroupRow", back_populates="agents"
+    )
 
     def actual_occupied_slots(self) -> ResourceSlot:
         resource_occupied_kernel_rows = cast(
@@ -107,7 +135,7 @@ class AgentRow(Base):
 
     def to_data(self) -> AgentData:
         return AgentData(
-            id=self.id,
+            id=AgentId(self.id),
             status=self.status,
             status_changed=self.status_changed,
             region=self.region,
@@ -145,12 +173,12 @@ class AgentRow(Base):
     @classmethod
     async def get_agents_by_condition(
         cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
-    ) -> list[Self]:
+    ) -> Sequence[AgentRow]:
         query_stmt = sa.select(AgentRow)
         for cond in conditions:
             query_stmt = cond(query_stmt)
 
-        async def fetch(db_session: SASession) -> list[AgentRow]:
+        async def fetch(db_session: SASession) -> Sequence[AgentRow]:
             return (await db_session.scalars(query_stmt)).all()
 
         async with db.connect() as db_conn:
@@ -159,7 +187,7 @@ class AgentRow(Base):
     @classmethod
     async def get_schedulable_agents_by_sgroup(
         cls, sgroup_name: str, *, db: ExtendedAsyncSAEngine
-    ) -> list[Self]:
+    ) -> Sequence[AgentRow]:
         return await cls.get_agents_by_condition(
             [
                 by_scaling_group(sgroup_name),
@@ -190,12 +218,16 @@ class AgentRow(Base):
             return occupied_slots
 
 
+# For compatibility
+agents = AgentRow.__table__
+
+
 def by_scaling_group(
     scaling_group: str,
 ) -> QueryCondition:
     def _by_scaling_group(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(AgentRow.scaling_group == scaling_group)
 
     return _by_scaling_group
@@ -205,8 +237,8 @@ def by_status(
     status: AgentStatus,
 ) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(AgentRow.status == status)
 
     return _by_status
@@ -216,8 +248,8 @@ def by_schedulable(
     schedulable: bool,
 ) -> QueryCondition:
     def _by_schedulable(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.expression.BinaryExpression:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         schedulable_ = true() if schedulable else false()
         return query_stmt.where(AgentRow.schedulable == schedulable_)
 
@@ -421,7 +453,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override
@@ -450,7 +482,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override
@@ -487,7 +519,7 @@ class AgentPermissionContextBuilder(
         for row in await self.db_session.scalars(_stmt):
             sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
-                aid_permission_map[ag.id] = permissions
+                aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
     @override

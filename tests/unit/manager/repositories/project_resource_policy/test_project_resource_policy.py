@@ -181,7 +181,9 @@ class TestProjectResourcePolicyRepository:
 
         # Mock session.add to raise IntegrityError
         mock_session.add = MagicMock()
-        mock_session.flush = AsyncMock(side_effect=IntegrityError("duplicate key", None, None))
+        mock_session.flush = AsyncMock(
+            side_effect=IntegrityError("duplicate key", None, Exception())
+        )
 
         with pytest.raises(IntegrityError):
             await project_resource_policy_repository.create(new_policy_creator)

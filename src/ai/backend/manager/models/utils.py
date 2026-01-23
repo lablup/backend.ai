@@ -26,7 +26,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     AttemptManager,
@@ -68,8 +68,8 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -378,7 +378,7 @@ async def execute_with_txn_retry(
             with attempt:
                 try:
                     async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn, *args, **kwargs)
+                        result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):
                         raise TryAgain
@@ -424,6 +424,8 @@ async def connect_database(
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
+        if version_str is None:
+            raise DatabaseError("Failed to retrieve PostgreSQL server version")
         major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
@@ -469,16 +471,16 @@ async def reenter_txn(
 @actxmgr
 async def reenter_txn_session(
     pool: ExtendedAsyncSAEngine,
-    sess: SASession,
+    sess: SASession | None,
     read_only: bool = False,
-) -> AsyncIterator[SAConnection]:
+) -> AsyncIterator[SASession]:
     if sess is None:
         if read_only:
-            async with pool.begin_readonly_session() as sess:
-                yield sess
+            async with pool.begin_readonly_session() as new_sess:
+                yield new_sess
         else:
-            async with pool.begin_session() as sess:
-                yield sess
+            async with pool.begin_session() as new_sess:
+                yield new_sess
     else:
         async with sess.begin_nested():
             yield sess
@@ -528,11 +530,11 @@ async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
 
 
-JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
+JSONCoalesceExpr: TypeAlias = sa.sql.elements.ColumnElement[Any]
 
 
 def sql_json_merge(
-    col,
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
     key: tuple[str, ...],
     obj: Mapping[str, Any],
     *,
@@ -554,20 +556,20 @@ def sql_json_merge(
                 key[_depth],
                 (
                     sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
-                        sa.func.cast(obj, psql.JSONB)
+                        sa.func.cast(sa.literal(obj, type_=psql.JSONB), psql.JSONB)
                     )
                     if _depth == len(key) - 1
                     else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
                 ),
             )
             if key
-            else sa.func.cast(obj, psql.JSONB)
+            else sa.func.cast(sa.literal(obj, type_=psql.JSONB), psql.JSONB)
         ),
     )
 
 
 def sql_json_increment(
-    col,
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
     key: tuple[str, ...],
     *,
     parent_updates: Optional[Mapping[str, Any]] = None,
@@ -581,7 +583,7 @@ def sql_json_increment(
 
     Note that the existing value of the parent key must be also an object, not a primitive value.
     """
-    expr = sa.func.coalesce(
+    expr: JSONCoalesceExpr = sa.func.coalesce(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
@@ -595,7 +597,7 @@ def sql_json_increment(
         ),
     )
     if _depth == len(key) - 1 and parent_updates is not None:
-        expr = expr.concat(sa.func.cast(parent_updates, psql.JSONB))
+        expr = expr.concat(sa.func.cast(sa.literal(parent_updates, type_=psql.JSONB), psql.JSONB))
     return expr
 
 
@@ -619,12 +621,16 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
     )
 
 
-def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
+def agg_to_str(
+    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
+) -> sa.sql.functions.Function:
     # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
     return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
 
 
-def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
+def agg_to_array(
+    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
+) -> sa.sql.functions.Function:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 

@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.common.types import ValkeyProfileTarget
     from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.clients.agent import AgentClientPool
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
@@ -96,6 +97,7 @@ class RootContext(BaseContext):
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
+    agent_client_pool: AgentClientPool
     scheduler_dispatcher: SchedulerDispatcher
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController

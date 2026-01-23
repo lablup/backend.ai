@@ -281,6 +281,9 @@ global_subapp_pkgs: Final[list[str]] = [
     ".notification",
     ".deployment",
     ".rbac",
+    ".scheduling_history",
+    ".fair_share",
+    ".export",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -453,11 +456,9 @@ async def exception_middleware(
 
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
-    try:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
         yield
-    finally:
-        await root_ctx.etcd.close()
 
 
 @asynccontextmanager
@@ -1044,6 +1045,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     from .agent_cache import AgentRPCCache
+    from .clients.agent import AgentClientPool, AgentPoolSpec
     from .registry import AgentRegistry
 
     # Create scheduling controller first
@@ -1082,10 +1084,19 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
+    root_ctx.agent_client_pool = AgentClientPool(
+        root_ctx.agent_cache,
+        AgentPoolSpec(
+            health_check_interval=30.0,
+            failure_threshold=3,
+            recovery_timeout=60.0,
+        ),
+    )
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
         root_ctx.agent_cache,
+        root_ctx.agent_client_pool,
         root_ctx.valkey_stat,
         root_ctx.valkey_live,
         root_ctx.valkey_image,
@@ -1104,6 +1115,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.agent_client_pool.close()
         await root_ctx.registry.shutdown()
 
 
@@ -1197,20 +1209,22 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .clients.agent import AgentPool
-    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.scheduler.coordinator import ScheduleCoordinator
+    from .sokovan.scheduler.factory import (
+        CoordinatorHandlersArgs,
+        create_coordinator_handlers,
+        create_default_scheduler_components,
+    )
+    from .sokovan.scheduler.fair_share import FairShareAggregator, FairShareFactorCalculator
     from .sokovan.sokovan import SokovanOrchestrator
 
-    # Create agent pool for scheduler
-    agent_pool = AgentPool(root_ctx.agent_cache)
-
-    # Create scheduler with default components
-    scheduler = create_default_scheduler(
+    # Create scheduler components
+    scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
+        root_ctx.repositories.fair_share.repository,
         root_ctx.config_provider,
-        root_ctx.distributed_lock_factory,
-        agent_pool,
+        root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,
         root_ctx.event_producer,
         root_ctx.valkey_schedule,
@@ -1252,13 +1266,40 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         service_discovery=root_ctx.service_discovery,
     )
 
-    # Create sokovan orchestrator with lock factory for timers
-    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler=scheduler,
-        event_producer=root_ctx.event_producer,
+    # Create fair share aggregator for usage tracking
+    # FairShareAggregator is now pure computation (no repositories)
+    fair_share_aggregator = FairShareAggregator()
+    fair_share_calculator = FairShareFactorCalculator()
+
+    # Create coordinator handlers using factory
+    coordinator_handlers = create_coordinator_handlers(
+        CoordinatorHandlersArgs(
+            provisioner=scheduler_components.provisioner,
+            launcher=scheduler_components.launcher,
+            terminator=scheduler_components.terminator,
+            repository=scheduler_components.repository,
+            valkey_schedule=root_ctx.valkey_schedule,
+            scheduling_controller=root_ctx.scheduling_controller,
+            fair_share_aggregator=fair_share_aggregator,
+            fair_share_calculator=fair_share_calculator,
+            resource_usage_repository=root_ctx.repositories.resource_usage_history.repository,
+            fair_share_repository=root_ctx.repositories.fair_share.repository,
+        )
+    )
+
+    # Create schedule coordinator
+    schedule_coordinator = ScheduleCoordinator(
         valkey_schedule=root_ctx.valkey_schedule,
-        lock_factory=root_ctx.distributed_lock_factory,
+        components=scheduler_components,
+        handlers=coordinator_handlers,
         scheduling_controller=root_ctx.scheduling_controller,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+    )
+
+    # Create sokovan orchestrator with all coordinators injected
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        schedule_coordinator=schedule_coordinator,
         deployment_coordinator=deployment_coordinator,
         route_coordinator=route_coordinator,
     )
@@ -1447,9 +1488,6 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
-    from .sweeper.kernel import stale_kernel_sweeper_ctx
-    from .sweeper.session import stale_session_sweeper_ctx
-
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1533,8 +1571,6 @@ def build_root_app(
             leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
-            stale_session_sweeper_ctx,
-            stale_kernel_sweeper_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
             gql_adapters_ctx,

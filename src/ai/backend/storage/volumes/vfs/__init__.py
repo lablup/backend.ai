@@ -632,16 +632,14 @@ class BaseVolume(AbstractVolume):
                         q.task_done()
 
         loop = asyncio.get_running_loop()
-        write_task: asyncio.Task = asyncio.create_task(
-            loop.run_in_executor(None, _write, q.sync_q),  # type: ignore
-        )
+        write_fut = loop.run_in_executor(None, _write, q.sync_q)
         try:
             async for buf in payload:
                 await q.async_q.put(buf)
             await q.async_q.put(b"")
             await q.async_q.join()
         finally:
-            await write_task
+            await write_fut
 
     def read_file(
         self,

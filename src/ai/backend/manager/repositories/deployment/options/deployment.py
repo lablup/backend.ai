@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.data.deployment.types import EndpointLifecycle
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -143,6 +144,13 @@ class DeploymentConditions:
 
     @staticmethod
     def by_status_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_lifecycle_stages(statuses: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.lifecycle_stage.in_(statuses)
 
@@ -310,3 +318,9 @@ class DeploymentOrders:
         if ascending:
             return EndpointRow.created_at.asc()
         return EndpointRow.created_at.desc()
+
+    @staticmethod
+    def updated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return EndpointRow.updated_at.asc()
+        return EndpointRow.updated_at.desc()

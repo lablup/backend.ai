@@ -1,355 +1,662 @@
-# Backend.AI Storage Proxy Configuration Sample
+# Backend.AI Storage Proxy Configuration (PROD Environment)
 #
 # This is a sample configuration file for the Backend.AI Storage Proxy.
 # All configuration options are documented with their descriptions,
-# default values, and examples.
+# default values, and environment-specific examples.
 #
-# Generated automatically from the StorageProxyUnifiedConfig schema.
+# Generated using BackendAIConfigMeta annotations.
 
-# Core storage-proxy service configuration.
-# Controls how the storage-proxy operates and communicates.
+
+# Core storage-proxy service configuration. Contains essential settings for the
+# storage-proxy including node identification, worker processes, ports, and
+# authentication secrets. This is the main configuration section.
+# Added in 25.12.0
 [storage-proxy]
-  # Base directory path for inter-process communication files.
-  # Used for Unix domain sockets and other IPC mechanisms.
-  ipc-base-path = "/tmp/backend.ai/ipc"
-  # Unique identifier for this storage-proxy node.
-  # Used for service discovery and coordination.
+  # Base directory path for inter-process communication files such as Unix
+  # domain sockets. This directory is automatically created if it doesn't exist.
+  # Used for low-latency communication between storage-proxy processes.
+  # Added in 22.03.4
+  ipc-base-path = "/var/run/backend.ai/ipc"
+  # Unique identifier for this storage-proxy node within the cluster. Used for
+  # service discovery, log correlation, and coordination among multiple storage-
+  # proxy instances. Should be unique across all storage-proxy nodes.
+  # Added in 22.06.0
   node-id = "storage-proxy-1"
-  # Number of worker processes to spawn.
-  # Defaults to the number of CPU cores available.
-  num-proc = 12
-  # Path to the file where the process ID will be written.
-  # Set to /dev/null to disable this feature.
-  pid-file = "/dev/null"
-  # Event loop implementation to use.
-  # 'asyncio' is the standard library implementation.
-  # 'uvloop' is a faster alternative but may have compatibility issues.
+  # Number of worker processes to spawn for handling concurrent requests.
+  # Defaults to the number of CPU cores available. Increase for I/O-bound
+  # workloads or decrease to limit resource usage.
+  # Added in 22.06.0
+  num-proc = 4
+  # Path to the file where the process ID will be written. Used by process
+  # managers and init systems to track the running process. Set to /dev/null to
+  # disable this feature.
+  # Added in 22.06.0
+  pid-file = "/var/run/storage-proxy.pid"
+  # Event loop implementation to use for async I/O operations. 'asyncio' is the
+  # standard library implementation with good compatibility. 'uvloop' is a
+  # faster alternative built on libuv but may have compatibility issues with
+  # some extensions.
+  # Added in 22.06.0
   event-loop = "asyncio"
-  # Maximum number of entries to scan in directory operations.
-  # Prevents excessive memory usage when scanning large directories.
-  scandir-limit = 1000
-  # Maximum size allowed for file uploads.
-  # Prevents storage exhaustion from large uploads.
+  # Maximum number of entries to return in directory listing operations.
+  # Prevents excessive memory usage and response times when scanning large
+  # directories. Set to 0 for unlimited (not recommended).
+  # Added in 22.06.0
+  scandir-limit = 5000
+  # Maximum size allowed for individual file uploads. Prevents storage
+  # exhaustion from excessively large uploads. Supports size suffixes: k (KB), m
+  # (MB), g (GB), t (TB). Example: '100g' for 100 gigabytes.
+  # Added in 22.06.0
   max-upload-size = "100g"
-  # Secret key for generating JWT tokens.
-  # Used for authenticating client requests.
-  secret = "jwt-secret-key"
-  # Session expiration time.
-  # Controls how long JWT tokens remain valid.
+  # Secret key for generating and validating JWT tokens used to authenticate
+  # client requests. Must be kept secure and shared only with authorized
+  # services. Use a long, random string for production deployments.
+  # Added in 22.03.0
+  secret = "JWT_SECRET"
+  # Duration for which JWT session tokens remain valid. After this period,
+  # clients must re-authenticate. Shorter durations improve security but require
+  # more frequent re-authentication. Supports duration suffixes: s, m, h, d.
+  # Added in 22.06.0
   session-expire = "1h"
-  # User ID to run the storage-proxy process as.
-  # Defaults to the UID of the current file's owner.
-  ## user = "501"
-  # Group ID to run the storage-proxy process as.
-  # Defaults to the GID of the current file's owner.
-  ## group = "20"
-  # Port for the aiomonitor terminal UI.
-  # Allows connecting to a debugging console.
+  # User ID (UID) under which the storage-proxy process runs. Controls file
+  # ownership and access permissions. Defaults to the UID of the current file's
+  # owner. Set to a dedicated service user in production.
+  # Added in 22.03.0
+  ## user = "nobody"
+  # Group ID (GID) under which the storage-proxy process runs. Controls file
+  # ownership and access permissions. Defaults to the GID of the current file's
+  # owner. Set to a dedicated service group in production.
+  # Added in 22.03.0
+  ## group = "nogroup"
+  # Port number for the aiomonitor terminal UI, which provides a console-based
+  # interface for inspecting running asyncio tasks and debugging issues. Connect
+  # via telnet or netcat to this port for interactive debugging.
+  # Added in 23.09.0
   aiomonitor-termui-port = 38300
-  # Port for the aiomonitor web UI.
-  # Provides a web-based monitoring interface.
+  # Port number for the aiomonitor web UI, which provides a browser-based
+  # interface for monitoring asyncio tasks and system state. Access via HTTP to
+  # view real-time task information and metrics.
+  # Added in 23.09.0
   aiomonitor-webui-port = 39300
-  # Path prefix for watcher input sockets.
-  # Used for communication with watcher processes.
-  ## watcher-insock-path-prefix = "/tmp/backend.ai/watcher"
-  # Path prefix for watcher output sockets.
-  # Used for communication with watcher processes.
-  ## watcher-outsock-path-prefix = "/tmp/backend.ai/watcher"
-  # Whether to use watcher processes.
-  # Enables additional monitoring capabilities.
-  use-watcher = false
-  # Whether to use experimental Redis-based event dispatcher.
-  # May provide better performance for event handling.
-  use-experimental-redis-event-dispatcher = false
-  # Whether to allow automatic creation of quota scopes.
-  # If true, quota scopes will be created when creating VFolders in non-existent
-  # quota scopes.
-  # If false, VFolder creation will fail if the quota scope does not exist.
-  allow-auto-quota-scope-creation = true
+  # Path prefix for watcher input Unix domain sockets. Used when the watcher
+  # feature is enabled to receive commands from the watcher process. Set to None
+  # to disable or use default paths.
+  # Added in 23.09.0
+  ## watcher-insock-path-prefix = "/var/run/backend.ai/watcher-in"
+  # Path prefix for watcher output Unix domain sockets. Used when the watcher
+  # feature is enabled to send status updates to the watcher process. Set to
+  # None to disable or use default paths.
+  # Added in 23.09.0
+  ## watcher-outsock-path-prefix = "/var/run/backend.ai/watcher-out"
+  # Enable the watcher process integration for additional monitoring and
+  # supervision capabilities. When enabled, the storage-proxy communicates with
+  # an external watcher process for health monitoring and management.
+  # Added in 23.09.0
+  use-watcher = true
+  # Enable the experimental Redis-based event dispatcher for inter-process event
+  # communication. May provide better scalability and performance for event
+  # handling in multi-node deployments. Requires Redis configuration.
+  # Added in 24.09.0
+  use-experimental-redis-event-dispatcher = true
+  # Allow automatic creation of quota scopes when creating virtual folders in
+  # non-existent quota scopes. If true, quota scopes are created on demand. If
+  # false, VFolder creation fails when the quota scope doesn't exist.
+  # Added in 25.19.0
+  allow-auto-quota-scope-creation = false
 
-# Pyroscope profiling configuration.
-# Controls integration with the Pyroscope performance profiling tool.
+# Pyroscope continuous profiling configuration. Pyroscope provides real-time CPU
+# and memory profiling for performance analysis. Enable this to collect
+# profiling data and send to a Pyroscope server for analysis.
+# Added in 25.12.0
 [pyroscope]
-  # Whether to enable Pyroscope profiling.
-  # When enabled, performance profiling data will be sent to a Pyroscope server.
-  # Useful for debugging performance issues, but adds some overhead.
-  enabled = false
-  # Application name to use in Pyroscope.
-  # This name will identify this storage-proxy instance in Pyroscope UI.
-  # Required if Pyroscope is enabled.
-  ## app-name = "backendai-storage-proxy"
-  # Address of the Pyroscope server.
-  # Must include the protocol (http or https) and port if non-standard.
-  # Required if Pyroscope is enabled.
-  ## server-addr = "http://localhost:4040"
-  # Sampling rate for Pyroscope profiling.
-  # Higher values collect more data but increase overhead.
-  # Balance based on your performance monitoring needs.
-  ## sample-rate = 10
+  # Whether to enable Pyroscope profiling. When enabled, performance profiling
+  # data will be sent to a Pyroscope server. Useful for debugging performance
+  # issues, but adds some overhead.
+  # Added in 24.12.1
+  enabled = true
+  # Application name to use in Pyroscope. This name will identify this component
+  # instance in Pyroscope UI. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## app-name = "backendai-manager-prod"
+  # Address of the Pyroscope server. Must include the protocol (http or https)
+  # and port if non-standard. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## server-addr = "http://pyroscope:4040"
+  # Sampling rate for Pyroscope profiling. Higher values collect more data but
+  # increase overhead. Balance based on your performance monitoring needs.
+  # Added in 24.12.1
+  ## sample-rate = 100
 
-# Logging system configuration.
-# Controls how logs are formatted, filtered, and stored.
+# Logging system configuration. Controls log levels, formats, outputs, and
+# rotation settings. Proper logging configuration is essential for monitoring
+# and debugging storage-proxy in production environments.
+# Added in 25.12.0
 [logging]
   # The version used by logging.dictConfig().
+  # Added in 24.09.0
   version = 1
   # The main log level to filter messages from all loggers.
+  # Added in 24.09.0
   level = "INFO"
   # Disable the existing loggers when applying the config.
+  # Added in 24.09.0
   disable-existing-loggers = false
-  # The list of log drivers to activate.
-  drivers = [ "console",]
-
   # The mapping of log handler configurations.
-  [logging.handlers]
-
+  # Added in 24.09.0
+  handlers = {}
   # The mapping of per-namespace logger configurations.
-  [logging.loggers]
+  # Added in 24.09.0
+  loggers = {}
+  # The list of log drivers to activate.
+  # Added in 24.09.0
+  drivers = ["console", "file"]
+  # Override default log level for specific scope of package.
+  # Added in 24.09.0
+  pkg-ns = "{ \"\" = \"WARNING\", \"ai.backend\" = \"INFO\" }"
 
+  # Console logging driver configuration.
+  # Added in 24.09.0
   [logging.console]
     # Opt to print colorized log.
+    # Added in 24.09.0
     ## colored = true
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # File logging driver configuration.
+  # Added in 24.09.0
   [logging.file]
     # Path to store log.
+    # Added in 24.09.0
     path = "/var/log/backend.ai"
     # Log file name.
-    filename = "wsproxy.log"
+    # Added in 24.09.0
+    filename = "manager.log"
     # Number of outdated log files to retain.
-    backup-count = 5
+    # Added in 24.09.0
+    backup-count = 10
     # Maximum size for a single log file.
-    ## rotation-size = "..."  # |     # min=0
+    # Added in 24.09.0
+    rotation-size = "100MB"
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # Logstash logging driver configuration.
+  # Added in 24.09.0
   [logging.logstash]
-    # Connection information of logstash node.
-    endpoint = { host = "127.0.0.1", port = 8001 }
     # Protocol to communicate with logstash server.
+    # Added in 24.09.0
     protocol = "tcp"
     # Use TLS to communicate with logstash server.
+    # Added in 24.09.0
     ssl-enabled = true
     # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
     ssl-verify = true
 
+    # Connection information of logstash node.
+    # Added in 24.09.0
+    [logging.logstash.endpoint]
+
+  # Graylog logging driver configuration.
+  # Added in 24.09.0
   [logging.graylog]
     # Graylog hostname.
-    host = "127.0.0.1"
+    # Added in 24.09.0
+    host = "graylog-server"
     # Graylog server port number.
-    port = 8000
+    # Added in 24.09.0
+    port = 12201
     # Log level.
+    # Added in 24.09.0
     level = "INFO"
     # The custom source identifier. If not specified, fqdn will be used instead.
-    ## localname = "..."
-    # The fuly qualified domain name of the source.
-    ## fqdn = "..."
-    # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
+    ## localname = "prod-manager-01"
+    # The fully qualified domain name of the source.
+    # Added in 24.09.0
+    ## fqdn = "manager.backend.ai"
+    # Verify validity of TLS certificate when communicating with Graylog.
+    # Added in 24.09.0
     ssl-verify = true
     # Path to Root CA certificate file.
+    # Added in 24.09.0
     ## ca-certs = "/etc/ssl/ca.pem"
     # Path to TLS private key file.
+    # Added in 24.09.0
     ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
     # Path to TLS certificate file.
+    # Added in 24.09.0
     ## certfile = "/etc/backend.ai/graylog/cert.pem"
 
-  # Override default log level for specific scope of package
-  [logging.pkg_ns]
-
-# API configuration for client and manager interfaces.
-# Controls how the storage-proxy serves requests.
+# API endpoints configuration for client and manager interfaces. Defines how the
+# storage-proxy accepts requests from users (client API) and from Backend.AI
+# Manager (manager API) including SSL and address settings.
+# Added in 25.12.0
 [api]
-  # Configuration for the client-facing API.
-  # Handles file operations requested by users.
+
+  # Configuration for the client-facing API endpoints. This section defines how
+  # the storage-proxy accepts connections from end users and client applications
+  # for file operations such as upload, download, and directory listing.
+  # Added in 22.06.0
   [api.client]
-    # Network address and port where the client API service will listen.
-    # This is the address accessible by clients for file operations.
-    service-addr = { host = "127.0.0.1", port = 6021 }
-    # Whether to enable SSL/TLS for client API connections.
-    # Required for secure communication with clients.
+    # The network address and port where the client-facing API server listens.
+    # Clients connect to this address for file operations like upload, download,
+    # and directory listing. Use '0.0.0.0' to listen on all interfaces in
+    # production.
+    # Added in 22.06.0
+    service-addr = { host = "0.0.0.0", port = 6021 }
+    # Enable SSL/TLS encryption for client API connections. When enabled,
+    # clients must connect using HTTPS. Requires ssl_cert and ssl_privkey to be
+    # configured. Strongly recommended for production to protect data in
+    # transit.
+    # Added in 22.06.0
     ssl-enabled = true
-    # Path to the SSL certificate file for client API.
-    # Required if ssl_enabled is True.
+    # The file path to the SSL/TLS certificate in PEM format for the client API.
+    # Required when ssl_enabled is true. Use certificates from a trusted CA for
+    # production deployments.
+    # Added in 22.06.0
     ## ssl-cert = "/etc/ssl/certs/storage-proxy.crt"
-    # Path to the SSL private key file for client API.
-    # Required if ssl_enabled is True.
+    # The file path to the SSL/TLS private key in PEM format for the client API.
+    # Required when ssl_enabled is true. Keep this file secure with restricted
+    # permissions (e.g., 0600).
+    # Added in 22.06.0
     ## ssl-privkey = "/etc/ssl/private/storage-proxy.key"
 
-  # Configuration for the manager-facing API.
-  # Handles control operations from manager services.
+  # Configuration for the manager-facing API endpoints. This section defines how
+  # the storage-proxy accepts connections from Backend.AI Manager for control
+  # operations such as volume management and quota enforcement.
+  # Added in 22.06.0
   [api.manager]
-    # Network address and port where the manager API service will listen.
-    # This is the address accessible by managers for control operations.
-    service-addr = { host = "127.0.0.1", port = 6022 }
-    # Address and port to announce to managers for service discovery.
-    # Should be accessible by other manager components.
-    announce-addr = { host = "127.0.0.1", port = 6022 }
-    # Address and port to announce for internal manager API requests.
-    # Used for service discovery within container environments.
-    announce-internal-addr = { host = "host.docker.internal", port = 6023 }
-    # Internal address where manager API listens for internal requests.
-    # Used for internal communication between services.
-    internal-addr = { host = "127.0.0.1", port = 16023 }
-    # Whether to enable SSL/TLS for manager API connections.
-    # Required for secure communication with managers.
+    # The network address and port where the manager-facing API server listens.
+    # Backend.AI Manager connects to this address for storage control operations
+    # like volume management and quota enforcement.
+    # Added in 22.06.0
+    service-addr = { host = "0.0.0.0", port = 6022 }
+    # The address announced to the service discovery system for managers to
+    # locate this storage-proxy. In containerized or NAT environments, this
+    # should be the externally routable address, not the bind address.
+    # Added in 22.06.0
+    announce-addr = { host = "storage.example.com", port = 6022 }
+    # The internal address announced for container-to-host communication. Used
+    # when compute kernels need to access storage-proxy from within containers.
+    # 'host.docker.internal' is the Docker DNS name for the host machine.
+    # Added in 22.06.0
+    announce-internal-addr = { host = "storage-internal", port = 6023 }
+    # The address where the internal API server listens for requests from
+    # compute containers. This endpoint handles internal file operations from
+    # running sessions. Typically bound to localhost or an internal network
+    # interface.
+    # Added in 22.06.0
+    internal-addr = { host = "0.0.0.0", port = 16023 }
+    # Enable SSL/TLS encryption for manager API connections. When enabled,
+    # managers must connect using HTTPS. Requires ssl_cert and ssl_privkey to be
+    # configured. Recommended for production deployments.
+    # Added in 22.06.0
     ssl-enabled = true
-    # Path to the SSL certificate file for manager API.
-    # Required if ssl_enabled is True.
+    # The file path to the SSL/TLS certificate in PEM format for the manager
+    # API. Required when ssl_enabled is true. Use certificates from a trusted CA
+    # for production deployments.
+    # Added in 22.06.0
     ## ssl-cert = "/etc/ssl/certs/storage-proxy.crt"
-    # Path to the SSL private key file for manager API.
-    # Required if ssl_enabled is True.
+    # The file path to the SSL/TLS private key in PEM format for the manager
+    # API. Required when ssl_enabled is true. Keep this file secure with
+    # restricted permissions (e.g., 0600).
+    # Added in 22.06.0
     ## ssl-privkey = "/etc/ssl/private/storage-proxy.key"
-    # Secret key for authenticating managers with the storage-proxy.
-    # Must be shared between manager and storage-proxy instances.
-    secret = "manager-secret-key"
+    # The shared secret key for authenticating manager requests to the storage-
+    # proxy. Must match the storage-proxy secret configured in the Backend.AI
+    # Manager. Keep this value secure and do not expose in logs.
+    # Added in 22.03.0
+    secret = "MANAGER_API_SECRET"
 
-# Volume configuration.
-# Defines available storage backends and their settings.
-[volume]
+# Storage volume configurations keyed by volume name. Each volume defines a
+# storage backend and its settings. Multiple volumes can be configured to
+# provide different storage backends (VFS, Pure Storage, CephFS, etc.).
+# Added in 25.12.0
+# Replace <name> with your actual key (e.g., 'default', 'local')
+[volume.<name>]
+    # The storage backend type for this volume. Common backends include 'vfs'
+    # for local filesystem, 'purestorage' for Pure Storage arrays, and 'cephfs'
+    # for Ceph distributed filesystem. The backend determines how files are
+    # stored, accessed, and managed.
+    # Added in 22.06.0
+    backend = "purestorage"
+    # The root filesystem path where this volume's data is stored. Must be an
+    # existing directory with appropriate read/write permissions for the
+    # storage-proxy process. For network storage backends, this is the local
+    # mount point.
+    # Added in 22.06.0
+    path = "/mnt/storage/backend.ai"
+    # An optional subdirectory prefix within the volume path. All storage
+    # operations are relative to this prefix. Use '.' for the volume root, or
+    # specify a subdirectory to organize data within the volume.
+    # Added in 22.06.0
+    ## fsprefix = "data"
+    # Backend-specific configuration options as key-value pairs. Each storage
+    # backend may support different options for tuning performance, enabling
+    # features, or connecting to external services. Refer to the backend
+    # documentation for details.
+    # Added in 22.06.0
+    ## options = {}
 
-# Debugging options configuration.
-# Controls various debugging features and tools.
+# Debugging options configuration. Controls various debugging features like
+# asyncio debug mode, enhanced task monitoring, and verbose event logging.
+# Should be disabled in production for security and performance.
+# Added in 25.12.0
 [debug]
-  # Master switch for debug mode.
-  # When enabled, activates various debugging features.
-  # Should be disabled in production for security and performance.
+  # Master switch for debug mode. When enabled, activates various debugging
+  # features including detailed logging and diagnostic tools. Should be disabled
+  # in production for security and performance reasons.
+  # Added in 22.06.0
   enabled = false
-  # Whether to enable asyncio debug mode.
-  # Helps detect problems like coroutines never awaited.
-  # Adds significant overhead, use only during development.
+  # Enable asyncio debug mode, which helps detect problems like coroutines that
+  # are never awaited, slow callbacks, and other async programming issues. Adds
+  # significant overhead, use only during development.
+  # Added in 22.06.0
   asyncio = false
-  # Enable enhanced task information in aiomonitor.
-  # Provides more detailed information about running asyncio tasks.
+  # Enable enhanced task information in aiomonitor. Provides more detailed
+  # information about running asyncio tasks including full stack traces and task
+  # creation context. Useful for debugging complex async workflows.
+  # Added in 23.09.0
   enhanced-aiomonitor-task-info = false
-  # Whether to log all internal events.
-  # Very verbose, but useful for debugging event-related issues.
+  # Enable logging of all internal events. This is very verbose and generates
+  # substantial log output, but is useful for debugging event-related issues and
+  # understanding the flow of operations through the system.
+  # Added in 24.09.0
   log-events = false
 
-# Service discovery configuration.
-# Controls how services are discovered and connected.
+# Service discovery configuration. Controls how the storage-proxy registers
+# itself with and discovers other services in the Backend.AI cluster. Essential
+# for multi-node deployments and automatic failover.
+# Added in 25.12.0
 [service-discovery]
-  # Type of service discovery to use.
+  # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
+  # Added in 25.9.0
   type = "redis"
 
-# OpenTelemetry configuration.
-# Controls how tracing and logging are handled.
+# OpenTelemetry (OTEL) configuration for distributed tracing and metrics.
+# Enables integration with observability platforms like Jaeger, Zipkin, or
+# commercial APM solutions for request tracing across services.
+# Added in 25.12.0
 [otel]
-  # Whether to enable OpenTelemetry for tracing or logging.
-  # When enabled, traces or logs will be collected and sent to the configured OTLP
-  # endpoint.
-  enabled = false
-  # Log level for OpenTelemetry.
-  # Controls the verbosity of logs generated by OpenTelemetry.
+  # Whether to enable OpenTelemetry for tracing or logging. When enabled, traces
+  # or logs will be collected and sent to the configured OTLP endpoint.
+  # Added in 25.7.0
+  enabled = true
+  # Log level for OpenTelemetry. Controls the verbosity of logs generated by
+  # OpenTelemetry. Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'.
+  # Added in 25.7.0
   log-level = "INFO"
-  # OTLP endpoint for sending traces.
-  # Should include the protocol, host and port of the OTLP receiver.
-  endpoint = "http://127.0.0.1:4317"
+  # OTLP endpoint for sending traces. Should include the host and port of the
+  # OTLP receiver.
+  # Added in 25.7.0
+  endpoint = "http://otel-collector:4317"
 
-# Etcd configuration settings.
-# Used for distributed coordination.
+# etcd configuration for distributed key-value storage. etcd is used for cluster
+# coordination, configuration sharing, and service discovery in Backend.AI.
+# Required for multi-node deployments.
+# Added in 25.12.0
 [etcd]
-  # Namespace prefix for etcd keys used by Backend.AI.
-  # Allows multiple Backend.AI clusters to share the same etcd cluster.
-  # All Backend.AI related keys will be stored under this namespace.
-  namespace = "ETCD_NAMESPACE"
-  # Network address of the etcd server.
-  # Default is the standard etcd port on localhost.
-  # In production, should point to one or more etcd instance endpoint(s).
-  ## addr = { host = "127.0.0.1", port = 2379 }  # | [ { host = "127.0.0.1", port = 2379 } ]
-  # Username for authenticating with etcd.
-  # Optional if etcd doesn't require authentication.
-  # Should be set along with password for secure deployments.
+  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
+  # keys will be stored under this namespace.
+  # Added in 22.03.0
+  namespace = "backend"
+  # Network address of the etcd server. Default is the standard etcd port on
+  # localhost. In production, should point to one or more etcd instance
+  # endpoint(s).
+  # Added in 22.03.0
+  addr = { host = "etcd-cluster", port = 2379 }
+  # Username for authenticating with etcd. Optional if etcd doesn't require
+  # authentication. Should be set along with password for secure deployments.
+  # Added in 22.03.0
   ## user = "backend"
-  # Password for authenticating with etcd.
-  # Optional if etcd doesn't require authentication.
-  # Can be a direct password or environment variable reference.
-  ## password = "develove"
+  # Password for authenticating with etcd. Should be kept secret in production
+  # environments. Set together with the user field for authentication.
+  # Added in 22.03.0
+  ## password = "ETCD_PASSWORD"
 
-# Dictionary of artifact storage configurations keyed by name.
-# Each configuration defines how to connect to and use an artifact storage
-# service.
-[artifact-storages]
+# Dictionary of artifact storage configurations keyed by storage name. Defines
+# storage backends for artifact files (models, datasets). Each entry can be
+# object storage (S3) or VFS depending on deployment requirements.
+# Added in 25.12.0
+# Replace <name> with your actual key (e.g., 'default', 'local')
+[artifact-storages.<name>]
+    # Type of storage backend for artifacts. Determines how files are stored and
+    # accessed. Options: 'object_storage' for S3-compatible storage,
+    # 'vfs_storage' for local filesystem, 'git_lfs' for Git LFS (not yet
+    # supported).
+    # Added in 25.12.0
+    type = "object_storage"
 
-# Dictionary of artifact registry configurations keyed by name.
-# Each configuration defines how to connect to and use an artifact registry
-# service.
-[artifact-registries]
+    # Configuration for S3-compatible object storage backend. Required when
+    # storage_type is 'object_storage'. Provides scalable, distributed storage
+    # suitable for production deployments with large artifact collections.
+    # Added in 25.12.0
+    [artifact-storages.<name>.object-storage]
+      # Endpoint URL for the S3-compatible object storage service. Must include
+      # the protocol (http or https) and port if non-standard. Examples: MinIO,
+      # AWS S3, Google Cloud Storage with S3 compatibility enabled.
+      # Added in 25.12.0
+      endpoint = "https://s3.amazonaws.com"
+      # Access key ID for authenticating with the object storage service. For
+      # AWS S3, this is the IAM user's access key. For MinIO, this is the
+      # configured access key. Keep secure and rotate periodically.
+      # Added in 25.12.0
+      access-key = "OBJECT_STORAGE_ACCESS_KEY"
+      # Secret access key for authenticating with the object storage service.
+      # Must be kept secure and never exposed in logs or error messages. Pair
+      # this with the access_key for authentication.
+      # Added in 25.12.0
+      secret-key = "OBJECT_STORAGE_SECRET_KEY"
+      # List of bucket names managed by this storage configuration. Each bucket
+      # represents a logical container for storing objects. Buckets must already
+      # exist in the object storage service unless auto-creation is enabled.
+      # Added in 25.12.0
+      buckets = "prod-data-bucket"
+      # Region identifier where the object storage service is located. For AWS
+      # S3, use region codes like 'us-east-1' or 'ap-northeast-2'. For local
+      # MinIO, use any valid region string (e.g., 'us-east-1').
+      # Added in 25.12.0
+      region = "ap-northeast-2"
+      # Chunk size in bytes for multipart upload operations to object storage.
+      # Must be at least 5MiB (5242880 bytes) due to S3 API requirements. Larger
+      # chunks reduce API calls but increase memory usage.
+      # Added in 25.12.0
+      upload-chunk-size = 10485760
+      # Chunk size in bytes for streaming downloads from object storage. Smaller
+      # chunks provide better responsiveness but increase overhead. Default is
+      # 8KB which works well for most use cases.
+      # Added in 25.12.0
+      download-chunk-size = 65536
+      # Chunk size in bytes for downloading files from remote reservoir storage.
+      # Reservoir is Backend.AI's artifact registry feature. Adjust based on
+      # network latency and file sizes typically downloaded.
+      # Added in 25.12.0
+      reservoir-download-chunk-size = 65536
 
-# Reservoir client configuration.
-# Controls timeout settings for HTTP client connections to reservoir registries.
+      # Configuration for generating presigned upload URLs. Presigned URLs allow
+      # clients to upload directly to object storage without proxying through
+      # the storage-proxy, improving performance for large files.
+      # Added in 25.12.0
+      [artifact-storages.<name>.object-storage.presigned-upload]
+        # Minimum file size in bytes that triggers multipart upload mode. Files
+        # smaller than this are uploaded in a single request. Set to None to use
+        # the default behavior. Typical value is 5MB (5242880 bytes) for
+        # S3-compatible storage.
+        # Added in 25.12.0
+        ## min-size = 5242880
+        # Maximum file size in bytes allowed for presigned uploads. Files larger
+        # than this are rejected. Set to None to allow unlimited size (limited
+        # only by storage backend constraints). Use to prevent storage quota
+        # abuse.
+        # Added in 25.12.0
+        ## max-size = 10737418240
+        # Expiration time in seconds for presigned upload URLs. After this
+        # duration, the URL becomes invalid and clients must request a new one.
+        # Balance security (shorter) vs. usability for large uploads (longer).
+        # Added in 25.12.0
+        expiration = 3600
+
+      # Configuration for generating presigned download URLs. Presigned URLs
+      # allow clients to download directly from object storage without proxying
+      # through the storage-proxy, improving performance for large files.
+      # Added in 25.12.0
+      [artifact-storages.<name>.object-storage.presigned-download]
+        # Expiration time in seconds for presigned download URLs. After this
+        # duration, the URL becomes invalid and clients must request a new one.
+        # Balance security (shorter) vs. usability for slow connections
+        # (longer).
+        # Added in 25.12.0
+        expiration = 3600
+
+    # Configuration for VFS (Virtual File System) storage backend. Required when
+    # storage_type is 'vfs_storage'. Uses local filesystem for storage, suitable
+    # for development or single-node deployments.
+    # Added in 25.12.0
+    [artifact-storages.<name>.vfs-storage]
+      # Base filesystem path for VFS (Virtual File System) storage. This
+      # directory serves as the root for all VFS operations. Must be an existing
+      # directory with appropriate read/write permissions for the storage-proxy
+      # process.
+      # Added in 25.12.0
+      base-path = "/mnt/storage/vfs"
+      # Optional subdirectory path appended to base_path. Used to further
+      # organize storage within the base directory, such as separating models,
+      # datasets, or user data. Set to None to use the base_path directly.
+      # Added in 25.12.0
+      ## subpath = "user-data"
+      # Mark this storage as temporary. When enabled, all files in the storage
+      # are cleared when the server starts. Useful for cache storage or
+      # temporary workspaces that should be cleaned up on restart.
+      # Added in 25.12.0
+      temporary = false
+      # Chunk size in bytes for streaming file upload operations. Larger chunks
+      # reduce overhead but increase memory usage. Smaller chunks are better for
+      # low-bandwidth connections. Default is 64KB (65536 bytes).
+      # Added in 25.12.0
+      upload-chunk-size = 1048576
+      # Chunk size in bytes for streaming file download operations. Larger
+      # chunks improve throughput for large files. Smaller chunks reduce memory
+      # usage and provide better progress reporting. Default is 64KB (65536
+      # bytes).
+      # Added in 25.12.0
+      download-chunk-size = 1048576
+      # Maximum file size in bytes allowed for uploads to this storage. Files
+      # exceeding this size are rejected. Set to None to allow unlimited file
+      # sizes (limited only by available storage space).
+      # Added in 25.12.0
+      ## max-file-size = 10737418240
+
+# Dictionary of artifact registry configurations keyed by registry name. Defines
+# external registries for discovering and downloading ML artifacts. Supports
+# HuggingFace Hub and Backend.AI Reservoir registries.
+# Added in 25.12.0
+# Replace <name> with your actual key (e.g., 'default', 'local')
+[artifact-registries.<name>]
+    # Type of artifact registry service. Determines how to interact with the
+    # registry for downloading models and datasets. Options: 'huggingface' for
+    # HuggingFace Hub, 'reservoir' for Backend.AI Reservoir.
+    # Added in 25.12.0
+    type = "reservoir"
+
+    # Configuration for HuggingFace Hub registry. Required when registry_type is
+    # 'huggingface'. Connects to HuggingFace Hub for accessing public and
+    # private ML models, datasets, and spaces.
+    # Added in 25.12.0
+    [artifact-registries.<name>.huggingface]
+      # API endpoint URL for the HuggingFace service. Defaults to the official
+      # HuggingFace Hub (https://huggingface.co). Change this to connect to
+      # self-hosted HuggingFace instances or enterprise deployments.
+      # Added in 25.12.0
+      endpoint = "https://huggingface.co"
+      # HuggingFace API token for authenticating requests. Required to access
+      # gated models and private repositories. Generate tokens at
+      # https://huggingface.co/settings/tokens. Keep this value secure.
+      # Added in 25.12.0
+      ## token = "HUGGINGFACE_TOKEN"
+      # Chunk size in bytes for streaming downloads from HuggingFace. Larger
+      # chunks improve throughput but increase memory usage. Default is 8KB
+      # which provides good balance for most use cases.
+      # Added in 25.12.0
+      download-chunk-size = 65536
+
+    # Configuration for Backend.AI Reservoir registry. Required when
+    # registry_type is 'reservoir'. Reservoir is Backend.AI's native artifact
+    # registry for managing ML models and datasets within your infrastructure.
+    # Added in 25.12.0
+    [artifact-registries.<name>.reservoir]
+      # API endpoint URL for the Reservoir registry service. Reservoir is
+      # Backend.AI's artifact registry feature for managing ML models and
+      # datasets. Can point to HuggingFace or a self-hosted Reservoir instance.
+      # Added in 25.12.0
+      endpoint = "https://reservoir.example.com"
+      # Access key for authenticating with the Reservoir registry's underlying
+      # object storage (S3-compatible). Required when the Reservoir uses object
+      # storage backend. Not needed for HuggingFace-backed registries.
+      # Added in 25.12.0
+      ## object-storage-access-key = "OBJECT_STORAGE_ACCESS_KEY"
+      # Secret key for authenticating with the Reservoir registry's underlying
+      # object storage (S3-compatible). Must be kept secure. Pair with
+      # object_storage_access_key for authentication.
+      # Added in 25.12.0
+      ## object-storage-secret-key = "OBJECT_STORAGE_SECRET_KEY"
+      # Region identifier for the Reservoir registry's object storage. Required
+      # when using AWS S3 or region-aware S3-compatible storage. Use standard
+      # region codes like 'us-east-1' or 'ap-northeast-2'.
+      # Added in 25.12.0
+      ## object-storage-region = "ap-northeast-2"
+      # API endpoint URL for the Backend.AI Manager when Reservoir uses VFS
+      # storage. Required for VFS-backed registries to handle file operations
+      # through Manager. Not needed when using object storage backend.
+      # Added in 25.12.0
+      ## manager-endpoint = "https://api.example.com"
+      # Access key for authenticating with Backend.AI Manager API when using
+      # VFS-backed Reservoir. This is a Backend.AI user access key, not an
+      # object storage key. Required when manager_endpoint is specified.
+      # Added in 25.12.0
+      ## manager-access-key = "MANAGER_ACCESS_KEY"
+      # Secret key for authenticating with Backend.AI Manager API when using
+      # VFS-backed Reservoir. Pair with manager_access_key for authentication.
+      # Keep this value secure.
+      # Added in 25.12.0
+      ## manager-secret-key = "MANAGER_SECRET_KEY"
+      # API version to use when communicating with Backend.AI Manager for VFS-
+      # backed Reservoir. Ensures compatibility between storage-proxy and
+      # Manager versions. Example: 'v8' for API version 8.
+      # Added in 25.12.0
+      ## manager-api-version = "v8"
+      # Name of the storage configuration to use with the Reservoir registry.
+      # References a storage defined elsewhere in the configuration. Required
+      # when using VFS-backed Reservoir to identify the target storage.
+      # Added in 25.12.0
+      ## storage-name = "vfs-production"
+
+# HTTP client configuration for Reservoir registry connections. Controls timeout
+# settings for API calls to Reservoir services. Tune these values based on
+# network conditions and expected transfer sizes.
+# Added in 25.12.0
 [reservoir-client]
-  # Total timeout for the entire request (in seconds).
-  # None means no timeout.
-  ## timeout-total = 300.0
-  # Timeout for acquiring a connection from the pool (in seconds).
-  # None means no timeout.
+  # Total timeout in seconds for the entire HTTP request lifecycle, including
+  # connection, sending, and receiving data. Set to None for no timeout. Default
+  # 300 seconds (5 minutes) accommodates large file transfers.
+  # Added in 25.12.0
+  ## timeout-total = 600.0
+  # Timeout in seconds for acquiring a connection from the connection pool.
+  # Limits wait time when all pool connections are in use. Set to None for no
+  # timeout (wait indefinitely for an available connection).
+  # Added in 25.12.0
   ## timeout-connect = 60.0
-  # Timeout for connecting to a peer for a new connection (in seconds).
-  # None means no timeout.
-  ## timeout-sock-connect = 30.0
-  # Timeout for reading a portion of data from a peer (in seconds).
-  # None means no timeout.
+  # Timeout in seconds for establishing a TCP connection to the remote server.
+  # Controls how long to wait for the initial connection handshake. Default 30
+  # seconds is suitable for most network conditions.
+  # Added in 25.12.0
+  ## timeout-sock-connect = 60.0
+  # Timeout in seconds for reading a chunk of data from the socket. Controls
+  # maximum wait time between data packets. Set to None for no timeout, useful
+  # for slow transfers over unreliable networks.
+  # Added in 25.12.0
   ## timeout-sock-read = 300.0
-
-# Deprecated, use `artifact_storages` instead.
-#
-# List of object storage configurations.
-# Each configuration defines how to connect to and use an object storage
-# service.
-[[storages]]
-# Add multiple [[storages]] sections as needed
-  # Endpoint URL for the object storage service.
-  # Should include the protocol (http or https) and port if non-standard.
-  endpoint = "http://localhost:9000"
-  # Access key for authenticating with the object storage service.
-  # Required for services that use access keys for authentication.
-  access-key = "my-access-key"
-  # Secret key for authenticating with the object storage service.
-  # Required for services that use secret keys for authentication.
-  secret-key = "my-secret-key"
-  # List of bucket names managed by this storage configuration.
-  buckets = "my-bucket"
-  # Region where the object storage service is located.
-  # Required for services that require region specification.
-  region = "us-west-1"
-  # Chunk size (in bytes) for uploading files to the object storage.
-  # Should be greater than or equal to 5 MiB due to S3 requirements.
-  upload-chunk-size = 5242880
-  # Chunk size (in bytes) for downloading files from the object storage.
-  download-chunk-size = 8192
-  # Chunk size (in bytes) for downloading files from the remote reservoir storage.
-  reservoir-download-chunk-size = 8192
-  # Name of the object storage configuration.
-  # Used to identify this storage in the system.
-  name = "s3-storage"
-
-  # Configuration for presigned upload URLs.
-  # Controls parameters like expiration time and size limits.
-  [storages.presigned-upload]
-    # Minimum file size for multipart uploads.
-    # If None, no minimum size limit is enforced.
-    ## min-size = 5242880
-    # Maximum file size for uploads.
-    # If None, no maximum size limit is enforced.
-    ## max-size = 5368709120
-    # Expiration time (in seconds) for presigned URLs.
-    expiration = 300
-
-  # Configuration for presigned download URLs.
-  # Controls parameters like expiration time.
-  [storages.presigned-download]
-    # Expiration time (in seconds) for presigned URLs.
-    expiration = 300
-
-# Deprecated, use `artifact_registries` instead.
-#
-# List of artifact registry configurations.
-# Each configuration defines how to connect to and use an artifact registry
-# service.
-[[registries]]
-# Add multiple [[registries]] sections as needed
-  # Name of the artifact registry configuration.
-  # Used to identify this registry in the system.
-  name = "huggingface"
-  # Configuration for the artifact registry.
-  config = "..."

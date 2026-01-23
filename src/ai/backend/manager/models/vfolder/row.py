@@ -4,7 +4,7 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Callable, Container, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -27,7 +27,7 @@ import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -66,7 +66,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
-    IDColumn,
     QuotaScopeIDType,
     StrEnumType,
     metadata,
@@ -105,6 +104,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.types import UserScope
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.storage import StorageSessionManager
 
 __all__: Sequence[str] = (
@@ -139,6 +139,14 @@ __all__: Sequence[str] = (
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _get_user_row_join_condition():
+    return UserRow.uuid == foreign(VFolderRow.user)
+
+
+def _get_group_row_join_condition():
+    return GroupRow.id == foreign(VFolderRow.group)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -279,53 +287,73 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-vfolders = sa.Table(
-    "vfolders",
-    metadata,
-    IDColumn("id"),
+class VFolderRow(Base):
+    __tablename__ = "vfolders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
     # host will be '' if vFolder is unmanaged
-    sa.Column("host", sa.String(length=128), nullable=False, index=True),
-    sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
-    sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
-    sa.Column(
+    host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
+    domain_name: Mapped[str] = mapped_column(
+        "domain_name", sa.String(length=64), nullable=False, index=True
+    )
+    quota_scope_id: Mapped[QuotaScopeID] = mapped_column(
+        "quota_scope_id", QuotaScopeIDType, nullable=False
+    )
+    name: Mapped[str] = mapped_column(
+        "name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True
+    )
+    usage_mode: Mapped[VFolderUsageMode] = mapped_column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
         default=VFolderUsageMode.GENERAL,
         nullable=False,
         index=True,
-    ),
-    sa.Column(
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
-    ),  # legacy
-    sa.Column("max_files", sa.Integer(), default=1000),
-    sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
-    sa.Column("num_files", sa.Integer(), default=0),
-    sa.Column("cur_size", sa.Integer(), default=0),  # in KBytes
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("last_used", sa.DateTime(timezone=True), nullable=True),
+    )  # legacy
+    max_files: Mapped[int | None] = mapped_column("max_files", sa.Integer(), default=1000)
+    max_size: Mapped[int | None] = mapped_column(
+        "max_size", sa.Integer(), default=None
+    )  # in MBytes
+    num_files: Mapped[int | None] = mapped_column("num_files", sa.Integer(), default=0)
+    cur_size: Mapped[int | None] = mapped_column("cur_size", sa.Integer(), default=0)  # in KBytes
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    last_used: Mapped[datetime | None] = mapped_column(
+        "last_used", sa.DateTime(timezone=True), nullable=True
+    )
     # creator is always set to the user who created vfolder (regardless user/project types)
-    sa.Column("creator", sa.String(length=128), nullable=True),
+    creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
-    sa.Column("unmanaged_path", sa.String(length=512), nullable=True),
-    sa.Column(
+    unmanaged_path: Mapped[str | None] = mapped_column(
+        "unmanaged_path", sa.String(length=512), nullable=True
+    )
+    ownership_type: Mapped[VFolderOwnershipType] = mapped_column(
         "ownership_type",
         EnumValueType(VFolderOwnershipType),
         default=VFolderOwnershipType.USER,
         nullable=False,
         index=True,
-    ),
-    sa.Column("user", GUID, nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, nullable=True),  # owner if project vfolder
-    sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
-    sa.Column(
+    )
+    user: Mapped[uuid.UUID | None] = mapped_column(
+        "user", GUID, nullable=True
+    )  # owner if user vfolder
+    group: Mapped[uuid.UUID | None] = mapped_column(
+        "group", GUID, nullable=True
+    )  # owner if project vfolder
+    cloneable: Mapped[bool] = mapped_column("cloneable", sa.Boolean, default=False, nullable=False)
+    status: Mapped[VFolderOperationStatus] = mapped_column(
         "status",
         StrEnumType(VFolderOperationStatus),
         default=VFolderOperationStatus.READY,
         server_default=VFolderOperationStatus.READY,
         nullable=False,
         index=True,
-    ),
+    )
     # status_history records the most recent status changes for each status
     # e.g)
     # {
@@ -333,9 +361,92 @@ vfolders = sa.Table(
     #   "delete-pending": "2022-10-22T11:40:30",
     #   "delete-ongoing": "2022-10-25T10:22:30"
     # }
-    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
-    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-)
+    status_history: Mapped[dict | None] = mapped_column(
+        "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
+    )
+    status_changed: Mapped[datetime | None] = mapped_column(
+        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
+    )
+
+    # Relationships
+    endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
+    user_row: Mapped[UserRow | None] = relationship(
+        "UserRow",
+        back_populates="vfolder_rows",
+        primaryjoin=_get_user_row_join_condition,
+    )
+    group_row: Mapped[GroupRow | None] = relationship(
+        "GroupRow",
+        back_populates="vfolder_rows",
+        primaryjoin=_get_group_row_join_condition,
+    )
+    permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
+        "VFolderPermissionRow", back_populates="vfolder_row"
+    )
+    invitation_rows: Mapped[list[VFolderInvitationRow]] = relationship(
+        "VFolderInvitationRow", back_populates="vfolder_row"
+    )
+
+    @classmethod
+    async def get(
+        cls,
+        session: SASession,
+        id: uuid.UUID,
+        load_user: bool = False,
+        load_group: bool = False,
+    ) -> VFolderRow:
+        query = sa.select(VFolderRow).where(VFolderRow.id == id)
+        if load_user:
+            query = query.options(selectinload(VFolderRow.user_row))
+        if load_group:
+            query = query.options(selectinload(VFolderRow.group_row))
+
+        result = await session.scalar(query)
+        if not result:
+            raise ObjectNotFound(object_name="VFolder")
+        return result
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.__dir__()
+
+    def __getitem__(self, item: str) -> Any:
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
+
+    @property
+    def vfid(self) -> VFolderID:
+        return VFolderID(self.quota_scope_id, self.id)
+
+    def to_data(self) -> VFolderData:
+        return VFolderData(
+            id=self.id,
+            name=self.name,
+            domain_name=self.domain_name,
+            quota_scope_id=self.quota_scope_id,
+            usage_mode=self.usage_mode,
+            permission=self.permission,
+            host=self.host,
+            max_files=self.max_files or 0,
+            max_size=self.max_size,
+            num_files=self.num_files or 0,
+            cur_size=self.cur_size or 0,
+            created_at=self.created_at or datetime.now(UTC),
+            last_used=self.last_used,
+            creator=self.creator,
+            unmanaged_path=self.unmanaged_path,
+            ownership_type=self.ownership_type,
+            user=self.user,
+            group=self.group,
+            cloneable=self.cloneable,
+            status=self.status,
+        )
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderRow class directly for new code.
+vfolders = VFolderRow.__table__
 
 
 vfolder_attachment = sa.Table(
@@ -357,131 +468,71 @@ vfolder_attachment = sa.Table(
 )
 
 
-vfolder_invitations = sa.Table(
-    "vfolder_invitations",
-    metadata,
-    IDColumn("id"),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
-    sa.Column("inviter", sa.String(length=256)),  # email
-    sa.Column("invitee", sa.String(length=256), nullable=False),  # email
-    sa.Column(
+class VFolderInvitationRow(Base):
+    __tablename__ = "vfolder_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
+    )
+    inviter: Mapped[str | None] = mapped_column("inviter", sa.String(length=256))  # email
+    invitee: Mapped[str] = mapped_column("invitee", sa.String(length=256), nullable=False)  # email
+    state: Mapped[VFolderInvitationState | None] = mapped_column(
         "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
-    ),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    modified_at: Mapped[datetime | None] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),
         nullable=True,
         onupdate=sa.func.current_timestamp(),
-    ),
-    sa.Column(
+    )
+    vfolder: Mapped[uuid.UUID] = mapped_column(
         "vfolder",
         GUID,
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-    ),
-)
+    )
+
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="invitation_rows")
 
 
-class VFolderInvitationRow(Base):
-    __table__ = vfolder_invitations
-
-    vfolder_row = relationship("VFolderRow", back_populates="invitation_rows")
-
-
-vfolder_permissions = sa.Table(
-    "vfolder_permissions",
-    metadata,
-    IDColumn(),
-    sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
-    sa.Column(
-        "vfolder",
-        GUID,
-        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
-)
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderInvitationRow class directly for new code.
+vfolder_invitations = VFolderInvitationRow.__table__
 
 
 class VFolderPermissionRow(Base):
-    __table__ = vfolder_permissions
+    __tablename__ = "vfolder_permissions"
 
-    vfolder_row = relationship("VFolderRow", back_populates="permission_rows")
-
-
-class VFolderRow(Base):
-    __table__ = vfolders
-
-    endpoints = relationship("EndpointRow", back_populates="model_row")
-    user_row = relationship(
-        "UserRow",
-        back_populates="vfolder_rows",
-        primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    group_row = relationship(
-        "GroupRow",
-        back_populates="vfolder_rows",
-        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    permission: Mapped[VFolderPermission | None] = mapped_column(
+        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
     )
-    permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
-    invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")
+    vfolder: Mapped[uuid.UUID] = mapped_column(
+        "vfolder",
+        GUID,
+        sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user: Mapped[uuid.UUID] = mapped_column(
+        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    )
 
-    @classmethod
-    async def get(
-        cls,
-        session: SASession,
-        id: uuid.UUID,
-        load_user: bool = False,
-        load_group: bool = False,
-    ) -> VFolderRow:
-        query = sa.select(VFolderRow).where(VFolderRow.id == id)
-        if load_user:
-            query = query.options(selectinload(VFolderRow.user_row))
-        if load_group:
-            query = query.options(selectinload(VFolderRow.group_row))
+    # Relationships
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="permission_rows")
 
-        result = await session.scalar(query)
-        if not result:
-            raise ObjectNotFound(object_name="VFolder")
-        return result
 
-    def __contains__(self, key) -> bool:
-        return key in self.__dir__()
-
-    def __getitem__(self, item) -> Any:
-        try:
-            return getattr(self, item)
-        except AttributeError:
-            raise KeyError(item)
-
-    @property
-    def vfid(self) -> VFolderID:
-        return VFolderID(self.quota_scope_id, self.id)
-
-    def to_data(self) -> VFolderData:
-        return VFolderData(
-            id=self.id,
-            name=self.name,
-            domain_name=self.domain_name,
-            quota_scope_id=self.quota_scope_id,
-            usage_mode=self.usage_mode,
-            permission=self.permission,
-            host=self.host,
-            max_files=self.max_files,
-            max_size=self.max_size,
-            num_files=self.num_files,
-            cur_size=self.cur_size,
-            created_at=self.created_at,
-            last_used=self.last_used,
-            creator=self.creator,
-            unmanaged_path=self.unmanaged_path,
-            ownership_type=self.ownership_type,
-            user=self.user,
-            group=self.group,
-            cloneable=self.cloneable,
-            status=self.status,
-        )
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use VFolderPermissionRow class directly for new code.
+vfolder_permissions = VFolderPermissionRow.__table__
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
@@ -549,7 +600,7 @@ async def query_accessible_vfolders(
             _query = _query.where(extra_vf_user_conds)
         result = await conn.execute(_query)
         for row in result:
-            row_keys = row.keys()
+            row_keys = row._mapping.keys()
             _perm = (
                 row.vfolder_permissions_permission
                 if "vfolder_permissions_permission" in row_keys
@@ -585,9 +636,11 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, users.c.email)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
         if allowed_status_set is not None:
             query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
         else:
@@ -609,10 +662,8 @@ async def query_accessible_vfolders(
             isouter=True,
         )
         query = (
-            sa.select(
-                vfolders_selectors + [vfolder_permissions.c.permission, users.c.email],
-                use_labels=True,
-            )
+            sa.select(*vfolders_selectors, vfolder_permissions.c.permission, users.c.email)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_uuid)
@@ -633,7 +684,7 @@ async def query_accessible_vfolders(
         # Scan group vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
@@ -642,14 +693,16 @@ async def query_accessible_vfolders(
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
-        ).select_from(j)
+        query = (
+            sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
+            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
+            .select_from(j)
+        )
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
@@ -709,14 +762,14 @@ async def get_allowed_vfolder_hosts_by_group(
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
-    query = sa.select([domains.c.allowed_vfolder_hosts]).where(
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
         allowed_hosts = allowed_hosts | values
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
+        query = sa.select(groups.c.allowed_vfolder_hosts).where(
             (groups.c.domain_name == domain_name)
             & (groups.c.id == group_id)
             & (groups.c.is_active),
@@ -744,7 +797,7 @@ async def get_allowed_vfolder_hosts_by_user(
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
-    query = sa.select([domains.c.allowed_vfolder_hosts]).where(
+    query = sa.select(domains.c.allowed_vfolder_hosts).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
@@ -768,7 +821,7 @@ async def get_allowed_vfolder_hosts_by_user(
             ),
         )
     query = (
-        sa.select([groups.c.allowed_vfolder_hosts])
+        sa.select(groups.c.allowed_vfolder_hosts)
         .select_from(j)
         .where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
@@ -1119,7 +1172,7 @@ async def update_vfolder_status(
                 "status": update_status,
                 "status_changed": now,
                 "status_history": sql_json_merge(
-                    VFolderRow.status_history,
+                    vfolders.c.status_history,
                     (),
                     {
                         update_status.name: now.isoformat(),
@@ -1306,7 +1359,7 @@ async def ensure_quota_scope_accessible_by_user(
                     return
             case _:
                 query = (
-                    sa.select([agus.c.group_id])
+                    sa.select(agus.c.group_id)
                     .select_from(agus)
                     .where(
                         (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
@@ -1321,7 +1374,7 @@ async def ensure_quota_scope_accessible_by_user(
 
 async def get_sessions_by_mounted_folder(
     db_session: SASession, vfolder_id: VFolderID
-) -> tuple[SessionId]:
+) -> tuple[SessionId, ...]:
     """
     Return a tuple of sessions.id that the give folder is mounted on.
     """
@@ -1496,8 +1549,10 @@ class VFolderPermissionContext(
             permissions = set(overriding_perm)
         else:
             permissions |= self.object_id_to_additional_permission_map.get(vfolder_id, set())
-            permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
-            permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
+            if vfolder_row.user is not None:
+                permissions |= self.user_id_to_permission_map.get(vfolder_row.user, set())
+            if vfolder_row.group is not None:
+                permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
             permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
         if self.host_permission_ctx is not None:
@@ -1654,6 +1709,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             ctx_to_merge = VFolderPermissionContext(
@@ -1687,6 +1743,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
@@ -1715,6 +1772,7 @@ class VFolderPermissionContextBuilder(
         object_id_to_permission_map = {
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
+            if row.permission is not None
         }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
@@ -1773,8 +1831,8 @@ async def get_vfolders(
     vfolder_id: uuid.UUID | None = None,
     vfolder_name: str | None = None,
     usage_mode: VFolderUsageMode | None = None,
-    allowed_status: Container[VFolderOperationStatus] | None = None,
-    blocked_status: Container[VFolderOperationStatus] | None = None,
+    allowed_status: Iterable[VFolderOperationStatus] | None = None,
+    blocked_status: Iterable[VFolderOperationStatus] | None = None,
 ) -> list[VFolderWithPermissionSet]:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]

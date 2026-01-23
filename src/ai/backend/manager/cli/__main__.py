@@ -275,7 +275,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             async with connect_database(bootstrap_config.db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
-                        sa.select([kernels.c.id])
+                        sa.select(kernels.c.id)
                         .select_from(kernels)
                         .where(
                             (kernels.c.terminated_at < expiration_date),
@@ -325,7 +325,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                     )
                     await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
 
-                curs = await conn.execute(sa.select([sa.func.count()]).select_from(SessionRow))
+                curs = await conn.execute(sa.select(sa.func.count()).select_from(SessionRow))
                 if ret := curs.fetchone():
                     table_size = ret[0]
                     log.info(

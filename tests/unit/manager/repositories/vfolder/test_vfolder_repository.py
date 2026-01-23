@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, create_autospec
 
 import pytest
 
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, VFolderHostPermissionMap, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -295,3 +295,177 @@ class TestVfolderRepository:
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+
+class TestVfolderRepositoryAllowedVfolderHosts:
+    """Tests for VfolderRepository.get_allowed_vfolder_hosts() method"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        return domain_name
+
+    @pytest.fixture
+    async def test_user_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test user resource policy."""
+        policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test project resource policy."""
+        policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_network_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test user."""
+        user_uuid = uuid.uuid4()
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_user_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        return user_uuid
+
+    @pytest.fixture
+    async def test_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create a group with allowed_vfolder_hosts set."""
+        group_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_uuid,
+                name=f"test-group-{group_uuid.hex[:8]}",
+                domain_name=test_domain_name,
+                description="Test group with vfolder hosts",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={
+                    "local": ["create-vfolder", "mount-in-session"],
+                },
+                resource_policy=test_project_resource_policy_name,
+                type=ProjectType.GENERAL,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+        return group_uuid
+
+    @pytest.fixture
+    async def vfolder_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> VfolderRepository:
+        """Create VfolderRepository instance."""
+        return VfolderRepository(db=db_with_cleanup)
+
+    async def test_get_allowed_vfolder_hosts_returns_vfolder_host_permission_map(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+        test_group: uuid.UUID,
+    ) -> None:
+        """Test that get_allowed_vfolder_hosts returns VFolderHostPermissionMap type."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=test_user,
+            group_uuid=test_group,
+        )
+
+        assert isinstance(result, VFolderHostPermissionMap)

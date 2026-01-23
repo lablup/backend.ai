@@ -7,7 +7,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -32,6 +32,8 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupOpts,
     ScalingGroupRow,
 )
@@ -47,9 +49,13 @@ from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
+    ScalingGroupForKeypairsCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_domain_purger,
+    create_scaling_group_for_keypairs_purger,
+    create_scaling_group_for_project_purger,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -79,12 +85,14 @@ class TestScalingGroupRepositoryDB:
                 DomainRow,
                 ScalingGroupRow,
                 ScalingGroupForDomainRow,
+                ScalingGroupForProjectRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
+                ScalingGroupForKeypairsRow,  # depends on ScalingGroupRow and KeyPairRow
                 GroupRow,
                 ImageRow,
                 VFolderRow,
@@ -759,7 +767,7 @@ class TestScalingGroupRepositoryDB:
         assert result.name == sgroup_name
         assert result.metadata.description == "Test scaling group for cascade delete"
 
-    # Associate Tests
+    # Associate with Domain Tests
     async def test_associate_scaling_group_with_domains_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -803,7 +811,7 @@ class TestScalingGroupRepositoryDB:
 
         yield sample_scaling_group_for_association, sample_domain
 
-    # Disassociate Tests
+    # Disassociate with Domain Tests
     async def test_disassociate_scaling_group_with_domains_success(
         self,
         scaling_group_repository: ScalingGroupRepository,
@@ -934,3 +942,247 @@ class TestScalingGroupRepositoryDB:
                 )
             )
             assert association_exists is False
+
+    # Associate/Disassociate with Keypair Tests
+
+    @pytest.fixture
+    async def sample_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[AccessKey, None]:
+        """Create a test keypair for association testing.
+
+        Returns:
+            The access_key of the created keypair.
+        """
+        test_user_uuid, _, _ = test_user_domain_group
+        # access_key column is varchar(20), so we need to keep it short
+        access_key = AccessKey(f"AK{uuid.uuid4().hex[:18].upper()}")
+        keypair_policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Create keypair resource policy first
+            keypair_policy = KeyPairResourcePolicyRow(
+                name=keypair_policy_name,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots={},
+                max_session_lifetime=0,
+                max_concurrent_sessions=30,
+                max_pending_session_count=None,
+                max_pending_session_resource_slots=None,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts={},
+            )
+            db_sess.add(keypair_policy)
+
+            keypair = KeyPairRow(
+                user=test_user_uuid,
+                access_key=access_key,
+                secret_key=f"SK{uuid.uuid4().hex}",
+                is_active=True,
+                is_admin=False,
+                resource_policy=keypair_policy_name,
+                rate_limit=1000,
+                num_queries=0,
+                ssh_public_key=None,
+            )
+            db_sess.add(keypair)
+            await db_sess.flush()
+
+        yield access_key
+
+    async def test_associate_scaling_group_with_keypairs_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        sample_keypair: AccessKey,
+    ) -> None:
+        """Test associating a scaling group with keypairs."""
+        # Given: A scaling group and a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = sample_keypair
+
+        # When: Associate the scaling group with the keypair
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForKeypairsCreatorSpec(
+                    scaling_group=sgroup_name,
+                    access_key=access_key,
+                )
+            ]
+        )
+        await scaling_group_repository.associate_scaling_group_with_keypairs(bulk_creator)
+
+        # Then: Association should exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
+        )
+        assert association_exists is True
+
+    async def test_disassociate_scaling_group_with_keypairs_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        sample_keypair: AccessKey,
+    ) -> None:
+        """Test disassociating a scaling group from keypairs."""
+        # Given: A scaling group associated with a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = sample_keypair
+
+        # First, associate the scaling group with the keypair using repository
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForKeypairsCreatorSpec(
+                    scaling_group=sgroup_name,
+                    access_key=access_key,
+                )
+            ]
+        )
+        await scaling_group_repository.associate_scaling_group_with_keypairs(bulk_creator)
+
+        # Verify association exists
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
+        )
+        assert association_exists is True
+
+        # When: Disassociate the scaling group from the keypair
+        purger = create_scaling_group_for_keypairs_purger(
+            scaling_group=sgroup_name,
+            access_key=access_key,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_keypairs(purger)
+
+        # Then: Association should no longer exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_keypair_association_exists(
+                sgroup_name, access_key
+            )
+        )
+        assert association_exists is False
+
+    async def test_disassociate_nonexistent_scaling_group_with_keypairs(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        sample_keypair: AccessKey,
+    ) -> None:
+        """Test disassociating a non-existent association does not raise error."""
+        # Given: A scaling group that is NOT associated with a keypair
+        sgroup_name = sample_scaling_group_for_purge
+        access_key = sample_keypair
+
+        # When: Disassociate (even though no association exists)
+        purger = create_scaling_group_for_keypairs_purger(
+            scaling_group=sgroup_name,
+            access_key=access_key,
+        )
+        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
+        await scaling_group_repository.disassociate_scaling_group_with_keypairs(purger)
+
+    # Associate/Disassociate with User Group (Project) Tests
+
+    async def test_associate_scaling_group_with_user_groups_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> None:
+        """Test associating a scaling group with user groups (projects)."""
+        # Given: A scaling group and a project (group)
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # When: Associate the scaling group with the project
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=sgroup_name,
+                    project=project_id,
+                )
+            ]
+        )
+        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
+
+        # Then: Association should exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
+            )
+        )
+        assert association_exists is True
+
+    async def test_disassociate_scaling_group_with_user_groups_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> None:
+        """Test disassociating a scaling group from a user group (project)."""
+        # Given: A scaling group associated with a project
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # First, associate the scaling group with the project using repository
+        bulk_creator = BulkCreator(
+            specs=[
+                ScalingGroupForProjectCreatorSpec(
+                    scaling_group=sgroup_name,
+                    project=project_id,
+                )
+            ]
+        )
+        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
+
+        # Verify association exists
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
+            )
+        )
+        assert association_exists is True
+
+        # When: Disassociate the scaling group from the project
+        purger = create_scaling_group_for_project_purger(
+            scaling_group=sgroup_name,
+            project=project_id,
+        )
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)
+
+        # Then: Association should no longer exist
+        association_exists = (
+            await scaling_group_repository.check_scaling_group_user_group_association_exists(
+                scaling_group=sgroup_name,
+                user_group=project_id,
+            )
+        )
+        assert association_exists is False
+
+    async def test_disassociate_nonexistent_scaling_group_with_user_groups(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_purge: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> None:
+        """Test disassociating a non-existent association does not raise error."""
+        # Given: A scaling group that is NOT associated with a project
+        sgroup_name = sample_scaling_group_for_purge
+        _, _, project_id = test_user_domain_group
+
+        # When: Disassociate (even though no association exists)
+        purger = create_scaling_group_for_project_purger(
+            scaling_group=sgroup_name,
+            project=project_id,
+        )
+        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
@@ -21,9 +21,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
-from ai.backend.manager.repositories.model_serving.admin_repository import (
-    AdminModelServingRepository,
-)
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 
 
@@ -50,12 +47,6 @@ def mock_db_engine():
 def model_serving_repository(mock_db_engine):
     """Create a ModelServingRepository instance with mocked database."""
     return ModelServingRepository(db=mock_db_engine)
-
-
-@pytest.fixture
-def admin_model_serving_repository(mock_db_engine):
-    """Create an AdminModelServingRepository instance with mocked database."""
-    return AdminModelServingRepository(db=mock_db_engine)
 
 
 @pytest.fixture
@@ -217,7 +208,7 @@ def sample_endpoint(
     """Create a sample endpoint for testing."""
     endpoint = sample_endpoint_creator_spec.build_row()
     # Set attributes that are normally set by the database
-    endpoint.id = uuid.uuid4()
+    endpoint.id = EndpointId(uuid.uuid4())
     endpoint.created_at = datetime.now(UTC)
     endpoint.destroyed_at = None
     endpoint.lifecycle_stage = EndpointLifecycle.CREATED
@@ -435,7 +426,7 @@ def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
     )
 
     # Set attributes normally set by database
-    endpoint_row.id = uuid.uuid4()
+    endpoint_row.id = EndpointId(uuid.uuid4())
     endpoint_row.created_at = None
     endpoint_row.destroyed_at = None
     endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED

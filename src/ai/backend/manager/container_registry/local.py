@@ -80,11 +80,10 @@ class LocalRegistry(BaseContainerRegistry):
                 "Architecture": architecture,
             }
             log.debug("scanned image info: {}:{}\n{}", image, tag, pretty_json_str(summary))
-            already_exists = 0
             config_digest = data["Id"]
             async with self.db.begin_readonly_session() as db_session:
                 already_exists = await db_session.scalar(
-                    sa.select([sa.func.count(ImageRow.id)]).where(
+                    sa.select(sa.func.count(ImageRow.id)).where(
                         sa.and_(
                             ImageRow.config_digest == config_digest,
                             ImageRow.is_local == sa.false(),
@@ -92,7 +91,7 @@ class LocalRegistry(BaseContainerRegistry):
                         )
                     ),
                 )
-            if already_exists > 0:
+            if already_exists is not None and already_exists > 0:
                 return {}, "already synchronized from a remote registry"
             labels = data["Config"]["Labels"]
             if labels is None:

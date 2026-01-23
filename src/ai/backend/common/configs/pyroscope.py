@@ -78,6 +78,6 @@ class PyroscopeConfig(BaseConfigSchema):
                 "Balance based on your performance monitoring needs."
             ),
             added_version="24.12.1",
-            example="100",
+            example=ConfigExample(local="100", prod="100"),
         ),
     ]

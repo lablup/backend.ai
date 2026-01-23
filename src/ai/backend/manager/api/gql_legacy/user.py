@@ -373,7 +373,7 @@ class UserNode(graphene.ObjectType):
         if external_filters_to_apply and external_table_filter:
             user_table = cast(sa.Table, UserRow.__table__)
 
-            join_clause = user_table
+            join_clause: sa.Table | sa.sql.Join = user_table
             for spec in external_filters_to_apply.values():
                 join_clause = spec.join_builder(join_clause)
 
@@ -478,8 +478,8 @@ class UserGroup(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            id=row["id"],
-            name=row["name"],
+            id=row.id,
+            name=row.name,
         )
 
     @classmethod
@@ -487,7 +487,7 @@ class UserGroup(graphene.ObjectType):
         async with ctx.db.begin() as conn:
             j = agus.join(groups, agus.c.group_id == groups.c.id)
             query = (
-                sa.select([agus.c.user_id, groups.c.name, groups.c.id])
+                sa.select(agus.c.user_id, groups.c.name, groups.c.id)
                 .select_from(j)
                 .where(agus.c.user_id.in_(user_ids))
             )
@@ -497,7 +497,7 @@ class UserGroup(graphene.ObjectType):
                 query,
                 cls,
                 user_ids,
-                lambda row: row["user_id"],
+                lambda row: row.user_id,
             )
 
 
@@ -587,29 +587,29 @@ class User(graphene.ObjectType):
         row: Row,
     ) -> User:
         return cls(
-            id=row["uuid"],
-            uuid=row["uuid"],
-            username=row["username"],
-            email=row["email"],
-            need_password_change=row["need_password_change"],
-            full_name=row["full_name"],
-            description=row["description"],
-            is_active=row["status"] == UserStatus.ACTIVE,  # legacy
-            status=row["status"],
-            status_info=row["status_info"],
-            created_at=row["created_at"],
-            modified_at=row["modified_at"],
-            domain_name=row["domain_name"],
-            role=row["role"],
-            resource_policy=row["resource_policy"],
-            allowed_client_ip=row["allowed_client_ip"],
-            totp_activated=row["totp_activated"],
-            totp_activated_at=row["totp_activated_at"],
-            sudo_session_enabled=row["sudo_session_enabled"],
-            main_access_key=row["main_access_key"],
-            container_uid=row["container_uid"],
-            container_main_gid=row["container_main_gid"],
-            container_gids=row["container_gids"],
+            id=row.uuid,
+            uuid=row.uuid,
+            username=row.username,
+            email=row.email,
+            need_password_change=row.need_password_change,
+            full_name=row.full_name,
+            description=row.description,
+            is_active=row.status == UserStatus.ACTIVE,  # legacy
+            status=row.status,
+            status_info=row.status_info,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            role=row.role,
+            resource_policy=row.resource_policy,
+            allowed_client_ip=row.allowed_client_ip,
+            totp_activated=row.totp_activated,
+            totp_activated_at=row.totp_activated_at,
+            sudo_session_enabled=row.sudo_session_enabled,
+            main_access_key=row.main_access_key,
+            container_uid=row.container_uid,
+            container_main_gid=row.container_main_gid,
+            container_gids=row.container_gids,
         )
 
     @classmethod
@@ -628,9 +628,9 @@ class User(graphene.ObjectType):
         """
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select([users]).select_from(j).where(agus.c.group_id == group_id)
+            query = sa.select(users).select_from(j).where(agus.c.group_id == group_id)
         else:
-            query = sa.select([users]).select_from(users)
+            query = sa.select(users).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
         if domain_name is not None:
@@ -700,9 +700,9 @@ class User(graphene.ObjectType):
     ) -> int:
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select([sa.func.count()]).select_from(j).where(agus.c.group_id == group_id)
+            query = sa.select(sa.func.count()).select_from(j).where(agus.c.group_id == group_id)
         else:
-            query = sa.select([sa.func.count()]).select_from(users)
+            query = sa.select(sa.func.count()).select_from(users)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -722,7 +722,7 @@ class User(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-        return result.scalar()
+        return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -741,14 +741,14 @@ class User(graphene.ObjectType):
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
             query = (
-                sa.select([users])
+                sa.select(users)
                 .select_from(j)
                 .where(agus.c.group_id == group_id)
                 .limit(limit)
                 .offset(offset)
             )
         else:
-            query = sa.select([users]).select_from(users).limit(limit).offset(offset)
+            query = sa.select(users).select_from(users).limit(limit).offset(offset)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -795,7 +795,7 @@ class User(graphene.ObjectType):
     ) -> Sequence[Optional[User]]:
         if not emails:
             return []
-        query = sa.select([users]).select_from(users).where(users.c.email.in_(emails))
+        query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -810,7 +810,7 @@ class User(graphene.ObjectType):
                 query,
                 cls,
                 emails,
-                lambda row: row["email"],
+                lambda row: row.email,
             )
 
     @classmethod
@@ -825,7 +825,7 @@ class User(graphene.ObjectType):
     ) -> Sequence[Optional[User]]:
         if not user_ids:
             return []
-        query = sa.select([users]).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -840,7 +840,7 @@ class User(graphene.ObjectType):
                 query,
                 cls,
                 user_ids,
-                lambda row: row["uuid"],
+                lambda row: row.uuid,
             )
 
 
@@ -1074,6 +1074,8 @@ class CreateUser(graphene.Mutation):
     ) -> CreateUser:
         from .keypair import KeyPair
 
+        validate_user_mutation_props(props)
+
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email, graph_ctx)
 
@@ -1108,6 +1110,8 @@ class ModifyUser(graphene.Mutation):
         props: ModifyUserInput,
     ) -> ModifyUser:
         graph_ctx: GraphQueryContext = info.context
+
+        validate_user_mutation_props(props)
 
         action: ModifyUserAction = props.to_action(email, graph_ctx)
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
@@ -1199,3 +1203,16 @@ class PurgeUser(graphene.Mutation):
             ok=True,
             msg="success",
         )
+
+
+def _validate_container_uid_gid(value: Any) -> None:
+    if value is not Undefined and value is not None and value < 0:
+        raise ValueError("UID and GID must be non-negative integers.")
+
+
+def validate_user_mutation_props(props: UserInput | ModifyUserInput) -> None:
+    for value in [props.container_uid, props.container_main_gid]:
+        _validate_container_uid_gid(value)
+    if props.container_gids is not Undefined and props.container_gids is not None:
+        for value in props.container_gids:
+            _validate_container_uid_gid(value)

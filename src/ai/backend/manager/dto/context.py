@@ -10,7 +10,9 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.config.unified import ExportConfig
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.export import ExportRepository
 from ai.backend.manager.services.processors import Processors
 
 
@@ -124,4 +126,27 @@ class VFolderAuthContext(MiddlewareParam):
             access_key=access_key,
             vfolder_row=row,
             processors=root_ctx.processors,
+        )
+
+
+class ExportCtx(MiddlewareParam):
+    """
+    Middleware parameter providing export-specific context.
+
+    Provides access to export repository (for report definitions) and export config
+    (for max_rows, statement_timeout_sec).
+    """
+
+    repository: ExportRepository
+    config: ExportConfig
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+        return cls(
+            repository=root_ctx.repositories.export.repository,
+            config=root_ctx.config_provider.config.export,
         )

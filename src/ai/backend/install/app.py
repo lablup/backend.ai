@@ -58,7 +58,10 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
@@ -115,7 +118,10 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
@@ -408,6 +414,12 @@ class ModeMenu(Static):
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+            fqdn_prefix=args.fqdn_prefix,
+            tls_advertised=args.tls_advertised,
+            advertised_port=args.advertised_port,
+            endpoint_protocol=args.endpoint_protocol,
+            frontend_mode=args.frontend_mode,
+            use_wildcard_binding=args.use_wildcard_binding,
         )
 
     def compose(self) -> ComposeResult:

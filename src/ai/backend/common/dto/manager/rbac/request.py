@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -22,6 +23,7 @@ from .types import (
     RoleOrderField,
     RoleSource,
     RoleStatus,
+    ScopeOrderField,
 )
 
 __all__ = (
@@ -34,7 +36,11 @@ __all__ = (
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
+    "ScopeFilter",
+    "ScopeOrder",
+    "SearchEntitiesRequest",
     "SearchRolesRequest",
+    "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -112,7 +118,9 @@ class SearchRolesRequest(BaseRequestModel):
 
     filter: Optional[RoleFilter] = Field(default=None, description="Filter conditions")
     order: Optional[list[RoleOrder]] = Field(default=None, description="Order specifications")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -138,7 +146,9 @@ class SearchUsersAssignedToRoleRequest(BaseRequestModel):
     order: Optional[list[AssignedUserOrder]] = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -154,9 +164,45 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     """Request to create an object permission for a role."""
 
     role_id: UUID = Field(description="Role ID to add the object permission to")
+    permission_group_id: UUID = Field(
+        description="Permission group ID to associate the object permission with"
+    )
     entity_type: EntityType = Field(description="Entity type for the object permission")
     entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
     operation: OperationType = Field(description="Operation type for the object permission")
     status: PermissionStatus = Field(
         default=PermissionStatus.ACTIVE, description="Permission status"
     )
+
+
+class ScopeFilter(BaseRequestModel):
+    """Filter for scopes."""
+
+    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
+
+
+class ScopeOrder(BaseRequestModel):
+    """Order specification for scopes."""
+
+    field: ScopeOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
+
+
+class SearchScopesRequest(BaseRequestModel):
+    """Request body for searching scopes with filters and pagination."""
+
+    filter: Optional[ScopeFilter] = Field(default=None, description="Filter conditions")
+    order: Optional[list[ScopeOrder]] = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class SearchEntitiesRequest(BaseRequestModel):
+    """Request body for searching entities within a scope."""
+
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")

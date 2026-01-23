@@ -13,7 +13,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
+from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
@@ -369,7 +369,9 @@ class ArtifactService:
             ordering=action.ordering,
             filters=action.filters,
         )
-        return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
+        return ListArtifactsWithRevisionsActionResult(
+            data=artifacts_data, total_count=total_count or 0
+        )
 
     async def search_with_revisions(
         self, action: SearchArtifactsWithRevisionsAction

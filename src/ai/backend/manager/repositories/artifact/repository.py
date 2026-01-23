@@ -180,7 +180,7 @@ class ArtifactRepository:
         )
 
     @artifact_repository_resilience.apply()
-    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
         return await self._db_source.get_artifact_revision_readme(artifact_revision_id)
 
     @artifact_repository_resilience.apply()
@@ -190,7 +190,7 @@ class ArtifactRepository:
         pagination: Optional[PaginationOptions] = None,
         ordering: Optional[ArtifactOrderingOptions] = None,
         filters: Optional[ArtifactFilterOptions] = None,
-    ) -> tuple[list[ArtifactDataWithRevisions], int]:
+    ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
         # Legacy
         return await self._db_source.list_artifacts_with_revisions_paginated(
             pagination=pagination, ordering=ordering, filters=filters

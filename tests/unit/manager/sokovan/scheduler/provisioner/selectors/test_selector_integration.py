@@ -1,5 +1,7 @@
 """Integration tests for agent selector strategies."""
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 
@@ -17,14 +19,13 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin impor
     RoundRobinAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
+    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
     ResourceRequirements,
     SessionMetadata,
 )
-
-from .conftest import create_agent_info
 
 
 class TestSelectorIntegration:
@@ -61,26 +62,9 @@ class TestSelectorIntegration:
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
         resource_priority: list[str],
+        agents_for_strategy_comparison: list[AgentInfo],
     ) -> None:
         """Test that different strategies make different choices for the same scenario."""
-        agents = [
-            create_agent_info(
-                agent_id="agent-1",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("14"), "mem": Decimal("28672")},
-            ),
-            create_agent_info(
-                agent_id="agent-2",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-            ),
-            create_agent_info(
-                agent_id="agent-3",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
@@ -94,8 +78,9 @@ class TestSelectorIntegration:
         roundrobin = RoundRobinAgentSelector(next_index=1)
 
         # Get selections
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_for_strategy_comparison
+        ]
         concentrated_choice = concentrated.select_tracker_by_strategy(
             trackers, resource_req, criteria, config
         )
@@ -116,49 +101,12 @@ class TestSelectorIntegration:
         assert roundrobin_choice.original_agent.agent_id == AgentId("agent-2")  # Index 1
 
     def test_mixed_resource_types_comparison(
-        self, criteria: AgentSelectionCriteria, config: AgentSelectionConfig
+        self,
+        criteria: AgentSelectionCriteria,
+        config: AgentSelectionConfig,
+        agents_mixed_accelerators: list[AgentInfo],
     ) -> None:
         """Test strategy differences with mixed resource types."""
-        agents = [
-            create_agent_info(
-                agent_id="gpu-specialist",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("0"),
-                },
-            ),
-            create_agent_info(
-                agent_id="tpu-specialist",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "tpu": Decimal("4"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "tpu": Decimal("0"),
-                },
-            ),
-            create_agent_info(
-                agent_id="cpu-generalist",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                },
-            ),
-        ]
-
         # Request only CPU/memory (explicitly no GPU/TPU)
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
@@ -176,8 +124,7 @@ class TestSelectorIntegration:
         legacy = LegacyAgentSelector(["cpu", "mem"])
 
         # All have same CPU/mem available, but different unutilized capabilities
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_mixed_accelerators]
         concentrated_choice = concentrated.select_tracker_by_strategy(
             trackers, resource_req, criteria, config
         )
@@ -205,29 +152,9 @@ class TestSelectorIntegration:
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
         resource_priority: list[str],
+        agents_for_large_scale_performance: list[AgentInfo],
     ) -> None:
         """Test selector performance with many agents."""
-        # Create 100 agents with varying resource levels
-        agents = []
-        for i in range(100):
-            occupied_cpu = Decimal(str(i % 16))
-            occupied_mem = Decimal(str((i % 16) * 2048))
-            agents.append(
-                create_agent_info(
-                    agent_id=f"agent-{i:03d}",
-                    available_slots={
-                        "cpu": Decimal("16"),
-                        "mem": Decimal("32768"),
-                        "cuda.shares": Decimal("4") if i % 3 == 0 else Decimal("0"),
-                    },
-                    occupied_slots={
-                        "cpu": occupied_cpu,
-                        "mem": occupied_mem,
-                        "cuda.shares": Decimal("0"),
-                    },
-                )
-            )
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
@@ -243,8 +170,9 @@ class TestSelectorIntegration:
         }
 
         results = {}
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_for_large_scale_performance
+        ]
         for name, selector in selectors.items():
             selected = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
             results[name] = selected
@@ -265,7 +193,11 @@ class TestSelectorIntegration:
         # Round-robin should pick based on index
         assert results["roundrobin"].original_agent.agent_id == AgentId("agent-042")  # Index 42
 
-    def test_inference_session_spreading(self, config: AgentSelectionConfig) -> None:
+    def test_inference_session_spreading(
+        self,
+        config: AgentSelectionConfig,
+        agents_for_inference_spreading: list[AgentInfo],
+    ) -> None:
         """Test special behavior for inference sessions with endpoint replica spreading."""
         # Create criteria for inference session
         criteria = AgentSelectionCriteria(
@@ -288,24 +220,6 @@ class TestSelectorIntegration:
             enforce_spreading_endpoint_replica=True,
         )
 
-        agents = [
-            create_agent_info(
-                agent_id="agent-1",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-            ),
-            create_agent_info(
-                agent_id="agent-2",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-            ),
-            create_agent_info(
-                agent_id="agent-3",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-            ),
-        ]
-
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
@@ -316,8 +230,9 @@ class TestSelectorIntegration:
         concentrated = ConcentratedAgentSelector(["cpu", "mem"])
         dispersed = DispersedAgentSelector(["cpu", "mem"])
 
-        # Convert agents to trackers
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
+        trackers = [
+            AgentStateTracker(original_agent=agent) for agent in agents_for_inference_spreading
+        ]
         concentrated_choice = concentrated.select_tracker_by_strategy(
             trackers, resource_req, criteria, config
         )

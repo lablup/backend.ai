@@ -73,10 +73,10 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
     async with root_ctx.db.begin() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name, access_key)
         if not is_admin:
-            sgroups = [sgroup for sgroup in sgroups if sgroup["is_public"]]
+            sgroups = [sgroup for sgroup in sgroups if sgroup.is_public]
         return web.json_response(
             {
-                "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
+                "scaling_groups": [{"name": sgroup.name} for sgroup in sgroups],
             },
             status=HTTPStatus.OK,
         )
@@ -101,8 +101,8 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
     async with root_ctx.db.begin_readonly() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
         for sgroup in sgroups:
-            if sgroup["name"] == scaling_group_name:
-                wsproxy_addr = sgroup["wsproxy_addr"]
+            if sgroup.name == scaling_group_name:
+                wsproxy_addr = sgroup.wsproxy_addr
                 if not wsproxy_addr:
                     wsproxy_version = "v1"
                 else:

@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, cast
 
 from aiohttp import web
+from sqlalchemy import RowMapping
 
 from ai.backend.common.dto.manager.auth.field import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
@@ -139,12 +140,12 @@ class AuthService:
                 action.email,
                 target_password_info=target_password_info,
             )
-        if user["status"] == UserStatus.BEFORE_VERIFICATION:
+        if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
-        if user["status"] in INACTIVE_USER_STATUSES:
+        if user.status in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
-        user_row = await self._auth_repository.get_user_row_by_uuid(user["uuid"])
+        user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
         main_keypair_row = user_row.get_main_keypair_row()
         if main_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
@@ -167,10 +168,10 @@ class AuthService:
             stream_response=None,
             authorization_result=AuthorizationResult(
                 access_key=main_keypair_row.access_key,
-                secret_key=main_keypair_row.secret_key,
-                user_id=user["uuid"],
-                role=user["role"],
-                status=user["status"],
+                secret_key=main_keypair_row.secret_key or "",
+                user_id=user.uuid,
+                role=user.role,
+                status=user.status,
             ),
         )
 
@@ -425,12 +426,14 @@ class AuthService:
             ),
         )
 
-    async def _check_password_age(self, user: dict, auth_config: Optional[AuthConfig]) -> None:
+    async def _check_password_age(
+        self, user: RowMapping, auth_config: Optional[AuthConfig]
+    ) -> None:
         if (
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None
         ):
-            password_changed_at: Optional[datetime] = user["password_changed_at"]
+            password_changed_at: Optional[datetime] = user.password_changed_at
             if password_changed_at is None:
                 return  # Skip check if password_changed_at is not set
 

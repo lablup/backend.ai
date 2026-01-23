@@ -5,13 +5,15 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
@@ -87,6 +89,10 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
+from ai.backend.manager.models.scheduling_history import (
+    DeploymentHistoryRow,
+    RouteHistoryRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -97,6 +103,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
@@ -174,9 +181,8 @@ class DeploymentDBSource:
             )
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -192,9 +198,8 @@ class DeploymentDBSource:
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                sess_factory = sessionmaker(
+                sess_factory = async_sessionmaker(
                     bind=conn_with_isolation,
-                    class_=SASession,
                     expire_on_commit=False,
                 )
                 session = sess_factory()
@@ -426,7 +431,7 @@ class DeploymentDBSource:
             )
         )
         result = await db_sess.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def list_endpoints_by_name(
         self,
@@ -467,7 +472,7 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=lifecycle)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def get_modified_endpoint(
         self,
@@ -546,6 +551,94 @@ class DeploymentDBSource:
                 .values(lifecycle_stage=new_status)
             )
             await db_sess.execute(query)
+
+    async def update_endpoint_lifecycle_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> int:
+        """Update lifecycle status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction. Uses merge logic to prevent duplicate
+        history records when phase, error_code, and to_status match.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        if not batch_updaters:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # 1. Execute all status updates
+            for batch_updater in batch_updaters:
+                update_result = await execute_batch_updater(db_sess, batch_updater)
+                total_updated += update_result.updated_count
+
+            if not bulk_creator.specs:
+                return total_updated
+
+            # 2. Build rows from specs
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            deployment_ids = [row.deployment_id for row in new_rows]
+
+            # 3. Get last history records for all deployments
+            last_records = await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[uuid.UUID] = []
+            create_rows: list[DeploymentHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(new_row.deployment_id)
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(DeploymentHistoryRow)
+                    .where(DeploymentHistoryRow.id.in_(merge_ids))
+                    .values(attempts=DeploymentHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
+
+            return total_updated
+
+    async def _get_last_deployment_histories_bulk(
+        self,
+        db_sess: SASession,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments efficiently."""
+        if not deployment_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per deployment
+        query = (
+            sa.select(DeploymentHistoryRow)
+            .where(DeploymentHistoryRow.deployment_id.in_(deployment_ids))
+            .distinct(DeploymentHistoryRow.deployment_id)
+            .order_by(
+                DeploymentHistoryRow.deployment_id,
+                DeploymentHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {row.deployment_id: row for row in rows}
 
     async def delete_endpoint_with_routes(
         self,
@@ -631,7 +724,7 @@ class DeploymentDBSource:
                 EndpointAutoScalingRuleRow.id == rule_id
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     # New Model Deployment Auto-scaling Rule methods (using new types)
 
@@ -733,7 +826,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=UTC),
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -752,7 +845,7 @@ class DeploymentDBSource:
                 .values(session=session_id, status=RouteStatus.PROVISIONING)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route(
         self,
@@ -781,7 +874,7 @@ class DeploymentDBSource:
 
             query = sa.update(RoutingRow).where(RoutingRow.id == route_id).values(**values)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def update_route_traffic_ratio(
         self,
@@ -796,7 +889,7 @@ class DeploymentDBSource:
                 .values(traffic_ratio=traffic_ratio)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def delete_route(
         self,
@@ -806,7 +899,7 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             query = sa.delete(RoutingRow).where(RoutingRow.id == route_id)
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def search_routes(
         self,
@@ -999,7 +1092,7 @@ class DeploymentDBSource:
         # Then delete the endpoint itself
         endpoint_query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint_id)
         result = await db_sess.execute(endpoint_query)
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def _fetch_endpoint_and_routes(
         self,
@@ -1022,7 +1115,7 @@ class DeploymentDBSource:
 
         return EndpointWithRoutesRawData(
             endpoint_row=endpoint_row,
-            route_rows=route_rows,
+            route_rows=list(route_rows),
         )
 
     # Additional methods for DeploymentExecutor
@@ -1111,7 +1204,7 @@ class DeploymentDBSource:
                 .values(last_triggered_at=triggered_at)
             )
             result = await db_sess.execute(query)
-            return result.rowcount > 0
+            return cast(CursorResult, result).rowcount > 0
 
     async def fetch_kernels_by_session_ids(
         self,
@@ -1188,11 +1281,11 @@ class DeploymentDBSource:
     ) -> Mapping[str, Optional[ScalingGroupProxyTarget]]:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa.select([
+                sa.select(
                     scaling_groups.c.name,
                     scaling_groups.c.wsproxy_addr,
                     scaling_groups.c.wsproxy_api_token,
-                ])
+                )
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name.in_(scaling_group))
             )
@@ -1302,7 +1395,7 @@ class DeploymentDBSource:
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
                     traffic_ratio=row.traffic_ratio,
-                    created_at=row.created_at,
+                    created_at=row.created_at or datetime.now(tz=UTC),
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)
@@ -1337,6 +1430,94 @@ class DeploymentDBSource:
                 .values(status=new_status)
             )
             await db_sess.execute(query)
+
+    async def update_route_status_bulk_with_history(
+        self,
+        batch_updaters: Sequence[BatchUpdater[RoutingRow]],
+        bulk_creator: BulkCreator[RouteHistoryRow],
+    ) -> int:
+        """Update route status and record history in same transaction.
+
+        All batch updates and history creations are executed atomically
+        in a single transaction. Uses merge logic to prevent duplicate
+        history records when phase, error_code, and to_status match.
+
+        Args:
+            batch_updaters: Sequence of BatchUpdaters for status updates
+            bulk_creator: BulkCreator containing all history records
+
+        Returns:
+            Total number of rows updated
+        """
+        if not batch_updaters:
+            return 0
+
+        async with self._begin_session_read_committed() as db_sess:
+            total_updated = 0
+            # 1. Execute all status updates
+            for batch_updater in batch_updaters:
+                update_result = await execute_batch_updater(db_sess, batch_updater)
+                total_updated += update_result.updated_count
+
+            if not bulk_creator.specs:
+                return total_updated
+
+            # 2. Build rows from specs
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            route_ids = [row.route_id for row in new_rows]
+
+            # 3. Get last history records for all routes
+            last_records = await self._get_last_route_histories_bulk(db_sess, route_ids)
+
+            # 4. Separate rows into merge and create groups
+            merge_ids: list[uuid.UUID] = []
+            create_rows: list[RouteHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(new_row.route_id)
+
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            # 5. Batch update attempts for merge group
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(RouteHistoryRow)
+                    .where(RouteHistoryRow.id.in_(merge_ids))
+                    .values(attempts=RouteHistoryRow.attempts + 1)
+                )
+
+            # 6. Batch insert for create group
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
+
+            return total_updated
+
+    async def _get_last_route_histories_bulk(
+        self,
+        db_sess: SASession,
+        route_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, RouteHistoryRow]:
+        """Get last history records for multiple routes efficiently."""
+        if not route_ids:
+            return {}
+
+        # Use DISTINCT ON to get latest record per route
+        query = (
+            sa.select(RouteHistoryRow)
+            .where(RouteHistoryRow.route_id.in_(route_ids))
+            .distinct(RouteHistoryRow.route_id)
+            .order_by(
+                RouteHistoryRow.route_id,
+                RouteHistoryRow.created_at.desc(),
+            )
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+        return {row.route_id: row for row in rows}
 
     async def mark_terminating_route_status_bulk(
         self,
@@ -1608,6 +1789,8 @@ class DeploymentDBSource:
                 raise EndpointNotFound(str(endpoint_id))
 
             # Get model vfolder for health check config
+            if endpoint.model is None:
+                return None
             model = await VFolderRow.get(db_sess, endpoint.model)
             if not model:
                 return None

@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from rich.console import ConsoleRenderable
+from rich.console import Console, ConsoleRenderable
 from rich.text import Text
+from rich.traceback import Traceback
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -44,9 +45,51 @@ class SetupLog(RichLog):
         Binding("enter", "continue", show=False),
     ]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._continue = asyncio.Event()
+        self._stdout_console: Console | None = None
+
+    def on_mount(self) -> None:
+        if self.app.is_headless:
+            self._stdout_console = Console(force_terminal=True)
+
+    def _write_to_stdout(self, content: object) -> None:
+        """Write content to stdout via Rich Console."""
+        if self._stdout_console is None:
+            return
+        try:
+            if isinstance(content, (str, Text, Traceback)):
+                self._stdout_console.print(content)
+            elif isinstance(content, Exception):
+                self._stdout_console.print(f"[red]Error: {content}[/red]")
+                self._stdout_console.print_exception()
+            else:
+                self._stdout_console.print(content)
+        except Exception:
+            pass
+
+    def write(
+        self,
+        content: object,
+        width: int | None = None,
+        expand: bool = False,
+        shrink: bool = True,
+        scroll_end: bool | None = None,
+    ) -> SetupLog:
+        """Write content to the log and optionally to stdout."""
+        # Always write to the RichLog widget
+        super().write(content, width=width, expand=expand, shrink=shrink, scroll_end=scroll_end)
+
+        # Write to stdout if headless mode
+        if self._stdout_console is not None:
+            self._write_to_stdout(content)
+
+        return self
 
     async def wait_continue(self) -> None:
         """

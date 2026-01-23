@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import foreign, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
@@ -14,12 +16,16 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
     ArtifactStatus,
 )
-from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IDColumn,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact import ArtifactRow
+    from ai.backend.manager.models.association_artifacts_storages import (
+        AssociationArtifactsStorageRow,
+    )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -32,6 +38,14 @@ def _get_artifact_join_cond():
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
+def _get_association_artifacts_storages_join_cond():
+    from ai.backend.manager.models.association_artifacts_storages import (
+        AssociationArtifactsStorageRow,
+    )
+
+    return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
+
+
 class ArtifactRevisionRow(Base):
     __tablename__ = "artifact_revisions"
     __table_args__ = (
@@ -39,67 +53,83 @@ class ArtifactRevisionRow(Base):
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
     )
 
-    id = IDColumn("id")
-    artifact_id = sa.Column(
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    artifact_id: Mapped[uuid.UUID] = mapped_column(
+        "artifact_id",
         GUID,
         nullable=False,
         index=True,
     )
-    version = sa.Column("version", sa.String, nullable=False)
-    readme = sa.Column("readme", sa.TEXT, nullable=True, default=None)
-    size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
-    digest = sa.Column("digest", sa.String, nullable=True, server_default=None, default=None)
-
-    # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.
-    status = sa.Column(sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value)
-    remote_status = sa.Column(
-        sa.String, index=True, nullable=True, default=None, server_default=sa.null()
+    version: Mapped[str] = mapped_column("version", sa.String, nullable=False)
+    readme: Mapped[str | None] = mapped_column("readme", sa.TEXT, nullable=True, default=None)
+    size: Mapped[int | None] = mapped_column("size", sa.BigInteger, nullable=True, default=None)
+    digest: Mapped[str | None] = mapped_column(
+        "digest", sa.String, nullable=True, server_default=None, default=None
     )
 
-    created_at = sa.Column(
+    # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.
+    status: Mapped[str] = mapped_column(
+        "status", sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value
+    )
+    remote_status: Mapped[str | None] = mapped_column(
+        "remote_status",
+        sa.String,
+        index=True,
+        nullable=True,
+        default=None,
+        server_default=sa.null(),
+    )
+
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         nullable=True,
         server_default=None,
         index=True,
     )
-    updated_at = sa.Column(
+    updated_at: Mapped[datetime | None] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
         nullable=True,
         server_default=None,
         index=True,
     )
-    verification_result = sa.Column(
+    verification_result: Mapped[dict | None] = mapped_column(
         "verification_result", sa.JSON(none_as_null=True), nullable=True, default=None
     )
 
-    artifact = relationship(
+    artifact: Mapped[ArtifactRow] = relationship(
         "ArtifactRow",
         back_populates="revision_rows",
         primaryjoin=_get_artifact_join_cond,
         viewonly=True,
     )
 
-    association_artifacts_storages_rows = relationship(
-        "AssociationArtifactsStorageRow",
-        back_populates="artifact_revision_row",
-        primaryjoin=lambda: ArtifactRevisionRow.id
-        == foreign(AssociationArtifactsStorageRow.artifact_revision_id),
+    association_artifacts_storages_rows: Mapped[list[AssociationArtifactsStorageRow]] = (
+        relationship(
+            "AssociationArtifactsStorageRow",
+            back_populates="artifact_revision_row",
+            primaryjoin=_get_association_artifacts_storages_join_cond,
+        )
     )
 
     def __str__(self) -> str:
+        readme_display = self.readme[:15] if self.readme else None
+        created_at_str = self.created_at.isoformat() if self.created_at else None
+        updated_at_str = self.updated_at.isoformat() if self.updated_at else None
         return (
             f"ArtifactRevisionRow("
             f"id={self.id}, "
             f"artifact_id={self.artifact_id}, "
             f"version={self.version}, "
-            f"readme={self.readme[:15]}, "  # truncate for display
+            f"readme={readme_display}, "
             f"size={self.size}, "
             f"status={self.status}, "
             f"remote_status={self.remote_status}, "
-            f"created_at={self.created_at.isoformat()}, "
-            f"updated_at={self.updated_at.isoformat()}, "
+            f"created_at={created_at_str}, "
+            f"updated_at={updated_at_str}, "
             f"digest={self.digest}"
             f")"
         )

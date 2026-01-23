@@ -125,7 +125,7 @@ async def get_user_scopes(
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
         async with root_ctx.db.begin_readonly() as conn:
             user_query = (
-                sa.select([users.c.uuid, users.c.role, users.c.domain_name])
+                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
                 .select_from(users)
                 .where(
                     (users.c.email == owner_user_email),
@@ -135,9 +135,9 @@ async def get_user_scopes(
             row = result.first()
             if row is None:
                 raise InvalidAPIParameters("Cannot delegate an unknown user")
-            owner_user_uuid = row["uuid"]
-            owner_user_role = row["role"]
-            owner_user_domain = row["domain_name"]
+            owner_user_uuid = row.uuid
+            owner_user_role = row.role
+            owner_user_domain = row.domain_name
         if request["is_superadmin"]:
             pass
         elif request["is_admin"]:

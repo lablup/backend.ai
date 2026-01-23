@@ -4,11 +4,14 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
 class AgentStatus(enum.Enum):
@@ -55,7 +58,7 @@ class AgentDataForHeartbeatUpdate:
     public_host: Optional[str]
     version: str
     architecture: str
-    compute_plugins: list[str]
+    compute_plugins: Mapping[str, Any]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
 
@@ -73,11 +76,11 @@ class AgentData:
     actual_occupied_slots: ResourceSlot
     addr: str
     public_host: Optional[str]
-    first_contact: datetime
+    first_contact: datetime | None
     lost_at: Optional[datetime]
     version: str
     architecture: str
-    compute_plugins: list[str]
+    compute_plugins: Mapping[str, Any]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
 
@@ -214,3 +217,26 @@ class UpsertResult:
             was_revived=was_revived,
             need_resource_slot_update=need_resource_slot_update,
         )
+
+
+@dataclass
+class AgentListResult:
+    """Search result with total count for agents."""
+
+    items: list[AgentDetailData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AgentDetailData:
+    """
+    Agent data with associated permissions.
+
+    This encapsulates an agent's data together with the permissions
+    the current user has on that agent.
+    """
+
+    agent: AgentData
+    permissions: list[AgentPermission]

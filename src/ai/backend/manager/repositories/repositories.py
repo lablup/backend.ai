@@ -14,6 +14,9 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
+from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
+from ai.backend.manager.repositories.export.repositories import ExportRepositories
+from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
@@ -36,6 +39,9 @@ from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
+from ai.backend.manager.repositories.resource_usage_history.repositories import (
+    ResourceUsageHistoryRepositories,
+)
 from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
@@ -63,6 +69,9 @@ class Repositories:
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
+    error_log: ErrorLogRepositories
+    export: ExportRepositories
+    fair_share: FairShareRepositories
     group: GroupRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
@@ -73,6 +82,7 @@ class Repositories:
     project_resource_policy: ProjectResourcePolicyRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
+    resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
     schedule: ScheduleRepositories
     scheduler: SchedulerRepositories
@@ -97,6 +107,9 @@ class Repositories:
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
+        error_log_repositories = ErrorLogRepositories.create(args)
+        export_repositories = ExportRepositories.create(args)
+        fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
@@ -107,6 +120,7 @@ class Repositories:
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
+        resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         schedule_repositories = ScheduleRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
@@ -130,6 +144,9 @@ class Repositories:
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
+            error_log=error_log_repositories,
+            export=export_repositories,
+            fair_share=fair_share_repositories,
             group=group_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
@@ -140,6 +157,7 @@ class Repositories:
             project_resource_policy=project_resource_policy_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
+            resource_usage_history=resource_usage_history_repositories,
             scaling_group=scaling_group_repositories,
             schedule=schedule_repositories,
             scheduler=scheduler_repositories,

@@ -134,13 +134,6 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
-    def by_driver(driver: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupRow.driver == driver
-
-        return inner
-
-    @staticmethod
     def by_scheduler(scheduler: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.scheduler == scheduler

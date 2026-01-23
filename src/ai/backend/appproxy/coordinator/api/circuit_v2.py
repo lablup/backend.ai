@@ -129,7 +129,9 @@ async def get_circuit_statistics(request: web.Request) -> PydanticResponse[Circu
     ])
     # Handle bytes data from valkey
     last_access_value = (
-        float(last_access.decode("utf-8")) if last_access else circuit.created_at.timestamp()
+        float(last_access.decode("utf-8"))
+        if last_access
+        else (circuit.created_at.timestamp() if circuit.created_at else 0.0)
     )
     requests_value = int(requests.decode("utf-8")) if requests else 0
 

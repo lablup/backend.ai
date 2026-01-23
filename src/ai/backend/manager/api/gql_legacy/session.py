@@ -670,6 +670,8 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
+        if session_row is None:
+            return None
         return cls.from_row(
             graph_ctx,
             session_row,
@@ -1206,6 +1208,7 @@ class ComputeSession(graphene.ObjectType):
         status: Optional[str] = None,
         filter: Optional[str] = None,
     ) -> int:
+        status_list: list[SessionStatus] | None = None
         if isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
@@ -1216,21 +1219,21 @@ class ComputeSession(graphene.ObjectType):
             .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
-        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
+        query = sa.select(sa.func.count(sa.distinct(SessionRow.id))).select_from(j)
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if group_id is not None:
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
-        if status is not None:
+        if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1246,9 +1249,8 @@ class ComputeSession(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[ComputeSession | None]:
-        if status is None:
-            status_list = None
-        elif isinstance(status, str):
+        status_list: list[SessionStatus] | None = None
+        if isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
@@ -1277,7 +1279,7 @@ class ComputeSession(graphene.ObjectType):
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
-        if status is not None:
+        if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
             parser = QueryFilterParser(cls._queryfilter_fieldspec)

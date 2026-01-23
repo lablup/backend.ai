@@ -22,6 +22,8 @@ class ResourcePresetCreatorSpec(CreatorSpec[ResourcePresetRow]):
         row = ResourcePresetRow()
         row.name = self.name
         row.resource_slots = self.resource_slots
-        row.shared_memory = BinarySize.from_str(self.shared_memory) if self.shared_memory else None
+        row.shared_memory = (
+            int(BinarySize.from_str(self.shared_memory)) if self.shared_memory else None
+        )
         row.scaling_group_name = self.scaling_group_name
         return row

@@ -236,11 +236,12 @@ class SessionEventHandler:
                                 update_data: dict[str, Any] = {
                                     "status": RouteStatus.FAILED_TO_START
                                 }
-                                if "error" in session.status_data:
-                                    if session.status_data["error"]["name"] == "MultiAgentError":
-                                        errors = session.status_data["error"]["collection"]
+                                status_data = session.status_data
+                                if status_data and "error" in status_data:
+                                    if status_data["error"]["name"] == "MultiAgentError":
+                                        errors = status_data["error"]["collection"]
                                     else:
-                                        errors = [session.status_data["error"]]
+                                        errors = [status_data["error"]]
                                     update_data["error_data"] = {
                                         "type": "session_cancelled",
                                         "errors": errors,
@@ -269,23 +270,23 @@ class SessionEventHandler:
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-                        query = sa.select([sa.func.count("*")]).where(
+                        query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
                             & (RoutingRow.status == RouteStatus.HEALTHY)
                         )
                         healthy_routes = await db_sess.scalar(query)
                         if endpoint.replicas == healthy_routes:
-                            query = (
+                            update_query = (
                                 sa.update(EndpointRow)
                                 .where(EndpointRow.id == endpoint.id)
                                 .values({"retries": 0})
                             )
-                            await db_sess.execute(query)
-                            query = sa.delete(RoutingRow).where(
+                            await db_sess.execute(update_query)
+                            delete_query = sa.delete(RoutingRow).where(
                                 (RoutingRow.endpoint == endpoint.id)
                                 & (RoutingRow.status == RouteStatus.FAILED_TO_START)
                             )
-                            await db_sess.execute(query)
+                            await db_sess.execute(delete_query)
 
                 await execute_with_retry(_clear_error)
         except NoResultFound:

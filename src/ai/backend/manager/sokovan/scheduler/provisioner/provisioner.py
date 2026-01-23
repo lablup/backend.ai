@@ -4,26 +4,33 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     ResourceSlot,
+    SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
+)
+from ai.backend.manager.sokovan.recorder import (
+    ExecutionRecord,
+    RecorderContext,
+    StepStatus,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KeypairOccupancy,
-    SchedulingConfig,
     SchedulingFailure,
     SchedulingPredicate,
     SessionAllocation,
@@ -42,6 +49,7 @@ from .selectors.selector import (
     AgentSelector,
 )
 from .sequencers.drf import DRFSequencer
+from .sequencers.fair_share import FairShareSequencer
 from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
@@ -57,6 +65,7 @@ class SessionProvisionerArgs:
     default_agent_selector: AgentSelector
     allocator: SchedulingAllocator
     repository: SchedulerRepository
+    fair_share_repository: FairShareRepository
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
 
@@ -77,6 +86,7 @@ class SessionProvisioner:
     _default_agent_selector: AgentSelector
     _allocator: SchedulingAllocator
     _repository: SchedulerRepository
+    _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
@@ -89,6 +99,7 @@ class SessionProvisioner:
         self._default_agent_selector = args.default_agent_selector
         self._allocator = args.allocator
         self._repository = args.repository
+        self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._sequencer_pool = self._make_sequencer_pool()
@@ -97,13 +108,13 @@ class SessionProvisioner:
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
-    @classmethod
-    def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
+    def _make_sequencer_pool(self) -> Mapping[str, WorkloadSequencer]:
         """Initialize the sequencer pool with default sequencers."""
         pool: dict[str, WorkloadSequencer] = defaultdict(DRFSequencer)
         pool["fifo"] = FIFOSequencer()
         pool["lifo"] = LIFOSequencer()
         pool["drf"] = DRFSequencer()
+        pool["fairshare"] = FairShareSequencer(self._fair_share_repository)
         return pool
 
     @classmethod
@@ -130,39 +141,27 @@ class SessionProvisioner:
         sequncer = self._sequencer_pool[name]
         return SchedulingSequencer(sequncer)
 
-    async def schedule_scaling_group(self, scaling_group: str) -> ScheduleResult:
-        """
-        Schedule sessions for a specific scaling group.
-        Args:
-            scaling_group: The scaling group to schedule for.
-        Returns:
-            ScheduleResult containing count and session data
-        """
-        # Single optimized call to get all scheduling data
-        # This consolidates: get_scaling_group_info_for_sokovan, get_pending_sessions,
-        # get_system_snapshot, and get_scheduling_config into ONE DB session
-        scheduling_data = await self._repository.get_scheduling_data(scaling_group)
-
-        if scheduling_data is None:
-            log.trace(
-                "No pending sessions for scaling group {}. Skipping scheduling.",
-                scaling_group,
-            )
-            return ScheduleResult()
-
-        # Schedule using the scheduling data - no more DB calls needed
-        return await self._schedule_queued_sessions_with_data(scaling_group, scheduling_data)
-
-    async def _schedule_queued_sessions_with_data(
-        self, scaling_group: str, scheduling_data: SchedulingData
+    async def schedule_scaling_group(
+        self,
+        scaling_group: str,
+        scheduling_data: SchedulingData,
+        provision_time: datetime,
     ) -> ScheduleResult:
         """
-        Schedule all queued sessions using pre-fetched scheduling data.
-        No database calls are made in this method - all data comes from scheduling_data.
+        Schedule sessions for a specific scaling group.
 
-        :param scaling_group: The scaling group to schedule for
-        :param scheduling_data: Pre-fetched data containing all necessary information
-        :return: The number of sessions successfully scheduled
+        This method orchestrates the full provisioning pipeline using pre-fetched data:
+        1. Sequencing: Order workloads using configured sequencer (FIFO/LIFO/DRF)
+        2. Validation: Check quotas and constraints for each workload
+        3. Agent selection: Select agents using configured strategy
+        4. Allocation: Persist allocations to database
+
+        Args:
+            scaling_group: The scaling group to schedule for.
+            scheduling_data: Pre-fetched scheduling data from Handler.
+
+        Returns:
+            ScheduleResult containing scheduled session data
         """
         # Use data from scheduling_data instead of making DB calls
         # Convert PendingSessionData to SessionWorkload
@@ -180,22 +179,28 @@ class SessionProvisioner:
             scheduling_data.spec.known_slot_types, scheduling_data.total_capacity
         )
 
-        # Create scheduling config from spec and scaling group opts
-        config = SchedulingConfig(
-            max_container_count_per_agent=scheduling_data.spec.max_container_count,
+        # Create agent selection config directly from spec and scaling group opts
+        selection_config = AgentSelectionConfig(
+            max_container_count=scheduling_data.spec.max_container_count,
             enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
         )
-
-        selection_config = AgentSelectionConfig(
-            max_container_count=config.max_container_count_per_agent,
-            enforce_spreading_endpoint_replica=config.enforce_spreading_endpoint_replica,
-        )
-        # Add sequencing predicate to track in passed predicates
-        with self._phase_metrics.measure_phase(
-            "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+        # Perform sequencing (batch operation for all workloads)
+        # Record as shared phase so all entity records include it
+        sequencer = self._get_sequencer(sg_info.scheduler)
+        with (
+            self._phase_metrics.measure_phase(
+                "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+            ),
+            RecorderContext[SessionId].shared_phase(
+                "sequencing", success_detail=sequencer.success_message()
+            ),
+            RecorderContext[SessionId].shared_step(
+                sequencer.name, success_detail=sequencer.success_message()
+            ),
         ):
-            sequencer = self._get_sequencer(sg_info.scheduler)
-            sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
+            sequenced_workloads = await sequencer.sequence(
+                scaling_group, system_snapshot, workloads
+            )
 
         # Build mutable agents with occupancy data from snapshot
         agent_occupancy = (
@@ -204,21 +209,7 @@ class SessionProvisioner:
             else {}
         )
         mutable_agents = [
-            AgentInfo(
-                agent_id=agent.id,
-                agent_addr=agent.addr,
-                architecture=agent.architecture,
-                scaling_group=agent.scaling_group,
-                available_slots=agent.available_slots,
-                occupied_slots=(
-                    agent_occupancy[agent.id].occupied_slots
-                    if agent.id in agent_occupancy
-                    else ResourceSlot()
-                ),
-                container_count=(
-                    agent_occupancy[agent.id].container_count if agent.id in agent_occupancy else 0
-                ),
-            )
+            AgentInfo.from_meta_and_occupancy(agent, agent_occupancy)
             for agent in scheduling_data.agents
         ]
         session_allocations: list[SessionAllocation] = []
@@ -226,15 +217,13 @@ class SessionProvisioner:
         # Get agent selection strategy from scheduler opts config
         agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
         agent_selector = self._agent_selector_pool[agent_selection_strategy]
-        for session_workload in sequenced_workloads:
-            # Track predicates for this session
-            passed_phases: list[SchedulingPredicate] = []
-            failed_phases: list[SchedulingPredicate] = []
-            passed_phases.append(
-                SchedulingPredicate(name=sequencer.name, msg=sequencer.success_message())
-            )
 
+        # Get current pool from RecorderContext (scope opened by coordinator)
+        pool = RecorderContext[SessionId].current_pool()
+
+        for session_workload in sequenced_workloads:
             try:
+                # Sequencing phase is automatically included via shared phases
                 session_allocation = await self._schedule_workload(
                     scaling_group,
                     system_snapshot,
@@ -242,8 +231,6 @@ class SessionProvisioner:
                     selection_config,
                     agent_selector,
                     session_workload,
-                    passed_phases,
-                    failed_phases,
                 )
                 session_allocations.append(session_allocation)
             except Exception as e:
@@ -252,23 +239,27 @@ class SessionProvisioner:
                     session_workload.session_id,
                     e,
                 )
-                if not failed_phases:
-                    # If no specific failure predicates were added, add a exception information
-                    failed_phases.append(
-                        SchedulingPredicate(
-                            name=type(e).__name__,
-                            msg=str(e),
-                        )
-                    )
-
+                # Get execution record from pool and convert to SchedulingFailure
+                record = pool.get_record(session_workload.session_id)
+                passed, failed = self._convert_record_to_predicates(record)
                 failure = SchedulingFailure(
                     session_id=session_workload.session_id,
-                    passed_phases=passed_phases,
-                    failed_phases=failed_phases,
+                    passed_phases=passed,
+                    failed_phases=failed,
+                    last_try=provision_time,
                     msg=str(e),
                 )
                 scheduling_failures.append(failure)
                 continue
+
+        # Convert execution records to passed_phases/failed_phases for allocations
+        for allocation in session_allocations:
+            record = pool.get_record(allocation.session_id)
+            if record:
+                passed, failed = self._convert_record_to_predicates(record)
+                allocation.passed_phases = passed
+                allocation.failed_phases = failed
+
         log.info(
             "Processing {} allocations and {} failures in scaling group {}",
             len(session_allocations),
@@ -297,56 +288,45 @@ class SessionProvisioner:
         selection_config: AgentSelectionConfig,
         agent_selector: AgentSelector,
         session_workload: SessionWorkload,
-        passed_phases: list[SchedulingPredicate],
-        failed_phases: list[SchedulingPredicate],
     ) -> SessionAllocation:
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session_workload.session_id)
+
         # Phase 1: Validation
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "validation"):
-            # validate_with_predicates will update both lists and raise if validation fails
-            self._validator.validate(
-                mutable_snapshot, session_workload, passed_phases, failed_phases
-            )
+            with recorder.phase("validation"):
+                self._validator.validate(mutable_snapshot, session_workload)
 
         # Phase 2: Agent Selection
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "agent_selection"):
-            try:
-                session_allocation = await self._allocate_workload(
-                    session_workload,
-                    mutable_agents,
-                    selection_config,
-                    scaling_group,
-                    agent_selector,
-                )
-                # Agent selection succeeded - add to passed predicates
-                passed_phases.append(
-                    SchedulingPredicate(
-                        name=agent_selector.strategy_name(),
-                        msg=agent_selector.strategy_success_message(),
+            with recorder.phase(
+                "agent_selection", success_detail=agent_selector.strategy_success_message()
+            ):
+                with recorder.step(
+                    agent_selector.strategy_name(),
+                    success_detail=agent_selector.strategy_success_message(),
+                ):
+                    session_allocation = await self._allocate_workload(
+                        session_workload,
+                        mutable_agents,
+                        selection_config,
+                        scaling_group,
+                        agent_selector,
                     )
+
+        # Phase 3: Allocation (prepare)
+        with recorder.phase("allocation", success_detail=self._allocator.success_message()):
+            with recorder.step(
+                self._allocator.name(), success_detail=self._allocator.success_message()
+            ):
+                # Update the snapshot to reflect this allocation
+                # Note: agent state changes are already applied to mutable_agents
+                self._update_system_snapshot(
+                    mutable_snapshot,
+                    session_workload,
+                    session_allocation,
                 )
-            except Exception as e:
-                # Add failed predicate for agent selection
-                failed_phases.append(
-                    SchedulingPredicate(name=agent_selector.strategy_name(), msg=str(e))
-                )
-                raise
 
-        # Phase 3: Allocation success - add allocator predicate
-        passed_phases.append(
-            SchedulingPredicate(name=self._allocator.name(), msg=self._allocator.success_message())
-        )
-
-        # Update the snapshot to reflect this allocation
-        # Note: agent state changes are already applied to mutable_agents by select_agents_for_batch_requirements
-        self._update_system_snapshot(
-            mutable_snapshot,
-            session_workload,
-            session_allocation,
-        )
-
-        # Store predicates in the allocation
-        session_allocation.passed_phases = passed_phases
-        session_allocation.failed_phases = failed_phases
         return session_allocation
 
     def _update_system_snapshot(
@@ -452,3 +432,46 @@ class SessionProvisioner:
             selections,
             scaling_group,
         )
+
+    @staticmethod
+    def _convert_record_to_predicates(
+        record: ExecutionRecord | None,
+    ) -> tuple[list[SchedulingPredicate], list[SchedulingPredicate]]:
+        """
+        Convert an ExecutionRecord to passed/failed SchedulingPredicate lists.
+
+        Args:
+            record: The execution record to convert (may be None if entity context failed early)
+
+        Returns:
+            Tuple of (passed_predicates, failed_predicates)
+        """
+        passed: list[SchedulingPredicate] = []
+        failed: list[SchedulingPredicate] = []
+
+        if record is None:
+            return passed, failed
+
+        for phase in record.phases:
+            # Add phase-level predicate
+            phase_predicate = SchedulingPredicate(
+                name=phase.name,
+                msg=phase.detail or "",
+            )
+            if phase.status == StepStatus.SUCCESS:
+                passed.append(phase_predicate)
+            else:
+                failed.append(phase_predicate)
+
+            # Add step-level predicates
+            for step in phase.steps:
+                step_predicate = SchedulingPredicate(
+                    name=step.name,
+                    msg=step.detail or "",
+                )
+                if step.status == StepStatus.SUCCESS:
+                    passed.append(step_predicate)
+                else:
+                    failed.append(step_predicate)
+
+        return passed, failed

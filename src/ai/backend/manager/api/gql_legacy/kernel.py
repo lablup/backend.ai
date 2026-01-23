@@ -303,7 +303,7 @@ class ComputeContainer(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[ComputeContainer]:
+    def from_row(cls, ctx: GraphQueryContext, row: KernelRow | None) -> Optional[ComputeContainer]:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -377,7 +377,7 @@ class ComputeContainer(graphene.ObjectType):
         filter: Optional[str] = None,
     ) -> int:
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(KernelRow.session_id == session_id)
         )
@@ -394,7 +394,7 @@ class ComputeContainer(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly_session() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -690,41 +690,39 @@ class LegacyComputeSession(graphene.ObjectType):
         else:
             hide_agents = ctx.config_provider.config.manager.hide_agents
         return {
-            "id": row["id"],
-            "sess_id": row["session_name"],  # legacy, will be deprecated
-            "sess_type": row["session_type"].name,  # legacy, will be deprecated
-            "session_name": row["session_name"],
-            "session_type": row["session_type"].name,
-            "role": row["cluster_role"],
-            "tag": row["tag"],
-            "image": row["image"],
-            "architecture": row["architecture"],
-            "registry": row["registry"],
-            "domain_name": row["domain_name"],
-            "group_name": row[
-                "name"
-            ],  # group.name (group is omitted since use_labels=True is not used)
-            "group_id": row["group_id"],
-            "scaling_group": row["scaling_group"],
-            "user_uuid": row["user_uuid"],
-            "access_key": row["access_key"],
-            "status": row["status"].name,
-            "status_changed": row["status_changed"],
-            "status_info": row["status_info"],
-            "created_at": row["created_at"],
-            "terminated_at": row["terminated_at"],
-            "startup_command": row["startup_command"],
-            "result": row["result"].name,
-            "service_ports": row["service_ports"],
-            "occupied_slots": row["occupied_slots"].to_json(),
-            "resource_opts": row["resource_opts"],
-            "num_queries": row["num_queries"],
+            "id": row.id,
+            "sess_id": row.session_name,  # legacy, will be deprecated
+            "sess_type": row.session_type.name,  # legacy, will be deprecated
+            "session_name": row.session_name,
+            "session_type": row.session_type.name,
+            "role": row.cluster_role,
+            "tag": row.tag,
+            "image": row.image,
+            "architecture": row.architecture,
+            "registry": row.registry,
+            "domain_name": row.domain_name,
+            "group_name": row.name,  # group.name (group is omitted since use_labels=True is not used)
+            "group_id": row.group_id,
+            "scaling_group": row.scaling_group,
+            "user_uuid": row.user_uuid,
+            "access_key": row.access_key,
+            "status": row.status.name,
+            "status_changed": row.status_changed,
+            "status_info": row.status_info,
+            "created_at": row.created_at,
+            "terminated_at": row.terminated_at,
+            "startup_command": row.startup_command,
+            "result": row.result.name,
+            "service_ports": row.service_ports,
+            "occupied_slots": row.occupied_slots.to_json(),
+            "resource_opts": row.resource_opts,
+            "num_queries": row.num_queries,
             # optionally hidden
-            "agent": row["agent"] if not hide_agents else None,
-            "container_id": row["container_id"] if not hide_agents else None,
+            "agent": row.agent if not hide_agents else None,
+            "container_id": row.container_id if not hide_agents else None,
             # live_stat is resolved by Graphene
             # last_stat is resolved by Graphene
-            "user_email": row["email"],
+            "user_email": row.email,
             # Legacy fields
             # NOTE: currently graphene always uses resolve methods!
             "cpu_used": 0,
@@ -736,12 +734,12 @@ class LegacyComputeSession(graphene.ObjectType):
             "io_write_bytes": 0,
             "io_max_scratch_size": 0,
             "io_cur_scratch_size": 0,
-            "lang": row["image"],
-            "occupied_shares": row["occupied_shares"],
-            "mem_slot": BinarySize.from_str(row["occupied_slots"].get("mem", 0)) // mega,
-            "cpu_slot": float(row["occupied_slots"].get("cpu", 0)),
-            "gpu_slot": float(row["occupied_slots"].get("cuda.device", 0)),
-            "tpu_slot": float(row["occupied_slots"].get("tpu.device", 0)),
+            "lang": row.image,
+            "occupied_shares": row.occupied_shares,
+            "mem_slot": BinarySize.from_str(row.occupied_slots.get("mem", 0)) // mega,
+            "cpu_slot": float(row.occupied_slots.get("cpu", 0)),
+            "gpu_slot": float(row.occupied_slots.get("cuda.device", 0)),
+            "tpu_slot": float(row.occupied_slots.get("tpu.device", 0)),
         }
 
     @classmethod
@@ -766,7 +764,7 @@ class LegacyComputeSession(graphene.ObjectType):
         elif isinstance(status, KernelStatus):
             status_list = [status]
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(kernels)
             .where(kernels.c.cluster_role == DEFAULT_ROLE)
         )
@@ -780,7 +778,7 @@ class LegacyComputeSession(graphene.ObjectType):
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -809,7 +807,7 @@ class LegacyComputeSession(graphene.ObjectType):
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select(kernels, groups.c.name, users.c.email)
             .select_from(j)
             .where(kernels.c.cluster_role == DEFAULT_ROLE)
             .order_by(*_ordering)
@@ -845,7 +843,7 @@ class LegacyComputeSession(graphene.ObjectType):
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select(kernels, groups.c.name, users.c.email)
             .select_from(j)
             .where(
                 (kernels.c.access_key.in_(access_keys)) & (kernels.c.cluster_role == DEFAULT_ROLE),
@@ -874,7 +872,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 access_keys,
-                lambda row: row["access_key"],
+                lambda row: row.access_key,
             )
 
     @classmethod
@@ -898,7 +896,7 @@ class LegacyComputeSession(graphene.ObjectType):
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select(kernels, groups.c.name, users.c.email)
             .select_from(j)
             .where((kernels.c.cluster_role == DEFAULT_ROLE) & (kernels.c.session_id.in_(sess_ids)))
         )
@@ -915,7 +913,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 sess_ids,
-                lambda row: row["session_id"],
+                lambda row: row.session_id,
             )
 
 

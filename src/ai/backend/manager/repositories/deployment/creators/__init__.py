@@ -9,6 +9,7 @@ from .deployment import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
     DeploymentResourceFields,
+    EndpointLifecycleBatchUpdaterSpec,
     ModelRevisionFields,
 )
 from .policy import DeploymentPolicyCreatorSpec
@@ -19,6 +20,8 @@ from .token import EndpointTokenCreatorSpec
 __all__ = [
     # Deployment (endpoint) - CreatorSpec
     "DeploymentCreatorSpec",
+    # Deployment (endpoint) - BatchUpdaterSpec
+    "EndpointLifecycleBatchUpdaterSpec",
     # Deployment (endpoint) - Field groups
     "DeploymentMetadataFields",
     "DeploymentReplicaFields",

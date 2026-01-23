@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -7,6 +8,8 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 __all__ = (
+    "ConfigEnvironment",
+    "CompositeType",
     "ConfigExample",
     "BackendAIFieldMeta",
     "BackendAIConfigMeta",
@@ -17,6 +20,31 @@ __all__ = (
     "generate_composite_example",
     "generate_model_example",
 )
+
+
+class ConfigEnvironment(enum.StrEnum):
+    """Environment type for configuration examples."""
+
+    LOCAL = "local"
+    PROD = "prod"
+
+
+class CompositeType(enum.StrEnum):
+    """Type of composite field structure.
+
+    Used to indicate how nested configuration fields should be handled
+    in various output formats (TOML, etcd, JSON Schema).
+    """
+
+    FIELD = "field"
+    """Single nested object (e.g., DatabaseConfig)."""
+
+    DICT = "dict"
+    """Dictionary with string keys (e.g., dict[str, VolumeConfig]).
+    Key type is always assumed to be str."""
+
+    LIST = "list"
+    """List of objects (e.g., list[EndpointConfig])."""
 
 
 @dataclass(frozen=True)
@@ -32,6 +60,14 @@ class ConfigExample:
 
     prod: str
     """Example value for production environment."""
+
+    def get(self, env: ConfigEnvironment) -> str:
+        """Get the example value for the specified environment."""
+        match env:
+            case ConfigEnvironment.LOCAL:
+                return self.local
+            case ConfigEnvironment.PROD:
+                return self.prod
 
 
 @dataclass(frozen=True)
@@ -67,19 +103,25 @@ class BackendAIConfigMeta(BackendAIFieldMeta):
     environment-specific examples and secret marking.
     """
 
-    example: ConfigExample | str | None = None
+    example: ConfigExample | None = None
     """Example value(s) for this configuration field.
-    Can be a ConfigExample for environment-specific examples,
-    a simple string for universal examples, or None if no example applies."""
+    Use ConfigExample for environment-specific examples, or None if no example applies."""
 
     secret: bool = False
     """Whether this field contains sensitive information.
     When True, the value should be masked in logs, CLI output, and error messages."""
 
-    composite: bool = False
-    """Whether this field is a composite type with nested fields.
-    When True, example values are auto-generated from child field metadata
-    rather than specified directly."""
+    composite: CompositeType | None = None
+    """Type of composite field structure, or None for simple fields.
+
+    - None: Simple field (not composite)
+    - CompositeType.FIELD: Single nested object (e.g., DatabaseConfig)
+    - CompositeType.DICT: Dictionary with string keys (e.g., dict[str, VolumeConfig])
+    - CompositeType.LIST: List of objects (e.g., list[EndpointConfig])
+
+    When set, example values are auto-generated from child field metadata
+    rather than specified directly.
+    """
 
 
 @dataclass(frozen=True)
@@ -90,9 +132,9 @@ class BackendAIAPIMeta(BackendAIFieldMeta):
     generation and schema introspection.
     """
 
-    example: str | None = None
+    example: ConfigExample | None = None
     """Example value for API documentation.
-    Used in OpenAPI schemas and GraphQL documentation."""
+    Use ConfigExample for environment-specific examples."""
 
     composite: bool = False
     """Whether this field is a composite type with nested fields.
@@ -165,57 +207,51 @@ def get_field_type(model: type[BaseModel], field_name: str) -> type | None:
     return field_info.annotation
 
 
-def generate_example(model: type[BaseModel], field_name: str) -> str | dict[str, Any]:
+def generate_example(
+    model: type[BaseModel],
+    field_name: str,
+    env: ConfigEnvironment = ConfigEnvironment.LOCAL,
+) -> str:
     """Generate example value for a field.
-
-    For fields with composite=False, returns the direct example value.
-    For fields with composite=True, recursively generates examples from child fields.
 
     Args:
         model: The Pydantic model class containing the field.
         field_name: The name of the field.
+        env: The environment to get the example for.
 
     Returns:
-        The example value as a string or dict. Returns empty string if no metadata found.
+        The example value as a string.
+
+    Raises:
+        ValueError: If field has no BackendAIConfigMeta/BackendAIAPIMeta or no example defined.
 
     Example:
-        >>> # For a composite field, returns nested dict of child examples
-        >>> generate_example(ParentConfig, "nested_config")
-        {'child_field': 'example_value'}
+        >>> generate_example(MyConfig, "server_addr", ConfigEnvironment.LOCAL)
+        '127.0.0.1:8080'
+        >>> generate_example(MyConfig, "server_addr", ConfigEnvironment.PROD)
+        'api.example.com:8080'
     """
     meta = get_field_meta(model, field_name)
 
     if meta is None:
-        return ""
+        raise ValueError(f"Field '{field_name}' in {model.__name__} has no BackendAI metadata")
 
-    # Only BackendAIAPIMeta and BackendAIConfigMeta have composite and example
+    # Only BackendAIAPIMeta and BackendAIConfigMeta have example
     if not isinstance(meta, (BackendAIAPIMeta, BackendAIConfigMeta)):
-        return ""
+        raise ValueError(
+            f"Field '{field_name}' in {model.__name__} has unsupported metadata type: {type(meta).__name__}"
+        )
 
-    # If composite=False, use direct example
-    if not meta.composite:
-        if meta.example is None:
-            return ""
-        if isinstance(meta.example, ConfigExample):
-            # For ConfigExample, return both local and prod
-            return {"local": meta.example.local, "prod": meta.example.prod}
-        return meta.example
+    if meta.example is None:
+        raise ValueError(f"Field '{field_name}' in {model.__name__} has no example defined")
 
-    # If composite=True, generate from child fields
-    field_type = get_field_type(model, field_name)
-    if field_type is None:
-        return ""
-
-    # Check if field_type is a Pydantic model
-    from pydantic import BaseModel as PydanticBaseModel
-
-    if isinstance(field_type, type) and issubclass(field_type, PydanticBaseModel):
-        return generate_composite_example(field_type)
-
-    return ""
+    return meta.example.get(env)
 
 
-def generate_composite_example(model: type[BaseModel]) -> dict[str, Any]:
+def generate_composite_example(
+    model: type[BaseModel],
+    env: ConfigEnvironment = ConfigEnvironment.LOCAL,
+) -> dict[str, Any]:
     """Recursively generate example for composite types from child fields.
 
     Traverses all fields in a model and builds a complete example dict
@@ -223,20 +259,19 @@ def generate_composite_example(model: type[BaseModel]) -> dict[str, Any]:
 
     Args:
         model: The Pydantic model class to generate examples for.
+        env: The environment to get examples for.
 
     Returns:
         A dictionary mapping field names to their example values.
 
     Example:
         >>> class SessionConfig(BaseModel):
-        ...     cpu: Annotated[int, BackendAIAPIMeta(
-        ...         description="CPU cores", added_version="25.1.0", example="4"
+        ...     cpu: Annotated[int, BackendAIConfigMeta(
+        ...         description="CPU cores", added_version="25.1.0",
+        ...         example=ConfigExample(local="2", prod="8")
         ...     )]
-        ...     memory: Annotated[str, BackendAIAPIMeta(
-        ...         description="Memory size", added_version="25.1.0", example="8g"
-        ...     )]
-        >>> generate_composite_example(SessionConfig)
-        {'cpu': '4', 'memory': '8g'}
+        >>> generate_composite_example(SessionConfig, ConfigEnvironment.PROD)
+        {'cpu': '8'}
     """
     from pydantic import BaseModel as PydanticBaseModel
 
@@ -259,43 +294,55 @@ def generate_composite_example(model: type[BaseModel]) -> dict[str, Any]:
                 and isinstance(child_type, type)
                 and issubclass(child_type, PydanticBaseModel)
             ):
-                result[name] = generate_composite_example(child_type)
+                result[name] = generate_composite_example(child_type, env)
         else:
             # Use direct example
             if meta.example is not None:
-                if isinstance(meta.example, ConfigExample):
-                    result[name] = {"local": meta.example.local, "prod": meta.example.prod}
-                else:
-                    result[name] = meta.example
+                result[name] = meta.example.get(env)
 
     return result
 
 
-def generate_model_example(model: type[BaseModel]) -> dict[str, Any]:
+def generate_model_example(
+    model: type[BaseModel],
+    env: ConfigEnvironment = ConfigEnvironment.LOCAL,
+) -> dict[str, Any]:
     """Generate example for entire model by collecting all field examples.
+
+    Skips composite fields (which have no direct example value).
 
     Args:
         model: The Pydantic model class to generate examples for.
+        env: The environment to get examples for.
 
     Returns:
         A dictionary mapping field names to their example values.
 
     Example:
         >>> class CreateSessionRequest(BaseModel):
-        ...     name: Annotated[str, BackendAIAPIMeta(
-        ...         description="Session name", added_version="25.1.0", example="my-session"
+        ...     name: Annotated[str, BackendAIConfigMeta(
+        ...         description="Session name", added_version="25.1.0",
+        ...         example=ConfigExample(local="dev-session", prod="prod-session")
         ...     )]
-        ...     config: Annotated[SessionConfig, BackendAIAPIMeta(
-        ...         description="Session config", added_version="25.1.0", composite=True
-        ...     )]
-        >>> generate_model_example(CreateSessionRequest)
-        {'name': 'my-session', 'config': {'cpu': '4', 'memory': '8g'}}
+        >>> generate_model_example(CreateSessionRequest, ConfigEnvironment.PROD)
+        {'name': 'prod-session'}
     """
     result: dict[str, Any] = {}
 
     for name in model.model_fields:
-        example = generate_example(model, name)
-        if example:
-            result[name] = example
+        meta = get_field_meta(model, name)
+
+        if meta is None:
+            continue
+
+        if not isinstance(meta, (BackendAIAPIMeta, BackendAIConfigMeta)):
+            continue
+
+        # Skip composite fields - they have no direct example
+        if meta.composite:
+            continue
+
+        if meta.example is not None:
+            result[name] = meta.example.get(env)
 
     return result

@@ -1,18 +1,19 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.common.config import ModelHealthCheck
 
 from .base import (
+    GUID,
     Base,
     BaseMixin,
-    IDColumn,
     StructuredJSONObjectColumn,
 )
 
@@ -32,13 +33,19 @@ class Endpoint(Base, BaseMixin):
     Store model service endpoint information and health check configuration
     """
 
-    id = IDColumn()
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    health_check_enabled = sa.Column(sa.Boolean(), nullable=False, default=False)
-    health_check_config = sa.Column(StructuredJSONObjectColumn(ModelHealthCheck), nullable=True)
+    health_check_enabled: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
+    health_check_config: Mapped[ModelHealthCheck | None] = mapped_column(
+        StructuredJSONObjectColumn(ModelHealthCheck), nullable=True
+    )
 
-    created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
-    updated_at = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()
     )
 

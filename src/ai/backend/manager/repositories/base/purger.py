@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
@@ -170,7 +171,7 @@ async def execute_batch_purger(
     """
     # Extract table and PK columns from the subquery
     base_subquery = purger.spec.build_subquery()
-    table = base_subquery.froms[0]
+    table = cast(sa.Table, base_subquery.froms[0])
     pk_columns = list(table.primary_key.columns)
 
     total_deleted = 0
@@ -187,7 +188,7 @@ async def execute_batch_purger(
         stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
         result = await db_sess.execute(stmt)
 
-        batch_deleted = result.rowcount
+        batch_deleted = cast(CursorResult, result).rowcount
         total_deleted += batch_deleted
 
         if batch_deleted < purger.batch_size:

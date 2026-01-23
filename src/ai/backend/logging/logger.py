@@ -22,6 +22,8 @@ from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .abc import AbstractLogger
 from .config import (
+    ConsoleConfig,
+    LogDriver,
     LoggerConfig,
     LoggingConfig,
     LogHandlerConfig,
@@ -35,7 +37,7 @@ from .formatter import (
     SerializedExceptionFormatter,
 )
 from .handler.intrinsic import RelayHandler
-from .types import LogLevel, MsgpackOptions
+from .types import LogFormat, LogLevel, MsgpackOptions
 from .utils import _register_custom_loglevels
 
 is_active: ContextVar[bool] = ContextVar("is_active", default=False)
@@ -70,6 +72,8 @@ class LocalLogger(AbstractLogger):
         """
         if config is None:
             self.config = LoggingConfig(
+                version=1,
+                level=LogLevel.INFO,
                 disable_existing_loggers=False,
                 handlers={
                     "null": LogHandlerConfig(class_="logging.NullHandler"),
@@ -84,6 +88,12 @@ class LocalLogger(AbstractLogger):
                         for k, v in default_pkg_ns.items()
                     },
                 },
+                drivers=[LogDriver.CONSOLE],
+                console=ConsoleConfig(colored=None, format=LogFormat.VERBOSE),
+                file=None,
+                logstash=None,
+                graylog=None,
+                pkg_ns=default_pkg_ns,
             )
         else:
             self.config = config
@@ -142,7 +152,7 @@ class Logger(AbstractLogger):
         # Let the workers inherit the per-package logger and level configurations from the parent.
         # Each worker will add the RelayHandler by themselves.
         self.worker_logging_config = LoggingConfig(
-            # version=1,
+            version=1,
             disable_existing_loggers=False,
             handlers={
                 "null": LogHandlerConfig(class_="logging.NullHandler"),
@@ -155,6 +165,12 @@ class Logger(AbstractLogger):
                     for k, v in config.pkg_ns.items()
                 },
             },
+            drivers=[LogDriver.CONSOLE],
+            console=ConsoleConfig(colored=None, format=LogFormat.VERBOSE),
+            file=None,
+            logstash=None,
+            graylog=None,
+            pkg_ns=config.pkg_ns,
         )
 
     @override

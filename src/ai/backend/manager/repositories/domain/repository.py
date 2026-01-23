@@ -66,7 +66,7 @@ class DomainRepository:
         self._role_manager = RoleManager()
 
     @domain_repository_resilience.apply()
-    async def create_domain_validated(self, creator: Creator[DomainRow]) -> DomainData:
+    async def create_domain(self, creator: Creator[DomainRow]) -> DomainData:
         """
         Creates a new domain with model-store group.
         Validates domain creation permissions.
@@ -90,7 +90,7 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
-    async def modify_domain_validated(self, updater: Updater[DomainRow]) -> DomainData:
+    async def modify_domain(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain.
         Validates domain modification permissions.
@@ -103,7 +103,7 @@ class DomainRepository:
             return result.row.to_data()
 
     @domain_repository_resilience.apply()
-    async def soft_delete_domain_validated(self, domain_name: str) -> None:
+    async def soft_delete_domain(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False.
         Validates domain deletion permissions.
@@ -117,7 +117,7 @@ class DomainRepository:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
 
     @domain_repository_resilience.apply()
-    async def purge_domain_validated(self, domain_name: str) -> None:
+    async def purge_domain(self, domain_name: str) -> None:
         """
         Permanently deletes a domain after validation checks.
         Validates domain purge permissions and prerequisites.
@@ -147,7 +147,7 @@ class DomainRepository:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
 
     @domain_repository_resilience.apply()
-    async def create_domain_node_validated(
+    async def create_domain_node(
         self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
         """
@@ -177,7 +177,7 @@ class DomainRepository:
             return domain_row.to_data()
 
     @domain_repository_resilience.apply()
-    async def modify_domain_node_validated(
+    async def modify_domain_node(
         self,
         updater: Updater[DomainRow],
         sgroups_to_add: Optional[set[str]] = None,
@@ -253,7 +253,7 @@ class DomainRepository:
         Private method to check if domain has active kernels.
         """
         query = (
-            sa.select([sa.func.count()])
+            sa.select(sa.func.count())
             .select_from(kernels)
             .where(
                 (kernels.c.domain_name == domain_name)
@@ -261,21 +261,21 @@ class DomainRepository:
             )
         )
         active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
+        return (active_kernel_count or 0) > 0
 
     async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get user count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(users.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(users.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
         """
         Private method to get group count for a domain.
         """
-        query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
-        return await conn.scalar(query)
+        query = sa.select(sa.func.count()).where(groups.c.domain_name == domain_name)
+        return await conn.scalar(query) or 0
 
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(
@@ -294,7 +294,7 @@ class DomainRepository:
                 await self._ensure_sgroup_permission(
                     user_info, scaling_groups, db_session=db_session
                 )
-            return await self.create_domain_node_validated(creator, scaling_groups)
+            return await self.create_domain_node(creator, scaling_groups)
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
@@ -332,7 +332,7 @@ class DomainRepository:
                     user_info, sgroups_to_remove, db_session=db_session
                 )
 
-            return await self.modify_domain_node_validated(
+            return await self.modify_domain_node(
                 updater,
                 sgroups_to_add,
                 sgroups_to_remove,

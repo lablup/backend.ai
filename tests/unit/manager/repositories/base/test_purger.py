@@ -10,6 +10,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
@@ -40,9 +41,9 @@ class PurgerTestRowInt(Base):
     __tablename__ = "test_purger_int_pk"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String(50), nullable=False)
-    status = sa.Column(sa.String(20), nullable=False, default="pending")
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
 class PurgerTestRowUUID(Base):
@@ -51,9 +52,9 @@ class PurgerTestRowUUID(Base):
     __tablename__ = "test_purger_uuid_pk"
     __table_args__ = {"extend_existing": True}
 
-    id = sa.Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = sa.Column(sa.String(50), nullable=False)
-    status = sa.Column(sa.String(20), nullable=False, default="pending")
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
 class TestPurgerIntPK:

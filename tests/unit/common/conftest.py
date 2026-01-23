@@ -11,7 +11,6 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
@@ -100,23 +99,6 @@ async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClien
 
 
 @pytest.fixture
-async def test_valkey_stat(redis_container) -> AsyncIterator[ValkeyStatClient]:  # noqa: F811
-    hostport_pair: HostPortPairModel = redis_container[1]
-    valkey_target = ValkeyTarget(
-        addr=hostport_pair.address,
-    )
-    client = await ValkeyStatClient.create(
-        valkey_target,
-        human_readable_name="test.stat",
-        db_id=REDIS_STATISTICS_DB,
-    )
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@pytest.fixture
 async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
@@ -183,19 +165,16 @@ async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[
 
 @pytest.fixture
 async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         addrs=[etcd_container[1]],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
         },
-    )
-    try:
+    ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         yield etcd
-    finally:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        del etcd
 
 
 @pytest.fixture

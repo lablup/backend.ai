@@ -20,6 +20,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -33,6 +34,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
@@ -72,8 +74,16 @@ class AgentRepository:
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
-        self._stateful_source = AgentStatefulSource(valkey_image)
+        self._stateful_source = AgentStatefulSource(valkey_image, valkey_stat)
         self._config_provider = config_provider
+
+    @agent_repository_resilience.apply()
+    async def load_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
+        """Load container counts for the given agent IDs.
+
+        Returns counts in the same order as the input agent_ids.
+        """
+        return await self._stateful_source.read_agent_container_counts(agent_ids)
 
     @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
@@ -203,3 +213,11 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
+
+    @agent_repository_resilience.apply()
+    async def search_agents(
+        self,
+        querier: BatchQuerier,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+        return await self._db_source.search_agents(querier=querier)

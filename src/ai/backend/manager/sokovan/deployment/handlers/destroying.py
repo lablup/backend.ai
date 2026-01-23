@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -56,6 +56,18 @@ class DestroyingDeploymentHandler(DeploymentHandler):
     def failure_status(cls) -> Optional[EndpointLifecycle]:
         # No failure status for destroying deployments
         return EndpointLifecycle.DESTROYED
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for destroying deployment handler (BEP-1030).
+
+        - success: Deployment → DESTROYED
+        - failure: Deployment → DESTROYED (always proceed to destroyed)
+        """
+        return DeploymentStatusTransitions(
+            success=EndpointLifecycle.DESTROYED,
+            failure=EndpointLifecycle.DESTROYED,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Process deployments marked for destruction."""

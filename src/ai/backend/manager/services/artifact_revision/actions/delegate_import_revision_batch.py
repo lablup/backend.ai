@@ -18,6 +18,7 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
     artifact_type: Optional[ArtifactType]
     delegatee_target: Optional[DelegateeTarget]
     artifact_revision_ids: list[uuid.UUID]
+    force: bool
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -63,7 +63,7 @@ async def test_select_queries(virtual_grid_db) -> None:
     parser = QueryOrderParser()
 
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "+data1",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -71,7 +71,7 @@ async def test_select_queries(virtual_grid_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "-data1",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -79,7 +79,7 @@ async def test_select_queries(virtual_grid_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "-data1,+data2",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -87,7 +87,7 @@ async def test_select_queries(virtual_grid_db) -> None:
     assert test_ret == actual_ret
 
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "-data1,+data3,-data2",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -96,7 +96,7 @@ async def test_select_queries(virtual_grid_db) -> None:
 
     # default ordering
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -105,7 +105,7 @@ async def test_select_queries(virtual_grid_db) -> None:
 
     # without order marks, it's assumed to be ascending
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "data3,-data2,data1",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -115,7 +115,7 @@ async def test_select_queries(virtual_grid_db) -> None:
     # invalid syntax
     with pytest.raises(ValueError):
         parser.append_ordering(
-            sa.select([grid.c.id]).select_from(grid),
+            sa.select(grid.c.id).select_from(grid),
             "xxx",
         )
 
@@ -129,7 +129,7 @@ async def test_column_map(virtual_grid_db) -> None:
     })
 
     sa_query = parser.append_ordering(
-        sa.select([grid.c.id]).select_from(grid),
+        sa.select(grid.c.id).select_from(grid),
         "-v3",
     )
     actual_ret = list(await conn.execute(sa_query))
@@ -139,7 +139,7 @@ async def test_column_map(virtual_grid_db) -> None:
     # non-existent column in the column map
     with pytest.raises(ValueError):
         parser.append_ordering(
-            sa.select([grid.c.id]).select_from(grid),
+            sa.select(grid.c.id).select_from(grid),
             "-data1,+data2",
         )
 
@@ -151,10 +151,10 @@ async def test_aggregated_foreign_fields(virtual_grid_db) -> None:
     })
 
     orig_query = (
-        sa.select([
+        sa.select(
             grid.c.id,
             agg_to_array(foreign_grid.c.name).label("dogs_name"),
-        ])
+        )
         .select_from(sa.join(grid, foreign_grid, grid.c.id == foreign_grid.c.user_id))
         .group_by(grid)
     )

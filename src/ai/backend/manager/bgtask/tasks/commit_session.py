@@ -21,7 +21,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
-from ai.backend.common.types import ImageRegistry, SessionId
+from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -116,6 +116,12 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 return CommitSessionResult(error_message=error_msg)
 
             # Resolve base image
+            if not session.main_kernel.image or not session.main_kernel.architecture:
+                error_msg = (
+                    f"Session {manifest.session_id} main kernel has no image or architecture"
+                )
+                log.error(error_msg)
+                return CommitSessionResult(error_message=error_msg)
             image_row = await self._session_repository.resolve_image([
                 ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
             ])
@@ -204,8 +210,12 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                     username=registry_conf.username,
                     password=registry_conf.password,
                 )
+                if not session.main_kernel.agent:
+                    error_msg = f"Session {manifest.session_id} main kernel has no agent assigned"
+                    log.error(error_msg)
+                    return CommitSessionResult(error_message=error_msg)
                 resp = await self._agent_registry.push_image(
-                    session.main_kernel.agent,
+                    AgentId(session.main_kernel.agent),
                     new_image_ref,
                     image_registry,
                 )

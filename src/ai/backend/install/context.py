@@ -52,6 +52,7 @@ from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
+    FrontendMode,
     HalfstackConfig,
     HostPortPair,
     ImageSource,
@@ -244,16 +245,13 @@ class Context(metaclass=ABCMeta):
                 "user": halfstack.etcd_user,
                 "password": halfstack.etcd_password,
             }
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
             "local",
             scope_prefix_map,
             credentials=creds,
-        )
-        try:
+        ) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     async def etcd_put_json(self, key: str, value: Any) -> None:
         async with self.etcd_ctx() as etcd:
@@ -604,14 +602,30 @@ class Context(metaclass=ABCMeta):
         conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
+        endpoint_protocol = self.install_variable.endpoint_protocol
+        fqdn_prefix = self.install_variable.fqdn_prefix
+        storage_public_address = self.install_variable.storage_public_address
+        public_facing_address = self.install_variable.public_facing_address
         assert halfstack.redis_addr is not None
+
+        # use FQDN if provided, otherwise use public_facing_address
+        if fqdn_prefix is not None:
+            # With FQDN prefix, use public storage address with https
+            wsproxy_url = f"https://{storage_public_address}:5050"
+        else:
+            # Without FQDN prefix, use public_facing_address with http
+            wsproxy_url = f"http://{public_facing_address}:5050"
+        # Use sed_in_place for dotted key wsproxy.url
+        self.sed_in_place(
+            conf_path,
+            re.compile(r'^wsproxy\.url\s*=\s*".*"', flags=re.MULTILINE),
+            f'wsproxy.url = "{wsproxy_url}"',
+        )
+
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
-            appproxy_itable = tomlkit.inline_table()
-            appproxy_itable["url"] = (
-                f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
-            )
-            data["service"]["appproxy"] = appproxy_itable  # type: ignore
+            if endpoint_protocol is not None:
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -740,6 +754,14 @@ class Context(metaclass=ABCMeta):
         self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
         self.log.write(f"API SECRET = {service.appproxy_api_secret}")
 
+        tls_advertised = self.install_variable.tls_advertised
+        advertised_port = self.install_variable.advertised_port
+        wildcard_domain = self.install_variable.wildcard_domain
+        public_facing_address = self.install_variable.public_facing_address
+        apphub_address = self.install_variable.apphub_address
+        app_address = self.install_variable.app_address
+        frontend_mode = self.install_variable.frontend_mode
+
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
             data["db"]["type"] = "postgresql"  # type: ignore[index]
@@ -750,17 +772,24 @@ class Context(metaclass=ABCMeta):
             data["db"]["max_overflow"] = 64  # type: ignore[index]
             data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
             data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
-            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
-            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            redis_addr_table = tomlkit.inline_table()
+            redis_addr_table["host"] = halfstack.redis_addr.face.host  # type: ignore
+            redis_addr_table["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["redis"]["addr"] = redis_addr_table  # type: ignore
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.host
-            )
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
             data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
+            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
+            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
+                service.appproxy_coordinator_addr.bind.port
+            )
+            if tls_advertised:
+                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -768,20 +797,65 @@ class Context(metaclass=ABCMeta):
         worker_conf = self.copy_config("app-proxy-worker.toml")
         with worker_conf.open("r") as fp:
             data = tomlkit.load(fp)
-            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
-            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            # Update redis addr inline table
+            redis_addr_table = tomlkit.inline_table()
+            redis_addr_table["host"] = halfstack.redis_addr.face.host  # type: ignore
+            redis_addr_table["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["redis"]["addr"] = redis_addr_table  # type: ignore
+
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
             )
-            data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
-                "host": service.appproxy_worker_addr.bind.host,
-                "port": service.appproxy_worker_addr.bind.port,
-            }
-            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
-            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
+
+            # api_bind_addr as inline table
+            api_bind_addr_table = tomlkit.inline_table()
+            api_bind_addr_table["host"] = service.appproxy_worker_addr.bind.host
+            api_bind_addr_table["port"] = service.appproxy_worker_addr.bind.port
+            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
+
+            # api_advertised_addr as inline table
+            api_advertised_addr_table = tomlkit.inline_table()
+            api_advertised_addr_table["host"] = public_facing_address
+            api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
+            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+
+            # advertise TLS to external clients
+            if tls_advertised:
+                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+
+            # set frontend mode (port or wildcard)
+            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+
+            # configure based on frontend_mode
+            if frontend_mode == FrontendMode.WILDCARD:
+                # Remove port_proxy section for wildcard mode
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+
+                # Override api_advertised_addr with app_address and advertised_port
+                api_advertised_addr_table = tomlkit.inline_table()
+                api_advertised_addr_table["host"] = app_address
+                api_advertised_addr_table["port"] = advertised_port
+                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+
+                # Add wildcard_domain section
+                if wildcard_domain:
+                    wildcard_table = tomlkit.table()
+                    wildcard_table["domain"] = wildcard_domain
+                    bind_addr_table = tomlkit.inline_table()
+                    bind_addr_table["host"] = "0.0.0.0"
+                    bind_addr_table["port"] = 10250
+                    wildcard_table["bind_addr"] = bind_addr_table
+                    wildcard_table["advertised_port"] = advertised_port
+                    wildcard_table.add(tomlkit.nl())  # Add newline before next section
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            else:
+                # update port_proxy.advertised_host
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 

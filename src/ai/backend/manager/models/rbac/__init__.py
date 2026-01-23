@@ -226,6 +226,8 @@ async def _calculate_role_in_scope_for_admin(
                 user_row = cast(UserRow | None, await db_session.scalar(stmt))
                 if user_row is None:
                     return _EMPTY_FSET
+                if user_row.domain_name is None:
+                    return _EMPTY_FSET
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
                 return frozenset([PredefinedRole.ADMIN])

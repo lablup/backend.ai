@@ -9,8 +9,10 @@ from decimal import Decimal
 from typing import Optional, cast
 from uuid import UUID
 
+import aiotools
 import msgpack
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
@@ -21,19 +23,43 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import SlotName
+from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
+from ai.backend.manager.errors.resource import (
+    InvalidUserUpdateMode,
+    ProjectHasActiveEndpointsError,
+    ProjectHasActiveKernelsError,
+    ProjectHasVFoldersMountedError,
+    ProjectNotFound,
+)
+from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
-from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    kernels,
+)
+from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.models.vfolder import (
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    initiate_vfolder_deletion,
+    vfolder_status_map,
+    vfolders,
+)
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
@@ -61,6 +87,7 @@ class GroupRepository:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
+    _storage_manager: StorageSessionManager
     _role_manager: RoleManager
 
     def __init__(
@@ -68,10 +95,12 @@ class GroupRepository:
         db: ExtendedAsyncSAEngine,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
+        storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
+        self._storage_manager = storage_manager
         self._role_manager = RoleManager()
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
@@ -96,7 +125,7 @@ class GroupRepository:
             # Validate resource policy exists
             policy_exists = await db_session.scalar(
                 sa.select(
-                    sa.exists().where(keypair_resource_policies.c.name == spec.resource_policy)
+                    sa.exists().where(project_resource_policies.c.name == spec.resource_policy)
                 )
             )
             if not policy_exists:
@@ -119,7 +148,7 @@ class GroupRepository:
 
             # Create the group
             creator_result = await execute_creator(db_session, creator)
-            row = creator_result.row
+            row: GroupRow = creator_result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)
@@ -183,7 +212,7 @@ class GroupRepository:
                 )
                 .where(groups.c.id == group_id)
             )
-            if result.rowcount > 0:
+            if cast(CursorResult, result).rowcount > 0:
                 return
             raise ProjectNotFound(f"Group not found: {group_id}")
 
@@ -200,7 +229,7 @@ class GroupRepository:
                 users, users.c.uuid == kernels.c.user_uuid
             )
             query = (
-                sa.select([
+                sa.select(
                     kernels.c.id,
                     kernels.c.container_id,
                     kernels.c.session_id,
@@ -226,7 +255,7 @@ class GroupRepository:
                     groups.c.name,
                     users.c.email,
                     users.c.full_name,
-                ])
+                )
                 .select_from(j)
                 .where(
                     # Filter sessions which existence period overlaps with requested period
@@ -246,34 +275,34 @@ class GroupRepository:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        kernel_ids = [str(row["id"]) for row in rows]
+        kernel_ids = [str(row.id) for row in rows]
         raw_stats = await self._valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids)
 
         objs_per_group = {}
         local_tz = self._config_provider.config.system.timezone
 
         for row, raw_stat in zip(rows, raw_stats, strict=True):
-            group_id = str(row["group_id"])
-            last_stat = row["last_stat"]
+            group_id = str(row.group_id)
+            last_stat = row.last_stat
             if not last_stat:
                 if raw_stat is None:
-                    log.warning("stat object for {} not found on redis, skipping", str(row["id"]))
+                    log.warning("stat object for {} not found on redis, skipping", str(row.id))
                     continue
                 last_stat = msgpack.unpackb(raw_stat)
             nfs = None
-            if row["vfolder_mounts"]:
+            if row.vfolder_mounts:
                 # For >=22.03, return used host directories instead of volume host, which is not so useful.
-                nfs = list({str(mount.host_path) for mount in row["vfolder_mounts"]})
-            elif row["mounts"] and isinstance(row["mounts"][0], list):
+                nfs = list({str(mount.host_path) for mount in row.vfolder_mounts})
+            elif row.mounts and isinstance(row.mounts[0], list):
                 # For the kernel records that have legacy contents of `mounts`.
-                nfs = list({mount[2] for mount in row["mounts"]})
-            if row["terminated_at"] is None:
+                nfs = list({mount[2] for mount in row.mounts})
+            if row.terminated_at is None:
                 used_time = used_days = None
             else:
-                used_time = str(row["terminated_at"] - row["created_at"])
+                used_time = str(row.terminated_at - row.created_at)
                 used_days = (
-                    row["terminated_at"].astimezone(local_tz).toordinal()
-                    - row["created_at"].astimezone(local_tz).toordinal()
+                    row.terminated_at.astimezone(local_tz).toordinal()
+                    - row.created_at.astimezone(local_tz).toordinal()
                     + 1
                 )
             device_type = set()
@@ -290,17 +319,17 @@ class GroupRepository:
                 if SlotName(key).is_accelerator():
                     gpu_allocated += value
             c_info = {
-                "id": str(row["id"]),
-                "session_id": str(row["session_id"]),
-                "container_id": row["container_id"],
-                "domain_name": row["domain_name"],
-                "group_id": str(row["group_id"]),
-                "group_name": row["name"],
-                "name": row["session_name"],
-                "access_key": row["access_key"],
-                "email": row["email"],
-                "full_name": row["full_name"],
-                "agent": row["agent"],
+                "id": str(row.id),
+                "session_id": str(row.session_id),
+                "container_id": row.container_id,
+                "domain_name": row.domain_name,
+                "group_id": str(row.group_id),
+                "group_name": row.name,
+                "name": row.session_name,
+                "access_key": row.access_key,
+                "email": row.email,
+                "full_name": row.full_name,
+                "agent": row.agent,
                 "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
                 "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
                 "mem_allocated": int(row.occupied_slots.get("mem", 0)),
@@ -317,21 +346,21 @@ class GroupRepository:
                 "gpu_mem_allocated": float(gpu_mem_allocated),
                 "gpu_allocated": float(gpu_allocated),
                 "nfs": nfs,
-                "image_id": row["image"],  # TODO: image id
-                "image_name": row["image"],
-                "created_at": str(row["created_at"]),
-                "terminated_at": str(row["terminated_at"]),
-                "status": row["status"].name,
-                "status_info": row["status_info"],
-                "status_changed": str(row["status_changed"]),
-                "status_history": row["status_history"] or {},
-                "cluster_mode": row["cluster_mode"],
+                "image_id": row.image,  # TODO: image id
+                "image_name": row.image,
+                "created_at": str(row.created_at),
+                "terminated_at": str(row.terminated_at),
+                "status": row.status.name,
+                "status_info": row.status_info,
+                "status_changed": str(row.status_changed),
+                "status_history": row.status_history or {},
+                "cluster_mode": row.cluster_mode,
             }
             if group_id not in objs_per_group:
                 objs_per_group[group_id] = {
-                    "domain_name": row["domain_name"],
+                    "domain_name": row.domain_name,
                     "g_id": group_id,
-                    "g_name": row["name"],  # this is group's name
+                    "g_name": row.name,  # this is group's name
                     "g_cpu_allocated": c_info["cpu_allocated"],
                     "g_cpu_used": c_info["cpu_used"],
                     "g_mem_allocated": c_info["mem_allocated"],
@@ -377,3 +406,184 @@ class GroupRepository:
     ):
         """Fetch resource usage data for projects."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
+
+    async def _check_group_vfolders_mounted_to_active_kernels(
+        self, session: SASession, group_id: uuid.UUID
+    ) -> bool:
+        """Check if group has vfolders mounted to active kernels."""
+        # Get group vfolder IDs
+        query = sa.select(vfolders.c.id).select_from(vfolders).where(vfolders.c.group == group_id)
+        result = await session.execute(query)
+        rows = result.fetchall()
+        group_vfolder_ids = [row.id for row in rows]
+
+        # Check if any active kernels have these vfolders mounted
+        query = (
+            sa.select(kernels.c.mounts)
+            .select_from(kernels)
+            .where(
+                (kernels.c.group_id == group_id)
+                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            )
+        )
+        async for row in await session.stream(query):
+            for _mount in row.mounts:
+                try:
+                    vfolder_id = uuid.UUID(_mount[2])
+                    if vfolder_id in group_vfolder_ids:
+                        return True
+                except Exception:
+                    pass
+        return False
+
+    async def _check_group_has_active_kernels(
+        self, session: SASession, group_id: uuid.UUID
+    ) -> bool:
+        """Check if group has active kernels."""
+        query = (
+            sa.select(sa.func.count())
+            .select_from(kernels)
+            .where(
+                (kernels.c.group_id == group_id)
+                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            )
+        )
+        active_kernel_count = await session.scalar(query)
+        return (active_kernel_count or 0) > 0
+
+    async def _delete_group_vfolders(self, group_id: uuid.UUID) -> int:
+        """Delete all vfolders belonging to the group."""
+        target_vfs: list[VFolderDeletionInfo] = []
+        async with self._db.begin_session() as session:
+            query = sa.select(VFolderRow).where(
+                sa.and_(
+                    VFolderRow.group == group_id,
+                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                )
+            )
+            result = await session.scalars(query)
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                )
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            await initiate_vfolder_deletion(
+                self._db,
+                target_vfs,
+                self._storage_manager,
+                storage_ptask_group,
+            )
+        except VFolderOperationFailed:
+            raise
+
+        return len(target_vfs)
+
+    async def _delete_group_kernels(self, session: SASession, group_id: uuid.UUID) -> int:
+        """Delete all kernels belonging to the group."""
+        query = sa.delete(kernels).where(kernels.c.group_id == group_id)
+        result = cast(CursorResult, await session.execute(query))
+        return result.rowcount
+
+    async def _delete_group_sessions(self, session: SASession, group_id: uuid.UUID) -> int:
+        """Delete all sessions belonging to the group."""
+        stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
+        result = cast(CursorResult, await session.execute(stmt))
+        return result.rowcount
+
+    async def _delete_group_endpoints(self, session: SASession, group_id: uuid.UUID) -> None:
+        """Delete all endpoints belonging to the group."""
+        # Get all endpoints for the group
+        endpoints = (
+            await session.execute(
+                sa.select(
+                    EndpointRow.id,
+                    sa.case(
+                        (
+                            EndpointRow.lifecycle_stage.in_([
+                                EndpointLifecycle.CREATED,
+                                EndpointLifecycle.DESTROYING,
+                            ]),
+                            True,
+                        ),
+                        else_=False,
+                    ).label("is_active"),
+                ).where(EndpointRow.project == group_id)
+            )
+        ).all()
+
+        if len(endpoints) == 0:
+            return
+
+        # Check for active endpoints
+        active_endpoints = [ep.id for ep in endpoints if ep.is_active]
+        if len(active_endpoints) > 0:
+            raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
+
+        # Delete endpoint-related data
+        endpoint_ids = [ep.id for ep in endpoints]
+
+        # Get session IDs before deleting endpoints
+        session_ids_result = await session.scalars(
+            sa.select(RoutingRow.session).where(
+                sa.and_(
+                    RoutingRow.endpoint.in_(endpoint_ids),
+                    RoutingRow.session.is_not(None),
+                )
+            )
+        )
+        session_ids = list(session_ids_result.unique().all())
+
+        # Delete endpoints (routings are CASCADE deleted automatically)
+        await session.execute(
+            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)),
+            execution_options={"synchronize_session": False},
+        )
+
+        # Delete sessions that were associated with endpoints
+        if session_ids:
+            await session.execute(
+                sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)),
+                execution_options={"synchronize_session": False},
+            )
+
+    @group_repository_resilience.apply()
+    async def purge_group(self, group_id: uuid.UUID) -> bool:
+        """Completely remove a group and all its associated data."""
+        async with self._db.begin_session() as session:
+            # Pre-flight checks
+            if await self._check_group_vfolders_mounted_to_active_kernels(session, group_id):
+                raise ProjectHasVFoldersMountedError(
+                    f"error on deleting project {group_id} with vfolders mounted to active kernels"
+                )
+
+            if await self._check_group_has_active_kernels(session, group_id):
+                raise ProjectHasActiveKernelsError(
+                    f"error on deleting project {group_id} with active kernels"
+                )
+
+            # Delete associated resources
+            await self._delete_group_endpoints(session, group_id)
+
+            # Commit session before vfolder deletion (which uses separate transactions)
+            await session.commit()
+
+        # Delete vfolders (uses separate transaction)
+        await self._delete_group_vfolders(group_id)
+
+        async with self._db.begin_session() as session:
+            # Delete remaining data
+            await self._delete_group_kernels(session, group_id)
+            await self._delete_group_sessions(session, group_id)
+
+            # Finally delete the group itself
+            result = cast(
+                CursorResult,
+                await session.execute(sa.delete(groups).where(groups.c.id == group_id)),
+            )
+
+            if result.rowcount > 0:
+                return True
+            raise ProjectNotFound("project not found")

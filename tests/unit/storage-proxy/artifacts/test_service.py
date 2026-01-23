@@ -26,6 +26,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
@@ -89,7 +90,7 @@ def create_mock_aiohttp_session() -> tuple[Mock, Mock]:
 @pytest.fixture
 def mock_huggingface_config() -> HuggingfaceConfig:
     """Mock HuggingfaceConfig object."""
-    return HuggingfaceConfig(
+    return HuggingfaceConfig(  # type: ignore[call-arg]
         token="test_token",
         endpoint="https://huggingface.co",
     )
@@ -210,7 +211,7 @@ def mock_progress_reporter() -> MagicMock:
 @pytest.fixture
 def mock_reservoir_config() -> ReservoirConfig:
     """Mock ReservoirConfig object."""
-    return ReservoirConfig(
+    return ReservoirConfig(  # type: ignore[call-arg]
         endpoint="https://s3.amazonaws.com",
         object_storage_region="us-west-2",
         object_storage_access_key="test_access_key",
@@ -221,7 +222,7 @@ def mock_reservoir_config() -> ReservoirConfig:
 @pytest.fixture
 def mock_object_storage_config() -> ObjectStorageConfig:
     """Mock ObjectStorageConfig object."""
-    return ObjectStorageConfig(
+    return ObjectStorageConfig(  # type: ignore[call-arg]
         endpoint="https://s3.amazonaws.com",
         region="us-west-2",
         access_key="test_access_key",
@@ -239,8 +240,8 @@ def mock_import_step_context(
 ) -> ImportStepContext:
     """Mock ImportStepContext."""
     storage_step_mappings = {
-        ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-        ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+        ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
     }
 
     return ImportStepContext(
@@ -256,7 +257,7 @@ def mock_import_step_context(
 def mock_reservoir_registry_configs() -> dict[str, ReservoirConfig]:
     """Mock Reservoir registry configurations."""
     return {
-        "test_registry": ReservoirConfig(
+        "test_registry": ReservoirConfig(  # type: ignore[call-arg]
             endpoint="https://s3.amazonaws.com",
             object_storage_region="us-west-2",
             object_storage_access_key="test_access_key",
@@ -294,7 +295,7 @@ def reservoir_download_step(
     # Create ManagerHTTPClientPool
     manager_client_pool = ManagerHTTPClientPool(
         registry_configs=mock_reservoir_registry_configs,
-        client_config=ReservoirClientConfig(),
+        client_config=ReservoirClientConfig(),  # type: ignore[call-arg]
     )
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
@@ -694,10 +695,11 @@ class TestHuggingFaceDownloadStep:
             await hf_download_step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=mock_import_step_context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
             # Verify the stream reader was created with correct parameters
@@ -742,10 +744,11 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
     @pytest.mark.asyncio
@@ -763,8 +766,8 @@ class TestHuggingFaceDownloadStep:
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
             storage_step_mappings={
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+                ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+                ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
             },
             step_metadata={},
         )
@@ -779,10 +782,11 @@ class TestHuggingFaceDownloadStep:
             await step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
     @pytest.mark.asyncio
@@ -809,10 +813,11 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
 
@@ -1053,7 +1058,7 @@ class TestReservoirDownloadStep:
         # Create ManagerHTTPClientPool with empty configs
         manager_client_pool = ManagerHTTPClientPool(
             registry_configs={},
-            client_config=ReservoirClientConfig(),
+            client_config=ReservoirClientConfig(),  # type: ignore[call-arg]
         )
         step = ReservoirDownloadStep(
             registry_configs={},

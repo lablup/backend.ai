@@ -5,11 +5,13 @@ This module defines the interface for agent selection that abstracts away
 the row-based implementation details of the legacy selectors.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
@@ -20,6 +22,10 @@ from .exceptions import (
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
+    from ai.backend.manager.sokovan.scheduler.types import AgentOccupancy
 
 
 @dataclass
@@ -40,6 +46,33 @@ class AgentInfo:
     scaling_group: str
     # Number of containers currently running on the agent
     container_count: int
+
+    @classmethod
+    def from_meta_and_occupancy(
+        cls,
+        meta: AgentMeta,
+        occupancy_map: Mapping[AgentId, AgentOccupancy],
+    ) -> AgentInfo:
+        """
+        Create an AgentInfo from agent metadata and occupancy mapping.
+
+        Args:
+            meta: Agent metadata containing static information
+            occupancy_map: Mapping of agent IDs to occupancy data
+
+        Returns:
+            AgentInfo instance with occupancy data looked up by agent ID
+        """
+        occupancy = occupancy_map.get(meta.id)
+        return cls(
+            agent_id=meta.id,
+            agent_addr=meta.addr,
+            architecture=meta.architecture,
+            scaling_group=meta.scaling_group,
+            available_slots=meta.available_slots,
+            occupied_slots=occupancy.occupied_slots if occupancy else ResourceSlot(),
+            container_count=occupancy.container_count if occupancy else 0,
+        )
 
 
 @dataclass

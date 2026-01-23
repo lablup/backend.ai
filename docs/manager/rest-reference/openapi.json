@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.19.0",
+    "version": "26.1.0rc1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -992,7 +992,7 @@
               }
             ],
             "default": null,
-            "description": "Image architecture",
+            "description": "Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
             "title": "Arch"
           },
           "group": {
@@ -5801,8 +5801,7 @@
                     "type": "string"
                   },
                   "arch": {
-                    "type": "string",
-                    "default": "x86_64"
+                    "type": "string"
                   },
                   "type": {
                     "type": "string",
@@ -5910,7 +5909,6 @@
                   "name",
                   "priority",
                   "image",
-                  "arch",
                   "type",
                   "group",
                   "domain",
@@ -5966,8 +5964,7 @@
                     "type": "string"
                   },
                   "arch": {
-                    "type": "string",
-                    "default": "x86_64"
+                    "type": "string"
                   },
                   "type": {
                     "type": "string",
@@ -6075,7 +6072,6 @@
                   "name",
                   "priority",
                   "image",
-                  "arch",
                   "type",
                   "group",
                   "domain",
@@ -10791,6 +10787,696 @@
           }
         ],
         "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/scope-types": {
+      "get": {
+        "operationId": "v2.0.get_scope_types",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get available scope types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/scopes/{scope_type}/search": {
+      "post": {
+        "operationId": "v2.0.search_scopes",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search scopes for a specific scope type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/entity-types": {
+      "get": {
+        "operationId": "v2.0.get_entity_types",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get available entity types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search": {
+      "post": {
+        "operationId": "v2.0.search_entities",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search entities within a scope by entity type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/scheduling-history/sessions/search": {
+      "post": {
+        "operationId": "scheduling-history.search_session_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search session scheduling history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/scheduling-history/deployments/search": {
+      "post": {
+        "operationId": "scheduling-history.search_deployment_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search deployment history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/scheduling-history/routes/search": {
+      "post": {
+        "operationId": "scheduling-history.search_route_history",
+        "tags": [
+          "scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search route history.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/domains/{resource_group}/{domain_name}": {
+      "get": {
+        "operationId": "fair-share.get_domain_fair_share",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single domain fair share.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/domains/search": {
+      "post": {
+        "operationId": "fair-share.search_domain_fair_shares",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search domain fair shares.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/projects/{resource_group}/{project_id}": {
+      "get": {
+        "operationId": "fair-share.get_project_fair_share",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single project fair share.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/projects/search": {
+      "post": {
+        "operationId": "fair-share.search_project_fair_shares",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search project fair shares.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/users/{resource_group}/{project_id}/{user_uuid}": {
+      "get": {
+        "operationId": "fair-share.get_user_fair_share",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single user fair share.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/users/search": {
+      "post": {
+        "operationId": "fair-share.search_user_fair_shares",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search user fair shares.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/usage-buckets/domains/search": {
+      "post": {
+        "operationId": "fair-share.search_domain_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search domain usage buckets.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/usage-buckets/projects/search": {
+      "post": {
+        "operationId": "fair-share.search_project_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search project usage buckets.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/usage-buckets/users/search": {
+      "post": {
+        "operationId": "fair-share.search_user_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search user usage buckets.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/domains/{resource_group}/{domain_name}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_domain_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert domain fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/projects/{resource_group}/{project_id}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_project_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert project fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/users/{resource_group}/{project_id}/{user_uuid}/weight": {
+      "put": {
+        "operationId": "fair-share.upsert_user_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Upsert user fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/resource-groups/{resource_group}/spec": {
+      "patch": {
+        "operationId": "fair-share.update_resource_group_fair_share_spec",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update resource group fair share spec with partial update (Read-Modify-Write pattern).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/reports": {
+      "get": {
+        "operationId": "export.list_reports",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List available export reports.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/reports/{report_key}": {
+      "get": {
+        "operationId": "export.get_report",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific export report by key.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/users/csv": {
+      "post": {
+        "operationId": "export.export_csv",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export user data as CSV.\n\nPOST /export/users/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/sessions/csv": {
+      "post": {
+        "operationId": "export.export_csv.2",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export session data as CSV.\n\nPOST /export/sessions/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/projects/csv": {
+      "post": {
+        "operationId": "export.export_csv.3",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export project data as CSV.\n\nPOST /export/projects/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/audit-logs/csv": {
+      "post": {
+        "operationId": "export.export_csv.4",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Export audit log data as CSV.\n\nPOST /export/audit-logs/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }

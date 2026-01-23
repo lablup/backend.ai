@@ -66,7 +66,7 @@ class UserInfo(graphene.ObjectType):
     ) -> Optional[UserInfo]:
         if row is None:
             return None
-        return cls(email=row["email"], full_name=row["full_name"])
+        return cls(email=row.email, full_name=row.full_name)
 
     @classmethod
     async def batch_load_by_uuid(
@@ -78,7 +78,7 @@ class UserInfo(graphene.ObjectType):
             from .user import users
 
             query = (
-                sa.select([users.c.uuid, users.c.email, users.c.full_name])
+                sa.select(users.c.uuid, users.c.email, users.c.full_name)
                 .select_from(users)
                 .where(users.c.uuid.in_(user_uuids))
             )
@@ -88,7 +88,7 @@ class UserInfo(graphene.ObjectType):
                 query,
                 cls,
                 user_uuids,
-                lambda row: row["uuid"],
+                lambda row: row.uuid,
             )
 
 
@@ -158,20 +158,20 @@ class KeyPair(graphene.ObjectType):
         row: Row,
     ) -> KeyPair:
         return cls(
-            id=row["access_key"],
-            user_id=row["user_id"],
-            full_name=row["full_name"] if "full_name" in row.keys() else None,
-            access_key=row["access_key"],
-            secret_key=row["secret_key"],
-            is_active=row["is_active"],
-            is_admin=row["is_admin"],
-            resource_policy=row["resource_policy"],
-            created_at=row["created_at"],
-            rate_limit=row["rate_limit"],
-            user=row["user"],
-            ssh_public_key=row["ssh_public_key"],
+            id=row.access_key,
+            user_id=row.user_id,
+            full_name=row._mapping.get("full_name"),
+            access_key=row.access_key,
+            secret_key=row.secret_key,
+            is_active=row.is_active,
+            is_admin=row.is_admin,
+            resource_policy=row.resource_policy,
+            created_at=row.created_at,
+            rate_limit=row.rate_limit,
+            user=row.user,
+            ssh_public_key=row.ssh_public_key,
             concurrency_limit=0,  # deprecated
-            projects=row["groups_name"] if "groups_name" in row.keys() else [],
+            projects=row._mapping.get("groups_name", []),
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -241,7 +241,7 @@ class KeyPair(graphene.ObjectType):
             users,
             keypairs.c.user == users.c.uuid,
         )
-        query = sa.select([keypairs]).select_from(j)
+        query = sa.select(keypairs).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
@@ -303,7 +303,7 @@ class KeyPair(graphene.ObjectType):
             .outerjoin(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
             .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([sa.func.count()]).group_by(keypairs.c.access_key).select_from(j)
+        query = sa.select(sa.func.count()).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -339,12 +339,12 @@ class KeyPair(graphene.ObjectType):
             .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select([
+            sa.select(
                 keypairs,
                 users.c.email,
                 users.c.full_name,
                 agg_to_array(groups.c.name).label("groups_name"),
-            ])
+            )
             .select_from(j)
             .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
@@ -389,12 +389,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select([
+            sa.select(
                 keypairs,
                 users.c.email,
                 users.c.full_name,
                 agg_to_array(groups.c.name).label("groups_name"),
-            ])
+            )
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -410,7 +410,7 @@ class KeyPair(graphene.ObjectType):
                 query,
                 cls,
                 user_ids,
-                lambda row: row["user_id"],
+                lambda row: row.user_id,
             )
 
     @classmethod
@@ -430,12 +430,12 @@ class KeyPair(graphene.ObjectType):
             .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
-            sa.select([
+            sa.select(
                 keypairs,
                 users.c.email,
                 users.c.full_name,
                 agg_to_array(groups.c.name).label("groups_name"),
-            ])
+            )
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
             .group_by(keypairs, users.c.email, users.c.full_name)
@@ -449,7 +449,7 @@ class KeyPair(graphene.ObjectType):
                 query,
                 cls,
                 access_keys,
-                lambda row: row["access_key"],
+                lambda row: row.access_key,
             )
 
 
@@ -512,7 +512,7 @@ class CreateKeyPair(graphene.Mutation):
         data = prepare_new_keypair(user_id, props.to_creator())
         insert_query = sa.insert(keypairs).values(
             **data,
-            user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
+            user=sa.select(users.c.uuid).where(users.c.email == user_id).as_scalar(),
         )
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
@@ -567,11 +567,11 @@ class DeleteKeyPair(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:
             user_query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(UserRow)
                 .where(UserRow.main_access_key == access_key)
             )
-            if (await db_session.scalar(user_query)) > 0:
+            if (await db_session.scalar(user_query) or 0) > 0:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         result = await simple_db_mutate(cls, ctx, delete_query)

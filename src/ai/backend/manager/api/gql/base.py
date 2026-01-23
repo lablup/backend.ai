@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 
 import graphene
 import strawberry
@@ -13,8 +13,6 @@ from graphql import StringValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.common.json import dump_json_str, load_json
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
 
 if TYPE_CHECKING:
@@ -30,6 +28,22 @@ class StringMatchSpec:
 
     value: str
     case_insensitive: bool
+    negated: bool
+
+
+@dataclass(frozen=True)
+class UUIDEqualMatchSpec:
+    """Specification for UUID equality operations (=, !=)."""
+
+    value: uuid.UUID
+    negated: bool
+
+
+@dataclass(frozen=True)
+class UUIDInMatchSpec:
+    """Specification for UUID IN operations (IN, NOT IN)."""
+
+    values: list[uuid.UUID]
     negated: bool
 
 
@@ -203,6 +217,65 @@ class IntFilter:
         )
 
 
+@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
+class UUIDFilter:
+    # Basic operations
+    equals: uuid.UUID | None = None
+    in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
+
+    # NOT operations
+    not_equals: uuid.UUID | None = None
+    not_in: list[uuid.UUID] | None = None
+
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[UUIDEqualMatchSpec], QueryCondition],
+        in_factory: Callable[[UUIDInMatchSpec], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory function for equality operations (=, !=)
+            in_factory: Factory function for IN operations (IN, NOT IN)
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        # Equality operations
+        if self.equals:
+            return equals_factory(
+                UUIDEqualMatchSpec(
+                    value=self.equals,
+                    negated=False,
+                )
+            )
+        if self.not_equals:
+            return equals_factory(
+                UUIDEqualMatchSpec(
+                    value=self.not_equals,
+                    negated=True,
+                )
+            )
+
+        # IN operations
+        if self.in_:
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.in_,
+                    negated=False,
+                )
+            )
+        if self.not_in:
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.not_in,
+                    negated=True,
+                )
+            )
+
+        return None
+
+
 @strawberry.input
 class DateTimeFilter:
     """Filter for datetime fields."""
@@ -251,29 +324,6 @@ class Ordering(StrEnum):
     DESC = "DESC"
     DESC_NULLS_FIRST = "DESC_NULLS_FIRST"
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
-
-
-@strawberry.scalar(description="Added in 25.15.0")
-class JSONString:
-    @staticmethod
-    def parse_value(value: str | bytes) -> Mapping[str, Any]:
-        if isinstance(value, str):
-            return load_json(value)
-        if isinstance(value, bytes):
-            return load_json(value)
-        return value
-
-    @staticmethod
-    def serialize(value: Any) -> JSONString:
-        if isinstance(value, (dict, list)):
-            return cast(JSONString, dump_json_str(value))
-        if isinstance(value, str):
-            return cast(JSONString, value)
-        return cast(JSONString, dump_json_str(value))
-
-    @staticmethod
-    def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
-        return JSONString.serialize(resource_slot.to_json())
 
 
 def to_global_id(

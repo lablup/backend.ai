@@ -252,5 +252,10 @@ def schema():
     """Command set for managing the database schema."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.config:cli")
+def config():
+    """Configuration management commands."""
+
+
 if __name__ == "__main__":
     main()

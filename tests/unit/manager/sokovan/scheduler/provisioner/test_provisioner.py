@@ -8,10 +8,12 @@ and correct agent selector selection based on agent_selection_strategy.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from dateutil.tz import tzutc
 
 from ai.backend.common.types import (
     AccessKey,
@@ -35,6 +37,7 @@ from ai.backend.manager.repositories.scheduler.types.snapshot import (
     ResourcePolicies,
     SnapshotData,
 )
+from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
@@ -155,6 +158,12 @@ def mock_repository() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_fair_share_repository() -> MagicMock:
+    """Create mock fair share repository."""
+    return MagicMock()
+
+
+@pytest.fixture
 def mock_validator() -> MagicMock:
     """Create mock validator."""
     validator = MagicMock()
@@ -208,6 +217,7 @@ def mock_selector_pool() -> dict[AgentSelectionStrategy, MagicMock]:
 @pytest.fixture
 def test_provisioner(
     mock_repository: AsyncMock,
+    mock_fair_share_repository: MagicMock,
     mock_validator: MagicMock,
     mock_sequencer: MagicMock,
     mock_agent_selector: MagicMock,
@@ -225,14 +235,15 @@ def test_provisioner(
             default_agent_selector=mock_agent_selector,
             allocator=mock_allocator,
             repository=mock_repository,
+            fair_share_repository=mock_fair_share_repository,
             config_provider=mock_config_provider,
             valkey_schedule=valkey_schedule,
         )
     )
 
 
-class TestScheduleQueuedSessionsWithData:
-    """Test _schedule_queued_sessions_with_data method."""
+class TestScheduleScalingGroup:
+    """Test schedule_scaling_group method."""
 
     @pytest.mark.parametrize(
         "strategy",
@@ -250,16 +261,22 @@ class TestScheduleQueuedSessionsWithData:
         mock_selector_pool: dict[AgentSelectionStrategy, MagicMock],
     ) -> None:
         """
-        Verify that _schedule_queued_sessions_with_data uses correct agent_selector.
+        Verify that schedule_scaling_group uses correct agent_selector.
         """
         # Given: Override provisioner's selector pool with mock selectors
         test_provisioner._agent_selector_pool = mock_selector_pool
 
         # Given: SchedulingData with specific strategy
         scheduling_data = _create_scheduling_data_with_strategy(strategy)
+        session_ids = [s.id for s in scheduling_data.pending_sessions.sessions]
 
-        # When: Execute _schedule_queued_sessions_with_data
-        await test_provisioner._schedule_queued_sessions_with_data("test-sg", scheduling_data)
+        # When: Execute schedule_scaling_group within RecorderContext scope
+        # (In production, coordinator opens the scope before calling provisioner)
+        provision_time = datetime.now(tzutc())
+        with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
+            await test_provisioner.schedule_scaling_group(
+                "test-sg", scheduling_data, provision_time
+            )
 
         # Then: The selector for the specified strategy was used
         used_selector = mock_selector_pool[strategy]

@@ -35,14 +35,14 @@ class RouteHealthStatusModel(BaseModel):
 
     route_id: UUID
     session_id: UUID
-    kernel_host: str
+    kernel_host: str | None
     kernel_port: int
     protocol: str
     health_status: ModelServiceStatus | None
     last_health_check: float | None
     consecutive_failures: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None
+    updated_at: datetime | None
 
 
 class EndpointHealthStatusModel(BaseModel):
@@ -336,7 +336,7 @@ async def status(request: web.Request) -> PydanticResponse[StatusResponseModel]:
                     ha_setup=w.nodes > 1,
                 )
                 for w in workers
-                if (w.updated_at.timestamp() - datetime.now(UTC).timestamp()) <= 30
+                if w.updated_at and (w.updated_at.timestamp() - datetime.now(UTC).timestamp()) <= 30
             ],
         )
     )

@@ -2,6 +2,9 @@
 Author: Gyubong Lee (gbl@lablup.com)
 Status: Accepted
 Created: 2025-07-10
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Support MinIO as Artifact Registry Storage Backend

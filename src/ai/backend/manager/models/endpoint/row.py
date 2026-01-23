@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections import defaultdict
 from collections.abc import (
-    Container,
-    Mapping,
+    Iterable,
     Sequence,
 )
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import (
@@ -21,12 +22,20 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 import trafaret as t
+import yarl
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    contains_eager,
+    foreign,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
@@ -81,9 +90,8 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,
-    EndpointIDColumn,
+    EndpointIDColumnType,
     EnumValueType,
-    IDColumn,
     ResourceSlotColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -93,21 +101,17 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
     "EndpointLifecycle",
     "EndpointRow",
-    "EndpointStatistics",
     "EndpointTokenRow",
     "ModelServiceHelper",
 )
@@ -116,6 +120,54 @@ __all__ = (
 ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+
+
+def _get_endpoint_tokens_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointTokenRow
+
+    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
+
+
+def _get_endpoint_revisions_join_condition():
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
+
+
+def _get_endpoint_auto_scaling_policy_join_condition():
+    from ai.backend.manager.models.deployment_auto_scaling_policy import (
+        DeploymentAutoScalingPolicyRow,
+    )
+
+    return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
+
+
+def _get_endpoint_deployment_policy_join_condition():
+    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+
+    return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
+
+
+def _get_image_row_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return foreign(EndpointRow.image) == ImageRow.id
+
+
+def _get_created_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(EndpointRow.created_user) == UserRow.uuid
+
+
+def _get_session_owner_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return foreign(EndpointRow.session_owner) == UserRow.uuid
+
+
+def _get_endpoint_token_endpoint_row_join_condition():
+    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
 class EndpointRow(Base):
@@ -139,83 +191,98 @@ class EndpointRow(Base):
         ),
     )
 
-    id = EndpointIDColumn()
-    name = sa.Column("name", sa.String(length=512), nullable=False)
-    created_user = sa.Column("created_user", GUID, nullable=False)
-    session_owner = sa.Column("session_owner", GUID, nullable=False)
+    id: Mapped[EndpointId] = mapped_column(
+        "id", EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
+    created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)
+    session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
     # minus session count means this endpoint is requested for removal
-    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
-    desired_replicas = sa.Column(
+    replicas: Mapped[int] = mapped_column(
+        "replicas", sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    desired_replicas: Mapped[int | None] = mapped_column(
         "desired_replicas", sa.Integer, nullable=True, default=None, server_default=sa.null()
     )
-    image = sa.Column("image", GUID)
-    model = sa.Column(
+    image: Mapped[UUID | None] = mapped_column("image", GUID)
+    model: Mapped[UUID | None] = mapped_column(
         "model",
         GUID,
         sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
         nullable=True,
     )
-    model_mount_destination = sa.Column(
+    model_mount_destination: Mapped[str] = mapped_column(
         "model_mount_destination",
         sa.String(length=1024),
         nullable=False,
         default="/models",
         server_default="/models",
     )
-    domain = sa.Column(
+    domain: Mapped[str] = mapped_column(
         "domain",
         sa.String(length=64),
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project = sa.Column(
+    project: Mapped[UUID] = mapped_column(
         "project",
         GUID,
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    resource_group = sa.Column(
+    resource_group: Mapped[str] = mapped_column(
         "resource_group",
+        sa.String,
         sa.ForeignKey("scaling_groups.name", ondelete="RESTRICT"),
         index=True,
         nullable=False,
     )
-    lifecycle_stage = sa.Column(
+    lifecycle_stage: Mapped[EndpointLifecycle] = mapped_column(
         "lifecycle_stage",
         EnumValueType(EndpointLifecycle),
         nullable=False,
         default=EndpointLifecycle.PENDING,
     )
-    tag = sa.Column("tag", sa.String(length=64), nullable=True)
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
-    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
-    environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
-    open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
-    runtime_variant = sa.Column(
+    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
+    startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
+    bootstrap_script: Mapped[str | None] = mapped_column(
+        "bootstrap_script", sa.String(length=16 * 1024), nullable=True
+    )
+    callback_url: Mapped[yarl.URL | None] = mapped_column(
+        "callback_url", URLColumn, nullable=True, default=sa.null()
+    )
+    environ: Mapped[dict[str, str] | None] = mapped_column(
+        "environ", pgsql.JSONB(), nullable=True, default={}
+    )
+    open_to_public: Mapped[bool | None] = mapped_column("open_to_public", sa.Boolean, default=False)
+    runtime_variant: Mapped[RuntimeVariant] = mapped_column(
         "runtime_variant",
         StrEnumType(RuntimeVariant),
         nullable=False,
         default=RuntimeVariant.CUSTOM,
     )
 
-    model_definition_path = sa.Column("model_definition_path", sa.String(length=128), nullable=True)
+    model_definition_path: Mapped[str | None] = mapped_column(
+        "model_definition_path", sa.String(length=128), nullable=True
+    )
 
-    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    url = sa.Column("url", sa.String(length=1024))
-    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
-    cluster_mode = sa.Column(
+    resource_slots = mapped_column("resource_slots", ResourceSlotColumn(), nullable=False)
+    url: Mapped[str | None] = mapped_column("url", sa.String(length=1024))
+    resource_opts: Mapped[dict[str, str] | None] = mapped_column(
+        "resource_opts", pgsql.JSONB(), nullable=True, default={}
+    )
+    cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
     )
-    cluster_size = sa.Column(
+    cluster_size: Mapped[int] = mapped_column(
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
 
-    extra_mounts = sa.Column(
+    extra_mounts = mapped_column(
         "extra_mounts",
         StructuredJSONObjectListColumn(VFolderMount),
         nullable=False,
@@ -223,23 +290,27 @@ class EndpointRow(Base):
         server_default="[]",
     )
 
-    retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
-    created_at = sa.Column(
+    retries: Mapped[int] = mapped_column(
+        "retries", sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
         nullable=True,
     )
-    destroyed_at = sa.Column(
+    destroyed_at: Mapped[datetime | None] = mapped_column(
         "destroyed_at",
         sa.DateTime(timezone=True),
         nullable=True,
     )
 
     # Revision management columns
-    current_revision = sa.Column("current_revision", GUID, nullable=True)
-    deploying_revision = sa.Column("deploying_revision", GUID, nullable=True)
-    revision_history_limit = sa.Column(
+    current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
+    deploying_revision: Mapped[UUID | None] = mapped_column(
+        "deploying_revision", GUID, nullable=True
+    )
+    revision_history_limit: Mapped[int] = mapped_column(
         "revision_history_limit",
         sa.Integer,
         nullable=False,
@@ -250,15 +321,14 @@ class EndpointRow(Base):
     tokens = relationship(
         "EndpointTokenRow",
         back_populates="endpoint_row",
-        primaryjoin="foreign(EndpointTokenRow.endpoint) == EndpointRow.id",
+        primaryjoin=_get_endpoint_tokens_join_condition,
     )
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
     image_row = relationship(
         "ImageRow",
-        primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
-        foreign_keys=[image],
+        primaryjoin=_get_image_row_join_condition,
         back_populates="endpoints",
     )
 
@@ -267,32 +337,32 @@ class EndpointRow(Base):
         "UserRow",
         back_populates="created_endpoints",
         foreign_keys=[created_user],
-        primaryjoin=lambda: foreign(EndpointRow.created_user) == UserRow.uuid,
+        primaryjoin=_get_created_user_row_join_condition,
     )
     session_owner_row = relationship(
         "UserRow",
         back_populates="owned_endpoints",
         foreign_keys=[session_owner],
-        primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
+        primaryjoin=_get_session_owner_row_join_condition,
     )
 
     revisions = relationship(
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)",
+        primaryjoin=_get_endpoint_revisions_join_condition,
     )
 
     auto_scaling_policy = relationship(
         "DeploymentAutoScalingPolicyRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)",
+        primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
         uselist=False,
     )
 
     deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
-        primaryjoin="EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)",
+        primaryjoin=_get_endpoint_deployment_policy_join_condition,
         uselist=False,
     )
 
@@ -353,7 +423,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
@@ -377,7 +447,7 @@ class EndpointRow(Base):
         if user_uuid:
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     @classmethod
     async def batch_load(
@@ -392,7 +462,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -433,7 +503,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -527,7 +597,8 @@ class EndpointRow(Base):
                 token_row.delegate_ownership(target_user_uuid)
             for routing_row in cast(list[RoutingRow], row.routings):
                 routing_row.delegate_ownership(target_user_uuid)
-                session_ids.append(routing_row.session)
+                if routing_row.session is not None:
+                    session_ids.append(routing_row.session)
         session_rows = await SessionRow.list_sessions(
             db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
         )
@@ -548,6 +619,7 @@ class EndpointRow(Base):
                 for r in active_routes
                 if r.status in RouteStatus.active_route_statuses()
                 and r.session
+                and r.session_row is not None
                 and r.session_row.status in [SessionStatus.RUNNING, SessionStatus.CREATING]
             ],
         )
@@ -567,7 +639,8 @@ class EndpointRow(Base):
                     kernel.id,
                 )
                 continue
-            num_inference_ports = len([*filter(lambda x: x["is_inference"], kernel.service_ports)])
+            service_ports_list = cast(list[dict[str, Any]], kernel.service_ports)
+            num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
             if num_inference_ports > 1:
                 log.warning(
                     "generate_route_info(): Multiple ({}) inference ports found. "
@@ -575,7 +648,7 @@ class EndpointRow(Base):
                     num_inference_ports,
                     self.id,
                 )
-            for port_info in kernel.service_ports:
+            for port_info in service_ports_list:
                 if port_info["is_inference"]:
                     connection_info[port_info["name"]].append({
                         "session_id": str(kernel.session_id),
@@ -595,8 +668,8 @@ class EndpointRow(Base):
             project=self.project,
             resource_group=self.resource_group,
             resource_slots=self.resource_slots,
-            url=self.url,
-            model=self.model,
+            url=self.url or "",
+            model=self.model or uuid.UUID(int=0),
             model_definition_path=self.model_definition_path,
             model_mount_destination=self.model_mount_destination,
             created_user_id=self.created_user,
@@ -614,8 +687,8 @@ class EndpointRow(Base):
             replicas=self.replicas,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
-            open_to_public=self.open_to_public,
-            created_at=self.created_at,
+            open_to_public=self.open_to_public if self.open_to_public is not None else False,
+            created_at=self.created_at or datetime.now(UTC),
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
@@ -736,7 +809,7 @@ class EndpointRow(Base):
                 desired_replica_count=self.desired_replicas,
             ),
             network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public,
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
             model_revisions=[
@@ -749,7 +822,7 @@ class EndpointRow(Base):
                         resource_opts=revision.resource_opts,
                     ),
                     mounts=MountMetadata(
-                        model_vfolder_id=revision.model,
+                        model_vfolder_id=revision.model or uuid.UUID(int=0),
                         model_definition_path=revision.model_definition_path,
                         model_mount_destination=revision.model_mount_destination,
                         extra_mounts=revision.extra_mounts or [],
@@ -759,7 +832,9 @@ class EndpointRow(Base):
                         bootstrap_script=revision.bootstrap_script,
                         environ=revision.environ,
                         runtime_variant=revision.runtime_variant,
-                        callback_url=revision.callback_url,
+                        callback_url=yarl.URL(revision.callback_url)
+                        if revision.callback_url
+                        else None,
                     ),
                 ),
             ],
@@ -769,6 +844,8 @@ class EndpointRow(Base):
     def _to_deployment_info_legacy(self) -> DeploymentInfo:
         """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
         # Create ImageIdentifier from endpoint's image_row
+        if self.image_row is None:
+            raise ValueError("image_row is not loaded")
         image_identifier = ImageIdentifier(
             canonical=self.image_row.name,
             architecture=self.image_row.architecture,
@@ -795,20 +872,20 @@ class EndpointRow(Base):
                 desired_replica_count=self.desired_replicas,
             ),
             network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public,
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
             model_revisions=[
                 ModelRevisionSpec(
                     image_identifier=image_identifier,
                     resource_spec=ResourceSpec(
-                        cluster_mode=self.cluster_mode,
+                        cluster_mode=ClusterMode(self.cluster_mode),
                         cluster_size=self.cluster_size,
                         resource_slots=self.resource_slots,
                         resource_opts=self.resource_opts,
                     ),
                     mounts=MountMetadata(
-                        model_vfolder_id=self.model,
+                        model_vfolder_id=self.model or uuid.UUID(int=0),
                         model_definition_path=self.model_definition_path,
                         model_mount_destination=self.model_mount_destination,
                         extra_mounts=self.extra_mounts,
@@ -818,7 +895,7 @@ class EndpointRow(Base):
                         bootstrap_script=self.bootstrap_script,
                         environ=self.environ,
                         runtime_variant=self.runtime_variant,
-                        callback_url=self.callback_url,
+                        callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
                     ),
                 ),
             ],
@@ -829,31 +906,33 @@ class EndpointRow(Base):
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
-    id = IDColumn()
-    token = sa.Column("token", sa.String(), nullable=False)
-    endpoint = sa.Column("endpoint", GUID, nullable=True)
-    session_owner = sa.Column("session_owner", GUID, nullable=False)
-    domain = sa.Column(
+    id: Mapped[UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
+    endpoint: Mapped[UUID | None] = mapped_column("endpoint", GUID, nullable=True)
+    session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
+    domain: Mapped[str] = mapped_column(
         "domain",
         sa.String(length=64),
         sa.ForeignKey("domains.name", ondelete="CASCADE"),
         nullable=False,
     )
-    project = sa.Column(
+    project: Mapped[UUID] = mapped_column(
         "project",
         GUID,
         sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
-    created_at = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
     )
 
-    endpoint_row = relationship(
+    endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="tokens",
         foreign_keys=[endpoint],
-        primaryjoin=lambda: foreign(EndpointTokenRow.endpoint) == EndpointRow.id,
+        primaryjoin=_get_endpoint_token_endpoint_row_join_condition,
     )
 
     def __init__(
@@ -932,52 +1011,56 @@ class EndpointTokenRow(Base):
         return EndpointTokenData(
             id=self.id,
             token=self.token,
-            endpoint=self.endpoint,
+            endpoint=self.endpoint or uuid.UUID(int=0),
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(UTC),
         )
 
 
 class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
-    id = IDColumn()
-    metric_source = sa.Column(
+    id: Mapped[UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    metric_source: Mapped[AutoScalingMetricSource] = mapped_column(
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False
     )
-    metric_name = sa.Column("metric_name", sa.Text(), nullable=False)
-    threshold = sa.Column("threshold", DecimalType(), nullable=False)
-    comparator = sa.Column(
+    metric_name: Mapped[str] = mapped_column("metric_name", sa.Text(), nullable=False)
+    threshold: Mapped[Decimal] = mapped_column("threshold", DecimalType(), nullable=False)
+    comparator: Mapped[AutoScalingMetricComparator] = mapped_column(
         "comparator", StrEnumType(AutoScalingMetricComparator, use_name=False), nullable=False
     )
-    step_size = sa.Column("step_size", sa.Integer(), nullable=False)
-    cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
+    step_size: Mapped[int] = mapped_column("step_size", sa.Integer(), nullable=False)
+    cooldown_seconds: Mapped[int] = mapped_column(
+        "cooldown_seconds", sa.Integer(), nullable=False, default=300
+    )
 
-    min_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
-    max_replicas = sa.Column("max_replicas", sa.Integer(), nullable=True)
+    min_replicas: Mapped[int | None] = mapped_column("min_replicas", sa.Integer(), nullable=True)
+    max_replicas: Mapped[int | None] = mapped_column("max_replicas", sa.Integer(), nullable=True)
 
-    created_at = sa.Column(
+    created_at: Mapped[datetime | None] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
         nullable=True,
     )
-    last_triggered_at = sa.Column(
+    last_triggered_at: Mapped[datetime | None] = mapped_column(
         "last_triggered_at",
         sa.DateTime(timezone=True),
         nullable=True,
     )
 
-    endpoint = sa.Column(
+    endpoint: Mapped[UUID] = mapped_column(
         "endpoint",
         GUID,
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    endpoint_row = relationship(
+    endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
     )
 
@@ -985,7 +1068,7 @@ class EndpointAutoScalingRuleRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_status_filter: Container[EndpointLifecycle] = frozenset([
+        endpoint_status_filter: Iterable[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
     ) -> Sequence[Self]:
@@ -1023,14 +1106,14 @@ class EndpointAutoScalingRuleRow(Base):
             id=self.id,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            threshold=self.threshold,
+            threshold=str(self.threshold),
             comparator=self.comparator,
             step_size=self.step_size,
             cooldown_seconds=self.cooldown_seconds,
-            min_replicas=self.min_replicas,
-            max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
+            min_replicas=self.min_replicas or 0,
+            max_replicas=self.max_replicas or 0,
+            created_at=self.created_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
             endpoint=self.endpoint,
         )
 
@@ -1055,7 +1138,7 @@ class EndpointAutoScalingRuleRow(Base):
             condition=AutoScalingCondition(
                 metric_source=self.metric_source,
                 metric_name=self.metric_name,
-                threshold=self.threshold,
+                threshold=str(self.threshold),
                 comparator=self.comparator,
             ),
             action=AutoScalingAction(
@@ -1064,7 +1147,7 @@ class EndpointAutoScalingRuleRow(Base):
                 min_replicas=self.min_replicas,
                 max_replicas=self.max_replicas,
             ),
-            created_at=self.created_at,
+            created_at=self.created_at or datetime.now(UTC),
             last_triggered_at=self.last_triggered_at,
         )
 
@@ -1125,8 +1208,8 @@ class EndpointAutoScalingRuleRow(Base):
             time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
+            created_at=self.created_at or datetime.now(UTC),
+            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
         )
 
     def apply_model_deployment_modifier(
@@ -1184,18 +1267,20 @@ class ModelServiceHelper:
         )
 
         query = (
-            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
             .where(scaling_groups.c.name == checked_scaling_group)
         )
 
         result = await conn.execute(query)
         sgroup = result.first()
-        wsproxy_addr = sgroup["wsproxy_addr"]
+        if sgroup is None:
+            raise ServiceUnavailable("Scaling group not found")
+        wsproxy_addr = sgroup.wsproxy_addr
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
 
-        if not sgroup["wsproxy_api_token"]:
+        if not sgroup.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
 
         return checked_scaling_group
@@ -1370,33 +1455,3 @@ class ModelServiceHelper:
             ) from e
         except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
-
-
-class EndpointStatistics:
-    @classmethod
-    async def batch_load_by_endpoint_impl(
-        cls,
-        valkey_stat_client: ValkeyStatClient,
-        endpoint_ids: Sequence[UUID],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        endpoint_id_strs = [str(endpoint_id) for endpoint_id in endpoint_ids]
-        return await valkey_stat_client.get_inference_app_statistics_batch(endpoint_id_strs)
-
-    @classmethod
-    async def batch_load_by_endpoint(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_ids: Sequence[UUID],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)
-
-    @classmethod
-    async def batch_load_by_replica(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        endpoint_replica_pairs = [
-            (str(endpoint_id), str(replica_id)) for endpoint_id, replica_id in endpoint_replica_ids
-        ]
-        return await ctx.valkey_stat.get_inference_replica_statistics_batch(endpoint_replica_pairs)

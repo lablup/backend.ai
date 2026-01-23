@@ -12,9 +12,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookSpec,
+)
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.api.gql.base import StringMatchSpec
-from ai.backend.manager.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -28,7 +32,6 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
-    WebhookConfig,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -212,7 +215,7 @@ class TestNotificationOptions:
 
             for name, channel_type, enabled in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -249,7 +252,7 @@ class TestNotificationOptions:
 
             for name, created_at, updated_at in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -276,7 +279,7 @@ class TestNotificationOptions:
         """Create a single channel for rule testing"""
         channel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            config = WebhookConfig(url="https://example.com/webhook")
+            config = WebhookSpec(url="https://example.com/webhook")
             channel = NotificationChannelRow(
                 id=channel_id,
                 name="Test Channel",
@@ -1121,7 +1124,7 @@ class TestNotificationCursorPagination:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{i}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{i}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel-{i}",
@@ -1182,12 +1185,12 @@ class TestNotificationCursorPagination:
         """
         # First, get the cursor value (Channel-3's ID)
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
+            db_result = await db_sess.execute(
                 sa.select(NotificationChannelRow.id).where(
                     NotificationChannelRow.name == "Channel-3"
                 )
             )
-            channel_3_id = result.scalar_one()
+            channel_3_id = db_result.scalar_one()
 
         # Forward cursor condition: created_at < cursor's created_at
         cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
@@ -1199,14 +1202,14 @@ class TestNotificationCursorPagination:
                 cursor_condition=cursor_condition,
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        search_result = await notification_repository.search_channels(querier=querier)
 
         # Should return older items (Channel-2, Channel-1)
-        assert len(result.items) == 2
-        assert result.items[0].name == "Channel-2"
-        assert result.items[1].name == "Channel-1"
-        assert result.has_previous_page is True  # Has items before (cursor was provided)
-        assert result.has_next_page is False  # No more items
+        assert len(search_result.items) == 2
+        assert search_result.items[0].name == "Channel-2"
+        assert search_result.items[1].name == "Channel-1"
+        assert search_result.has_previous_page is True  # Has items before (cursor was provided)
+        assert search_result.has_next_page is False  # No more items
 
     @pytest.mark.asyncio
     async def test_backward_pagination_last_page_fetches_oldest_first(
@@ -1251,12 +1254,12 @@ class TestNotificationCursorPagination:
         """
         # Get the cursor value (Channel-3's ID)
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
+            db_result = await db_sess.execute(
                 sa.select(NotificationChannelRow.id).where(
                     NotificationChannelRow.name == "Channel-3"
                 )
             )
-            channel_3_id = result.scalar_one()
+            channel_3_id = db_result.scalar_one()
 
         # Backward cursor condition: created_at > cursor's created_at
         cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
@@ -1268,11 +1271,11 @@ class TestNotificationCursorPagination:
                 cursor_condition=cursor_condition,
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        search_result = await notification_repository.search_channels(querier=querier)
 
         # Should return newer items (Channel-4, Channel-5) in ASC order
-        assert len(result.items) == 2
-        assert result.items[0].name == "Channel-4"
-        assert result.items[1].name == "Channel-5"
-        assert result.has_previous_page is False  # No more newer items
-        assert result.has_next_page is True  # Has items after (cursor was provided)
+        assert len(search_result.items) == 2
+        assert search_result.items[0].name == "Channel-4"
+        assert search_result.items[1].name == "Channel-5"
+        assert search_result.has_previous_page is False  # No more newer items
+        assert search_result.has_next_page is True  # Has items after (cursor was provided)

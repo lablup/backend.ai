@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from datetime import datetime
+from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.common.types import DefaultForUnspecified
+from ai.backend.common.types import (
+    DefaultForUnspecified,
+    ResourceSlot,
+    VFolderHostPermissionMap,
+)
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     ProjectResourcePolicyData,
@@ -17,8 +22,12 @@ from ai.backend.manager.models.base import (
     EnumType,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
-    mapper_registry,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
     "DefaultForUnspecified",
@@ -31,41 +40,53 @@ __all__: Sequence[str] = (
 )
 
 
-keypair_resource_policies = sa.Table(
-    "keypair_resource_policies",
-    mapper_registry.metadata,
-    sa.Column("name", sa.String(length=256), primary_key=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column(
+class KeyPairResourcePolicyRow(Base):
+    __tablename__ = "keypair_resource_policies"
+
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",
         EnumType(DefaultForUnspecified),
         default=DefaultForUnspecified.LIMITED,
         nullable=False,
-    ),
-    sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
-    sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
-    sa.Column("max_pending_session_count", sa.Integer(), nullable=True),
-    sa.Column("max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True),
-    sa.Column(
+    )
+    total_resource_slots: Mapped[ResourceSlot] = mapped_column(
+        "total_resource_slots", ResourceSlotColumn(), nullable=False
+    )
+    max_session_lifetime: Mapped[int] = mapped_column(
+        "max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")
+    )
+    max_concurrent_sessions: Mapped[int] = mapped_column(
+        "max_concurrent_sessions", sa.Integer(), nullable=False
+    )
+    max_pending_session_count: Mapped[int | None] = mapped_column(
+        "max_pending_session_count", sa.Integer(), nullable=True
+    )
+    max_pending_session_resource_slots: Mapped[ResourceSlot | None] = mapped_column(
+        "max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True
+    )
+    max_concurrent_sftp_sessions: Mapped[int] = mapped_column(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
-    ),
-    sa.Column("max_containers_per_session", sa.Integer(), nullable=False),
-    sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
-    sa.Column(
+    )
+    max_containers_per_session: Mapped[int] = mapped_column(
+        "max_containers_per_session", sa.Integer(), nullable=False
+    )
+    idle_timeout: Mapped[int] = mapped_column("idle_timeout", sa.BigInteger(), nullable=False)
+    allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
         default={},
-    ),
+    )
     # TODO: implement with a many-to-many association table
-    # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
-)
+    # allowed_scaling_groups: Mapped[list[str]] = mapped_column(sa.Array(sa.String), nullable=False)
 
-
-class KeyPairResourcePolicyRow(Base):
-    __table__ = keypair_resource_policies
-    keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
+    keypairs: Mapped[list[KeyPairRow]] = relationship(
+        "KeyPairRow", back_populates="resource_policy_row"
+    )
 
     def to_dataclass(
         self,
@@ -86,21 +107,32 @@ class KeyPairResourcePolicyRow(Base):
         )
 
 
-user_resource_policies = sa.Table(
-    "user_resource_policies",
-    mapper_registry.metadata,
-    sa.Column("name", sa.String(length=256), primary_key=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
-    sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
-    sa.Column("max_session_count_per_model_session", sa.Integer(), nullable=False),
-    sa.Column("max_customized_image_count", sa.Integer(), nullable=False, default=3),
-)
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use KeyPairResourcePolicyRow class directly for new code.
+keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
 class UserResourcePolicyRow(Base):
-    __table__ = user_resource_policies
-    users = relationship("UserRow", back_populates="resource_policy_row")
+    __tablename__ = "user_resource_policies"
+
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    max_vfolder_count: Mapped[int] = mapped_column(
+        "max_vfolder_count", sa.Integer(), nullable=False
+    )
+    max_quota_scope_size: Mapped[int] = mapped_column(
+        "max_quota_scope_size", sa.BigInteger(), nullable=False
+    )
+    max_session_count_per_model_session: Mapped[int] = mapped_column(
+        "max_session_count_per_model_session", sa.Integer(), nullable=False
+    )
+    max_customized_image_count: Mapped[int] = mapped_column(
+        "max_customized_image_count", sa.Integer(), nullable=False, default=3
+    )
+
+    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
         self,
@@ -136,20 +168,31 @@ class UserResourcePolicyRow(Base):
         )
 
 
-project_resource_policies = sa.Table(
-    "project_resource_policies",
-    mapper_registry.metadata,
-    sa.Column("name", sa.String(length=256), primary_key=True),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
-    sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
-    sa.Column("max_network_count", sa.Integer(), nullable=False),
-)
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use UserResourcePolicyRow class directly for new code.
+user_resource_policies = UserResourcePolicyRow.__table__
 
 
 class ProjectResourcePolicyRow(Base):
-    __table__ = project_resource_policies
-    projects = relationship("GroupRow", back_populates="resource_policy_row")
+    __tablename__ = "project_resource_policies"
+
+    name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
+    created_at: Mapped[datetime | None] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    max_vfolder_count: Mapped[int] = mapped_column(
+        "max_vfolder_count", sa.Integer(), nullable=False
+    )
+    max_quota_scope_size: Mapped[int] = mapped_column(
+        "max_quota_scope_size", sa.BigInteger(), nullable=False
+    )
+    max_network_count: Mapped[int] = mapped_column(
+        "max_network_count", sa.Integer(), nullable=False
+    )
+
+    projects: Mapped[list[GroupRow]] = relationship(
+        "GroupRow", back_populates="resource_policy_row"
+    )
 
     def __init__(
         self,
@@ -179,3 +222,8 @@ class ProjectResourcePolicyRow(Base):
             max_quota_scope_size=self.max_quota_scope_size,
             max_network_count=self.max_network_count,
         )
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use ProjectResourcePolicyRow class directly for new code.
+project_resource_policies = ProjectResourcePolicyRow.__table__

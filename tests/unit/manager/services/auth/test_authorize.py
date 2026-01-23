@@ -57,13 +57,14 @@ def setup_successful_auth(mock_auth_repository, mock_hook_plugin_ctx):
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
-    mock_auth_repository.check_credential_with_migration.return_value = {
-        "uuid": UUID("12345678-1234-5678-1234-567812345678"),
-        "email": "test@example.com",
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-        "password_changed_at": None,
-    }
+    mock_user = MagicMock()
+    mock_user.uuid = UUID("12345678-1234-5678-1234-567812345678")
+    mock_user.email = "test@example.com"
+    mock_user.role = UserRole.USER
+    mock_user.status = UserStatus.ACTIVE
+    mock_user.password_changed_at = None
+    mock_user.__getitem__ = lambda self, key: getattr(self, key)
+    mock_auth_repository.check_credential_with_migration.return_value = mock_user
     mock_user_row = MagicMock()
     mock_user_row.get_main_keypair_row.return_value = MagicMock(
         access_key="test_access_key",
@@ -149,14 +150,14 @@ async def test_authorize_with_hook_authorization(
         stoken=None,
     )
 
-    # Hook returns user data
-    hook_user = {
-        "uuid": UUID("87654321-4321-8765-4321-876543218765"),
-        "email": "hook@example.com",
-        "role": UserRole.ADMIN,
-        "status": UserStatus.ACTIVE,
-        "password_changed_at": None,
-    }
+    # Hook returns user data as MagicMock for attribute access
+    hook_user = MagicMock()
+    hook_user.uuid = UUID("87654321-4321-8765-4321-876543218765")
+    hook_user.email = "hook@example.com"
+    hook_user.role = UserRole.ADMIN
+    hook_user.status = UserStatus.ACTIVE
+    hook_user.password_changed_at = None
+    hook_user.__getitem__ = lambda self, key: getattr(self, key)
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
         result=hook_user,
@@ -177,7 +178,7 @@ async def test_authorize_with_hook_authorization(
     assert result.authorization_result is not None
     assert result.authorization_result.access_key == "hook_access_key"
     assert result.authorization_result.secret_key == "hook_secret_key"
-    assert result.authorization_result.user_id == hook_user["uuid"]
+    assert result.authorization_result.user_id == hook_user.uuid
     assert result.authorization_result.role == UserRole.ADMIN
 
 
@@ -202,13 +203,14 @@ async def test_authorize_with_password_expiry(
 
     # Setup expired password
     password_changed_at = datetime.now(tz=UTC) - timedelta(days=100)
-    mock_auth_repository.check_credential_with_migration.return_value = {
-        "uuid": UUID("12345678-1234-5678-1234-567812345678"),
-        "email": "expired@example.com",
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-        "password_changed_at": password_changed_at,
-    }
+    mock_user = MagicMock()
+    mock_user.uuid = UUID("12345678-1234-5678-1234-567812345678")
+    mock_user.email = "expired@example.com"
+    mock_user.role = UserRole.USER
+    mock_user.status = UserStatus.ACTIVE
+    mock_user.password_changed_at = password_changed_at
+    mock_user.__getitem__ = lambda self, key: getattr(self, key)
+    mock_auth_repository.check_credential_with_migration.return_value = mock_user
     mock_auth_repository.get_current_time.return_value = datetime.now(tz=UTC)
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -238,13 +240,14 @@ async def test_authorize_with_post_hook_response(
     )
 
     # Setup successful credential check
-    mock_auth_repository.check_credential_with_migration.return_value = {
-        "uuid": UUID("12345678-1234-5678-1234-567812345678"),
-        "email": "test@example.com",
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-        "password_changed_at": None,
-    }
+    mock_user = MagicMock()
+    mock_user.uuid = UUID("12345678-1234-5678-1234-567812345678")
+    mock_user.email = "test@example.com"
+    mock_user.role = UserRole.USER
+    mock_user.status = UserStatus.ACTIVE
+    mock_user.password_changed_at = None
+    mock_user.__getitem__ = lambda self, key: getattr(self, key)
+    mock_auth_repository.check_credential_with_migration.return_value = mock_user
 
     # Mock user row
     mock_user_row = MagicMock()

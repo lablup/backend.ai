@@ -1,6 +1,6 @@
 """Session related types."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional
@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -110,7 +111,7 @@ class PendingSessions:
 class TerminatingKernelData:
     """Kernel data for termination processing."""
 
-    kernel_id: str
+    kernel_id: KernelId
     status: KernelStatus
     container_id: Optional[str]
     agent_id: Optional[AgentId]
@@ -135,7 +136,7 @@ class TerminatingSessionData:
 class TerminatingKernelWithAgentData:
     """Kernel data with agent status for lost agent cleanup."""
 
-    kernel_id: str
+    kernel_id: KernelId
     session_id: SessionId
     status: KernelStatus
     agent_id: Optional[AgentId]
@@ -146,30 +147,11 @@ class TerminatingKernelWithAgentData:
 class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
-    kernel_id: str
+    kernel_id: KernelId
     agent_id: Optional[AgentId]
     occupied_slots: ResourceSlot
     success: bool
     error: Optional[str] = None
-
-
-@dataclass
-class SessionTerminationResult:
-    """Result of termination for a session and its kernels."""
-
-    session_id: SessionId
-    access_key: AccessKey
-    creation_id: str
-    session_type: SessionTypes
-    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
-    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
-
-    @property
-    def should_terminate_session(self) -> bool:
-        """Check if all kernels in the session were successfully terminated."""
-        if not self.kernel_results:
-            return False
-        return all(kernel.success for kernel in self.kernel_results)
 
 
 @dataclass

@@ -5,13 +5,13 @@ import re
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Optional, Self, cast
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.container_registry import ContainerRegistryType
@@ -23,10 +23,16 @@ from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryURL,
 )
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.association_container_registries_groups import (
+        AssociationContainerRegistriesGroupsRow,
+    )
+    from ai.backend.manager.models.image import ImageRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -91,12 +97,31 @@ class ContainerRegistryValidator:
                 pass
 
 
+def _get_image_join_condition():
+    from ai.backend.manager.models.image import ImageRow
+
+    return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
+
+
+def _get_association_join_condition():
+    from ai.backend.manager.models.association_container_registries_groups import (
+        AssociationContainerRegistriesGroupsRow,
+    )
+
+    return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
+
+
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
-    id = IDColumn()
-    url = sa.Column("url", sa.String(length=512), index=True, nullable=False)
-    registry_name = sa.Column("registry_name", sa.String(length=255), index=True, nullable=False)
-    type = sa.Column(
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    url: Mapped[str] = mapped_column("url", sa.String(length=512), index=True, nullable=False)
+    registry_name: Mapped[str] = mapped_column(
+        "registry_name", sa.String(length=255), index=True, nullable=False
+    )
+    type: Mapped[ContainerRegistryType] = mapped_column(
         "type",
         StrEnumType(ContainerRegistryType),
         default=ContainerRegistryType.DOCKER,
@@ -104,27 +129,33 @@ class ContainerRegistryRow(Base):
         nullable=False,
         index=True,
     )
-    project = sa.Column("project", sa.String(length=255), index=True, nullable=True)
-    username = sa.Column("username", sa.String(length=255), nullable=True)
-    password = sa.Column("password", sa.String, nullable=True)
-    ssl_verify = sa.Column(
+    project: Mapped[str | None] = mapped_column(
+        "project", sa.String(length=255), index=True, nullable=True
+    )
+    username: Mapped[str | None] = mapped_column("username", sa.String(length=255), nullable=True)
+    password: Mapped[str | None] = mapped_column("password", sa.String, nullable=True)
+    ssl_verify: Mapped[bool | None] = mapped_column(
         "ssl_verify", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
-    is_global = sa.Column(
+    is_global: Mapped[bool | None] = mapped_column(
         "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
-    extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
-
-    image_rows = relationship(
-        "ImageRow",
-        back_populates="registry_row",
-        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    extra: Mapped[dict[str, Any] | None] = mapped_column(
+        "extra", sa.JSON, nullable=True, default=None
     )
 
-    association_container_registries_groups_rows = relationship(
+    image_rows: Mapped[list[ImageRow]] = relationship(
+        "ImageRow",
+        back_populates="registry_row",
+        primaryjoin=_get_image_join_condition,
+    )
+
+    association_container_registries_groups_rows: Mapped[
+        list[AssociationContainerRegistriesGroupsRow]
+    ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
         back_populates="container_registry_row",
-        primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
+        primaryjoin=_get_association_join_condition,
     )
 
     def __init__(
@@ -220,6 +251,8 @@ class ContainerRegistryRow(Base):
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
         for registry_row in registries:
             project = registry_row.project
+            if project is None:
+                continue
             registry_name = registry_row.registry_name
             url = registry_row.url
             if project not in result:

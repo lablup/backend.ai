@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -54,6 +54,18 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
     @classmethod
     def failure_status(cls) -> Optional[EndpointLifecycle]:
         return None
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for check pending deployment handler (BEP-1030).
+
+        - success: Deployment → SCALING
+        - failure: None (stays in current state)
+        """
+        return DeploymentStatusTransitions(
+            success=EndpointLifecycle.SCALING,
+            failure=None,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check for pending deployments and process them."""

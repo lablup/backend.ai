@@ -30,24 +30,26 @@ async def prepare_dotfiles(
     vfolder_mounts: Sequence[VFolderMount],
 ) -> Mapping[str, Any]:
     # Feed SSH keypair and dotfiles if exists.
-    internal_data = {}
+    internal_data: dict[str, Any] = {}
     query = (
-        sa.select([
+        sa.select(
             keypairs.c.ssh_public_key,
             keypairs.c.ssh_private_key,
             keypairs.c.dotfiles,
-        ])
+        )
         .select_from(keypairs)
         .where(keypairs.c.access_key == access_key)
     )
     result = await conn.execute(query)
     row = result.first()
-    dotfiles = msgpack.unpackb(row["dotfiles"])
+    if row is None:
+        return internal_data
+    dotfiles = msgpack.unpackb(row.dotfiles)
     internal_data.update({"dotfiles": dotfiles})
-    if row["ssh_public_key"] and row["ssh_private_key"]:
+    if row.ssh_public_key and row.ssh_private_key:
         internal_data["ssh_keypair"] = {
-            "public_key": row["ssh_public_key"],
-            "private_key": row["ssh_private_key"],
+            "public_key": row.ssh_public_key,
+            "private_key": row.ssh_private_key,
         }
     # use dotfiles in the priority of keypair > group > domain
     dotfile_paths = set(map(lambda x: x["path"], dotfiles))

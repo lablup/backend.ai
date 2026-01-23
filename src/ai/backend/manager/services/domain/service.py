@@ -5,8 +5,6 @@ from typing import cast
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.domain.admin_repository import AdminDomainRepository
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import (
@@ -39,15 +37,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class DomainService:
     _repository: DomainRepository
-    _admin_repository: AdminDomainRepository
 
     def __init__(
         self,
         repository: DomainRepository,
-        admin_repository: AdminDomainRepository,
     ) -> None:
         self._repository = repository
-        self._admin_repository = admin_repository
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
         spec = cast(DomainCreatorSpec, action.creator.spec)
@@ -55,28 +50,19 @@ class DomainService:
         if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
-        if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.create_domain_force(action.creator)
-        else:
-            domain_data = await self._repository.create_domain_validated(action.creator)
+        domain_data = await self._repository.create_domain(action.creator)
         return CreateDomainActionResult(
             domain_data=domain_data,
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
-        if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.modify_domain_force(action.updater)
-        else:
-            domain_data = await self._repository.modify_domain_validated(action.updater)
+        domain_data = await self._repository.modify_domain(action.updater)
         return ModifyDomainActionResult(
             domain_data=domain_data,
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
-        if action.user_info.role == UserRole.SUPERADMIN:
-            await self._admin_repository.soft_delete_domain_force(action.name)
-        else:
-            await self._repository.soft_delete_domain_validated(action.name)
+        await self._repository.soft_delete_domain(action.name)
 
         return DeleteDomainActionResult(
             name=action.name,
@@ -85,10 +71,7 @@ class DomainService:
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         name = action.name
 
-        if action.user_info.role == UserRole.SUPERADMIN:
-            await self._admin_repository.purge_domain_force(name)
-        else:
-            await self._repository.purge_domain_validated(name)
+        await self._repository.purge_domain(name)
         return PurgeDomainActionResult(
             name=name,
         )
@@ -101,14 +84,11 @@ class DomainService:
         if domain_name_candidate == "" or len(domain_name_candidate) > 64:
             raise InvalidAPIParameters("Domain name cannot be empty or exceed 64 characters.")
 
-        if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.create_domain_node_with_permissions_force(
-                action.creator, action.user_info, action.scaling_groups
-            )
-        else:
-            domain_data = await self._repository.create_domain_node_with_permissions(
-                action.creator, action.user_info, action.scaling_groups
-            )
+        domain_data = await self._repository.create_domain_node_with_permissions(
+            action.creator,
+            action.user_info,
+            action.scaling_groups,
+        )
 
         return CreateDomainNodeActionResult(
             domain_data=domain_data,
@@ -118,26 +98,18 @@ class DomainService:
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
         if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
-            if union := action.sgroups_to_add | action.sgroups_to_remove:
+            if conflict := action.sgroups_to_add & action.sgroups_to_remove:
                 raise InvalidAPIParameters(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
-                    f"(sg:{union})."
+                    f"(sg:{conflict})."
                 )
 
-        if action.user_info.role == UserRole.SUPERADMIN:
-            domain_data = await self._admin_repository.modify_domain_node_with_permissions_force(
-                action.updater,
-                action.user_info,
-                action.sgroups_to_add,
-                action.sgroups_to_remove,
-            )
-        else:
-            domain_data = await self._repository.modify_domain_node_with_permissions(
-                action.updater,
-                action.user_info,
-                action.sgroups_to_add,
-                action.sgroups_to_remove,
-            )
+        domain_data = await self._repository.modify_domain_node_with_permissions(
+            action.updater,
+            action.user_info,
+            action.sgroups_to_add,
+            action.sgroups_to_remove,
+        )
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
         )

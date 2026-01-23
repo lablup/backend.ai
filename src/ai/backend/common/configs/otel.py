@@ -43,7 +43,7 @@ class OTELConfig(BaseConfigSchema):
                 "Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'."
             ),
             added_version="25.7.0",
-            example="INFO",
+            example=ConfigExample(local="DEBUG", prod="INFO"),
         ),
     ]
     endpoint: Annotated[

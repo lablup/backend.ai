@@ -173,6 +173,7 @@ class NetworkNode(graphene.ObjectType):
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
+            additional_cond: sa.ColumnElement[bool]
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
                     additional_cond = sa.true()
@@ -249,11 +250,13 @@ class CreateNetwork(graphene.Mutation):
                 and project.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
-            query = sa.select([sa.func.count("*")]).where(NetworkRow.project == project.id)
-            project_network_count = await db_session.scalar(query)
+            query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
+            project_network_count = await db_session.scalar(query) or 0
+            max_network_count = project.resource_policy_row.max_network_count
             if (
-                project_network_count >= 0
-                and project_network_count >= project.resource_policy_row.max_network_count
+                max_network_count is not None
+                and project_network_count >= 0
+                and project_network_count >= max_network_count
             ):
                 raise GenericForbidden(
                     "Cannot create more networks on this project (restricted by project resource policy)"

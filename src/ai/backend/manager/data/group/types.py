@@ -41,9 +41,9 @@ class GroupData:
     id: uuid.UUID = field(compare=False)
     name: str
     description: Optional[str]
-    is_active: bool
-    created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
+    is_active: bool | None
+    created_at: datetime | None = field(compare=False)
+    modified_at: datetime | None = field(compare=False)
     integration_id: Optional[str]
     domain_name: str
     total_resource_slots: ResourceSlot

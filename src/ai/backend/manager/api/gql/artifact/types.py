@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Optional, Self
 
@@ -22,13 +23,13 @@ from ai.backend.manager.api.gql.base import (
     IntFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
-    ArtifactFilterOptions,
     ArtifactOrderField,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
@@ -44,13 +45,6 @@ from ai.backend.manager.repositories.artifact.options import (
     ArtifactRevisionConditions,
     ArtifactRevisionOrders,
 )
-from ai.backend.manager.repositories.artifact.types import (
-    ArtifactRemoteStatusFilter,
-    ArtifactRemoteStatusFilterType,
-    ArtifactRevisionFilterOptions,
-    ArtifactStatusFilter,
-    ArtifactStatusFilterType,
-)
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -59,6 +53,45 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
+
+
+@strawberry.type(
+    name="ArtifactVerifierMetadataEntry",
+    description=dedent_strip("""
+    Added in 26.1.0.
+
+    A single key-value entry representing metadata from an artifact verifier.
+    Contains additional information about the verification process.
+    """),
+)
+class ArtifactVerifierMetadataEntryGQL:
+    """Single metadata entry with key and value."""
+
+    key: str = strawberry.field(description="The key identifier for this metadata entry.")
+    value: str = strawberry.field(description="The value for this metadata entry.")
+
+
+@strawberry.type(
+    name="ArtifactVerifierMetadata",
+    description=dedent_strip("""
+    Added in 26.1.0.
+
+    A collection of metadata from an artifact verifier.
+    Contains key-value pairs providing additional information about the verification.
+    """),
+)
+class ArtifactVerifierMetadataGQL:
+    """Metadata containing multiple key-value entries."""
+
+    entries: list[ArtifactVerifierMetadataEntryGQL] = strawberry.field(
+        description="List of metadata entries. Each entry contains a key-value pair."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
+        """Convert a Mapping to GraphQL type."""
+        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
+        return cls(entries=entries)
 
 
 @strawberry.type(
@@ -82,7 +115,9 @@ class ArtifactVerifierGQLResult:
         description="Time taken to complete verification in seconds"
     )
     scanned_count: int = strawberry.field(description="Total number of files scanned")
-    metadata: JSON = strawberry.field(description="Additional metadata from the verifier")
+    metadata: ArtifactVerifierMetadataGQL = strawberry.field(
+        description="Added in 26.1.0. Additional metadata from the verifier."
+    )
     error: Optional[str] = strawberry.field(
         description="Fatal error message if the verifier failed to complete"
     )
@@ -95,7 +130,7 @@ class ArtifactVerifierGQLResult:
             scanned_at=data.scanned_at,
             scan_time=data.scan_time,
             scanned_count=data.scanned_count,
-            metadata=data.metadata,
+            metadata=ArtifactVerifierMetadataGQL.from_mapping(data.metadata),
             error=data.error,
         )
 
@@ -243,26 +278,6 @@ class ArtifactFilter(GQLFilter):
 
         return field_conditions
 
-    def to_repo_filter(self) -> ArtifactFilterOptions:
-        repo_filter = ArtifactFilterOptions()
-
-        # Handle basic filters
-        repo_filter.artifact_type = self.type
-        repo_filter.name_filter = self.name.to_dataclass() if self.name else None
-        repo_filter.registry_filter = self.registry.to_dataclass() if self.registry else None
-        repo_filter.source_filter = self.source.to_dataclass() if self.source else None
-        repo_filter.availability = self.availability
-
-        # Handle logical operations
-        if self.AND:
-            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
-        if self.OR:
-            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
-        if self.NOT:
-            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
-
-        return repo_filter
-
 
 @strawberry.input(
     description=dedent_strip("""
@@ -286,6 +301,9 @@ class ArtifactOrderBy(GQLOrderBy):
             case ArtifactOrderField.SCANNED_AT:
                 return ArtifactOrders.scanned_at(ascending)
             case ArtifactOrderField.UPDATED_AT:
+                return ArtifactOrders.updated_at(ascending)
+            case ArtifactOrderField.SIZE:
+                # SIZE ordering is not supported yet, fall back to updated_at
                 return ArtifactOrders.updated_at(ascending)
 
 
@@ -322,7 +340,7 @@ class ArtifactRevisionFilter(GQLFilter):
         default=None, description="Added in 25.16.0"
     )
     version: Optional[StringFilter] = None
-    artifact_id: Optional[ID] = None
+    artifact_id: Optional[UUIDFilter] = strawberry.field(default=None)
     size: Optional[IntFilter] = None
 
     AND: Optional[list[ArtifactRevisionFilter]] = None
@@ -372,6 +390,17 @@ class ArtifactRevisionFilter(GQLFilter):
             )
             if version_condition:
                 field_conditions.append(version_condition)
+
+        # Apply artifact_id filter
+        if self.artifact_id:
+            if self.artifact_id.equals:
+                field_conditions.append(
+                    ArtifactRevisionConditions.by_artifact_id(self.artifact_id.equals)
+                )
+            elif self.artifact_id.in_:
+                field_conditions.append(
+                    ArtifactRevisionConditions.by_artifact_ids(self.artifact_id.in_)
+                )
 
         # Apply size filter
         if self.size:
@@ -425,51 +454,6 @@ class ArtifactRevisionFilter(GQLFilter):
 
         return field_conditions
 
-    def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
-        repo_filter = ArtifactRevisionFilterOptions()
-
-        # Handle basic filters
-        if self.artifact_id:
-            repo_filter.artifact_id = uuid.UUID(self.artifact_id)
-
-        # Handle status filter using ArtifactRevisionStatusFilter
-        if self.status:
-            if self.status.in_:
-                repo_filter.status_filter = ArtifactStatusFilter(
-                    type=ArtifactStatusFilterType.IN, values=self.status.in_
-                )
-            elif self.status.equals:
-                repo_filter.status_filter = ArtifactStatusFilter(
-                    type=ArtifactStatusFilterType.EQUALS, values=[self.status.equals]
-                )
-
-        # Handle remote_status filter using ArtifactRevisionRemoteStatusFilter
-        if self.remote_status:
-            if self.remote_status.in_:
-                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
-                    type=ArtifactRemoteStatusFilterType.IN, values=self.remote_status.in_
-                )
-            elif self.remote_status.equals:
-                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
-                    type=ArtifactRemoteStatusFilterType.EQUALS, values=[self.remote_status.equals]
-                )
-
-        # Pass StringFilter directly for processing in repository
-        repo_filter.version_filter = self.version
-
-        # Handle size filter
-        repo_filter.size_filter = self.size
-
-        # Handle logical operations
-        if self.AND:
-            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
-        if self.OR:
-            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
-        if self.NOT:
-            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
-
-        return repo_filter
-
 
 @strawberry.input(
     description=dedent_strip("""
@@ -519,6 +503,22 @@ class ScanArtifactsInput:
 
 @strawberry.input(
     description=dedent_strip("""
+    Added in 26.1.0.
+
+    Options for importing artifact revisions.
+
+    Controls import behavior such as forcing re-download regardless of digest freshness.
+    """)
+)
+class ImportArtifactsOptionsGQL:
+    force: bool = strawberry.field(
+        default=False,
+        description="Force re-download regardless of digest freshness check.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
     Added in 25.14.0.
 
     Input for importing scanned artifact revisions from external registries.
@@ -529,6 +529,14 @@ class ScanArtifactsInput:
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
+    vfolder_id: ID | None = strawberry.field(
+        default=None,
+        description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
+    )
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
+        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
+    )
 
 
 @strawberry.input(description="Added in 25.15.0")
@@ -587,6 +595,10 @@ class DelegateImportArtifactsInput:
     )
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
+    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+        default=None,
+        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
+    )
 
 
 @strawberry.input(
@@ -810,10 +822,7 @@ class Artifact(Node):
     ) -> ArtifactRevisionConnection:
         from .fetcher import fetch_artifact_revisions
 
-        if filter is None:
-            filter = ArtifactRevisionFilter(artifact_id=ID(self.id))
-        else:
-            filter.artifact_id = ID(self.id)
+        base_conditions = [ArtifactRevisionConditions.by_artifact_id(uuid.UUID(self.id))]
 
         return await fetch_artifact_revisions(
             info,
@@ -825,6 +834,7 @@ class Artifact(Node):
             last=last,
             limit=limit,
             offset=offset,
+            base_conditions=base_conditions,
         )
 
 
