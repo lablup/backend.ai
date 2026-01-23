@@ -424,7 +424,9 @@ class StatContext:
         metric_keys = list(known_metrics.keys())
         agent_id = self.agent.id
         session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        # TODO: Avoid passing kernel_metrics dict to UtilizationMetricObserver
         await self._utilization_metric_observer.lazy_remove_container_metric(
+            self.kernel_metrics,
             agent_id=agent_id,
             kernel_id=kernel_id,
             session_id=session_id,
