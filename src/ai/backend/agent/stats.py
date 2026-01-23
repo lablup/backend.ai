@@ -419,6 +419,7 @@ class StatContext:
         known_metrics = self.kernel_metrics.get(kernel_id)
         log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
         if known_metrics is None:
+            log.warning("No known metrics for kernel {}", kernel_id)
             return
         metric_keys = list(known_metrics.keys())
         agent_id = self.agent.id
@@ -655,10 +656,6 @@ class StatContext:
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
                     kernel_obj_map[kid] = info
-            unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
-            for unused_kernel_id in unused_kernel_ids:
-                log.debug("removing kernel_metric for {}", unused_kernel_id)
-                self.kernel_metrics.pop(unused_kernel_id, None)
 
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
