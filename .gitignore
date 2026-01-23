@@ -79,21 +79,21 @@ venv/
 ENV/
 
 # IDE/vim
-.idea
+/.idea
 .swp
 .swo
 .*.swp
 .*.swo
-.vscode
-.vim
-.vimrc
-.nvimrc
-.exrc
-.ripgreprc
-.neoconf.json
-.zed
-.ropeproject
-pyrightconfig.json
+/.vscode
+/.vim
+/.vimrc
+/.nvimrc
+/.exrc
+/.ripgreprc
+/.neoconf.json
+/.zed
+/.ropeproject
+/pyrightconfig.json
 
 # Pants
 /.pants.d/
