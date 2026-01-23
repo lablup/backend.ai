@@ -4,7 +4,7 @@ import inspect
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, cast, get_args, get_type_hints
+from typing import Any, cast, get_args, get_origin, get_type_hints
 
 import aiohttp_cors
 import click
@@ -15,6 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
+from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
@@ -206,6 +207,55 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict]:
     return resp
 
 
+def extract_api_handler_params(
+    handler: Any,
+) -> tuple[type[BaseModel] | None, type[BaseModel] | None, type[BaseModel] | None]:
+    """
+    Extract Pydantic models from @api_handler decorated functions.
+
+    Uses get_type_hints() to resolve string annotations from PEP 563
+    (`from __future__ import annotations`). inspect.signature() returns
+    string annotations in that case, which don't work with get_origin()/get_args().
+
+    Returns:
+        tuple of (body_model, query_model, path_model) - any can be None if not present
+    """
+    body_model: type[BaseModel] | None = None
+    query_model: type[BaseModel] | None = None
+    path_model: type[BaseModel] | None = None
+
+    try:
+        type_hints = get_type_hints(handler)
+    except (ValueError, TypeError, NameError):
+        return None, None, None
+
+    for param_name, annotation in type_hints.items():
+        if param_name == "return":
+            continue
+
+        origin = get_origin(annotation)
+        if origin is None:
+            continue
+
+        args = get_args(annotation)
+        if not args:
+            continue
+
+        model = args[0]
+        if not (isinstance(model, type) and issubclass(model, BaseModel)):
+            continue
+
+        if origin is BodyParam:
+            body_model = model
+        elif origin is QueryParam:
+            query_model = model
+        elif origin is PathParam:
+            path_model = model
+        # HeaderParam is typically not included in OpenAPI request body/params
+
+    return body_model, query_model, path_model
+
+
 def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str, Any]:
     openapi: dict[str, Any] = {
         "openapi": "3.1.0",
@@ -343,8 +393,88 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                             f"{request_scheme} not considered as a valid request type"
                         )
 
+            # Handle @api_handler decorated functions (BodyParam, QueryParam, PathParam)
+            if "requestBody" not in route_def:
+                body_model, query_model, path_model = extract_api_handler_params(route.handler)
+
+                if body_model is not None:
+                    schema_name = body_model.__name__
+                    request_schema = body_model.model_json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
+                    if additional_definitions := request_schema.pop("$defs", None):
+                        openapi["components"]["schemas"].update(additional_definitions)
+                    openapi["components"]["schemas"][schema_name] = request_schema
+                    route_def["requestBody"] = {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                            }
+                        }
+                    }
+
+                if query_model is not None:
+                    query_schema = query_model.model_json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
+                    properties = query_schema.get("properties", {})
+                    required_keys = query_schema.get("required", [])
+                    for prop_name, prop_schema in properties.items():
+                        parameters.append({
+                            "name": prop_name,
+                            "in": "query",
+                            "required": prop_name in required_keys,
+                            "schema": prop_schema,
+                        })
+
+                if path_model is not None:
+                    path_schema = path_model.model_json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
+                    properties = path_schema.get("properties", {})
+                    for prop_name, prop_schema in properties.items():
+                        # Check if already added by get_path_parameters
+                        if not any(p["name"] == prop_name for p in parameters):
+                            parameters.append({
+                                "name": prop_name,
+                                "in": "path",
+                                "required": True,
+                                "schema": prop_schema,
+                            })
+
+                # TODO: Extract response model from @api_handler decorated functions.
+                # Currently, @api_handler returns APIResponse which wraps BaseResponseModel,
+                # but the actual response model type is not captured in the return type annotation.
+                #
+                # To enable OpenAPI response schema generation, APIResponse should be made Generic:
+                #
+                #   # In api_handlers.py:
+                #   TResponseModel = TypeVar("TResponseModel", bound=BaseResponseModel)
+                #
+                #   @dataclass
+                #   class APIResponse(Generic[TResponseModel]):
+                #       _status_code: int
+                #       _data: Optional[TResponseModel]
+                #
+                #   # In handler:
+                #   async def handler(...) -> APIResponse[MyResponseModel]:
+                #       return APIResponse.build(200, MyResponseModel(...))
+                #
+                # Then we can extract the response model via:
+                #   ret_type = get_type_hints(handler).get("return")
+                #   if get_origin(ret_type) is APIResponse:
+                #       response_model = get_args(ret_type)[0]
+
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
+
+            # Extract response schema from handler's return type annotation.
+            # Supported return types:
+            #   - BaseModel subclass: async def handler(...) -> MyResponseModel
+            #   - list[BaseModel]: async def handler(...) -> list[MyResponseModel]
+            #
+            # Note: @api_handler decorated functions return APIResponse (not BaseModel),
+            # so they are not captured here. See TODO comment above for future improvement.
             try:
                 type_hints = get_type_hints(route.handler)
             except (NameError, AttributeError):
@@ -353,11 +483,14 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                 type_hints = {}
             if (
                 (ret_type := type_hints.get("return"))
+                # For generic types like list[Model], get the origin (list).
+                # For non-generic types like Model, use the type itself.
                 and (response_cls := getattr(ret_type, "__origin__", ret_type))
                 and (issubclass(response_cls, BaseModel) or issubclass(response_cls, list))
             ):
                 response_schema: dict[str, Any]
                 if issubclass(response_cls, list):
+                    # Handle list[SomeModel] return type
                     arg: type[BaseModel]
                     (arg,) = get_args(ret_type)
                     schema_name = f"{arg.__name__}_List"
@@ -365,6 +498,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                         ref_template="#/components/schemas/{model}"
                     )
                 elif issubclass(response_cls, BaseModel):
+                    # Handle direct BaseModel return type
                     schema_name = response_cls.__name__
                     response_schema = response_cls.model_json_schema(
                         ref_template="#/components/schemas/{model}"
@@ -373,6 +507,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                 else:
                     raise RuntimeError(f"{arg} not considered as a valid response type")
 
+                # Extract nested model definitions (e.g., referenced models) to components
                 if additional_definitions := response_schema.pop("$defs", None):
                     openapi["components"]["schemas"].update(additional_definitions)
                 openapi["components"]["schemas"][schema_name] = response_schema
