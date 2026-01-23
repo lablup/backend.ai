@@ -14,24 +14,33 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.model_serving.types import RuntimeVariant
 
 # Import Row classes to ensure SQLAlchemy mapper initialization
-from ai.backend.manager.models.agent import AgentRow  # noqa: F401
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow  # noqa: F401
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.group.purgers import (
+    create_group_endpoint_purger,
+    create_group_endpoint_session_purger,
+    create_group_kernel_purger,
     create_group_purger,
     create_group_session_purger,
 )
@@ -61,6 +70,11 @@ class TestGroupPurgersIntegration:
                 KeyPairRow,
                 GroupRow,
                 SessionRow,
+                AgentRow,
+                KernelRow,
+                VFolderRow,
+                EndpointRow,
+                RoutingRow,
             ],
         ):
             yield database_connection
@@ -175,6 +189,21 @@ class TestGroupPurgersIntegration:
             return group
 
     @pytest.fixture
+    async def sample_scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        """Create a test scaling group."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+        return sgroup_name
+
+    @pytest.fixture
     async def sample_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -209,6 +238,130 @@ class TestGroupPurgersIntegration:
                 await session.refresh(sess)
         return sessions
 
+    @pytest.fixture
+    async def sample_kernels(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_sessions: list[SessionRow],
+        sample_domain: str,
+        sample_group: GroupRow,
+        sample_user: UserRow,
+    ) -> list[KernelRow]:
+        """Create test kernels belonging to sessions."""
+        kernels: list[KernelRow] = []
+        async with db_with_cleanup.begin_session() as session:
+            for sess in sample_sessions:
+                kernel = KernelRow(
+                    session_id=sess.id,
+                    domain_name=sample_domain,
+                    group_id=sample_group.id,
+                    user_uuid=sample_user.uuid,
+                    occupied_slots=ResourceSlot({}),
+                    requested_slots=ResourceSlot({}),
+                    occupied_shares={},
+                    vfolder_mounts=[],
+                    status=KernelStatus.TERMINATED,
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                )
+                session.add(kernel)
+                kernels.append(kernel)
+            await session.flush()
+            for kernel in kernels:
+                await session.refresh(kernel)
+        return kernels
+
+    @pytest.fixture
+    async def sample_endpoints(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: str,
+        sample_group: GroupRow,
+        sample_user: UserRow,
+        sample_scaling_group: str,
+    ) -> list[EndpointRow]:
+        """Create test endpoints belonging to the group."""
+        endpoints: list[EndpointRow] = []
+        async with db_with_cleanup.begin_session() as session:
+            for i in range(3):
+                endpoint = EndpointRow(
+                    name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
+                    created_user=sample_user.uuid,
+                    session_owner=sample_user.uuid,
+                    domain=sample_domain,
+                    project=sample_group.id,
+                    resource_group=sample_scaling_group,
+                    lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    replicas=0,
+                    model_mount_destination="/models",
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                    resource_slots=ResourceSlot({}),
+                )
+                session.add(endpoint)
+                endpoints.append(endpoint)
+            await session.flush()
+            for endpoint in endpoints:
+                await session.refresh(endpoint)
+        return endpoints
+
+    @pytest.fixture
+    async def sample_endpoint_sessions_with_routings(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_endpoints: list[EndpointRow],
+        sample_domain: str,
+        sample_group: GroupRow,
+        sample_user: UserRow,
+    ) -> tuple[list[SessionRow], list[RoutingRow]]:
+        """Create test sessions connected to endpoints via routings."""
+        sessions: list[SessionRow] = []
+        routings: list[RoutingRow] = []
+        async with db_with_cleanup.begin_session() as session:
+            for i, endpoint in enumerate(sample_endpoints):
+                # Create a session for this endpoint
+                sess = SessionRow(
+                    name=f"endpoint-session-{i}-{uuid.uuid4().hex[:8]}",
+                    session_type=SessionTypes.INFERENCE,
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=sample_domain,
+                    group_id=sample_group.id,
+                    user_uuid=sample_user.uuid,
+                    occupying_slots=ResourceSlot({}),
+                    requested_slots=ResourceSlot({}),
+                    status=SessionStatus.TERMINATED,
+                    status_info="",
+                    target_sgroup_names=[],
+                    vfolder_mounts=[],
+                    environ={},
+                )
+                session.add(sess)
+                await session.flush()
+                await session.refresh(sess)
+                sessions.append(sess)
+
+                # Create routing connecting endpoint to session
+                routing = RoutingRow(
+                    id=uuid.uuid4(),
+                    endpoint=endpoint.id,
+                    session=sess.id,
+                    session_owner=sample_user.uuid,
+                    domain=sample_domain,
+                    project=sample_group.id,
+                    status=RouteStatus.TERMINATED,
+                    traffic_ratio=1.0,
+                )
+                session.add(routing)
+                routings.append(routing)
+            await session.flush()
+            for routing in routings:
+                await session.refresh(routing)
+        return sessions, routings
+
     @pytest.mark.asyncio
     async def test_purge_group_sessions(
         self,
@@ -240,6 +393,130 @@ class TestGroupPurgersIntegration:
                 sa.select(sa.func.count())
                 .select_from(SessionRow)
                 .where(SessionRow.group_id == group_id)
+            )
+            assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_purge_group_kernels(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_sessions: list[SessionRow],
+        sample_kernels: list[KernelRow],
+        sample_group: GroupRow,
+    ) -> None:
+        """Test purging kernels belonging to group sessions."""
+        group_id = sample_group.id
+        session_ids = [sess.id for sess in sample_sessions]
+
+        # Verify kernels exist
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(KernelRow.session_id.in_(session_ids))
+            )
+            assert count == len(sample_kernels)
+
+        # Purge kernels
+        async with db_with_cleanup.begin_session() as session:
+            purger = create_group_kernel_purger(group_id)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(sample_kernels)
+
+        # Verify kernels are deleted
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(KernelRow.session_id.in_(session_ids))
+            )
+            assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_purge_group_endpoints(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_endpoints: list[EndpointRow],
+        sample_group: GroupRow,
+    ) -> None:
+        """Test purging endpoints belonging to the group."""
+        group_id = sample_group.id
+
+        # Verify endpoints exist
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(EndpointRow)
+                .where(EndpointRow.project == group_id)
+            )
+            assert count == len(sample_endpoints)
+
+        # Purge endpoints
+        async with db_with_cleanup.begin_session() as session:
+            purger = create_group_endpoint_purger(group_id)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(sample_endpoints)
+
+        # Verify endpoints are deleted
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(EndpointRow)
+                .where(EndpointRow.project == group_id)
+            )
+            assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_purge_group_endpoint_sessions(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_endpoint_sessions_with_routings: tuple[list[SessionRow], list[RoutingRow]],
+        sample_endpoints: list[EndpointRow],
+        sample_group: GroupRow,
+    ) -> None:
+        """Test purging sessions connected to group endpoints via routings.
+
+        The endpoint_session_purger finds sessions via routing.session references.
+        To satisfy FK constraints (routing.session -> sessions with RESTRICT),
+        we first set routing.session to NULL, then delete the sessions.
+        """
+        group_id = sample_group.id
+        endpoint_sessions, routings = sample_endpoint_sessions_with_routings
+        session_ids = [sess.id for sess in endpoint_sessions]
+        routing_ids = [r.id for r in routings]
+
+        # Verify endpoint sessions exist
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+            )
+            assert count == len(endpoint_sessions)
+
+        # Verify the purger's subquery correctly identifies the sessions
+        async with db_with_cleanup.begin_session() as session:
+            purger = create_group_endpoint_session_purger(group_id)
+            subquery = purger.spec.build_subquery()
+            found_sessions = (await session.scalars(subquery)).all()
+            assert len(found_sessions) == len(endpoint_sessions)
+
+        # Set routing.session to NULL to satisfy FK constraints before session deletion
+        async with db_with_cleanup.begin_session() as session:
+            await session.execute(
+                sa.update(RoutingRow).where(RoutingRow.id.in_(routing_ids)).values(session=None)
+            )
+
+        # Purge endpoint sessions using direct session IDs (subquery won't work after NULLing)
+        async with db_with_cleanup.begin_session() as session:
+            await session.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
+
+        # Verify endpoint sessions are deleted
+        async with db_with_cleanup.begin_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
             )
             assert count == 0
 
