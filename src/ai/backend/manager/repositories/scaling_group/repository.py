@@ -12,7 +12,11 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
+    ScalingGroupData,
+    ScalingGroupListResult,
+)
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -170,3 +174,20 @@ class ScalingGroupRepository:
             scaling_group=scaling_group,
             user_group=user_group,
         )
+
+    async def get_resource_info(
+        self,
+        scaling_group: str,
+    ) -> ResourceInfo:
+        """Get aggregated resource information for a scaling group.
+
+        Args:
+            scaling_group: The name of the scaling group.
+
+        Returns:
+            ResourceInfo containing capacity, used, and free resource metrics.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_resource_info(scaling_group)

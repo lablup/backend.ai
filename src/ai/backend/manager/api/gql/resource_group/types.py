@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Self, override
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.types import ResourceSlot
@@ -15,9 +16,10 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
     ResourceWeightEntryInputGQL,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
     ScalingGroupData,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -31,6 +33,9 @@ from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
     ScalingGroupOrders,
 )
+from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
+    GetResourceInfoAction,
+)
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
@@ -38,6 +43,7 @@ __all__ = (
     "ResourceGroupOrderByGQL",
     "ResourceGroupOrderFieldGQL",
     "ResourceGroupGQL",
+    "ResourceInfoGQL",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupFairShareSpecPayload",
 )
@@ -100,6 +106,38 @@ class FairShareScalingGroupSpecGQL:
 
 
 @strawberry.type(
+    name="ResourceInfo",
+    description=(
+        "Added in 26.1.0. Resource information for a resource group. "
+        "Provides aggregated resource metrics including capacity, used, and free resources."
+    ),
+)
+class ResourceInfoGQL:
+    """Resource information containing capacity, used, and free resource metrics."""
+
+    capacity: ResourceSlotGQL = strawberry.field(
+        description=(
+            "Total available resources from ALIVE, schedulable agents in this resource group."
+        )
+    )
+    used: ResourceSlotGQL = strawberry.field(
+        description=(
+            "Currently occupied resources from active kernels (RUNNING/TERMINATING status)."
+        )
+    )
+    free: ResourceSlotGQL = strawberry.field(description="Available resources (capacity - used).")
+
+    @classmethod
+    def from_resource_info(cls, info: ResourceInfo) -> Self:
+        """Convert from ResourceInfo dataclass to GQL type."""
+        return cls(
+            capacity=ResourceSlotGQL.from_resource_slot(info.capacity),
+            used=ResourceSlotGQL.from_resource_slot(info.used),
+            free=ResourceSlotGQL.from_resource_slot(info.free),
+        )
+
+
+@strawberry.type(
     name="ResourceGroup",
     description="Added in 26.1.0. Resource group with structured configuration",
 )
@@ -127,6 +165,20 @@ class ResourceGroupGQL(Node):
             name=data.name,
             fair_share_spec=FairShareScalingGroupSpecGQL.from_model(data.fair_share_spec),
         )
+
+    @strawberry.field(
+        description=(
+            "Added in 26.1.0. Resource usage information for this resource group. "
+            "Provides aggregated metrics for capacity, used, and free resources. "
+            "This is a lazy-loaded field that queries agent and kernel data on demand."
+        )
+    )
+    async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
+        """Get resource information for this resource group."""
+        ctx = info.context
+        action = GetResourceInfoAction(scaling_group=self.name)
+        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
+        return ResourceInfoGQL.from_resource_info(result.resource_info)
 
 
 # Filter and OrderBy types

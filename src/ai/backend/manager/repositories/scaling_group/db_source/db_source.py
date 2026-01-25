@@ -8,9 +8,18 @@ from typing import TYPE_CHECKING, cast
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
+    ScalingGroupData,
+    ScalingGroupListResult,
+)
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -265,3 +274,62 @@ class ScalingGroupDBSource:
             )
             result = await session.scalar(query)
             return (result or 0) > 0
+
+    async def get_resource_info(
+        self,
+        scaling_group: str,
+    ) -> ResourceInfo:
+        """Get aggregated resource information for a scaling group.
+
+        Args:
+            scaling_group: The name of the scaling group.
+
+        Returns:
+            ResourceInfo containing capacity, used, and free resource metrics.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Validate scaling group exists
+            sg_exists = await db_sess.scalar(
+                sa.select(sa.exists().where(ScalingGroupRow.name == scaling_group))
+            )
+            if not sg_exists:
+                raise ScalingGroupNotFound(scaling_group)
+
+            # Get capacity from ALIVE, schedulable agents
+            capacity_query = sa.select(AgentRow.available_slots).where(
+                sa.and_(
+                    AgentRow.scaling_group == scaling_group,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            capacity_result = await db_sess.execute(capacity_query)
+            capacity = ResourceSlot()
+            for row in capacity_result:
+                if row.available_slots:
+                    capacity = capacity + row.available_slots
+
+            # Get used from kernels in RUNNING/TERMINATING status
+            used_query = sa.select(KernelRow.occupied_slots).where(
+                sa.and_(
+                    KernelRow.scaling_group == scaling_group,
+                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                )
+            )
+            used_result = await db_sess.execute(used_query)
+            used = ResourceSlot()
+            for row in used_result:
+                if row.occupied_slots:
+                    used = used + row.occupied_slots
+
+            # Calculate free = capacity - used
+            free = capacity - used
+
+            return ResourceInfo(
+                capacity=capacity,
+                used=used,
+                free=free,
+            )

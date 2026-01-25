@@ -30,6 +30,10 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_gr
     DisassociateScalingGroupWithUserGroupsAction,
     DisassociateScalingGroupWithUserGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
+    GetResourceInfoAction,
+    GetResourceInfoActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -129,3 +133,12 @@ class ScalingGroupService:
         """Disassociates a single scaling group from a user group (project)."""
         await self._repository.disassociate_scaling_group_with_user_groups(action.purger)
         return DisassociateScalingGroupWithUserGroupsActionResult()
+
+    async def get_resource_info(self, action: GetResourceInfoAction) -> GetResourceInfoActionResult:
+        """Get aggregated resource information for a scaling group.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        resource_info = await self._repository.get_resource_info(action.scaling_group)
+        return GetResourceInfoActionResult(resource_info=resource_info)
