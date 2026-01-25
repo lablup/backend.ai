@@ -33,12 +33,17 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -47,6 +52,17 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
     execute_upserter,
+)
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareEntityItem,
+    DomainFairShareEntitySearchResult,
+    DomainFairShareSearchScope,
+    ProjectFairShareEntityItem,
+    ProjectFairShareEntitySearchResult,
+    ProjectFairShareSearchScope,
+    UserFairShareEntityItem,
+    UserFairShareEntitySearchResult,
+    UserFairShareSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -132,6 +148,72 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def search_domain_fair_share_entities(
+        self,
+        scope: DomainFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainFairShareEntitySearchResult:
+        """Search domain entities with their fair share records.
+
+        This method returns all domains associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            DomainFairShareEntitySearchResult with domain entities and their optional fair share details.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Build LEFT JOIN query: domains associated with resource_group LEFT JOIN fair_share
+            query = (
+                sa.select(
+                    ScalingGroupForDomainRow.scaling_group,
+                    ScalingGroupForDomainRow.domain,
+                    DomainFairShareRow,
+                )
+                .select_from(ScalingGroupForDomainRow)
+                .outerjoin(
+                    DomainFairShareRow,
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group == DomainFairShareRow.resource_group,
+                        ScalingGroupForDomainRow.domain == DomainFairShareRow.domain_name,
+                    ),
+                )
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
+
+            items = [
+                self._build_domain_entity_item(
+                    resource_group=row.scaling_group,
+                    domain_name=row.domain,
+                    fair_share_row=row.DomainFairShareRow,
+                )
+                for row in result.rows
+            ]
+
+            return DomainFairShareEntitySearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    def _build_domain_entity_item(
+        self,
+        resource_group: str,
+        domain_name: str,
+        fair_share_row: DomainFairShareRow | None,
+    ) -> DomainFairShareEntityItem:
+        """Build domain entity item from query result."""
+        return DomainFairShareEntityItem(
+            resource_group=resource_group,
+            domain_name=domain_name,
+            details=fair_share_row.to_data() if fair_share_row is not None else None,
+        )
+
     # ==================== Project Fair Share ====================
 
     async def create_project_fair_share(
@@ -196,6 +278,78 @@ class FairShareDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_project_fair_share_entities(
+        self,
+        scope: ProjectFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> ProjectFairShareEntitySearchResult:
+        """Search project entities with their fair share records.
+
+        This method returns all projects associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            ProjectFairShareEntitySearchResult with project entities and their optional fair share details.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Build LEFT JOIN query: projects associated with resource_group LEFT JOIN fair_share
+            query = (
+                sa.select(
+                    ScalingGroupForProjectRow.scaling_group,
+                    ScalingGroupForProjectRow.group.label("project_id"),
+                    GroupRow.domain_name,
+                    ProjectFairShareRow,
+                )
+                .select_from(ScalingGroupForProjectRow)
+                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .outerjoin(
+                    ProjectFairShareRow,
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group
+                        == ProjectFairShareRow.resource_group,
+                        ScalingGroupForProjectRow.group == ProjectFairShareRow.project_id,
+                    ),
+                )
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
+
+            items = [
+                self._build_project_entity_item(
+                    resource_group=row.scaling_group,
+                    project_id=row.project_id,
+                    domain_name=row.domain_name,
+                    fair_share_row=row.ProjectFairShareRow,
+                )
+                for row in result.rows
+            ]
+
+            return ProjectFairShareEntitySearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    def _build_project_entity_item(
+        self,
+        resource_group: str,
+        project_id: uuid.UUID,
+        domain_name: str,
+        fair_share_row: ProjectFairShareRow | None,
+    ) -> ProjectFairShareEntityItem:
+        """Build project entity item from query result."""
+        return ProjectFairShareEntityItem(
+            resource_group=resource_group,
+            project_id=project_id,
+            domain_name=domain_name,
+            details=fair_share_row.to_data() if fair_share_row is not None else None,
+        )
 
     # ==================== User Fair Share ====================
 
@@ -338,6 +492,87 @@ class FairShareDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_user_fair_share_entities(
+        self,
+        scope: UserFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> UserFairShareEntitySearchResult:
+        """Search user entities with their fair share records.
+
+        This method returns all users associated with a resource group (via project membership),
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            UserFairShareEntitySearchResult with user entities and their optional fair share details.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # Build LEFT JOIN query:
+            # Users in projects associated with resource_group LEFT JOIN fair_share
+            # Path: ScalingGroupForProjectRow -> AssocGroupUserRow -> UserFairShareRow
+            query = (
+                sa.select(
+                    ScalingGroupForProjectRow.scaling_group,
+                    AssocGroupUserRow.user_id.label("user_uuid"),
+                    AssocGroupUserRow.group_id.label("project_id"),
+                    GroupRow.domain_name,
+                    UserFairShareRow,
+                )
+                .select_from(ScalingGroupForProjectRow)
+                .join(
+                    AssocGroupUserRow, ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id
+                )
+                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .outerjoin(
+                    UserFairShareRow,
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == UserFairShareRow.resource_group,
+                        AssocGroupUserRow.user_id == UserFairShareRow.user_uuid,
+                        AssocGroupUserRow.group_id == UserFairShareRow.project_id,
+                    ),
+                )
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
+
+            items = [
+                self._build_user_entity_item(
+                    resource_group=row.scaling_group,
+                    user_uuid=row.user_uuid,
+                    project_id=row.project_id,
+                    domain_name=row.domain_name,
+                    fair_share_row=row.UserFairShareRow,
+                )
+                for row in result.rows
+            ]
+
+            return UserFairShareEntitySearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    def _build_user_entity_item(
+        self,
+        resource_group: str,
+        user_uuid: uuid.UUID,
+        project_id: uuid.UUID,
+        domain_name: str,
+        fair_share_row: UserFairShareRow | None,
+    ) -> UserFairShareEntityItem:
+        """Build user entity item from query result."""
+        return UserFairShareEntityItem(
+            resource_group=resource_group,
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name=domain_name,
+            details=fair_share_row.to_data() if fair_share_row is not None else None,
+        )
 
     async def get_user_scheduling_ranks_batch(
         self,

@@ -50,8 +50,10 @@ from .querier import (
 )
 from .types import (
     CursorConditionFactory,
+    ExistenceCheck,
     QueryCondition,
     QueryOrder,
+    SearchScope,
 )
 from .updater import (
     BatchUpdater,
@@ -79,6 +81,8 @@ __all__ = [
     "QueryCondition",
     "QueryOrder",
     "CursorConditionFactory",
+    "ExistenceCheck",
+    "SearchScope",
     # Export
     "ExportDataStream",
     "ExportFieldDef",

@@ -1,0 +1,268 @@
+"""Types for fair share repository operations.
+
+Contains Scope dataclasses for search operations and entity-based result types.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+import sqlalchemy as sa
+
+from ai.backend.manager.data.fair_share import (
+    DomainFairShareData,
+    ProjectFairShareData,
+    UserFairShareData,
+)
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
+from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+
+__all__ = (
+    # Scope types
+    "DomainFairShareSearchScope",
+    "ProjectFairShareSearchScope",
+    "UserFairShareSearchScope",
+    # Entity-based result items
+    "DomainFairShareEntityItem",
+    "ProjectFairShareEntityItem",
+    "UserFairShareEntityItem",
+    # Entity-based search results
+    "DomainFairShareEntitySearchResult",
+    "ProjectFairShareEntitySearchResult",
+    "UserFairShareEntitySearchResult",
+)
+
+
+# ==================== Scope Types ====================
+
+
+@dataclass(frozen=True)
+class DomainFairShareSearchScope(SearchScope):
+    """Required scope for domain fair share entity search.
+
+    Used for Field-level queries where resource_group is determined by parent context.
+    """
+
+    resource_group: str
+    """Required. The scaling group to search within."""
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ScalingGroupForDomainRow."""
+        resource_group = self.resource_group
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group == resource_group
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class ProjectFairShareSearchScope(SearchScope):
+    """Required scope for project fair share entity search.
+
+    Used for Field-level queries where resource_group is determined by parent context.
+    """
+
+    resource_group: str
+    """Required. The scaling group to search within."""
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ScalingGroupForProjectRow."""
+        resource_group = self.resource_group
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserFairShareSearchScope(SearchScope):
+    """Required scope for user fair share entity search.
+
+    Used for Field-level queries where resource_group is determined by parent context.
+    """
+
+    resource_group: str
+    """Required. The scaling group to search within."""
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ScalingGroupForProjectRow."""
+        resource_group = self.resource_group
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+        ]
+
+
+# ==================== Entity-based Search Result Items ====================
+
+
+@dataclass(frozen=True)
+class DomainFairShareEntityItem:
+    """Entity-based search result item for domain fair share.
+
+    Represents a domain that may or may not have a fair share record.
+    If no record exists, `details` will be None.
+    """
+
+    resource_group: str
+    """The scaling group this domain is associated with."""
+
+    domain_name: str
+    """The name of the domain."""
+
+    details: DomainFairShareData | None
+    """Fair share record details. None if no record exists."""
+
+
+@dataclass(frozen=True)
+class ProjectFairShareEntityItem:
+    """Entity-based search result item for project fair share.
+
+    Represents a project that may or may not have a fair share record.
+    If no record exists, `details` will be None.
+    """
+
+    resource_group: str
+    """The scaling group this project is associated with."""
+
+    project_id: uuid.UUID
+    """The UUID of the project."""
+
+    domain_name: str
+    """The domain this project belongs to."""
+
+    details: ProjectFairShareData | None
+    """Fair share record details. None if no record exists."""
+
+
+@dataclass(frozen=True)
+class UserFairShareEntityItem:
+    """Entity-based search result item for user fair share.
+
+    Represents a user that may or may not have a fair share record.
+    If no record exists, `details` will be None.
+    """
+
+    resource_group: str
+    """The scaling group this user is associated with."""
+
+    user_uuid: uuid.UUID
+    """The UUID of the user."""
+
+    project_id: uuid.UUID
+    """The project this user belongs to (for this resource group)."""
+
+    domain_name: str
+    """The domain this user belongs to."""
+
+    details: UserFairShareData | None
+    """Fair share record details. None if no record exists."""
+
+
+# ==================== Entity-based Search Results ====================
+
+
+@dataclass(frozen=True)
+class DomainFairShareEntitySearchResult:
+    """Search result for entity-based domain fair share query.
+
+    Contains domains associated with a resource group,
+    regardless of whether they have fair share records.
+    """
+
+    items: list[DomainFairShareEntityItem]
+    """List of domain fair share items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""
+
+
+@dataclass(frozen=True)
+class ProjectFairShareEntitySearchResult:
+    """Search result for entity-based project fair share query.
+
+    Contains projects associated with a resource group,
+    regardless of whether they have fair share records.
+    """
+
+    items: list[ProjectFairShareEntityItem]
+    """List of project fair share items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""
+
+
+@dataclass(frozen=True)
+class UserFairShareEntitySearchResult:
+    """Search result for entity-based user fair share query.
+
+    Contains users associated with a resource group,
+    regardless of whether they have fair share records.
+    """
+
+    items: list[UserFairShareEntityItem]
+    """List of user fair share items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""

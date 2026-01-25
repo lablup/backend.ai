@@ -31,6 +31,14 @@ from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupS
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
 
 from .db_source import FairShareDBSource
+from .types import (
+    DomainFairShareEntitySearchResult,
+    DomainFairShareSearchScope,
+    ProjectFairShareEntitySearchResult,
+    ProjectFairShareSearchScope,
+    UserFairShareEntitySearchResult,
+    UserFairShareSearchScope,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.fair_share import (
@@ -108,6 +116,26 @@ class FairShareRepository:
         """Search domain fair shares with pagination."""
         return await self._db_source.search_domain_fair_shares(querier)
 
+    @fair_share_repository_resilience.apply()
+    async def search_domain_fair_share_entities(
+        self,
+        scope: DomainFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainFairShareEntitySearchResult:
+        """Search domain entities with their fair share records.
+
+        Returns all domains associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            DomainFairShareEntitySearchResult with domain entities and their optional details.
+        """
+        return await self._db_source.search_domain_fair_share_entities(scope, querier)
+
     # ==================== Project Fair Share ====================
 
     @fair_share_repository_resilience.apply()
@@ -146,6 +174,26 @@ class FairShareRepository:
     ) -> ProjectFairShareSearchResult:
         """Search project fair shares with pagination."""
         return await self._db_source.search_project_fair_shares(querier)
+
+    @fair_share_repository_resilience.apply()
+    async def search_project_fair_share_entities(
+        self,
+        scope: ProjectFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> ProjectFairShareEntitySearchResult:
+        """Search project entities with their fair share records.
+
+        Returns all projects associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            ProjectFairShareEntitySearchResult with project entities and their optional details.
+        """
+        return await self._db_source.search_project_fair_share_entities(scope, querier)
 
     # ==================== User Fair Share ====================
 
@@ -186,6 +234,26 @@ class FairShareRepository:
     ) -> UserFairShareSearchResult:
         """Search user fair shares with pagination."""
         return await self._db_source.search_user_fair_shares(querier)
+
+    @fair_share_repository_resilience.apply()
+    async def search_user_fair_share_entities(
+        self,
+        scope: UserFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> UserFairShareEntitySearchResult:
+        """Search user entities with their fair share records.
+
+        Returns all users associated with a resource group (via project membership),
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            UserFairShareEntitySearchResult with user entities and their optional details.
+        """
+        return await self._db_source.search_user_fair_share_entities(scope, querier)
 
     # ==================== Entity Info & Spec ====================
 
