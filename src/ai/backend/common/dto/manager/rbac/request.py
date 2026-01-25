@@ -38,6 +38,7 @@ __all__ = (
     "RoleOrder",
     "ScopeFilter",
     "ScopeOrder",
+    "SearchEntitiesRequest",
     "SearchRolesRequest",
     "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
@@ -163,6 +164,9 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     """Request to create an object permission for a role."""
 
     role_id: UUID = Field(description="Role ID to add the object permission to")
+    permission_group_id: UUID = Field(
+        description="Permission group ID to associate the object permission with"
+    )
     entity_type: EntityType = Field(description="Entity type for the object permission")
     entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
     operation: OperationType = Field(description="Operation type for the object permission")
@@ -189,6 +193,15 @@ class SearchScopesRequest(BaseRequestModel):
 
     filter: Optional[ScopeFilter] = Field(default=None, description="Filter conditions")
     order: Optional[list[ScopeOrder]] = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class SearchEntitiesRequest(BaseRequestModel):
+    """Request body for searching entities within a scope."""
+
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )

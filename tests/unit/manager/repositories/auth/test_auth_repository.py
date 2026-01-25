@@ -14,6 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
@@ -307,7 +308,7 @@ class TestAuthRepository:
                 integration_id=group.integration_id,
                 domain_name=group.domain_name,
                 total_resource_slots=group.total_resource_slots,
-                allowed_vfolder_hosts=group.allowed_vfolder_hosts,
+                allowed_vfolder_hosts=VFolderHostPermissionMap(group.allowed_vfolder_hosts),
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,

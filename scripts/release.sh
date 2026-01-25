@@ -36,6 +36,7 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 ./backend.ai storage config generate-sample --overwrite --unmask-secrets
 ./backend.ai web config generate-sample --overwrite --unmask-secrets
 
+./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ./scripts/generate-graphql-schema.sh
 
 git add -A

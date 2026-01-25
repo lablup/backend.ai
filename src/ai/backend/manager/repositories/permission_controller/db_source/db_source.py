@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -86,6 +87,12 @@ class PermissionDBSource:
         Returns:
             Created role row
         """
+        # TODO: Object permissions require a permission group for the scope they reference.
+        # When creating object permissions during role creation, the corresponding permission group
+        # for each object permission's scope MUST be included in `permission_groups`.
+        # This acts as a "guest permission group" providing scope visibility (see BEP-1012-main.md).
+        # Currently, ObjectPermissionCreateInputBeforeRoleCreation does not include scope_id,
+        # so the caller must ensure the correct permission group is provided in `permission_groups`.
 
         async with self._db.begin_session() as db_session:
             # 1. Create role
@@ -116,19 +123,6 @@ class PermissionDBSource:
                         )
                     )
                     await self._add_permission_to_group(db_session, perm_creator)
-
-            # 3. Create object permissions
-            for obj_perm_input in input_data.object_permissions:
-                obj_perm_creator = Creator(
-                    spec=ObjectPermissionCreatorSpec(
-                        role_id=role_id,
-                        entity_type=obj_perm_input.entity_type,
-                        entity_id=obj_perm_input.entity_id,
-                        operation=obj_perm_input.operation,
-                        status=obj_perm_input.status,
-                    )
-                )
-                await self._add_object_permission_to_role(db_session, obj_perm_creator)
 
             await db_session.refresh(role_row)
             return role_row
@@ -575,6 +569,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
+                        permission_group_id=obj_perm_input.permission_group_id,
                         entity_type=obj_perm_input.entity_type,
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
@@ -981,6 +976,48 @@ class PermissionDBSource:
             ]
 
             return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_entities_in_scope(
+        self,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Queries the association_scopes_entities table for entity IDs matching
+        the conditions in the querier (scope_type, scope_id, entity_type).
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            EntityListResult containing entity data
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                AssociationScopesEntitiesRow.entity_id,
+                AssociationScopesEntitiesRow.entity_type,
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                EntityData(
+                    entity_type=row.entity_type,
+                    entity_id=row.entity_id,
+                )
+                for row in result.rows
+            ]
+
+            return EntityListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

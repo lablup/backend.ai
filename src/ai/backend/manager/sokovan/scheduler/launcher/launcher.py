@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
@@ -31,7 +30,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -46,7 +45,6 @@ from ai.backend.manager.sokovan.scheduler.types import (
     ImageConfigData,
     KernelBindingData,
     NetworkSetup,
-    RetryResult,
     SessionDataForPull,
     SessionDataForStart,
 )
@@ -150,12 +148,15 @@ class SessionLauncher:
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
-            # Note: shared_phase should be provided by the caller (e.g., handler)
-            with RecorderContext[SessionId].shared_step(
-                "check_and_pull_images",
-                success_detail="Image pull triggered",
+            with RecorderContext[SessionId].shared_phase(
+                "prepare_images",
+                success_detail="Image pull requested",
             ):
-                await asyncio.gather(*pull_tasks, return_exceptions=True)
+                with RecorderContext[SessionId].shared_step(
+                    "check_and_pull_images",
+                    success_detail="Image pull triggered",
+                ):
+                    await asyncio.gather(*pull_tasks, return_exceptions=True)
 
     async def start_sessions_for_handler(
         self,
@@ -174,7 +175,15 @@ class SessionLauncher:
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image name
         """
-        await self._start_sessions_concurrently(sessions, image_configs)
+        with RecorderContext[SessionId].shared_phase(
+            "trigger_kernel_creation",
+            success_detail="Kernel creation triggered",
+        ):
+            with RecorderContext[SessionId].shared_step(
+                "create_kernels",
+                success_detail="Kernel creation requested",
+            ):
+                await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
@@ -414,7 +423,7 @@ class SessionLauncher:
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # Update error info in status_data without changing status
-            # Session will be retried by retry_creating_sessions later
+            # Session will be handled by timeout detection in Coordinator
             await self._repository.update_session_error_info(session.session_id, error_info)
 
     async def _setup_network_configuration(
@@ -547,366 +556,4 @@ class SessionLauncher:
         return ClusterSSHKeyPair(
             private_key=pem.decode("utf-8"),
             public_key=public_key.decode("utf-8"),
-        )
-
-    def _filter_stuck_sessions_for_pull(
-        self,
-        sessions: list[SessionDataForPull],
-        threshold: float,
-    ) -> list[SessionDataForPull]:
-        """
-        Filter sessions that appear stuck based on kernel status change time.
-
-        :param sessions: List of sessions to filter
-        :param threshold: Time threshold in seconds
-        :return: List of stuck sessions
-        """
-        current_time = time.time()
-        stuck_sessions: list[SessionDataForPull] = []
-
-        for session in sessions:
-            # Check the oldest kernel's status_changed time
-            oldest_status_change = min(
-                (kernel.status_changed for kernel in session.kernels if kernel.status_changed),
-                default=None,
-            )
-
-            if oldest_status_change is None:
-                # No status change info, consider it stuck
-                stuck_sessions.append(session)
-            elif (current_time - oldest_status_change) >= threshold:
-                # Status hasn't changed for too long
-                stuck_sessions.append(session)
-
-        return stuck_sessions
-
-    async def _check_truly_stuck_pulling_sessions(
-        self,
-        sessions: list[SessionDataForPull],
-        image_configs: dict[str, ImageConfigData],
-    ) -> list[SessionDataForPull]:
-        """
-        Check if sessions are truly stuck by verifying if pulling is still in progress.
-
-        :param sessions: List of potentially stuck sessions
-        :param image_configs: Image configurations
-        :return: List of sessions that are truly stuck
-        """
-        truly_stuck_sessions: list[SessionDataForPull] = []
-
-        # Group images by agent to check pulling status
-        agent_images: defaultdict[AgentId, set[str]] = defaultdict(set)
-        session_images: dict[SessionId, set[str]] = {}
-
-        for session in sessions:
-            session_image_set = set()
-            for kernel in session.kernels:
-                if kernel.agent_id and kernel.image in image_configs:
-                    img_cfg = image_configs[kernel.image]
-                    canonical = img_cfg.canonical
-                    agent_images[kernel.agent_id].add(canonical)
-                    session_image_set.add(canonical)
-            session_images[session.session_id] = session_image_set
-
-        # Check pulling status for each agent in parallel
-        check_tasks = [
-            self._check_agent_pulling_status(agent_id, images)
-            for agent_id, images in agent_images.items()
-        ]
-        results = await asyncio.gather(*check_tasks, return_exceptions=True)
-
-        agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
-        for result in results:
-            if isinstance(result, BaseException):
-                log.warning("Failed to check pulling status: {}", result)
-                continue
-            agent_id, pulling_status = result
-            agent_pulling_status[agent_id] = pulling_status
-
-        # Determine truly stuck sessions
-        pool = RecorderContext[SessionId].current_pool()
-        for session in sessions:
-            recorder = pool.recorder(session.session_id)
-            with recorder.phase(
-                "verify_pull_status",
-                success_detail="Image pull status verified",
-            ):
-                with recorder.step(
-                    "check_pull_progress",
-                    success_detail="Image pull progress checked",
-                ):
-                    images_to_check = session_images[session.session_id]
-                    if not images_to_check:
-                        # No images to check, consider it stuck
-                        truly_stuck_sessions.append(session)
-                        continue
-
-                    # Check if any image for this session is actively being pulled
-                    any_pulling = False
-                    for kernel in session.kernels:
-                        if kernel.agent_id and kernel.image in image_configs:
-                            img_cfg = image_configs[kernel.image]
-                            canonical = img_cfg.canonical
-                            if agent_pulling_status.get(kernel.agent_id, {}).get(canonical, False):
-                                any_pulling = True
-                                break
-
-                    if not any_pulling:
-                        # No images are being pulled, session is truly stuck
-                        truly_stuck_sessions.append(session)
-
-        return truly_stuck_sessions
-
-    async def _check_agent_pulling_status(
-        self,
-        agent_id: AgentId,
-        images: set[str],
-    ) -> tuple[AgentId, dict[str, bool]]:
-        """Check pulling status for all images on a single agent."""
-        pulling_status: dict[str, bool] = {}
-        try:
-            async with self._agent_client_pool.acquire(agent_id) as client:
-                for image in images:
-                    try:
-                        is_pulling = await client.check_pulling(image)
-                        pulling_status[image] = is_pulling
-                    except Exception as e:
-                        log.warning(
-                            "Failed to check pulling status for image {} on agent {}: {}",
-                            image,
-                            agent_id,
-                            e,
-                        )
-                        pulling_status[image] = False
-        except Exception as e:
-            log.warning(
-                "Failed to acquire connection for agent {}: {}",
-                agent_id,
-                e,
-            )
-            for image in images:
-                pulling_status[image] = False
-        return agent_id, pulling_status
-
-    def _filter_stuck_sessions_for_start(
-        self,
-        sessions: list[SessionDataForStart],
-        threshold: float,
-    ) -> list[SessionDataForStart]:
-        """
-        Filter sessions that appear stuck based on kernel status change time.
-
-        :param sessions: List of sessions to filter
-        :param threshold: Time threshold in seconds
-        :return: List of stuck sessions
-        """
-        current_time = time.time()
-        stuck_sessions: list[SessionDataForStart] = []
-
-        for session in sessions:
-            # Check the oldest kernel's status_changed time
-            oldest_status_change = min(
-                (kernel.status_changed for kernel in session.kernels if kernel.status_changed),
-                default=None,
-            )
-
-            if oldest_status_change is None:
-                # No status change info, consider it stuck
-                stuck_sessions.append(session)
-            elif (current_time - oldest_status_change) >= threshold:
-                # Status hasn't changed for too long
-                stuck_sessions.append(session)
-
-        return stuck_sessions
-
-    async def _check_truly_stuck_creating_sessions(
-        self,
-        sessions: list[SessionDataForStart],
-    ) -> list[SessionDataForStart]:
-        """
-        Check if sessions are truly stuck by verifying if kernels are being created or already exist.
-
-        :param sessions: List of potentially stuck sessions
-        :return: List of sessions that are truly stuck
-        """
-        if not sessions:
-            return []
-
-        # Check all sessions in parallel
-        check_tasks = [self._check_session_has_active_kernels(session) for session in sessions]
-        results = await asyncio.gather(*check_tasks, return_exceptions=True)
-
-        # Filter sessions that have no active kernels
-        truly_stuck_sessions: list[SessionDataForStart] = []
-        pool = RecorderContext[SessionId].current_pool()
-        for session, result in zip(sessions, results, strict=True):
-            recorder = pool.recorder(session.session_id)
-            with recorder.phase(
-                "verify_creation_status",
-                success_detail="Kernel creation status verified",
-            ):
-                with recorder.step(
-                    "check_kernel_status",
-                    success_detail="Kernel creation status checked",
-                ):
-                    if isinstance(result, BaseException):
-                        log.warning(
-                            "Failed to check session {} creating status: {}",
-                            session.session_id,
-                            result,
-                        )
-                        # If we can't check, assume it's stuck
-                        truly_stuck_sessions.append(session)
-                    elif not result:
-                        # No active kernels, session is stuck
-                        truly_stuck_sessions.append(session)
-
-        return truly_stuck_sessions
-
-    async def _check_session_has_active_kernels(
-        self,
-        session: SessionDataForStart,
-    ) -> bool:
-        """Check if any kernel in the session is being created or already exists."""
-        for kernel in session.kernels:
-            if not kernel.agent_id:
-                continue
-            try:
-                async with self._agent_client_pool.acquire(kernel.agent_id) as client:
-                    is_active = await client.check_creating(kernel.kernel_id)
-                    if is_active:
-                        return True
-            except Exception as e:
-                log.warning(
-                    "Failed to check creating status for kernel {} on agent {}: {}",
-                    kernel.kernel_id,
-                    kernel.agent_id,
-                    e,
-                )
-        return False
-
-    async def retry_preparing_for_handler(
-        self,
-        sessions: list[SessionDataForPull],
-        image_configs: dict[str, ImageConfigData],
-    ) -> RetryResult:
-        """
-        Retry PREPARING/PULLING sessions for the given sessions list.
-
-        Handler-specific method that works with pre-fetched data.
-        Used by RetryPreparingLifecycleHandler.
-
-        :param sessions: List of sessions to check for retry
-        :param image_configs: Image configurations indexed by image name
-        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
-        """
-        PREPARING_CHECK_THRESHOLD = 10.0  # 10 seconds
-
-        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
-
-        if not sessions:
-            return empty_result
-
-        # Filter sessions that haven't changed status for threshold time
-        stuck_sessions = self._filter_stuck_sessions_for_pull(sessions, PREPARING_CHECK_THRESHOLD)
-
-        if not stuck_sessions:
-            return empty_result
-
-        # Check which sessions are actually stuck (not actively pulling)
-        truly_stuck_sessions = await self._check_truly_stuck_pulling_sessions(
-            stuck_sessions, image_configs
-        )
-
-        if not truly_stuck_sessions:
-            log.debug("All sessions are actively pulling, no retry needed")
-            return empty_result
-
-        log.info("Retrying {} truly stuck PREPARING/PULLING sessions", len(truly_stuck_sessions))
-
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        retry_update_result = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not retry_update_result.sessions_to_retry:
-            log.info("All stuck sessions exceeded max retries")
-            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in retry_update_result.sessions_to_retry
-        ]
-
-        # Use the existing _trigger_image_pulling_for_sessions method
-        await self._trigger_image_pulling_for_sessions(sessions_to_retry, image_configs)
-
-        return RetryResult(
-            retried_ids=list(retry_update_result.sessions_to_retry),
-            exceeded_ids=list(retry_update_result.sessions_exceeded),
-        )
-
-    async def retry_creating_for_handler(
-        self,
-        sessions: list[SessionDataForStart],
-        image_configs: dict[str, ImageConfigData],
-    ) -> RetryResult:
-        """
-        Retry CREATING sessions for the given sessions list.
-
-        Handler-specific method that works with pre-fetched data.
-        Used by RetryCreatingLifecycleHandler.
-
-        :param sessions: List of sessions to check for retry
-        :param image_configs: Image configurations indexed by image name
-        :return: RetryResult with retried_ids and exceeded_ids for Coordinator to process
-        """
-        CREATING_CHECK_THRESHOLD = 10.0  # 10 seconds
-
-        empty_result = RetryResult(retried_ids=[], exceeded_ids=[])
-
-        if not sessions:
-            return empty_result
-
-        # Filter sessions that haven't changed status for threshold time
-        stuck_sessions = self._filter_stuck_sessions_for_start(sessions, CREATING_CHECK_THRESHOLD)
-
-        if not stuck_sessions:
-            return empty_result
-
-        # Check which sessions are truly stuck (not actively creating)
-        truly_stuck_sessions = await self._check_truly_stuck_creating_sessions(stuck_sessions)
-
-        if not truly_stuck_sessions:
-            log.debug("All sessions are actively creating kernels, no retry needed")
-            return empty_result
-
-        log.info("Retrying {} truly stuck CREATING sessions", len(truly_stuck_sessions))
-
-        # Update retry counts and get sessions that should continue retrying
-        stuck_session_ids = [session.session_id for session in truly_stuck_sessions]
-        retry_update_result = await self._repository.batch_update_stuck_session_retries(
-            stuck_session_ids, SERVICE_MAX_RETRIES
-        )
-
-        if not retry_update_result.sessions_to_retry:
-            log.info("All stuck sessions exceeded max retries")
-            return RetryResult(retried_ids=[], exceeded_ids=retry_update_result.sessions_exceeded)
-
-        # Filter sessions that should be retried based on returned IDs
-        sessions_to_retry = [
-            session
-            for session in truly_stuck_sessions
-            if session.session_id in retry_update_result.sessions_to_retry
-        ]
-
-        # Use the existing _start_sessions_concurrently method to retry
-        await self._start_sessions_concurrently(sessions_to_retry, image_configs)
-
-        return RetryResult(
-            retried_ids=list(retry_update_result.sessions_to_retry),
-            exceeded_ids=list(retry_update_result.sessions_exceeded),
         )

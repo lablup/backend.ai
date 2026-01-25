@@ -336,6 +336,9 @@ class Image(graphene.ObjectType):
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
 
+        if allowed_docker_registries is None:
+            return []
+
         filtered_items: list[Image] = [
             item for item in items if item.registry in allowed_docker_registries
         ]
@@ -792,7 +795,10 @@ class ForgetImage(graphene.Mutation):
 
     class Arguments:
         reference = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -803,17 +809,18 @@ class ForgetImage(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         reference: str,
-        architecture: str,
+        architecture: str | None,
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         result = await ctx.processors.image.forget_image.wait_for_complete(
             ForgetImageAction(
                 user_id=ctx.user["uuid"],
                 client_role=ctx.user["role"],
                 reference=reference,
-                architecture=architecture,
+                architecture=arch,
             )
         )
 
@@ -1035,7 +1042,10 @@ class AliasImage(graphene.Mutation):
     class Arguments:
         alias = graphene.String(required=True)
         target = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -1046,15 +1056,16 @@ class AliasImage(graphene.Mutation):
         info: graphene.ResolveInfo,
         alias: str,
         target: str,
-        architecture: str,
+        architecture: str | None,
     ) -> AliasImage:
         log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         await ctx.processors.image.alias_image.wait_for_complete(
             AliasImageAction(
                 image_canonical=target,
-                architecture=architecture,
+                architecture=arch,
                 alias=alias,
             )
         )
@@ -1147,9 +1158,17 @@ class ModifyImageInput(graphene.InputObjectType):
             resources_data = {}
             for limit_option in self.resource_limits:
                 limit_data = {}
-                if limit_option.min is not Undefined and len(limit_option.min) > 0:
+                if (
+                    limit_option.min is not Undefined
+                    and limit_option.min is not None
+                    and len(limit_option.min) > 0
+                ):
                     limit_data["min"] = limit_option.min
-                if limit_option.max is not Undefined and len(limit_option.max) > 0:
+                if (
+                    limit_option.max is not Undefined
+                    and limit_option.max is not None
+                    and len(limit_option.max) > 0
+                ):
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
 
@@ -1183,7 +1202,11 @@ class ModifyImage(graphene.Mutation):
 
     class Arguments:
         target = graphene.String(required=True, default_value=None)
-        architecture = graphene.String(required=False, default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            required=False,
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
         props = ModifyImageInput(required=True)
 
     ok = graphene.Boolean()
@@ -1194,16 +1217,17 @@ class ModifyImage(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         target: str,
-        architecture: str,
+        architecture: str | None,
         props: ModifyImageInput,
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
         log.info("modify image {0} by API request", target)
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
                 target=target,
-                architecture=architecture,
+                architecture=arch,
                 updater_spec=props.to_updater_spec(),
             )
         )
@@ -1302,7 +1326,11 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     """
 
     image_canonical = graphene.String(required=True)
-    architecture = graphene.String(required=True, default_value=DEFAULT_IMAGE_ARCH)
+    architecture = graphene.String(
+        required=False,
+        default_value=None,
+        description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+    )
 
 
 class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
@@ -1330,14 +1358,15 @@ class ClearImageCustomResourceLimit(graphene.Mutation):
         info: graphene.ResolveInfo,
         key: ClearImageCustomResourceLimitKey,
     ) -> ClearImageCustomResourceLimitPayload:
+        arch = key.architecture if key.architecture is not None else DEFAULT_IMAGE_ARCH
         log.info(
-            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+            f'clear custom resource limits for image "{key.image_canonical}" ({arch}) by API request',
         )
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(
             ClearImageCustomResourceLimitAction(
                 image_canonical=key.image_canonical,
-                architecture=key.architecture,
+                architecture=arch,
             )
         )
         return ClearImageCustomResourceLimitPayload(

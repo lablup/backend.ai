@@ -12,6 +12,7 @@ from .types import NotificationRuleType
 
 __all__ = (
     "ArtifactDownloadCompletedMessage",
+    "EndpointLifecycleChangedMessage",
     "NotifiableMessage",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
@@ -168,3 +169,29 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
     verification_result: Optional[dict[str, Any]] = Field(
         default=None, description="Verification result of the artifact revision, if available"
     )
+
+
+class EndpointLifecycleChangedMessage(NotifiableMessage):
+    """Notification message for endpoint lifecycle change events.
+
+    This message is sent when an endpoint (model service) lifecycle stage
+    changes (e.g., PENDING → SCALING → READY → DESTROYING → DESTROYED).
+    """
+
+    @classmethod
+    def rule_type(cls) -> NotificationRuleType:
+        """Return the notification rule type for this message class."""
+        return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED
+
+    endpoint_id: str = Field(description="Unique identifier of the endpoint")
+    endpoint_name: str = Field(description="User-defined name for the endpoint")
+    domain: str = Field(description="Domain where the endpoint is deployed")
+    project_id: str = Field(description="Project ID where the endpoint belongs")
+    resource_group: str = Field(description="Resource group where the endpoint is deployed")
+    from_status: str | None = Field(
+        default=None,
+        description="Previous lifecycle stage (or None for newly created endpoints)",
+    )
+    to_status: str = Field(description="New lifecycle stage")
+    transition_result: str = Field(description="Result of the transition (success or failure)")
+    event_timestamp: str = Field(description="ISO format timestamp when the transition occurred")

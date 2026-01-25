@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointAutoScalingRuleListResult,
-    RequesterCtx,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -47,12 +47,14 @@ class TestAutoScalingServiceSearch:
         )
 
     @pytest.fixture
-    def sample_requester_ctx(self) -> RequesterCtx:
-        """Create sample requester context"""
-        return RequesterCtx(
-            is_authorized=True,
+    def user_data(self) -> UserData:
+        """Create sample user data"""
+        return UserData(
             user_id=uuid.uuid4(),
-            user_role=UserRole.USER,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER.value,
             domain_name="default",
         )
 
@@ -61,10 +63,10 @@ class TestAutoScalingServiceSearch:
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
         sample_auto_scaling_rule_data: EndpointAutoScalingRuleData,
-        sample_requester_ctx: RequesterCtx,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules with querier"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[sample_auto_scaling_rule_data],
                 total_count=1,
@@ -80,7 +82,6 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            requester_ctx=sample_requester_ctx,
         )
         result = await auto_scaling_service.search_auto_scaling_rules(action)
 
@@ -93,10 +94,10 @@ class TestAutoScalingServiceSearch:
         self,
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
-        sample_requester_ctx: RequesterCtx,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules when no results are found"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[],
                 total_count=0,
@@ -112,7 +113,6 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            requester_ctx=sample_requester_ctx,
         )
         result = await auto_scaling_service.search_auto_scaling_rules(action)
 
@@ -124,10 +124,10 @@ class TestAutoScalingServiceSearch:
         auto_scaling_service: AutoScalingService,
         mock_repositories: MagicMock,
         sample_auto_scaling_rule_data: EndpointAutoScalingRuleData,
-        sample_requester_ctx: RequesterCtx,
+        user_data: UserData,
     ) -> None:
         """Test searching auto scaling rules with pagination"""
-        mock_repositories.repository.search_auto_scaling_rules_validated = AsyncMock(
+        mock_repositories.repository.search_auto_scaling_rules = AsyncMock(
             return_value=EndpointAutoScalingRuleListResult(
                 items=[sample_auto_scaling_rule_data],
                 total_count=25,
@@ -143,7 +143,6 @@ class TestAutoScalingServiceSearch:
         )
         action = SearchAutoScalingRulesAction(
             querier=querier,
-            requester_ctx=sample_requester_ctx,
         )
         result = await auto_scaling_service.search_auto_scaling_rules(action)
 

@@ -22,7 +22,7 @@ from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -154,7 +154,7 @@ class GroupNode(graphene.ObjectType):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
@@ -223,7 +223,7 @@ class GroupNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
             result = [type(self).from_row(graph_ctx, row) for row in user_rows]
-            total_cnt = await db_session.scalar(cnt_query)
+            total_cnt = await db_session.scalar(cnt_query) or 0
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
@@ -569,7 +569,11 @@ class GroupInput(graphene.InputObjectType):
             if self.total_resource_slots is Undefined
             else ResourceSlot.from_user_input(self.total_resource_slots, None)
         )
-        allowed_vfolder_hosts_val = value_or_none(self.allowed_vfolder_hosts)
+        allowed_vfolder_hosts_val = (
+            VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts)
+            if self.allowed_vfolder_hosts is not Undefined
+            else None
+        )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)

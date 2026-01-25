@@ -44,6 +44,7 @@ from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     StructuredJSONObjectColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
@@ -59,6 +60,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermission
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -296,6 +298,12 @@ class ScalingGroupRow(Base):
         nullable=False,
         default={},
     )
+    fair_share_spec: Mapped[FairShareScalingGroupSpec | None] = mapped_column(
+        "fair_share_spec",
+        PydanticColumn(FairShareScalingGroupSpec),
+        nullable=True,
+        default=None,
+    )
 
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
     agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
@@ -362,6 +370,7 @@ class ScalingGroupRow(Base):
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                 ),
             ),
+            fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
         )
 
     @classmethod

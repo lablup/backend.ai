@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
-from dateutil.tz import tzutc
-
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -25,7 +23,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.data.session.types import SessionInfo
+from ai.backend.manager.data.session.types import KernelMatchType, SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -400,7 +398,7 @@ class SchedulingFailure:
     session_id: SessionId
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
     failed_phases: list[SchedulingPredicate] = field(default_factory=list)
-    last_try: Optional[datetime] = field(default_factory=lambda: datetime.now(tzutc()))
+    last_try: Optional[datetime] = None
     msg: Optional[str] = None
 
     def to_status_data(self, current_retries: int) -> dict:
@@ -796,10 +794,20 @@ class SessionWithKernels:
 
     This is the primary data unit for scheduler operations,
     representing a session and all its kernels as an atomic unit.
+
+    Attributes:
+        session_info: Session information including lifecycle data
+        kernel_infos: List of kernels belonging to this session
+        phase_attempts: Number of attempts for current phase from scheduling history
+                       (used for failure classification: give_up when >= max_retries)
+        phase_started_at: When the current phase started from scheduling history
+                         (used for failure classification: expired when timeout exceeded)
     """
 
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
+    phase_attempts: int = 0
+    phase_started_at: Optional[datetime] = None
 
     @property
     def main_kernel(self) -> KernelInfo:
@@ -845,11 +853,6 @@ class SchedulerExecutionResult:
         """Check if there are any failed operations."""
         return len(self.errors) > 0
 
-    @property
-    def has_successes(self) -> bool:
-        """Check if there are any successful operations."""
-        return len(self.successes) > 0
-
 
 @dataclass
 class KernelTerminationInfo:
@@ -876,18 +879,6 @@ class SweepStaleKernelsResult:
 
 
 @dataclass
-class RetryUpdateResult:
-    """Result of batch_update_stuck_session_retries operation.
-
-    Used by repository to communicate which sessions should be retried
-    and which have exceeded max retries (for Coordinator to update status).
-    """
-
-    sessions_to_retry: list[SessionId]
-    sessions_exceeded: list[SessionId]
-
-
-@dataclass
 class RetryResult:
     """Result of retry_*_for_handler operations in Launcher.
 
@@ -897,3 +888,24 @@ class RetryResult:
 
     retried_ids: list[SessionId]
     exceeded_ids: list[SessionId]
+
+
+# ============================================================================
+# Promotion Spec for simplified promotion handling
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class PromotionSpec:
+    """Specification for session promotion operations.
+
+    Replaces promotion handlers with a declarative spec. The Coordinator
+    processes promotions directly based on these specs.
+    """
+
+    name: str
+    target_statuses: list[SessionStatus]
+    target_kernel_statuses: list[KernelStatus]
+    kernel_match_type: KernelMatchType
+    success_status: SessionStatus
+    reason: str

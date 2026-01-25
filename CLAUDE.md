@@ -161,7 +161,59 @@ BEP documents define architectural decisions, API designs, and implementation st
 * Utilize `typing.Protocol` and `typing.TypedDict` when typing mocked objects and functions if applicable
   - When using partial data structures, use `typing.cast()` to minimal scopes.
 * Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
-* Prefer pytest-style module-level test functions rather than unittest-style test classes
+
+### Test Structure and Organization
+
+* **Use Test Classes**: Group tests by target unit (class, module, or function being tested)
+  - Each test class should focus on a single target
+  - Test methods within the class test different scenarios for that target
+  ```python
+  class TestScheduleSessionsLifecycleHandler:
+      """Tests for ScheduleSessionsLifecycleHandler."""
+
+      async def test_all_sessions_scheduled_successfully(self, ...) -> None:
+          ...
+
+      async def test_partial_scheduling_failure(self, ...) -> None:
+          ...
+  ```
+
+* **Use Fixtures for Test Scenarios**: Express test conditions through fixtures, not inline setup code
+  - Fixtures should have descriptive names that indicate the scenario
+  - Keep test functions concise by delegating setup to fixtures
+  ```python
+  @pytest.fixture
+  def session_with_pending_status() -> SessionData:
+      return create_session(status=SessionStatus.PENDING)
+
+  @pytest.fixture
+  def mock_provisioner_success(mock_provisioner: AsyncMock) -> AsyncMock:
+      mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(...)
+      return mock_provisioner
+  ```
+
+* **No Cross-Test Imports**: Never import from other test files
+  - Shared test utilities go in `conftest.py` or `ai.backend.testutils`
+  - Each test file should be self-contained
+
+* **Keep Test Functions Concise**: Test functions should focus on:
+  1. Arrange: Receive pre-configured fixtures
+  2. Act: Call the method under test
+  3. Assert: Verify the expected outcome
+  ```python
+  async def test_session_scheduled_successfully(
+      self,
+      handler: ScheduleSessionsLifecycleHandler,
+      session_with_pending_status: SessionData,
+      mock_provisioner_success: AsyncMock,
+  ) -> None:
+      # Act
+      result = await handler.execute("default", [session_with_pending_status])
+
+      # Assert
+      assert len(result.successes) == 1
+      mock_provisioner_success.schedule_scaling_group.assert_called_once()
+  ```
 
 ### Database Tests with `with_tables`
 

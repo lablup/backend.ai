@@ -52,7 +52,6 @@ from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
     MountOption,
-    RequesterCtx,
     ServiceConfig,
     ServiceInfo,
 )
@@ -314,12 +313,6 @@ async def get_info(request: web.Request) -> ServeInfoModel:
     )
 
     action = GetModelServiceInfoAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
     result: GetModelServiceInfoActionResult = (
@@ -431,7 +424,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default=RuntimeVariant.CUSTOM,
     )
     architecture: Optional[str] = Field(
-        description="Image architecture",
+        description="Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
         alias="arch",
         default=None,
     )
@@ -840,12 +833,6 @@ async def delete(request: web.Request) -> SuccessResponseModel:
     # Fall back to model_serving
     action = DeleteModelServiceAction(
         service_id=service_id,
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
     )
     result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
     return SuccessResponseModel(success=result.success)
@@ -868,12 +855,6 @@ async def sync(request: web.Request) -> SuccessResponseModel:
 
     action = ForceSyncAction(
         service_id=service_id,
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
     )
     result = await root_ctx.processors.model_serving.force_sync.wait_for_complete(action)
 
@@ -906,12 +887,6 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
     )
 
     action = ScaleServiceReplicasAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         max_session_count_per_model_session=request["user"]["resource_policy"][
             "max_session_count_per_model_session"
         ],
@@ -955,12 +930,6 @@ async def update_route(
     )
 
     action = UpdateRouteAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         route_id=route_id,
         traffic_ratio=params.traffic_ratio,
@@ -991,12 +960,6 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
     )
 
     action = DeleteRouteAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         route_id=route_id,
     )
@@ -1058,12 +1021,6 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
     )
 
     action = GenerateTokenAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         duration=params.duration,
         valid_until=params.valid_until,
@@ -1107,12 +1064,6 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
     )
 
     action = ListErrorsAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
 
@@ -1142,12 +1093,6 @@ async def clear_error(request: web.Request) -> web.Response:
     )
 
     action = ClearErrorAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
 

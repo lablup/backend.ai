@@ -1,4 +1,10 @@
-"""Factory functions for creating scheduler components."""
+"""Factory functions for creating scheduler components and coordinator handlers."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -6,7 +12,39 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.resource_usage_history import (
+    ResourceUsageHistoryRepository,
+)
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.scheduler.types import ScheduleType
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.sokovan.scheduler.fair_share import (
+    FairShareAggregator,
+    FairShareFactorCalculator,
+)
+from ai.backend.manager.sokovan.scheduler.handlers import (
+    CheckPreconditionLifecycleHandler,
+    DeprioritizeSessionsLifecycleHandler,
+    ScheduleSessionsLifecycleHandler,
+    SessionLifecycleHandler,
+    StartSessionsLifecycleHandler,
+    SweepSessionsLifecycleHandler,
+    TerminateSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
+    KernelLifecycleHandler,
+    SweepStaleKernelsKernelHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.observer import (
+    FairShareObserver,
+    KernelObserver,
+)
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -61,11 +99,13 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
 )
+from ai.backend.manager.sokovan.scheduler.types import PromotionSpec
 
 
 def create_default_scheduler_components(
     repository: SchedulerRepository,
     deployment_repository: DeploymentRepository,
+    fair_share_repository: FairShareRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
@@ -78,6 +118,7 @@ def create_default_scheduler_components(
     Args:
         repository: The repository for accessing system data
         deployment_repository: The deployment repository
+        fair_share_repository: The fair share repository for sequencing
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
@@ -112,6 +153,7 @@ def create_default_scheduler_components(
             default_agent_selector=agent_selector,
             allocator=allocator,
             repository=repository,
+            fair_share_repository=fair_share_repository,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
         )
@@ -145,6 +187,179 @@ def create_default_scheduler_components(
         deployment_repository=deployment_repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
-        network_plugin_ctx=network_plugin_ctx,
         event_producer=event_producer,
     )
+
+
+# =============================================================================
+# Coordinator Handlers
+# =============================================================================
+
+
+@dataclass
+class CoordinatorHandlers:
+    """Container for all handlers and specs injected into Coordinator.
+
+    This dataclass decouples the Coordinator from handler creation logic,
+    allowing handlers to be created externally and injected.
+    """
+
+    lifecycle_handlers: Mapping[ScheduleType, SessionLifecycleHandler]
+    promotion_specs: Mapping[ScheduleType, PromotionSpec]
+    kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
+    kernel_observers: Mapping[ScheduleType, KernelObserver]
+
+
+@dataclass
+class CoordinatorHandlersArgs:
+    """Arguments for creating CoordinatorHandlers."""
+
+    provisioner: SessionProvisioner
+    launcher: SessionLauncher
+    terminator: SessionTerminator
+    repository: SchedulerRepository
+    valkey_schedule: ValkeyScheduleClient
+    scheduling_controller: SchedulingController
+    fair_share_aggregator: FairShareAggregator
+    fair_share_calculator: FairShareFactorCalculator
+    resource_usage_repository: ResourceUsageHistoryRepository
+    fair_share_repository: FairShareRepository
+
+
+def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
+    """Create all handlers and specs for the Coordinator.
+
+    This factory function centralizes handler creation, decoupling the
+    Coordinator from the details of handler instantiation.
+    """
+    lifecycle_handlers = _create_lifecycle_handlers(args)
+    promotion_specs = _create_promotion_specs()
+    kernel_handlers = _create_kernel_handlers(args)
+    kernel_observers = _create_kernel_observers(args)
+
+    return CoordinatorHandlers(
+        lifecycle_handlers=lifecycle_handlers,
+        promotion_specs=promotion_specs,
+        kernel_handlers=kernel_handlers,
+        kernel_observers=kernel_observers,
+    )
+
+
+def _create_lifecycle_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, SessionLifecycleHandler]:
+    """Create lifecycle handlers mapping."""
+    return {
+        ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
+            args.provisioner,
+            args.repository,
+        ),
+        ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
+            args.repository,
+        ),
+        ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
+            args.launcher,
+            args.repository,
+        ),
+        ScheduleType.START: StartSessionsLifecycleHandler(
+            args.launcher,
+            args.repository,
+        ),
+        ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
+            args.terminator,
+            args.repository,
+        ),
+        ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
+            args.repository,
+        ),
+    }
+
+
+def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
+    """Create promotion specs mapping.
+
+    Kernel matching semantics:
+    - NOT_ANY: None of the kernels should be in these statuses (used for "no longer in X" checks)
+    - ANY: At least one kernel should be in these statuses (used for early detection)
+    - ALL: All kernels must be in these statuses (used for completion checks)
+    """
+    return {
+        # Promote to PREPARED when no kernel is in pre-prepared states
+        # (handles terminal statuses gracefully)
+        ScheduleType.CHECK_PULLING_PROGRESS: PromotionSpec(
+            name="promote-to-prepared",
+            target_statuses=[SessionStatus.PREPARING, SessionStatus.PULLING],
+            target_kernel_statuses=list(KernelStatus.pre_prepared_statuses()),
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.PREPARED,
+            reason="triggered-by-scheduler",
+        ),
+        # Promote to RUNNING when no kernel is in pre-running states
+        # (allows partial failure - some kernels may be TERMINATED)
+        ScheduleType.CHECK_CREATING_PROGRESS: PromotionSpec(
+            name="promote-to-running",
+            target_statuses=[SessionStatus.CREATING],
+            target_kernel_statuses=list(KernelStatus.pre_running_statuses()),
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.RUNNING,
+            reason="triggered-by-scheduler",
+        ),
+        # Promote to TERMINATED when all kernels are TERMINATED
+        ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
+            name="promote-to-terminated",
+            target_statuses=[SessionStatus.TERMINATING],
+            target_kernel_statuses=[KernelStatus.TERMINATED],
+            kernel_match_type=KernelMatchType.ALL,
+            success_status=SessionStatus.TERMINATED,
+            reason="triggered-by-scheduler",
+        ),
+        # Detect abnormal termination when ANY kernel is TERMINATED or CANCELLED
+        # Covers all active session states where kernels can be terminated
+        ScheduleType.DETECT_KERNEL_TERMINATION: PromotionSpec(
+            name="detect-termination",
+            target_statuses=[
+                SessionStatus.PENDING,
+                SessionStatus.SCHEDULED,
+                SessionStatus.PREPARING,
+                SessionStatus.PULLING,
+                SessionStatus.PREPARED,
+                SessionStatus.CREATING,
+                SessionStatus.RUNNING,
+                SessionStatus.DEPRIORITIZING,
+            ],
+            target_kernel_statuses=[KernelStatus.TERMINATED, KernelStatus.CANCELLED],
+            kernel_match_type=KernelMatchType.ANY,
+            success_status=SessionStatus.TERMINATING,
+            reason="ABNORMAL_TERMINATION",
+        ),
+    }
+
+
+def _create_kernel_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, KernelLifecycleHandler]:
+    """Create kernel handlers mapping."""
+    return {
+        ScheduleType.SWEEP_STALE_KERNELS: SweepStaleKernelsKernelHandler(
+            args.terminator,
+        ),
+    }
+
+
+def _create_kernel_observers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, KernelObserver]:
+    """Create kernel observers mapping.
+
+    Observers are read-only operations that collect data without changing
+    kernel state. Used for fair share usage tracking, metrics, etc.
+    """
+    return {
+        ScheduleType.OBSERVE_FAIR_SHARE: FairShareObserver(
+            aggregator=args.fair_share_aggregator,
+            calculator=args.fair_share_calculator,
+            resource_usage_repository=args.resource_usage_repository,
+            fair_share_repository=args.fair_share_repository,
+            scheduler_repository=args.repository,
+        ),
+    }

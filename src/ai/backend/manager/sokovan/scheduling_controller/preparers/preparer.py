@@ -6,8 +6,6 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Optional
 
-from dateutil.tz import tzutc
-
 from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
@@ -55,6 +53,7 @@ class SessionPreparer:
         validated_scaling_group: AllowedScalingGroup,
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> SessionEnqueueData:
         """
         Convert creation spec to enqueue data.
@@ -112,6 +111,7 @@ class SessionPreparer:
             context.vfolder_mounts,
             context,
             calculated_resources,
+            enqueue_time,
         )
 
         # Collect images from kernels
@@ -136,7 +136,7 @@ class SessionPreparer:
             priority=spec.priority,
             status=SessionStatus.PENDING.name,
             status_history={
-                SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                SessionStatus.PENDING.name: enqueue_time.isoformat(),
             },
             requested_slots=total_requested,
             occupying_slots=ResourceSlot(),
@@ -183,6 +183,7 @@ class SessionPreparer:
         vfolder_mounts: list[VFolderMount],
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> list[KernelEnqueueData]:
         """Prepare kernel enqueue data."""
         kernel_data_list = []
@@ -261,7 +262,7 @@ class SessionPreparer:
                 starts_at=spec.starts_at,
                 status=KernelStatus.PENDING.name,
                 status_history={
-                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                    KernelStatus.PENDING.name: enqueue_time.isoformat(),
                 },
                 occupied_slots=ResourceSlot(),
                 requested_slots=requested_slots,

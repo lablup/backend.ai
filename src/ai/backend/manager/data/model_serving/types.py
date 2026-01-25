@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus
 
 __all__ = [
+    "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
     "EndpointAutoScalingRuleListResult",
     "EndpointData",
@@ -35,6 +36,15 @@ __all__ = [
     "EndpointTokenData",
     "RoutingData",
 ]
+
+
+@dataclass
+class EndpointAccessValidationData:
+    """Minimal endpoint data required for access validation."""
+
+    session_owner_id: uuid.UUID | None
+    session_owner_role: UserRole | None
+    domain: str
 
 
 @dataclass
@@ -228,6 +238,8 @@ class CompactServiceInfo:
 
 @dataclass
 class RequesterCtx:
+    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
+
     is_authorized: Optional[bool]
     user_id: uuid.UUID
     user_role: UserRole

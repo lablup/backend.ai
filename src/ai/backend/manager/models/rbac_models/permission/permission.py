@@ -37,7 +37,10 @@ class PermissionRow(Base):
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     permission_group_id: Mapped[uuid.UUID] = mapped_column(
-        "permission_group_id", GUID, nullable=False
+        "permission_group_id",
+        GUID,
+        sa.ForeignKey("permission_groups.id", ondelete="CASCADE"),
+        nullable=False,
     )
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False

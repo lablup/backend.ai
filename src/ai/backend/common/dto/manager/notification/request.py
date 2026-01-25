@@ -8,18 +8,21 @@ from __future__ import annotations
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.notification.types import (
+    EmailSpec,
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookSpec,
+)
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
     NotificationChannelOrderField,
-    NotificationChannelType,
     NotificationRuleOrderField,
-    NotificationRuleType,
     OrderDirection,
-    WebhookConfig,
 )
 
 __all__ = (
@@ -47,18 +50,8 @@ class CreateNotificationChannelRequest(BaseRequestModel):
     name: str = Field(description="Channel name")
     description: Optional[str] = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: WebhookConfig = Field(description="Channel configuration")
+    spec: WebhookSpec | EmailSpec = Field(description="Channel specification")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
-
-    @field_validator("config", mode="before")
-    @classmethod
-    def validate_config(cls, v: dict[str, Any] | WebhookConfig) -> WebhookConfig:
-        """Convert dict to WebhookConfig if needed."""
-        if isinstance(v, WebhookConfig):
-            return v
-        if isinstance(v, dict):
-            return WebhookConfig(**v)
-        raise ValueError(f"Invalid config type: {type(v)}")
 
 
 class UpdateNotificationChannelRequest(BaseRequestModel):
@@ -66,24 +59,10 @@ class UpdateNotificationChannelRequest(BaseRequestModel):
 
     name: Optional[str] = Field(default=None, description="Updated channel name")
     description: Optional[str] = Field(default=None, description="Updated channel description")
-    config: Optional[dict[str, Any] | WebhookConfig] = Field(
-        default=None, description="Updated channel configuration"
+    spec: WebhookSpec | EmailSpec | None = Field(
+        default=None, description="Updated channel specification"
     )
     enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
-
-    @field_validator("config", mode="before")
-    @classmethod
-    def validate_config(
-        cls, v: Optional[dict[str, Any] | WebhookConfig]
-    ) -> Optional[WebhookConfig]:
-        """Convert dict to WebhookConfig if needed."""
-        if v is None:
-            return None
-        if isinstance(v, WebhookConfig):
-            return v
-        if isinstance(v, dict):
-            return WebhookConfig(**v)
-        raise ValueError(f"Invalid config type: {type(v)}")
 
 
 class NotificationChannelFilter(BaseRequestModel):

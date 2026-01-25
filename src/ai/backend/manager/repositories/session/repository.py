@@ -14,6 +14,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
+from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.common import GenericBadRequest
@@ -584,6 +585,37 @@ class SessionRepository:
             items = [row.SessionRow.to_dataclass() for row in result.rows]
 
             return SessionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @session_repository_resilience.apply()
+    async def search_kernels(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelListResult:
+        """Search kernels with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            KernelListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.KernelRow.to_kernel_info() for row in result.rows]
+
+            return KernelListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

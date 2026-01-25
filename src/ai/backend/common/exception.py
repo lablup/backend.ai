@@ -983,3 +983,15 @@ class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict)
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
         )
+
+
+class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-channel-spec"
+    error_title = "Invalid Notification Channel Specification."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

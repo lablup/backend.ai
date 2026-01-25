@@ -39,6 +39,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -341,7 +342,7 @@ class TraefikConfig(BaseSchema):
         ),
     ]
     last_used_time_marker_directory: Annotated[
-        Path,
+        AutoDirectoryPath,
         Field(),
         BackendAIConfigMeta(
             description=(

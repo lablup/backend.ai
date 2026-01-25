@@ -9,12 +9,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+
+# Default lookback period for fair share calculation (28 days)
+DEFAULT_LOOKBACK_DAYS = 28
 
 
 class SessionConditions:
@@ -40,6 +44,114 @@ class SessionConditions:
             return SessionRow.scaling_group_name == scaling_group
 
         return inner
+
+    # Promotion handler conditions - optimized with EXISTS subqueries
+    # These check kernel status conditions without loading kernel data
+
+    @staticmethod
+    def all_kernels_in_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
+        """Filter sessions where ALL kernels are in the specified statuses.
+
+        Uses NOT EXISTS to check that no kernel is outside the specified statuses.
+        Also requires at least one kernel exists (sessions without kernels are excluded).
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            # Subquery: check if any kernel is NOT in the specified statuses
+            kernel_not_in_statuses = (
+                sa.select(sa.literal(1))
+                .select_from(KernelRow)
+                .where(
+                    KernelRow.session_id == SessionRow.id,
+                    KernelRow.status.notin_(statuses),
+                )
+                .exists()
+            )
+            # Subquery: check if session has at least one kernel
+            has_kernels = (
+                sa.select(sa.literal(1))
+                .select_from(KernelRow)
+                .where(KernelRow.session_id == SessionRow.id)
+                .exists()
+            )
+            # ALL: no kernel outside statuses AND has at least one kernel
+            return sa.and_(~kernel_not_in_statuses, has_kernels)
+
+        return inner
+
+    @staticmethod
+    def any_kernel_in_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
+        """Filter sessions where at least one kernel is in the specified statuses.
+
+        Uses EXISTS to check that at least one kernel is in the specified statuses.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            # Subquery: check if any kernel is in the specified statuses
+            return (
+                sa.select(sa.literal(1))
+                .select_from(KernelRow)
+                .where(
+                    KernelRow.session_id == SessionRow.id,
+                    KernelRow.status.in_(statuses),
+                )
+                .exists()
+            )
+
+        return inner
+
+    @staticmethod
+    def no_kernel_in_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
+        """Filter sessions where no kernel is in the specified statuses.
+
+        Uses NOT EXISTS to check that no kernel is in the specified statuses.
+        Also requires at least one kernel exists (sessions without kernels are excluded).
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            # Subquery: check if any kernel is in the specified statuses
+            kernel_in_statuses = (
+                sa.select(sa.literal(1))
+                .select_from(KernelRow)
+                .where(
+                    KernelRow.session_id == SessionRow.id,
+                    KernelRow.status.in_(statuses),
+                )
+                .exists()
+            )
+            # Subquery: check if session has at least one kernel
+            has_kernels = (
+                sa.select(sa.literal(1))
+                .select_from(KernelRow)
+                .where(KernelRow.session_id == SessionRow.id)
+                .exists()
+            )
+            # NOT_ANY: no kernel in statuses AND has at least one kernel
+            return sa.and_(~kernel_in_statuses, has_kernels)
+
+        return inner
+
+    @staticmethod
+    def by_kernel_match(
+        statuses: Collection[KernelStatus],
+        match_type: KernelMatchType,
+    ) -> QueryCondition:
+        """Filter sessions by kernel status match type.
+
+        Args:
+            statuses: Kernel statuses to check against
+            match_type: How to match kernel statuses (ALL/ANY/NOT_ANY)
+
+        Returns:
+            QueryCondition for the specified match type
+        """
+        match match_type:
+            case KernelMatchType.ALL:
+                return SessionConditions.all_kernels_in_statuses(statuses)
+            case KernelMatchType.ANY:
+                return SessionConditions.any_kernel_in_statuses(statuses)
+            case KernelMatchType.NOT_ANY:
+                return SessionConditions.no_kernel_in_statuses(statuses)
 
 
 class SessionOrders:
@@ -72,6 +184,75 @@ class KernelConditions:
     def by_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group(scaling_group: str) -> QueryCondition:
+        """Filter kernels by scaling group."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def for_fair_share_observation(
+        scaling_group: str,
+    ) -> QueryCondition:
+        """Filter kernels that need fair share observation.
+
+        Includes:
+        1. Running kernels (terminated_at IS NULL) with starts_at set
+        2. Recently terminated kernels with unobserved periods
+           (terminated_at > last_observed_at, within lookback window)
+
+        The lookback_days is fetched from scaling_groups.fair_share_spec via subquery.
+
+        Args:
+            scaling_group: The scaling group to filter
+
+        Returns:
+            QueryCondition for fair share observation targets
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            # Subquery to get lookback_days from scaling_group's fair_share_spec
+            # Falls back to DEFAULT_LOOKBACK_DAYS if not set
+            lookback_days_subquery = (
+                sa.select(
+                    sa.func.coalesce(
+                        sa.cast(
+                            ScalingGroupRow.fair_share_spec["lookback_days"].as_string(),
+                            sa.Integer,
+                        ),
+                        DEFAULT_LOOKBACK_DAYS,
+                    )
+                )
+                .where(ScalingGroupRow.name == scaling_group)
+                .scalar_subquery()
+            )
+
+            # Calculate lookback cutoff using the subquery
+            lookback_cutoff = sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days_subquery)
+
+            return sa.and_(
+                KernelRow.scaling_group == scaling_group,
+                KernelRow.starts_at.isnot(None),  # Must have started
+                sa.or_(
+                    # Running kernels (not yet terminated)
+                    KernelRow.terminated_at.is_(None),
+                    # Terminated kernels with unobserved period, within lookback
+                    sa.and_(
+                        KernelRow.terminated_at
+                        > sa.func.coalesce(
+                            KernelRow.last_observed_at,
+                            KernelRow.starts_at,
+                        ),
+                        KernelRow.terminated_at >= lookback_cutoff,
+                    ),
+                ),
+            )
 
         return inner
 

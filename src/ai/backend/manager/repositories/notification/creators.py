@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
+from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -21,9 +22,9 @@ class NotificationChannelCreatorSpec(CreatorSpec[NotificationChannelRow]):
 
     name: str
     channel_type: NotificationChannelType
-    config: WebhookConfig
+    spec: WebhookSpec | EmailSpec
     created_by: UUID
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool = True
 
     @override
@@ -32,7 +33,7 @@ class NotificationChannelCreatorSpec(CreatorSpec[NotificationChannelRow]):
             name=self.name,
             description=self.description,
             channel_type=str(self.channel_type),
-            config=self.config.model_dump(),
+            config=self.spec.model_dump(),
             enabled=self.enabled,
             created_by=self.created_by,
         )
@@ -47,7 +48,7 @@ class NotificationRuleCreatorSpec(CreatorSpec[NotificationRuleRow]):
     channel_id: UUID
     message_template: str
     created_by: UUID
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool = True
 
     @override

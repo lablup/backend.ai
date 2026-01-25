@@ -69,6 +69,17 @@ from .deployment import (
     update_model_deployment,
     update_route_traffic_status,
 )
+from .fair_share import (
+    domain_fair_share,
+    domain_fair_shares,
+    project_fair_share,
+    project_fair_shares,
+    upsert_domain_fair_share_weight,
+    upsert_project_fair_share_weight,
+    upsert_user_fair_share_weight,
+    user_fair_share,
+    user_fair_shares,
+)
 from .huggingface_registry import (
     create_huggingface_registry,
     delete_huggingface_registry,
@@ -107,7 +118,15 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
-from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
+from .resource_group import (
+    resource_groups,
+    update_resource_group_fair_share_spec,
+)
+from .resource_usage import (
+    domain_usage_buckets,
+    project_usage_buckets,
+    user_usage_buckets,
+)
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -142,6 +161,15 @@ class Query:
     merged_app_config = merged_app_config
     deployments = deployments
     deployment = deployment
+    domain_fair_share = domain_fair_share
+    domain_fair_shares = domain_fair_shares
+    domain_usage_buckets = domain_usage_buckets
+    project_fair_share = project_fair_share
+    project_fair_shares = project_fair_shares
+    project_usage_buckets = project_usage_buckets
+    user_fair_share = user_fair_share
+    user_fair_shares = user_fair_shares
+    user_usage_buckets = user_usage_buckets
     revisions = revisions
     revision = revision
     replicas = replicas
@@ -159,8 +187,7 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
-    scaling_groups_v2 = scaling_groups_v2
-    all_scaling_groups_v2 = all_scaling_groups_v2
+    resource_groups = resource_groups
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
@@ -225,6 +252,12 @@ class Mutation:
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
+    # Fair Share
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    # Resource Group
+    update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
 
 
 @strawberry.type

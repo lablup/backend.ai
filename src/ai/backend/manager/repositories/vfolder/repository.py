@@ -16,7 +16,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -125,7 +125,7 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
-    async def get_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderData]:
+    async def get_by_id(self, vfolder_id: uuid.UUID) -> VFolderData:
         """
         Get a VFolder by ID without validation.
         Returns VFolderData if found, None otherwise.
@@ -133,7 +133,7 @@ class VfolderRepository:
         async with self._db.begin_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
-                return None
+                raise VFolderNotFound()
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
@@ -306,15 +306,6 @@ class VfolderRepository:
                     )
                 )
                 await self._role_manager.map_entity_to_scope(session, owner_scope_creator)
-                await self._role_manager.add_object_permission_to_user_role(
-                    session,
-                    user_id=params.user,
-                    entity_id=ObjectId(
-                        entity_type=EntityType.VFOLDER,
-                        entity_id=str(params.id),
-                    ),
-                    operations=[OperationType.READ],
-                )
 
             # Return the created vfolder data
             created_vfolder = await self._get_vfolder_by_id(session, params.id)
@@ -475,15 +466,6 @@ class VfolderRepository:
                 )
             )
             await self._role_manager.map_entity_to_scope(session, user_scope_creator)
-            await self._role_manager.add_object_permission_to_user_role(
-                session,
-                user_id=user_id,
-                entity_id=ObjectId(
-                    entity_type=EntityType.VFOLDER,
-                    entity_id=str(vfolder_id),
-                ),
-                operations=permission.to_rbac_operation(),
-            )
 
             return VFolderPermissionData(
                 id=permission_id,
@@ -510,11 +492,6 @@ class VfolderRepository:
                     entity_id=str(vfolder_id),
                 ),
                 scope_id=ScopeId(ScopeType.USER, str(user_id)),
-            )
-            await self._role_manager.delete_object_permission_of_user(
-                session,
-                user_id,
-                vfolder_id,
             )
 
     @vfolder_repository_resilience.apply()

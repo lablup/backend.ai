@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from typing import Optional
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -79,6 +79,7 @@ from .types import (
     DeleteArtifactsInput,
     DeleteArtifactsPayload,
     ImportArtifactsInput,
+    ImportArtifactsOptionsGQL,
     ImportArtifactsPayload,
     RejectArtifactInput,
     RejectArtifactPayload,
@@ -145,7 +146,7 @@ async def artifacts(
     """)
 )
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
-    return await fetch_artifact(info, uuid.UUID(id))
+    return await fetch_artifact(info, UUID(id))
 
 
 @strawberry.field(
@@ -196,7 +197,7 @@ async def artifact_revisions(
     """)
 )
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
-    return await fetch_artifact_revision(info, uuid.UUID(id))
+    return await fetch_artifact_revision(info, UUID(id))
 
 
 @strawberry.mutation(
@@ -221,7 +222,7 @@ async def scan_artifacts(
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             artifact_type=input.artifact_type,
-            registry_id=uuid.UUID(input.registry_id) if input.registry_id else None,
+            registry_id=UUID(input.registry_id) if input.registry_id else None,
             limit=input.limit,
             # TODO: Move this huggingface_registries config if needed
             order=ModelSortKey.DOWNLOADS,
@@ -260,11 +261,19 @@ async def import_artifacts(
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
     tasks = []
+    vfolder_id = UUID(input.vfolder_id) if input.vfolder_id else None
+    # When using VFolderStorage (vfolder_id provided), store at root path
+    storage_prefix = "/" if vfolder_id else None
+    options = input.options or ImportArtifactsOptionsGQL()
+    force = options.force
     for revision_id in input.artifact_revision_ids:
         action_result = (
             await info.context.processors.artifact_revision.import_revision.wait_for_complete(
                 ImportArtifactRevisionAction(
-                    artifact_revision_id=uuid.UUID(revision_id),
+                    artifact_revision_id=UUID(revision_id),
+                    vfolder_id=vfolder_id,
+                    storage_prefix=storage_prefix,
+                    force=force,
                 )
             )
         )
@@ -319,7 +328,7 @@ async def delegate_scan_artifacts(
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
     delegator_reservoir_id = (
-        uuid.UUID(input.delegator_reservoir_id) if input.delegator_reservoir_id else None
+        UUID(input.delegator_reservoir_id) if input.delegator_reservoir_id else None
     )
 
     action_result = await info.context.processors.artifact.delegate_scan.wait_for_complete(
@@ -368,9 +377,11 @@ async def delegate_import_artifacts(
     imported_artifacts = []
     tasks = []
 
+    options = input.options or ImportArtifactsOptionsGQL()
+    force = options.force
     action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
         DelegateImportArtifactRevisionBatchAction(
-            delegator_reservoir_id=uuid.UUID(input.delegator_reservoir_id)
+            delegator_reservoir_id=UUID(input.delegator_reservoir_id)
             if input.delegator_reservoir_id
             else None,
             delegatee_target=input.delegatee_target.to_dataclass()
@@ -378,8 +389,9 @@ async def delegate_import_artifacts(
             else None,
             artifact_type=input.artifact_type,
             artifact_revision_ids=[
-                uuid.UUID(revision_id) for revision_id in input.artifact_revision_ids
+                UUID(revision_id) for revision_id in input.artifact_revision_ids
             ],
+            force=force,
         )
     )
     artifact_revisions = [
@@ -442,7 +454,7 @@ async def update_artifact(
                     readonly=TriState.from_graphql(input.readonly),
                     description=TriState.from_graphql(input.description),
                 ),
-                pk_value=uuid.UUID(input.artifact_id),
+                pk_value=UUID(input.artifact_id),
             ),
         )
     )
@@ -483,7 +495,7 @@ async def cleanup_artifact_revisions(
     for artifact_revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
             CleanupArtifactRevisionAction(
-                artifact_revision_id=uuid.UUID(artifact_revision_id),
+                artifact_revision_id=UUID(artifact_revision_id),
             )
         )
         cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
@@ -522,7 +534,7 @@ async def delete_artifacts(
 ) -> DeleteArtifactsPayload:
     action_result = await info.context.processors.artifact.delete_artifacts.wait_for_complete(
         DeleteArtifactsAction(
-            artifact_ids=[uuid.UUID(id) for id in input.artifact_ids],
+            artifact_ids=[UUID(id) for id in input.artifact_ids],
         )
     )
 
@@ -554,7 +566,7 @@ async def restore_artifacts(
 ) -> RestoreArtifactsPayload:
     action_result = await info.context.processors.artifact.restore_artifacts.wait_for_complete(
         RestoreArtifactsAction(
-            artifact_ids=[uuid.UUID(id) for id in input.artifact_ids],
+            artifact_ids=[UUID(id) for id in input.artifact_ids],
         )
     )
 
@@ -587,7 +599,7 @@ async def cancel_import_artifact(
     # TODO: Cancel actual import bgtask
     action_result = await info.context.processors.artifact_revision.cancel_import.wait_for_complete(
         CancelImportAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
+            artifact_revision_id=UUID(input.artifact_revision_id),
         )
     )
     return CancelImportArtifactPayload(
@@ -611,7 +623,7 @@ async def approve_artifact_revision(
 ) -> ApproveArtifactPayload:
     action_result = await info.context.processors.artifact_revision.approve.wait_for_complete(
         ApproveArtifactRevisionAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
+            artifact_revision_id=UUID(input.artifact_revision_id),
         )
     )
 
@@ -635,7 +647,7 @@ async def reject_artifact_revision(
 ) -> RejectArtifactPayload:
     action_result = await info.context.processors.artifact_revision.reject.wait_for_complete(
         RejectArtifactRevisionAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
+            artifact_revision_id=UUID(input.artifact_revision_id),
         )
     )
 

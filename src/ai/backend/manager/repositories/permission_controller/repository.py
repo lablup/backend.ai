@@ -10,6 +10,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.permission.entity import EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -296,3 +297,18 @@ class PermissionControllerRepository:
                 return await self._db_source.search_project_scopes(querier)
             case ScopeType.USER:
                 return await self._db_source.search_user_scopes(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_entities(
+        self,
+        querier: BatchQuerier,
+    ) -> EntityListResult:
+        """Search entities within a scope.
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            EntityListResult with matching entities.
+        """
+        return await self._db_source.search_entities_in_scope(querier)

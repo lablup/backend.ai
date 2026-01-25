@@ -184,7 +184,7 @@ class RouteCoordinator:
             route_ids = [r.route_id for r in routes]
             with RouteRecorderContext.scope(lifecycle_type.value, entity_ids=route_ids) as pool:
                 result = await handler.execute(routes)
-                all_records = pool.get_all_records()
+                all_records = pool.build_all_records()
 
                 # Handle status transitions with history recording
                 await self._handle_status_transitions(handler, result, all_records)
