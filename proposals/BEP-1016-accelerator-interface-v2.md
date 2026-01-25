@@ -164,7 +164,7 @@ These APIs are called once per node during the agent runtime initialization. The
 
 ### `AbstractDevicePlugin` API (Agent-level) ✨
 
-Each agent instance creates its own `AbstractDevicePlugin` with a device mask (allow list). This context provides agent-scoped operations that only see and manage the partitioned devices.
+Each agent instance creates its own `AbstractDevicePlugin` with a `device_mask` that acts as an allow list. This context provides agent-scoped operations that only see and manage the devices included in the mask.
 
 | Function                                                    | Role                                                                                                |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -182,7 +182,7 @@ Each agent instance creates its own `AbstractDevicePlugin` with a device mask (a
 | Attribute       | Content                                                                              |
 | --------------- | ------------------------------------------------------------------------------------ |
 | `host_plugin`   | Reference to the parent `AbstractDeviceHostPlugin` instance                             |
-| `device_mask`   | Frozen set of `DeviceId` values that this agent is allowed to access                 |
+| `device_mask`   | Frozen set of `DeviceId` values (allow list) that this agent can access              |
 | `agent_id`      | The unique identifier of the agent instance                                          |
 | `devices`       | Cached list of `AbstractDevice` filtered by `device_mask`                     |
 | `alloc_map`     | The `AbstractAllocMap` instance scoped to this agent's devices                       |
@@ -193,19 +193,53 @@ Here the "workload" means either a container or a (native) process tree, dependi
 
 ### Device Masking and Partitioning ✨
 
-The `device_mask` is a set of `DeviceId` values that defines which devices an agent instance can access. This enables:
+The `device_mask` is a set of `DeviceId` values that acts as an **allow list** defining which devices an agent instance can access. Only devices included in the mask are visible and allocatable to the agent. This enables:
 
 * **Resource Isolation**: Each agent only sees its assigned devices, preventing cross-agent resource conflicts
-* **Flexible Allocation Modes**:
-    - `SHARED`: All agents see all devices (device_mask includes all device IDs)
-    - `AUTO_SPLIT`: Devices are automatically divided among agents (e.g., 8 GPUs / 2 agents = 4 GPUs each)
+* **Allocation Modes**:
+    - `AUTO_SPLIT`: Devices are automatically divided among agents
     - `MANUAL`: Explicit device assignment per agent via configuration
+    - Note: Devices are always mutually exclusive between agents. Cross-agent device sharing is not supported.
 
 When `AbstractDevicePlugin` is created with a `device_mask`:
 1. `list_devices()` returns only devices in the mask
 2. `available_slots()` reflects only the capacity of masked devices
 3. `create_alloc_map()` creates an allocation map that enforces the mask
 4. Allocation requests for devices outside the mask are rejected
+
+#### AUTO_SPLIT Mode
+
+In `AUTO_SPLIT` mode, the agent runtime automatically partitions devices among agent instances using `divmod(total_devices, num_agents)` with remainder distribution:
+
+* Example: 5 GPUs with 2 agents → Agent 0 gets devices [0, 1, 2], Agent 1 gets devices [3, 4]
+* Example: 8 GPUs with 3 agents → Agent 0 gets [0, 1, 2], Agent 1 gets [3, 4, 5], Agent 2 gets [6, 7]
+
+The agent runtime constructs `device_mask` for each agent based on device discovery order and passes it to `create_agent_context()`.
+
+#### MANUAL Mode
+
+In `MANUAL` mode, administrators explicitly configure device assignments per agent:
+
+```toml
+[[agents]]
+[agents.agent]
+id = "agent-1"
+[agents.resource]
+device_mask = ["GPU-0", "GPU-1"]
+
+[[agents]]
+[agents.agent]
+id = "agent-2"
+[agents.resource]
+device_mask = ["GPU-2", "GPU-3"]
+```
+
+The agent runtime validates that:
+- All specified device IDs exist in the node
+- No device ID appears in multiple agents' masks
+- The union of all masks covers the intended devices
+
+> **Note**: The `device_mask` operates strictly as an allow list. Excluding specific devices (e.g., faulty devices) is handled separately by the multi-agent runtime configuration, outside the scope of this plugin interface.
 
 ### `AbstractDevice` Struct (formerly `AbstractComputeDevice`)
 
@@ -259,10 +293,8 @@ All fields are optional.
     - Immutable: Simpler implementation, but requires agent restart for repartitioning
     - Mutable: More flexible, but adds complexity for handling in-flight workloads during reconfiguration
 
-* **Cross-Agent Device Sharing**: In `SHARED` allocation mode, how should multiple agents coordinate when accessing the same device?
-    - Option A: Leave coordination entirely to the cluster scheduler (Manager)
-    - Option B: Provide plugin-level locking/coordination primitives
-    - Option C: Disallow `SHARED` mode for devices that don't support concurrent access
+* **Cross-Agent Device Sharing**:
+    - **Decision**: Cross-agent device sharing is not supported. Devices are always mutually exclusive between agents within a node. This simplifies the implementation and avoids coordination complexity at the plugin level.
 
 * **Lifecycle Hook Scope**: Should `AbstractLifecycleHook` be aware of multi-agent context?
     - Current design: Hooks are scoped to a single agent's workloads
