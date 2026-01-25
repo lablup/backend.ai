@@ -516,6 +516,7 @@ class TestCalculateFactors:
                         spec=make_fair_share_spec(weight=Decimal("1.0")),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     )
                 },
                 project={
@@ -527,6 +528,7 @@ class TestCalculateFactors:
                         spec=make_fair_share_spec(weight=Decimal("1.0")),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     )
                 },
                 user={
@@ -539,6 +541,7 @@ class TestCalculateFactors:
                         spec=make_fair_share_spec(weight=Decimal("1.0")),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     )
                 },
             ),
@@ -639,6 +642,7 @@ class TestCalculateFactors:
                         spec=make_fair_share_spec(weight=Decimal("0.5")),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     )
                 },
                 project={},
@@ -664,6 +668,7 @@ class TestCalculateFactors:
                         spec=make_fair_share_spec(weight=Decimal("2.0")),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     )
                 },
                 project={},
@@ -884,6 +889,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                     domain_b: DomainFairShareData(
                         id=uuid4(),
@@ -892,6 +898,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                 },
                 project={
@@ -903,6 +910,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                     project_b: ProjectFairShareData(
                         id=uuid4(),
@@ -912,6 +920,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                 },
                 user={
@@ -924,6 +933,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                     user_b: UserFairShareData(
                         id=uuid4(),
@@ -934,6 +944,7 @@ class TestIntegrationScenarios:
                         spec=make_fair_share_spec(),
                         calculation_snapshot=make_calculation_snapshot(),
                         metadata=make_metadata(),
+                        default_weight=Decimal("1.0"),
                     ),
                 },
             ),

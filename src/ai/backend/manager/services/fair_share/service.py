@@ -135,6 +135,7 @@ class FairShareService:
                 spec=self._create_default_spec(scaling_group_spec),
                 calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
                 metadata=self._create_default_metadata(),
+                default_weight=scaling_group_spec.default_weight,
             )
             return GetDomainFairShareActionResult(data=default_data)
 
@@ -189,6 +190,7 @@ class FairShareService:
                 spec=self._create_default_spec(scaling_group_spec),
                 calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
                 metadata=self._create_default_metadata(),
+                default_weight=scaling_group_spec.default_weight,
             )
             return GetProjectFairShareActionResult(data=default_data)
 
@@ -247,6 +249,7 @@ class FairShareService:
                 spec=self._create_default_spec(scaling_group_spec),
                 calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
                 metadata=self._create_default_metadata(),
+                default_weight=scaling_group_spec.default_weight,
                 scheduling_rank=None,  # No rank calculated yet
             )
             return GetUserFairShareActionResult(data=default_data)

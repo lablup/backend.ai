@@ -95,6 +95,8 @@ class DomainFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,8 @@ class ProjectFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
 
 
 @dataclass(frozen=True)
@@ -122,6 +126,8 @@ class UserFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
     scheduling_rank: int | None = None
     """Computed scheduling priority rank. Lower value = higher priority.
     None means rank calculation has not been performed yet."""
