@@ -2,8 +2,8 @@
 Author: Joongi Kim (joongi@lablup.com)
 Status: Draft
 Created: 2025-11-28
-Created-Version:
-Target-Version:
+Created-Version: "25.15"
+Target-Version: "26.2"
 Implemented-Version:
 ---
 
@@ -161,6 +161,10 @@ These APIs are called once per node during the agent runtime initialization. The
 | `get_node_info()` ♻                    | Get the node information such as driver/runtime versions and hardware info using a structured dataclass |
 | `gather_node_metrics(stat_ctx)` ♻      | Collect node-level metrics such as total processor and memory utilization across all devices       |
 | `create_agent_context(device_mask)` ✨ | Create an `AbstractDevicePlugin` instance scoped to the specified device subset                    |
+| `get_device_topology()` ✨             | Return the device interconnect topology (e.g., NVLink/NVSwitch connections) as a structured object |
+| `get_host_service_client(service_name)` ✨ | Return a client interface for host-level services (e.g., nvidia-fabric-manager)                |
+| `get_recommended_partitions(num_agents)` ✨ | Return topology-aware partition recommendations that respect hardware domain boundaries (e.g., NVSwitch groups) |
+| `validate_partition(device_ids)` ✨    | Validate if a partition respects hardware topology; returns warnings if it splits hardware domains |
 
 ### `AbstractDevicePlugin` API (Agent-level) ✨
 
@@ -172,7 +176,7 @@ Each agent instance creates its own `AbstractDevicePlugin` with a `device_mask` 
 | `list_devices()`                                            | List only the devices assigned to this agent (filtered by device_mask)                              |
 | `available_slots()`                                         | List the currently allocatable resource slot types within this agent's partition                    |
 | `create_alloc_map()`                                        | Create an `AbstractAllocMap` instance with device_mask applied                                      |
-| `create_lifecycle_hook(workload, device_alloc)` ✨          | Create an `AbstractLifecycleHook` instance for workload management                                  |
+| `create_lifecycle_hook(workload, device_alloc)` ✨          | Create an `AbstractLifecycleHook` instance with a scoped `LifecycleHookContext`                     |
 | `alloc_to_devices(device_alloc)` ♻️                         | Extract the list of devices used in the given allocation, with their metadata                       |
 | `gather_workload_metrics(stat_ctx, workload_id)` ♻          | Collect metrics for a specific workload (container or process tree) managed by this agent           |
 | `gather_process_metrics(stat_ctx, pid)` ♻                   | Collect metrics for a specific process within a workload                                            |
@@ -209,12 +213,30 @@ When `AbstractDevicePlugin` is created with a `device_mask`:
 
 #### AUTO_SPLIT Mode
 
-In `AUTO_SPLIT` mode, the agent runtime automatically partitions devices among agent instances using `divmod(total_devices, num_agents)` with remainder distribution:
+In `AUTO_SPLIT` mode, the agent runtime automatically partitions devices among agent instances. The partitioning strategy depends on whether topology information is available:
+
+**Topology-aware partitioning (recommended):**
+
+When the plugin provides `get_recommended_partitions()`, the agent runtime uses topology-aware partitioning that respects hardware domain boundaries (e.g., NVSwitch groups). This ensures that fabric manager constraints can always be satisfied within a single agent's device_mask.
+
+```
+Example: 8 GPUs with NVSwitch groups {0,1,4,5} and {2,3,6,7}, 2 agents
+
+Naive split:     Agent 0 = [0,1,2,3], Agent 1 = [4,5,6,7]
+                 → Each agent spans TWO NVSwitch groups (suboptimal)
+
+Topology-aware:  Agent 0 = [0,1,4,5], Agent 1 = [2,3,6,7]
+                 → Each agent owns ONE complete NVSwitch group (optimal)
+```
+
+**Fallback partitioning:**
+
+When topology information is unavailable or `get_recommended_partitions()` returns `None`, the runtime falls back to simple `divmod(total_devices, num_agents)` distribution:
 
 * Example: 5 GPUs with 2 agents → Agent 0 gets devices [0, 1, 2], Agent 1 gets devices [3, 4]
 * Example: 8 GPUs with 3 agents → Agent 0 gets [0, 1, 2], Agent 1 gets [3, 4, 5], Agent 2 gets [6, 7]
 
-The agent runtime constructs `device_mask` for each agent based on device discovery order and passes it to `create_agent_context()`.
+The agent runtime constructs `device_mask` for each agent and passes it to `create_agent_context()`. When using topology-aware partitioning, the runtime also calls `validate_partition()` to log warnings if the resulting partition is suboptimal.
 
 #### MANUAL Mode
 
@@ -247,17 +269,35 @@ See [BEP-1000](https://github.com/lablup/beps/blob/main/proposals/BEP-1000-redef
 
 ### `AbstractLifecycleHook` API ✨
 
-| Function                           | Role                                                                                                                                                                 |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `__init__(workload, device_alloc)` | Initialize the instance with the given workload and allocation                                                                                                       |
-| `pre_create()`                     | Invoked before workload is created.<br>It may deny or (temporarily) fail the creation by raising predefined exceptions.<br>Should return a `WorkloadConfig` struct. |
-| `post_create()`                    | Invoked after workload is created.                                                                                                                                  |
-| `pre_terminate()`                  | Invoked before workload is terminated.<br>It cannot cancel the termination but may defer termination for plugin-specific cleanup.                                   |
-| `post_terminate()`                 | Invoked after workload is terminated.                                                                                                                               |
+| Function                        | Role                                                                                                                                                                 |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__init__(context)`             | Initialize the instance with a `LifecycleHookContext` providing scoped access to workload info, allocated devices, topology view, and host services                 |
+| `pre_create()`                  | Invoked before workload is created.<br>It may deny or (temporarily) fail the creation by raising predefined exceptions.<br>Should return a `WorkloadConfig` struct. |
+| `post_create()`                 | Invoked after workload is created.                                                                                                                                   |
+| `pre_terminate()`               | Invoked before workload is terminated.<br>It cannot cancel the termination but may defer termination for plugin-specific cleanup.                                    |
+| `post_terminate()`              | Invoked after workload is terminated.                                                                                                                                |
 
 This new API merges and replaces Docker-specific argument/mount generation methods in the prior design.
 
 `AbstractLifecycleHook` should be designed as stateless, and it should be able to restore additional state from the container if necessary, to ensure that the Backend.AI Agent is fully restartable at any time.
+
+### `LifecycleHookContext` Struct ✨
+
+The `LifecycleHookContext` provides controlled, scoped access to host services, ensuring lifecycle hooks cannot affect other agents' workloads or access devices outside their allocation.
+
+| Attribute           | Content                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `workload`          | The `Workload` struct for the current workload                                                   |
+| `device_alloc`      | The `DeviceAllocation` for this workload                                                         |
+| `agent_id`          | The unique identifier of the agent instance                                                      |
+| `allocated_devices` | Tuple of `AbstractDevice` instances allocated to this workload (read-only)                       |
+| `topology_view`     | `ScopedTopologyView` providing topology info filtered to allocated devices only                  |
+| `host_services`     | `ScopedHostServices` providing host service access restricted to the workload's allocated devices |
+
+**Security guarantees:**
+- Hooks cannot access devices outside their allocation
+- Hooks cannot affect other agents' workloads through host service manipulation
+- All host service calls are scoped to the workload's allocated devices and include workload ID for audit tracking
 
 ### `Workload` Struct ✨
 
@@ -279,6 +319,32 @@ This new API merges and replaces Docker-specific argument/mount generation metho
 
 All fields are optional.
 
+### Example: NVIDIA GPU Plugin with Fabric Manager Integration
+
+The following pseudocode demonstrates how the proposed APIs would be implemented for NVIDIA GPUs, including integration with nvidia-fabric-manager for NVSwitch topology management.
+
+📄 **Full example code**: [BEP-1016/nvidia_plugin_example.py](BEP-1016/nvidia_plugin_example.py)
+
+The example includes:
+
+| Component | Description |
+|-----------|-------------|
+| `NvidiaFabricManagerClient` | Client for interacting with nvidia-fabric-manager service |
+| `NvidiaDeviceHostPlugin` | Node-level plugin with topology discovery and partition recommendations |
+| `NvidiaDevicePlugin` | Agent-scoped plugin with device masking |
+| `LifecycleHookContext` | Scoped context providing controlled access to host services |
+| `ScopedTopologyView` | Topology view filtered to allocated devices |
+| `ScopedHostServices` | Host service access restricted to workload's devices |
+| `NvidiaLifecycleHook` | Workload lifecycle hook with fabric manager integration |
+| Agent runtime functions | `init_node_plugins()`, `compute_auto_split_partitions()`, `init_agent()`, `create_workload()` |
+
+Key patterns demonstrated:
+
+1. **Topology-aware partitioning**: `get_recommended_partitions()` returns partitions aligned with NVSwitch group boundaries
+2. **Scoped access**: `LifecycleHookContext` prevents hooks from accessing devices outside their allocation
+3. **Fabric manager integration**: Hooks configure NVLink routing and notify workload lifecycle events
+4. **Security guarantees**: All host service calls are scoped to allocated devices with workload ID for audit tracking
+
 ### Discussion
 
 * How to handle & distinguish in-place restarts and relocated restarts in lifecycle hooks?
@@ -299,6 +365,21 @@ All fields are optional.
 * **Lifecycle Hook Scope**: Should `AbstractLifecycleHook` be aware of multi-agent context?
     - Current design: Hooks are scoped to a single agent's workloads
     - Alternative: Node-level hooks that can observe all agents' workloads (e.g., for vendor-specific device manager integration)
+
+* **Host Service Integration**: Lifecycle hooks may need to interact with host-level services such as nvidia-fabric-manager for NVSwitch/NVLink configuration:
+    - **Proposed solution**: Use `LifecycleHookContext` with scoped access instead of direct `host_plugin` reference
+    - `ScopedTopologyView`: Provides topology information filtered to allocated devices only
+    - `ScopedHostServices`: Provides host service access restricted to the workload's allocated devices
+    - This ensures hooks cannot affect other agents' workloads or access devices outside their allocation
+    - Trade-off: Slightly more complex API surface, but provides strong isolation guarantees
+
+* **Topology-aware Device Partitioning**: When device interconnect topology (e.g., NVSwitch groups) exists, how should multi-agent partitioning consider it?
+    - **Recommendation**: Partition devices along hardware domain boundaries (e.g., NVSwitch groups) to ensure fabric manager constraints can always be satisfied within a single agent's `device_mask`
+    - `get_recommended_partitions(num_agents)` API provides topology-aware partition suggestions
+    - `validate_partition(device_ids)` API warns if a partition splits hardware domains
+    - AUTO_SPLIT mode should prefer topology-aware partitioning when available
+    - **Trade-off**: Reduces partitioning flexibility but guarantees that topology-aware allocation never requires cross-agent coordination
+    - **Implication**: Fabric manager's allocation adjustment suggestions are guaranteed to stay within agent boundaries
 
 * **Metrics Aggregation**: How should node-level metrics relate to agent-level metrics?
     - Option A: Node-level metrics are independently collected (may differ from sum of agent metrics)
