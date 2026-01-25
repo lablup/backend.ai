@@ -104,6 +104,27 @@ class ScalingGroupDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def get_scaling_group_by_name(
+        self,
+        name: str,
+    ) -> ScalingGroupData:
+        """Get a single scaling group by name (primary key).
+
+        Args:
+            name: The name of the scaling group (primary key).
+
+        Returns:
+            ScalingGroupData for the requested scaling group.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            row = await db_sess.get(ScalingGroupRow, name)
+            if row is None:
+                raise ScalingGroupNotFound(name)
+            return row.to_dataclass()
+
     async def purge_scaling_group(
         self,
         purger: Purger[ScalingGroupRow],

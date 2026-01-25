@@ -80,6 +80,24 @@ class ScalingGroupRepository:
         return await self._db_source.search_scaling_groups(querier=querier)
 
     @scaling_group_repository_resilience.apply()
+    async def get_scaling_group_by_name(
+        self,
+        name: str,
+    ) -> ScalingGroupData:
+        """Get a single scaling group by name (primary key).
+
+        Args:
+            name: The name of the scaling group (primary key).
+
+        Returns:
+            ScalingGroupData for the requested scaling group.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_scaling_group_by_name(name=name)
+
+    @scaling_group_repository_resilience.apply()
     async def purge_scaling_group(
         self,
         purger: Purger[ScalingGroupRow],

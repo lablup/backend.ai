@@ -47,6 +47,10 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
+    UpdateFairShareSpecAction,
+    UpdateFairShareSpecActionResult,
+)
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 
 
@@ -58,6 +62,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
     get_resource_info: ActionProcessor[GetResourceInfoAction, GetResourceInfoActionResult]
+    update_fair_share_spec: ActionProcessor[
+        UpdateFairShareSpecAction, UpdateFairShareSpecActionResult
+    ]
     associate_scaling_group_with_domains: ActionProcessor[
         AssociateScalingGroupWithDomainsAction, AssociateScalingGroupWithDomainsActionResult
     ]
@@ -84,6 +91,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
         self.get_resource_info = ActionProcessor(service.get_resource_info, action_monitors)
+        self.update_fair_share_spec = ActionProcessor(
+            service.update_fair_share_spec, action_monitors
+        )
         self.associate_scaling_group_with_domains = ActionProcessor(
             service.associate_scaling_group_with_domains, action_monitors
         )
@@ -111,6 +121,7 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             ModifyScalingGroupAction.spec(),
             SearchScalingGroupsAction.spec(),
             GetResourceInfoAction.spec(),
+            UpdateFairShareSpecAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
             AssociateScalingGroupWithKeypairsAction.spec(),
