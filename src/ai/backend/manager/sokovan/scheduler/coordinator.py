@@ -430,13 +430,23 @@ class ScheduleCoordinator:
             True if operation was performed, False otherwise
         """
         try:
-            log.debug("Processing observer schedule type: {}", schedule_type.value)
+            log.debug(
+                "[Coordinator] Processing observer schedule: type={}, observer={}",
+                schedule_type.value,
+                observer.name(),
+            )
 
             async with AsyncExitStack() as stack:
                 stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
 
                 # Process each scaling group in parallel
                 scaling_groups = await self._repository.get_schedulable_scaling_groups()
+
+                log.debug(
+                    "[Coordinator] Found {} scaling groups to observe: {}",
+                    len(scaling_groups),
+                    scaling_groups,
+                )
 
                 results = await asyncio.gather(
                     *[
@@ -456,6 +466,7 @@ class ScheduleCoordinator:
                             result,
                         )
 
+            log.debug("[Coordinator] Observer schedule {} completed", schedule_type.value)
             return True
 
         except Exception as e:
@@ -483,6 +494,11 @@ class ScheduleCoordinator:
             observer: The kernel observer to execute
             scaling_group: The scaling group to process
         """
+        log.debug(
+            "[Coordinator] Processing observer {} for scaling_group={}",
+            observer.name(),
+            scaling_group,
+        )
         condition = observer.get_query_condition(scaling_group)
 
         # Process in batches with pagination for large result sets
@@ -497,7 +513,16 @@ class ScheduleCoordinator:
 
             kernel_result = await self._repository.search_kernels_for_handler(querier)
 
+            log.debug(
+                "[Coordinator] Observer {} batch: offset={}, items_count={}, has_next_page={}",
+                observer.name(),
+                offset,
+                len(kernel_result.items),
+                kernel_result.has_next_page,
+            )
+
             if not kernel_result.items:
+                log.debug("[Coordinator] Observer {} no items found, exiting loop", observer.name())
                 break
 
             # Execute observer logic (no status transitions)
@@ -509,6 +534,12 @@ class ScheduleCoordinator:
                 break
 
             offset += _OBSERVER_BATCH_SIZE
+
+        log.debug(
+            "[Coordinator] Observer {} completed: total_observed={}",
+            observer.name(),
+            total_observed,
+        )
 
         # Emit metrics (total observed count across all batches)
         if total_observed > 0:

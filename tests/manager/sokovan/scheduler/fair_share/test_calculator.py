@@ -84,6 +84,18 @@ def today() -> date:
     return date(2024, 1, 15)
 
 
+@pytest.fixture
+def cluster_capacity() -> ResourceSlot:
+    """Default cluster capacity for testing.
+
+    Large enough to produce normalized_usage values in 0~1 range.
+    """
+    return ResourceSlot({
+        "cpu": Decimal("100"),  # 100 CPUs
+        "mem": Decimal("1000000000000"),  # 1TB memory
+    })
+
+
 class TestApplyTimeDecay:
     """Tests for _apply_time_decay private method.
 
@@ -107,6 +119,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -135,6 +148,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -162,6 +176,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -193,6 +208,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -221,6 +237,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -236,6 +253,7 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -249,117 +267,182 @@ class TestApplyTimeDecay:
         assert abs(actual_14 - expected_14) < Decimal("0.01")
 
 
-class TestCalculateUsageScore:
-    """Tests for _calculate_usage_score method."""
+class TestCalculateNormalizedUsage:
+    """Tests for _calculate_normalized_usage method.
 
-    def test_single_resource_with_weight(self, calculator: FairShareFactorCalculator) -> None:
-        """Single resource weighted correctly."""
-        usage = ResourceSlot({"cpu": Decimal("1000")})
-        weights = ResourceSlot({"cpu": Decimal("2.0")})
+    Formula:
+        capacity_seconds[r] = cluster_capacity[r] * lookback_days * SECONDS_PER_DAY
+        ratio[r] = usage[r] / capacity_seconds[r]
+        normalized = sum(ratio[r] * weight[r]) / sum(weight[r])
+    """
 
-        score = calculator._calculate_usage_score(usage, weights)
+    def test_single_resource_normalized(self, calculator: FairShareFactorCalculator) -> None:
+        """Single resource normalized by capacity."""
+        # Usage: 8640000 cpu-seconds (100 CPUs * 1 day)
+        # Capacity: 100 CPUs, lookback: 30 days
+        # capacity_seconds = 100 * 30 * 86400 = 259,200,000
+        # ratio = 8,640,000 / 259,200,000 = 0.0333...
+        usage = ResourceSlot({"cpu": Decimal("8640000")})
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
+        weights = ResourceSlot({"cpu": Decimal("1.0")})
 
-        # 1000 * 2.0 / 2.0 = 1000 (normalized by total weight)
-        assert score == Decimal("1000")
+        normalized = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights
+        )
+
+        # ratio = 8640000 / (100 * 30 * 86400) = 8640000 / 259200000 ≈ 0.0333
+        expected = Decimal("8640000") / (Decimal("100") * 30 * 86400)
+        assert abs(normalized - expected) < Decimal("0.0001")
 
     def test_multiple_resources_weighted_average(
         self, calculator: FairShareFactorCalculator
     ) -> None:
-        """Multiple resources combined with weighted average."""
-        usage = ResourceSlot({"cpu": Decimal("1000"), "mem": Decimal("2000")})
+        """Multiple resources combined with weighted average of ratios."""
+        # CPU: usage=8640000, capacity=100 -> ratio = 0.0333
+        # Mem: usage=259200000000, capacity=1000000000 -> ratio = 0.1 (10% of 1GB * 30 days)
+        usage = ResourceSlot({
+            "cpu": Decimal("8640000"),
+            "mem": Decimal("259200000000"),
+        })
+        cluster_capacity = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000000000"),  # 1GB
+        })
+        lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")})
 
-        score = calculator._calculate_usage_score(usage, weights)
+        normalized = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights
+        )
 
-        # (1000*1.0 + 2000*1.0) / (1.0 + 1.0) = 1500
-        assert score == Decimal("1500")
+        # cpu_ratio = 8640000 / (100 * 30 * 86400) ≈ 0.0333
+        # mem_ratio = 259200000000 / (1000000000 * 30 * 86400) = 0.1
+        # weighted avg = (0.0333 * 1.0 + 0.1 * 1.0) / 2.0 ≈ 0.0667
+        cpu_ratio = Decimal("8640000") / (Decimal("100") * 30 * 86400)
+        mem_ratio = Decimal("259200000000") / (Decimal("1000000000") * 30 * 86400)
+        expected = (cpu_ratio + mem_ratio) / 2
+        assert abs(normalized - expected) < Decimal("0.0001")
 
-    def test_different_weights_affect_score(self, calculator: FairShareFactorCalculator) -> None:
-        """Different weights should affect the final score."""
-        usage = ResourceSlot({"cpu": Decimal("1000"), "mem": Decimal("1000000")})
+    def test_different_weights_affect_normalized(
+        self, calculator: FairShareFactorCalculator
+    ) -> None:
+        """Different weights affect the weighted average."""
+        usage = ResourceSlot({
+            "cpu": Decimal("8640000"),
+            "mem": Decimal("259200000000"),
+        })
+        cluster_capacity = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000000000"),
+        })
+        lookback_days = 30
 
         # Equal weights
         weights_equal = ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")})
-        score_equal = calculator._calculate_usage_score(usage, weights_equal)
+        normalized_equal = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights_equal
+        )
 
-        # mem weight much lower (like bytes vs cores)
-        weights_scaled = ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("0.001")})
-        score_scaled = calculator._calculate_usage_score(usage, weights_scaled)
+        # CPU weighted more heavily
+        weights_cpu_heavy = ResourceSlot({"cpu": Decimal("10.0"), "mem": Decimal("1.0")})
+        normalized_cpu_heavy = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights_cpu_heavy
+        )
 
-        # score_scaled should be much smaller due to mem being weighted down
-        assert score_scaled < score_equal
+        # CPU ratio (0.0333) is HIGHER than mem ratio (0.0001) due to large mem capacity
+        # So CPU-heavy weighting gives HIGHER normalized value
+        assert normalized_cpu_heavy > normalized_equal
 
     def test_empty_usage_returns_zero(self, calculator: FairShareFactorCalculator) -> None:
-        """Empty usage should return zero score."""
+        """Empty usage should return zero normalized value."""
         usage = ResourceSlot()
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0")})
 
-        score = calculator._calculate_usage_score(usage, weights)
+        normalized = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights
+        )
 
-        assert score == Decimal("0")
+        assert normalized == Decimal("0")
 
-    def test_missing_weight_uses_default(self, calculator: FairShareFactorCalculator) -> None:
-        """Resources without explicit weight use default of 1.0."""
-        usage = ResourceSlot({"cpu": Decimal("1000"), "custom": Decimal("500")})
-        weights = ResourceSlot({"cpu": Decimal("1.0")})  # No weight for 'custom'
+    def test_zero_capacity_resource_ignored(self, calculator: FairShareFactorCalculator) -> None:
+        """Resources with zero capacity are skipped."""
+        usage = ResourceSlot({"cpu": Decimal("1000"), "gpu": Decimal("500")})
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100"), "gpu": Decimal("0")})
+        lookback_days = 30
+        weights = ResourceSlot({"cpu": Decimal("1.0"), "gpu": Decimal("1.0")})
 
-        score = calculator._calculate_usage_score(usage, weights)
+        normalized = calculator._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, weights
+        )
 
-        # (1000*1.0 + 500*1.0) / (1.0 + 1.0) = 750
-        assert score == Decimal("750")
+        # Only CPU contributes (GPU capacity is 0)
+        cpu_ratio = Decimal("1000") / (Decimal("100") * 30 * 86400)
+        assert abs(normalized - cpu_ratio) < Decimal("0.0001")
 
 
 class TestCalculateFactor:
-    """Tests for _calculate_factor method."""
+    """Tests for _calculate_factor method.
+
+    New signature: _calculate_factor(usage, weight, resource_weights, cluster_capacity, lookback_days)
+    Uses capacity-based normalization instead of time_capacity.
+    """
 
     def test_zero_usage_returns_factor_one(self, calculator: FairShareFactorCalculator) -> None:
         """Zero usage should give maximum factor (1.0)."""
         usage = ResourceSlot()
         weight = Decimal("1.0")
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        time_capacity = Decimal("604800")  # 7 days in seconds
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
 
         normalized, factor = calculator._calculate_factor(
-            usage, weight, resource_weights, time_capacity
+            usage, weight, resource_weights, cluster_capacity, lookback_days
         )
 
         assert normalized == Decimal("0")
         assert factor == Decimal("1")  # 2^0 = 1
 
-    def test_usage_equals_weight_gives_half_factor(
+    def test_full_utilization_gives_half_factor(
         self, calculator: FairShareFactorCalculator
     ) -> None:
-        """When normalized_usage equals weight, factor should be 0.5."""
-        # Setup: normalized_usage = usage_score / time_capacity = weight
-        # So: usage_score = weight * time_capacity
+        """When normalized_usage equals weight (=1.0), factor should be 0.5."""
+        # Setup: normalized_usage = 1.0 (100% utilization)
+        # capacity_seconds = 100 * 30 * 86400 = 259,200,000
+        # usage should equal capacity_seconds for 100% utilization
         weight = Decimal("1.0")
-        time_capacity = Decimal("604800")
-        usage_score = weight * time_capacity  # Makes normalized_usage = weight
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
+        capacity_seconds = Decimal("100") * 30 * 86400  # 259,200,000
 
-        # cpu * cpu_weight / total_weight = usage_score
-        # cpu * 1.0 / 1.0 = usage_score
-        usage = ResourceSlot({"cpu": usage_score})
+        usage = ResourceSlot({"cpu": capacity_seconds})  # 100% utilization
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
 
         normalized, factor = calculator._calculate_factor(
-            usage, weight, resource_weights, time_capacity
+            usage, weight, resource_weights, cluster_capacity, lookback_days
         )
 
-        # F = 2^(-1) = 0.5
-        assert normalized == weight
-        assert factor == Decimal("0.5")
+        # normalized = 1.0 (100% usage)
+        # F = 2^(-1.0/1.0) = 2^(-1) = 0.5
+        assert abs(normalized - Decimal("1.0")) < Decimal("0.0001")
+        assert abs(factor - Decimal("0.5")) < Decimal("0.0001")
 
     def test_higher_weight_gives_higher_factor(self, calculator: FairShareFactorCalculator) -> None:
         """Higher weight should result in higher factor for same usage."""
-        usage = ResourceSlot({"cpu": Decimal("604800")})  # Makes normalized=1 with time_cap
+        # 50% utilization
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
+        capacity_seconds = Decimal("100") * 30 * 86400
+        usage = ResourceSlot({"cpu": capacity_seconds / 2})  # 50% utilization
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        time_capacity = Decimal("604800")
 
         _, factor_low_weight = calculator._calculate_factor(
-            usage, Decimal("1.0"), resource_weights, time_capacity
+            usage, Decimal("1.0"), resource_weights, cluster_capacity, lookback_days
         )
         _, factor_high_weight = calculator._calculate_factor(
-            usage, Decimal("2.0"), resource_weights, time_capacity
+            usage, Decimal("2.0"), resource_weights, cluster_capacity, lookback_days
         )
 
         # Higher weight = less penalty = higher factor
@@ -368,13 +451,15 @@ class TestCalculateFactor:
     def test_factor_clamped_to_valid_range(self, calculator: FairShareFactorCalculator) -> None:
         """Factor should be clamped to [0, 1] range."""
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        time_capacity = Decimal("604800")
+        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        lookback_days = 30
         weight = Decimal("1.0")
 
-        # Very high usage should give factor close to 0
-        high_usage = ResourceSlot({"cpu": Decimal("100000000")})
+        # Very high usage (1000x capacity) should give factor close to 0
+        capacity_seconds = Decimal("100") * 30 * 86400
+        high_usage = ResourceSlot({"cpu": capacity_seconds * 1000})
         _, factor_high = calculator._calculate_factor(
-            high_usage, weight, resource_weights, time_capacity
+            high_usage, weight, resource_weights, cluster_capacity, lookback_days
         )
         assert factor_high >= Decimal("0")
         assert factor_high <= Decimal("1")
@@ -382,7 +467,7 @@ class TestCalculateFactor:
         # Zero usage should give factor = 1
         zero_usage = ResourceSlot()
         _, factor_zero = calculator._calculate_factor(
-            zero_usage, weight, resource_weights, time_capacity
+            zero_usage, weight, resource_weights, cluster_capacity, lookback_days
         )
         assert factor_zero == Decimal("1")
 
@@ -401,6 +486,7 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -465,6 +551,7 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -480,16 +567,24 @@ class TestCalculateFactors:
     def test_half_life_affects_factor(
         self, calculator: FairShareFactorCalculator, today: date
     ) -> None:
-        """Different half_life_days should produce different factors."""
+        """Different half_life_days should produce different factors via decay.
+
+        half_life affects decay calculation for past usage:
+        - Shorter half_life = faster decay = lower decayed usage = higher factor
+        - Longer half_life = slower decay = higher decayed usage = lower factor
+        """
+        from datetime import timedelta
+
         domain_name = "test-domain"
-        # Usage from today (no decay)
+        # Usage from 7 days ago (will be decayed based on half_life)
+        past_date = today - timedelta(days=7)
         raw_buckets = RawUsageBucketsByLevel(
-            domain={domain_name: {today: ResourceSlot({"cpu": Decimal("604800")})}},
+            domain={domain_name: {past_date: ResourceSlot({"cpu": Decimal("259200000")})}},
             project={},
             user={},
         )
 
-        # Short half-life: smaller time_capacity -> higher normalized_usage -> lower factor
+        # Short half-life (3 days): 7 days ago = ~2.3 half-lives = ~20% remaining
         context_short = FairShareCalculationContext(
             fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
             raw_usage_buckets=raw_buckets,
@@ -497,10 +592,11 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
-        # Long half-life: larger time_capacity -> lower normalized_usage -> higher factor
+        # Long half-life (14 days): 7 days ago = 0.5 half-lives = ~71% remaining
         context_long = FairShareCalculationContext(
             fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
             raw_usage_buckets=raw_buckets,
@@ -508,6 +604,7 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -517,8 +614,8 @@ class TestCalculateFactors:
         factor_short = result_short.domain_results[domain_name].fair_share_factor
         factor_long = result_long.domain_results[domain_name].fair_share_factor
 
-        # Shorter half-life = smaller time_capacity = larger normalized_usage = lower factor
-        assert factor_short < factor_long
+        # Shorter half-life = more decay = less decayed usage = higher factor
+        assert factor_short > factor_long
 
     def test_weight_affects_factor(
         self, calculator: FairShareFactorCalculator, today: date
@@ -552,6 +649,7 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -576,6 +674,7 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -620,6 +719,7 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -653,6 +753,7 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -687,6 +788,7 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -741,6 +843,7 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 
@@ -856,6 +959,7 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
             today=today,
         )
 

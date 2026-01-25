@@ -1899,7 +1899,28 @@ class ScheduleDBSource:
         :param creation_info: Container creation information as dataclass
         :return: True if update was successful, False otherwise
         """
+        log.debug(
+            "[DBSource] update_kernel_status_running called: kernel_id={}, reason={}",
+            kernel_id,
+            reason,
+        )
         async with self._begin_session_read_committed() as db_sess:
+            # Check current kernel status before update
+            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at).where(
+                KernelRow.id == kernel_id
+            )
+            check_result = await db_sess.execute(check_stmt)
+            current = check_result.first()
+            if current:
+                log.debug(
+                    "[DBSource] Kernel {} current state: status={}, starts_at={}",
+                    kernel_id,
+                    current.status,
+                    current.starts_at,
+                )
+            else:
+                log.debug("[DBSource] Kernel {} not found!", kernel_id)
+
             now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
@@ -1931,7 +1952,15 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            rowcount = cast(CursorResult, result).rowcount
+            log.debug(
+                "[DBSource] update_kernel_status_running result: kernel_id={}, rowcount={}, "
+                "starts_at_to_set={}",
+                kernel_id,
+                rowcount,
+                now,
+            )
+            return rowcount > 0
 
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """

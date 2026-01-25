@@ -11,6 +11,7 @@ Repository operations are handled by FairShareObserver.
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -20,9 +21,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.resource_usage_history import (
     KernelUsageRecordCreatorSpec,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Observation slice duration (5 minutes)
 SLICE_DURATION_SECONDS = 300
@@ -347,9 +351,24 @@ class FairShareAggregator:
             # RUNNING: floor to last complete boundary (no partial end slice)
             end_time = self._floor_to_boundary(now)
 
+        log.debug(
+            "[Aggregator] Kernel {}: is_first={}, is_terminated={}, "
+            "start_time={}, end_time={}, now={}",
+            kernel.id,
+            is_first_observation,
+            is_terminated,
+            start_time,
+            end_time,
+            now,
+        )
+
         # Validate time range
         if end_time <= start_time:
             # Not enough time has passed to generate any slices
+            log.debug(
+                "[Aggregator] Kernel {}: skipped (end_time <= start_time)",
+                kernel.id,
+            )
             return [], start_time
 
         # Generate 5-minute slices
@@ -358,6 +377,12 @@ class FairShareAggregator:
             scaling_group=scaling_group,
             start_time=start_time,
             end_time=end_time,
+        )
+
+        log.debug(
+            "[Aggregator] Kernel {}: generated {} specs",
+            kernel.id,
+            len(specs),
         )
 
         # Return end_time as the new last_observed_at

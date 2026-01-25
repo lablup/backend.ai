@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
@@ -26,6 +27,7 @@ from ai.backend.manager.data.fair_share import (
 )
 from ai.backend.manager.errors.fair_share import FairShareNotFoundError
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
@@ -412,68 +414,86 @@ class FairShareDBSource:
         async with self._db.begin_session() as db_sess:
             now = sa.func.now()
 
-            # Update domain fair shares
+            # Upsert domain fair shares
             for domain_name, domain_result in calculation_result.domain_results.items():
-                await db_sess.execute(
-                    sa.update(DomainFairShareRow)
-                    .where(
-                        sa.and_(
-                            DomainFairShareRow.resource_group == resource_group,
-                            DomainFairShareRow.domain_name == domain_name,
-                        )
-                    )
-                    .values(
-                        fair_share_factor=domain_result.fair_share_factor,
-                        total_decayed_usage=domain_result.total_decayed_usage,
-                        normalized_usage=domain_result.normalized_usage,
-                        lookback_start=lookback_start,
-                        lookback_end=lookback_end,
-                        last_calculated_at=now,
-                    )
+                insert_stmt = pg_insert(DomainFairShareRow).values(
+                    resource_group=resource_group,
+                    domain_name=domain_name,
+                    fair_share_factor=domain_result.fair_share_factor,
+                    total_decayed_usage=domain_result.total_decayed_usage,
+                    normalized_usage=domain_result.normalized_usage,
+                    lookback_start=lookback_start,
+                    lookback_end=lookback_end,
+                    last_calculated_at=now,
                 )
+                upsert_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["resource_group", "domain_name"],
+                    set_={
+                        "fair_share_factor": insert_stmt.excluded.fair_share_factor,
+                        "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
+                        "normalized_usage": insert_stmt.excluded.normalized_usage,
+                        "lookback_start": insert_stmt.excluded.lookback_start,
+                        "lookback_end": insert_stmt.excluded.lookback_end,
+                        "last_calculated_at": insert_stmt.excluded.last_calculated_at,
+                    },
+                )
+                await db_sess.execute(upsert_stmt)
 
-            # Update project fair shares
+            # Upsert project fair shares
             for project_id, project_result in calculation_result.project_results.items():
-                await db_sess.execute(
-                    sa.update(ProjectFairShareRow)
-                    .where(
-                        sa.and_(
-                            ProjectFairShareRow.resource_group == resource_group,
-                            ProjectFairShareRow.project_id == project_id,
-                        )
-                    )
-                    .values(
-                        fair_share_factor=project_result.fair_share_factor,
-                        total_decayed_usage=project_result.total_decayed_usage,
-                        normalized_usage=project_result.normalized_usage,
-                        lookback_start=lookback_start,
-                        lookback_end=lookback_end,
-                        last_calculated_at=now,
-                    )
+                insert_stmt = pg_insert(ProjectFairShareRow).values(
+                    resource_group=resource_group,
+                    project_id=project_id,
+                    domain_name=project_result.domain_name,
+                    fair_share_factor=project_result.fair_share_factor,
+                    total_decayed_usage=project_result.total_decayed_usage,
+                    normalized_usage=project_result.normalized_usage,
+                    lookback_start=lookback_start,
+                    lookback_end=lookback_end,
+                    last_calculated_at=now,
                 )
+                upsert_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["resource_group", "project_id"],
+                    set_={
+                        "fair_share_factor": insert_stmt.excluded.fair_share_factor,
+                        "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
+                        "normalized_usage": insert_stmt.excluded.normalized_usage,
+                        "lookback_start": insert_stmt.excluded.lookback_start,
+                        "lookback_end": insert_stmt.excluded.lookback_end,
+                        "last_calculated_at": insert_stmt.excluded.last_calculated_at,
+                    },
+                )
+                await db_sess.execute(upsert_stmt)
 
-            # Update user fair shares with scheduling ranks
+            # Upsert user fair shares with scheduling ranks
             for user_key, user_result in calculation_result.user_results.items():
                 scheduling_rank = rank_by_user.get(user_key)
-                await db_sess.execute(
-                    sa.update(UserFairShareRow)
-                    .where(
-                        sa.and_(
-                            UserFairShareRow.resource_group == resource_group,
-                            UserFairShareRow.user_uuid == user_key.user_uuid,
-                            UserFairShareRow.project_id == user_key.project_id,
-                        )
-                    )
-                    .values(
-                        fair_share_factor=user_result.fair_share_factor,
-                        total_decayed_usage=user_result.total_decayed_usage,
-                        normalized_usage=user_result.normalized_usage,
-                        lookback_start=lookback_start,
-                        lookback_end=lookback_end,
-                        last_calculated_at=now,
-                        scheduling_rank=scheduling_rank,
-                    )
+                insert_stmt = pg_insert(UserFairShareRow).values(
+                    resource_group=resource_group,
+                    user_uuid=user_key.user_uuid,
+                    project_id=user_key.project_id,
+                    domain_name=user_result.domain_name,
+                    fair_share_factor=user_result.fair_share_factor,
+                    total_decayed_usage=user_result.total_decayed_usage,
+                    normalized_usage=user_result.normalized_usage,
+                    lookback_start=lookback_start,
+                    lookback_end=lookback_end,
+                    last_calculated_at=now,
+                    scheduling_rank=scheduling_rank,
                 )
+                upsert_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["resource_group", "user_uuid", "project_id"],
+                    set_={
+                        "fair_share_factor": insert_stmt.excluded.fair_share_factor,
+                        "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
+                        "normalized_usage": insert_stmt.excluded.normalized_usage,
+                        "lookback_start": insert_stmt.excluded.lookback_start,
+                        "lookback_end": insert_stmt.excluded.lookback_end,
+                        "last_calculated_at": insert_stmt.excluded.last_calculated_at,
+                        "scheduling_rank": insert_stmt.excluded.scheduling_rank,
+                    },
+                )
+                await db_sess.execute(upsert_stmt)
 
     # ==================== Batched Reads ====================
 
@@ -596,6 +616,9 @@ class FairShareDBSource:
                 db_sess, scaling_group, lookback_start, lookback_end
             )
 
+            # 4. Fetch cluster capacity (sum of ALIVE schedulable agents' available_slots)
+            cluster_capacity = await self._fetch_cluster_capacity(db_sess, scaling_group)
+
         return FairShareCalculationContext(
             fair_shares=fair_shares,
             raw_usage_buckets=raw_usage_buckets,
@@ -603,6 +626,7 @@ class FairShareDBSource:
             lookback_days=spec.lookback_days,
             default_weight=spec.default_weight,
             resource_weights=spec.resource_weights,
+            cluster_capacity=cluster_capacity,
             today=today,
         )
 
@@ -626,6 +650,38 @@ class FairShareDBSource:
             return row.fair_share_spec
 
         return FairShareScalingGroupSpec()
+
+    async def _fetch_cluster_capacity(
+        self,
+        db_sess: SASession,
+        scaling_group: str,
+    ) -> ResourceSlot:
+        """Fetch total available slots from ALIVE schedulable agents in scaling group.
+
+        Args:
+            db_sess: Database session
+            scaling_group: The scaling group name
+
+        Returns:
+            Sum of available_slots from all ALIVE schedulable agents
+        """
+        query = sa.select(AgentRow.available_slots).where(
+            sa.and_(
+                AgentRow.scaling_group == scaling_group,
+                AgentRow.status == AgentStatus.ALIVE,
+                AgentRow.schedulable == sa.true(),
+            )
+        )
+        result = await db_sess.execute(query)
+        available_slots_list = result.scalars().all()
+
+        # Sum all available_slots in Python (JSONB aggregation not straightforward in SQL)
+        total_capacity = ResourceSlot()
+        for slots in available_slots_list:
+            if slots:
+                total_capacity = total_capacity + slots
+
+        return total_capacity
 
     async def _fetch_fair_shares(
         self,

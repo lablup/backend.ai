@@ -249,5 +249,10 @@ class FairShareCalculationContext:
     resource_weights: ResourceSlot
     """Default resource weights for normalized usage calculation."""
 
+    cluster_capacity: ResourceSlot
+    """Total available slots from all ALIVE schedulable agents in the scaling group.
+    Used to normalize usage: usage[r] / (capacity[r] * lookback_days * SECONDS_PER_DAY).
+    """
+
     today: date
     """Current date for decay calculation."""

@@ -126,7 +126,13 @@ class FairShareObserver(KernelObserver):
         Returns:
             ObservationResult containing observed count
         """
+        log.debug(
+            "[FairShareObserver] observe() called: scaling_group={}, kernel_count={}",
+            scaling_group,
+            len(kernels),
+        )
         if not kernels:
+            log.debug("[FairShareObserver] No kernels to observe, returning early")
             return ObservationResult(observed_count=0)
 
         now = await self._scheduler_repository.get_db_now()
@@ -136,12 +142,27 @@ class FairShareObserver(KernelObserver):
             kernels, scaling_group, now
         )
 
+        log.debug(
+            "[FairShareObserver] Preparation result: specs_count={}, observed_count={}",
+            len(preparation_result.specs),
+            preparation_result.observed_count,
+        )
+
         if not preparation_result.specs:
+            log.debug("[FairShareObserver] No specs prepared, returning early")
             return ObservationResult(observed_count=0)
 
         # Aggregate to daily buckets (pure computation)
         aggregation_result = self._aggregator.aggregate_kernel_usage_to_buckets(
             preparation_result.specs
+        )
+
+        log.debug(
+            "[FairShareObserver] Aggregation result: user_deltas={}, project_deltas={}, "
+            "domain_deltas={}",
+            len(aggregation_result.user_usage_deltas),
+            len(aggregation_result.project_usage_deltas),
+            len(aggregation_result.domain_usage_deltas),
         )
 
         # Atomic DB write for usage records
@@ -151,10 +172,15 @@ class FairShareObserver(KernelObserver):
             preparation_result.kernel_observation_times,
             aggregation_result,
         )
+        log.debug("[FairShareObserver] DB write completed")
 
         # ===== Phase 2: Calculate and update factors + ranks =====
         await self._calculate_and_update_factors_and_ranks(scaling_group, now.date())
 
+        log.debug(
+            "[FairShareObserver] Observation complete: observed_count={}",
+            preparation_result.observed_count,
+        )
         return ObservationResult(observed_count=preparation_result.observed_count)
 
     async def _calculate_and_update_factors_and_ranks(
@@ -175,18 +201,36 @@ class FairShareObserver(KernelObserver):
             today: Current date for decay calculation
         """
         try:
+            log.debug("[FairShareObserver] Phase 2: calculating factors for {}", scaling_group)
+
             # ===== Single batched DB read =====
             # Get all data needed for calculation in one database session
             context = await self._fair_share_repository.get_fair_share_calculation_context(
                 scaling_group, today
             )
 
+            log.debug(
+                "[FairShareObserver] Got calculation context: lookback_days={}, "
+                "raw_usage_buckets_empty={}",
+                context.lookback_days,
+                context.raw_usage_buckets.is_empty(),
+            )
+
             # Skip if no usage data
             if context.raw_usage_buckets.is_empty():
+                log.debug("[FairShareObserver] No usage data, skipping factor calculation")
                 return
 
             # ===== Pure computation: factors + ranks =====
             calculation_result = self._calculator.calculate_factors(context)
+
+            log.debug(
+                "[FairShareObserver] Calculation result: domain_results={}, "
+                "project_results={}, user_results={}",
+                len(calculation_result.domain_results),
+                len(calculation_result.project_results),
+                len(calculation_result.user_results),
+            )
 
             # Skip if no results
             if not (
@@ -194,6 +238,7 @@ class FairShareObserver(KernelObserver):
                 or calculation_result.project_results
                 or calculation_result.user_results
             ):
+                log.debug("[FairShareObserver] No calculation results, skipping DB update")
                 return
 
             # Calculate lookback_start for DB write
@@ -206,6 +251,7 @@ class FairShareObserver(KernelObserver):
                 lookback_start,
                 today,
             )
+            log.debug("[FairShareObserver] Phase 2 completed: factors updated")
 
         except Exception as e:
             log.warning(
