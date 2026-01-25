@@ -323,7 +323,7 @@ All fields are optional.
 
 The following pseudocode demonstrates how the proposed APIs would be implemented for NVIDIA GPUs, including integration with nvidia-fabric-manager for NVSwitch topology management.
 
-📄 **Full example code**: [BEP-1016/nvidia_plugin_example.py](BEP-1016/nvidia_plugin_example.py)
+📄 **Full example with explanations**: [BEP-1016/nvidia_plugin_example.md](BEP-1016/nvidia_plugin_example.md)
 
 The example includes:
 

@@ -1,14 +1,26 @@
-"""
-BEP-1016: NVIDIA GPU Plugin Example with Fabric Manager Integration
+# NVIDIA GPU Plugin Example with Fabric Manager Integration
 
-This pseudocode demonstrates how the proposed Accelerator Interface v2 APIs
-would be implemented for NVIDIA GPUs, including integration with
-nvidia-fabric-manager for NVSwitch topology management.
+This document demonstrates how the proposed Accelerator Interface v2 APIs (BEP-1016) would be implemented for NVIDIA GPUs, including integration with nvidia-fabric-manager for NVSwitch topology management.
 
-NOTE: This is pseudocode for illustration purposes. Some imports and
-type definitions are assumed to exist in the actual implementation.
-"""
+> **Note**: This is pseudocode for illustration purposes. Some imports and type definitions are assumed to exist in the actual implementation.
 
+## Table of Contents
+
+- [Supporting Types and Structs](#supporting-types-and-structs)
+- [Fabric Manager Client](#fabric-manager-client)
+- [Node-level Plugin (AbstractDeviceHostPlugin)](#node-level-plugin-abstractdevicehostplugin)
+- [Agent-level Plugin (AbstractDevicePlugin)](#agent-level-plugin-abstractdeviceplugin)
+- [Lifecycle Hook Context and Scoped Access](#lifecycle-hook-context-and-scoped-access)
+- [Workload-level Lifecycle Hook](#workload-level-lifecycle-hook)
+- [Agent Runtime Usage Examples](#agent-runtime-usage-examples)
+
+---
+
+## Supporting Types and Structs
+
+These data structures represent GPU topology, device information, and validation results.
+
+```python
 from __future__ import annotations
 
 import grp
@@ -16,20 +28,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-
-# Assumed imports from the Backend.AI agent framework
-# from ai.backend.agent.types import (
-#     AbstractDeviceHostPlugin, AbstractDevicePlugin, AbstractLifecycleHook,
-#     AbstractDevice, DeviceId, AgentId, SlotName, SlotDefinition, SlotType,
-#     DeviceAllocation, Workload, WorkloadConfig, Mount,
-#     StatContext, NodeMetrics, WorkloadMetrics, ProcessMetrics,
-#     ServiceNotAvailableError, UnknownServiceError,
-# )
-
-
-# =============================================================================
-# Supporting Types and Structs
-# =============================================================================
 
 
 @dataclass
@@ -82,17 +80,19 @@ class PartitionValidation:
     """Result of partition validation."""
     is_optimal: bool
     warnings: list[str]
+```
 
+---
 
-# =============================================================================
-# Fabric Manager Client
-# =============================================================================
+## Fabric Manager Client
 
+The `NvidiaFabricManagerClient` provides an interface to interact with the nvidia-fabric-manager service for NVSwitch/NVLink configuration.
 
+```python
 class NvidiaFabricManagerClient:
     """Client for interacting with nvidia-fabric-manager service."""
 
-    def __init__(self, socket_path: str = "/var/run/nvidia-fabricmanager.sock"):
+    def __init__(self, socket_path: str = "/var/run/nvidia-fabricmanager.sock") -> None:
         self._socket_path = socket_path
 
     async def get_nvswitch_status(self) -> dict[str, Any]:
@@ -118,20 +118,29 @@ class NvidiaFabricManagerClient:
     async def notify_workload_end(self, workload_id: str) -> None:
         """Notify fabric manager that a workload has terminated."""
         ...
+```
 
+---
 
-# =============================================================================
-# Node-level Plugin (AbstractDeviceHostPlugin)
-# =============================================================================
+## Node-level Plugin (AbstractDeviceHostPlugin)
 
+The `NvidiaDeviceHostPlugin` provides a global view of all devices in the node. It is initialized once per node during the agent runtime startup.
 
+### Key Responsibilities
+
+- **Device Discovery**: Lists all NVIDIA GPUs in the node
+- **Topology Management**: Discovers and caches NVLink/NVSwitch topology
+- **Partition Recommendations**: Provides topology-aware partition suggestions for multi-agent deployments
+- **Host Service Access**: Provides access to fabric-manager and other host-level services
+
+```python
 class NvidiaDeviceHostPlugin(AbstractDeviceHostPlugin):
     """
     Node-level NVIDIA GPU plugin.
     Provides global view of all devices and manages host-level services.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._fabric_manager_client: NvidiaFabricManagerClient | None = None
         self._topology: NvidiaDeviceTopology | None = None
 
@@ -224,7 +233,13 @@ class NvidiaDeviceHostPlugin(AbstractDeviceHostPlugin):
     ) -> NvidiaDevicePlugin:
         """Create an agent-scoped plugin instance."""
         return NvidiaDevicePlugin(self, device_mask)
+```
 
+### Topology-aware Partitioning
+
+These methods support topology-aware device partitioning for multi-agent deployments, ensuring that NVSwitch groups are not split across agents.
+
+```python
     async def get_recommended_partitions(
         self,
         num_agents: int,
@@ -284,13 +299,21 @@ class NvidiaDeviceHostPlugin(AbstractDeviceHostPlugin):
         """Discover NVLink/NVSwitch topology using NVML."""
         # Implementation would use pynvml to discover topology
         ...
+```
 
+---
 
-# =============================================================================
-# Agent-level Plugin (AbstractDevicePlugin)
-# =============================================================================
+## Agent-level Plugin (AbstractDevicePlugin)
 
+The `NvidiaDevicePlugin` is created per agent instance with a `device_mask` that filters the visible devices. It ensures that each agent only sees and manages its assigned subset of GPUs.
 
+### Key Responsibilities
+
+- **Scoped Device View**: Only sees devices within the assigned `device_mask`
+- **Allocation Management**: Creates and manages allocation maps for the agent's devices
+- **Lifecycle Hook Creation**: Creates scoped lifecycle hooks for workload management
+
+```python
 class NvidiaDevicePlugin(AbstractDevicePlugin):
     """
     Agent-scoped NVIDIA GPU plugin.
@@ -301,7 +324,7 @@ class NvidiaDevicePlugin(AbstractDevicePlugin):
         self,
         host_plugin: NvidiaDeviceHostPlugin,
         device_mask: frozenset[DeviceId],
-    ):
+    ) -> None:
         self.host_plugin = host_plugin
         self.device_mask = device_mask
         self.agent_id: AgentId | None = None
@@ -383,13 +406,17 @@ class NvidiaDevicePlugin(AbstractDevicePlugin):
     ) -> ProcessMetrics:
         """Collect metrics for a specific process."""
         ...
+```
 
+---
 
-# =============================================================================
-# Lifecycle Hook Context and Scoped Access Classes
-# =============================================================================
+## Lifecycle Hook Context and Scoped Access
 
+The `LifecycleHookContext` and its helper classes provide **controlled, scoped access** to host services. This ensures that lifecycle hooks cannot affect other agents' workloads or access devices outside their allocation.
 
+### LifecycleHookContext
+
+```python
 @dataclass(frozen=True)
 class LifecycleHookContext:
     """
@@ -412,8 +439,13 @@ class LifecycleHookContext:
 
     # === Scoped host service access ===
     host_services: ScopedHostServices
+```
 
+### ScopedTopologyView
 
+Provides topology information filtered to only show connections between devices that are part of the current allocation.
+
+```python
 class ScopedTopologyView:
     """
     Topology view restricted to allocated devices.
@@ -426,7 +458,7 @@ class ScopedTopologyView:
         self,
         full_topology: NvidiaDeviceTopology,
         allocated_device_ids: frozenset[DeviceId],
-    ):
+    ) -> None:
         self._full_topology = full_topology
         self._allocated_ids = allocated_device_ids
 
@@ -444,8 +476,13 @@ class ScopedTopologyView:
             if self._allocated_ids.issubset(group):
                 return True
         return False
+```
 
+### ScopedHostServices
 
+Provides controlled access to host-level services, ensuring that operations are scoped to the current workload's devices.
+
+```python
 class ScopedHostServices:
     """
     Host service access restricted to allocated devices.
@@ -459,7 +496,7 @@ class ScopedHostServices:
         host_plugin: AbstractDeviceHostPlugin,
         workload: Workload,
         allocated_device_ids: frozenset[DeviceId],
-    ):
+    ) -> None:
         self._host_plugin = host_plugin
         self._workload = workload
         self._allocated_ids = allocated_device_ids
@@ -496,13 +533,31 @@ class ScopedHostServices:
             pass
 
     # NOTE: No direct access to host_plugin - only specific, scoped APIs are exposed
+```
 
+### Security Guarantees
 
-# =============================================================================
-# Workload-level Lifecycle Hook
-# =============================================================================
+| Attempt | Result |
+|---------|--------|
+| Access devices outside allocation | `PermissionError` from `ScopedTopologyView` |
+| Affect other workloads via fabric-manager | Blocked - all calls include `workload_id` |
+| Direct access to `host_plugin` | Not exposed - only scoped APIs available |
+| Query full node topology | Filtered by `ScopedTopologyView` |
 
+---
 
+## Workload-level Lifecycle Hook
+
+The `NvidiaLifecycleHook` manages the lifecycle of GPU workloads, integrating with fabric-manager for NVLink optimization.
+
+### Key Responsibilities
+
+- **Pre-create**: Configure NVLink routing, notify fabric-manager, generate workload configuration
+- **Post-create**: Optional verification after workload creation
+- **Pre-terminate**: Optional cleanup before termination
+- **Post-terminate**: Notify fabric-manager that workload has ended
+
+```python
 class NvidiaLifecycleHook(AbstractLifecycleHook):
     """
     Lifecycle hook for NVIDIA GPU workloads.
@@ -511,7 +566,7 @@ class NvidiaLifecycleHook(AbstractLifecycleHook):
     Cannot access devices outside the allocation or affect other workloads.
     """
 
-    def __init__(self, context: LifecycleHookContext):
+    def __init__(self, context: LifecycleHookContext) -> None:
         self.ctx = context
 
     async def pre_create(self) -> WorkloadConfig:
@@ -530,7 +585,7 @@ class NvidiaLifecycleHook(AbstractLifecycleHook):
 
         # --- Generate Workload Configuration ---
         allocated_devices = self.ctx.allocated_devices
-        driver_version = "535.104.05"  # Would be obtained from host_plugin
+        driver_version = "535.104.05"  # Would be obtained from node info
 
         return WorkloadConfig(
             mounts=[
@@ -589,13 +644,19 @@ class NvidiaLifecycleHook(AbstractLifecycleHook):
     def _get_video_gid(self) -> int:
         """Get the video group ID for GPU access."""
         return grp.getgrnam("video").gr_gid
+```
 
+---
 
-# =============================================================================
-# Agent Runtime Usage Examples
-# =============================================================================
+## Agent Runtime Usage Examples
 
+These examples show how the plugin APIs are used in the agent runtime.
 
+### Node Initialization
+
+Called once per node during agent runtime startup, before any agent instances are created.
+
+```python
 async def init_node_plugins() -> dict[str, AbstractDeviceHostPlugin]:
     """
     Initialize node-level plugins (once per node).
@@ -604,8 +665,13 @@ async def init_node_plugins() -> dict[str, AbstractDeviceHostPlugin]:
     nvidia_host_plugin = NvidiaDeviceHostPlugin()
     await nvidia_host_plugin.init()
     return {"nvidia": nvidia_host_plugin}
+```
 
+### AUTO_SPLIT Partitioning
 
+Computes device partitions for AUTO_SPLIT mode, preferring topology-aware partitioning when available.
+
+```python
 async def compute_auto_split_partitions(
     host_plugins: dict[str, AbstractDeviceHostPlugin],
     num_agents: int,
@@ -641,8 +707,13 @@ async def compute_auto_split_partitions(
                 log.warning("Agent %d partition: %s", i, warning)
 
     return [frozenset(p) for p in partitions]
+```
 
+### Agent Initialization
 
+Called per agent instance to create agent-scoped plugins.
+
+```python
 async def init_agent(
     host_plugins: dict[str, AbstractDeviceHostPlugin],
     agent_config: AgentConfig,
@@ -677,8 +748,13 @@ async def init_agent(
     await nvidia_plugin.init(agent_config.agent_id)
 
     return {"nvidia": nvidia_plugin}
+```
 
+### Workload Creation
 
+Creates a workload with GPU allocation, demonstrating lifecycle hook usage.
+
+```python
 async def create_workload(
     agent_plugins: dict[str, AbstractDevicePlugin],
     workload: Workload,
@@ -704,8 +780,13 @@ async def create_workload(
     await hook.post_create()
 
     return container
+```
 
+### Workload Termination
 
+Terminates a workload and cleans up GPU resources.
+
+```python
 async def terminate_workload(
     hook: NvidiaLifecycleHook,
     container: Container,
@@ -721,3 +802,16 @@ async def terminate_workload(
 
     # Post-termination hook (notify fabric manager)
     await hook.post_terminate()
+```
+
+---
+
+## Summary
+
+This example demonstrates the key patterns of the Accelerator Interface v2:
+
+1. **Node vs Agent separation**: `NvidiaDeviceHostPlugin` provides global view, `NvidiaDevicePlugin` provides scoped view
+2. **Topology-aware partitioning**: `get_recommended_partitions()` aligns partitions with NVSwitch groups
+3. **Scoped access**: `LifecycleHookContext` prevents hooks from accessing devices outside their allocation
+4. **Security guarantees**: All host service calls are scoped and include workload ID for audit tracking
+5. **Fabric manager integration**: Lifecycle hooks configure NVLink and notify workload events
