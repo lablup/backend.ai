@@ -6,7 +6,7 @@ COPY requirements.txt /requirements.txt
 # Install dependencies from requirements.txt to respect version constraints
 RUN pip wheel --wheel-dir=/wheels --no-cache-dir -r /requirements.txt
 # Install backend.ai packages from /dist (these are not in requirements.txt or PyPI)
-RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-manager==${PKGVER} --find-links=/dist --no-deps
+RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-webserver==${PKGVER} --find-links=/dist --no-deps --find-links=/dist
 
 FROM python:${PYTHON_VERSION}
 COPY --from=builder /wheels /wheels
@@ -15,14 +15,10 @@ COPY dist /dist
 RUN pip install --no-cache-dir --find-links=/dist /wheels/*.whl
 
 # Create necessary directories
-RUN mkdir -p /tmp/backend.ai/ipc /var/log/backend.ai /etc/backend.ai /app/fixtures
+RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 
 # Set working directory
 WORKDIR /app
 
-# Copy entrypoint script
-COPY docker/backend.ai-manager-entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+CMD ["python", "-m", "ai.backend.web.server", "-f", "/etc/backend.ai/webserver.conf"]
 
-# Set the default command to run the entrypoint script
-CMD ["/app/entrypoint.sh"]
