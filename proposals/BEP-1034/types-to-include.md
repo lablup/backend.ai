@@ -111,7 +111,7 @@ class KernelAttachedDevicesGQL:
 
 ### KernelResourceInfoGQL
 
-> **Note**: `scaling_group: ScalingGroupNode` is **deferred** (see types-to-defer.md)
+> **Note**: `resource_group: ResourceGroupNode` is **deferred** (see types-to-defer.md)
 >
 > **Field Renames**: `occupied_slots` → `used`, `requested_slots` → `requested`, `occupied_shares` → `shares`
 
@@ -119,7 +119,7 @@ class KernelAttachedDevicesGQL:
 class KernelResourceInfoGQL:
     agent_id: uuid.UUID | None
     agent: AgentNode | None
-    scaling_group_name: str | None
+    resource_group_name: str | None
     container_id: str | None
     used: ResourceSlotGQL
     requested: ResourceSlotGQL

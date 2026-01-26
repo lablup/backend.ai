@@ -16,7 +16,7 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 | `KernelUserPermissionInfoGQL` | `domain_name: str` | `domain: DomainNode` |
 | `KernelUserPermissionInfoGQL` | `group_id: uuid.UUID` | `project: GroupNode` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
-| `KernelResourceInfoGQL` | `scaling_group_name: str` | `scaling_group: ScalingGroupNode` |
+| `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
 | `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
 
 ### Types to Skip Entirely
@@ -101,12 +101,12 @@ class KernelSessionInfoGQL:
 
 ## Resource Types (Defer to Node connections)
 
-### KernelResourceInfoGQL.scaling_group
+### KernelResourceInfoGQL.resource_group
 
-**Action**: Include `scaling_group_name: str | None` field now. Defer `scaling_group: ScalingGroupNode` connection.
+**Action**: Include `resource_group_name: str | None` field now. Defer `resource_group: ResourceGroupNode` connection.
 
 **Future additions**:
-- `scaling_group: ScalingGroupNode | None`
+- `resource_group: ResourceGroupNode | None`
 
 ---
 
@@ -135,5 +135,5 @@ class KernelSessionInfoGQL:
 | DomainNode PR | `KernelUserPermissionInfoGQL.domain: DomainNode` |
 | GroupNode PR | `KernelUserPermissionInfoGQL.project: GroupNode` |
 | SessionNode PR | `KernelSessionInfoGQL.session: SessionNode` |
-| ScalingGroupNode PR | `KernelResourceInfoGQL.scaling_group: ScalingGroupNode` |
+| ResourceGroupNode PR | `KernelResourceInfoGQL.resource_group: ResourceGroupNode` |
 | VFolderNode PR | `KernelRuntimeInfoGQL.vfolders: list[VFolderNode]` |
