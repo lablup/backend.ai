@@ -84,7 +84,7 @@ class ImagePermissionInfoGQL:
 ### ImageV2GQL
 
 ```python
-@strawberry.type(name="ImageNode")
+@strawberry.type(name="ImageV2")
 class ImageV2GQL(Node):
     id: NodeID[UUID]
 
@@ -115,7 +115,7 @@ ImageEdgeGQL = Edge[ImageV2GQL]
 
 ### ImageConnectionV2GQL
 ```python
-@strawberry.type(name="ImageConnection")
+@strawberry.type(name="ImageConnectionV2")
 class ImageConnectionV2GQL(Connection[ImageV2GQL]):
     count: int
 ```
