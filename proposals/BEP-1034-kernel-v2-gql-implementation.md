@@ -63,8 +63,7 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelConnectionV2GQL` - Connection type
 
 #### Common Types (from common/types.py)
-- `ResourceOptsEntryGQL`, `ResourceOptsGQL` - Resource options
-- `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options input
+- `ResourceOptsEntryGQL`, `ResourceOptsGQL`, `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options (already exist)
 - `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports
 - `DotfileInfoGQL`, `SSHKeypairGQL` - Internal data types
 

@@ -270,21 +270,8 @@ class ServicePortsGQL:
 ```
 
 ### Resource Options Types
-```python
-class ResourceOptsEntryGQL:
-    name: str
-    value: str
 
-class ResourceOptsGQL:
-    entries: list[ResourceOptsEntryGQL]
-
-class ResourceOptsEntryInput:
-    name: str
-    value: str
-
-class ResourceOptsInput:
-    entries: list[ResourceOptsEntryInput]
-```
+> **Note**: `ResourceOptsEntryGQL`, `ResourceOptsGQL`, `ResourceOptsEntryInput`, `ResourceOptsInput` already exist in `deployment/types/revision.py`
 
 ### Internal Data Types
 ```python
