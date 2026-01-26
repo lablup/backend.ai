@@ -197,7 +197,7 @@ def print_error(exc: Exception, *, file=None):
 
 def show_warning(message, category, filename, lineno, file=None, line=None):
     echo(
-        "{0}: {1}".format(
+        "{}: {}".format(
             style(str(category.__name__), fg="yellow", bold=True),
             style(str(message), fg="yellow"),
         ),

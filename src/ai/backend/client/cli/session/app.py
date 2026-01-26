@@ -345,7 +345,7 @@ def apps(session_name, app_name, list_names):
                 apps = list(filter(lambda x: x["name"] in app_name))
         if list_names:
             print_info(
-                "This session provides the following app services: {0}".format(
+                "This session provides the following app services: {}".format(
                     ", ".join(list(map(lambda x: x["name"], apps)))
                 )
             )
@@ -355,14 +355,14 @@ def apps(session_name, app_name, list_names):
             has_envs = "allowed_envs" in service.keys()
 
             if has_arguments or has_envs:
-                print_info("Information for service {0}:".format(service["name"]))
+                print_info("Information for service {}:".format(service["name"]))
                 if has_arguments:
-                    print("\tAvailable arguments: {0}".format(service["allowed_arguments"]))
+                    print("\tAvailable arguments: {}".format(service["allowed_arguments"]))
                 if has_envs:
-                    print("\tAvailable environment variables: {0}".format(service["allowed_envs"]))
+                    print("\tAvailable environment variables: {}".format(service["allowed_envs"]))
             else:
                 print_info(
-                    "Service {0} does not have customizable arguments.".format(service["name"])
+                    "Service {} does not have customizable arguments.".format(service["name"])
                 )
 
     try:

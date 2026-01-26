@@ -298,14 +298,14 @@ def list_shared_vfolders():
             result = resp.get("shared", [])
             for _result in result:
                 print(
-                    'Virtual folder "{0}" (ID: {1})'.format(
+                    'Virtual folder "{}" (ID: {})'.format(
                         _result["vfolder_name"], _result["vfolder_id"]
                     )
                 )
-                print("- Owner: {0}".format(_result["owner"]))
-                print("- Status: {0}".format(_result["status"]))
-                print("- Permission: {0}".format(_result["perm"]))
-                print("- Folder Type: {0}".format(_result["type"]))
+                print("- Owner: {}".format(_result["owner"]))
+                print("- Status: {}".format(_result["status"]))
+                print("- Permission: {}".format(_result["perm"]))
+                print("- Folder Type: {}".format(_result["type"]))
                 shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
@@ -333,14 +333,14 @@ def shared_vfolder_info(vfolder_id):
             if result:
                 _result = result[0]
                 print(
-                    'Virtual folder "{0}" (ID: {1})'.format(
+                    'Virtual folder "{}" (ID: {})'.format(
                         _result["vfolder_name"], _result["vfolder_id"]
                     )
                 )
-                print("- Owner: {0}".format(_result["owner"]))
-                print("- Status: {0}".format(_result["status"]))
-                print("- Permission: {0}".format(_result["perm"]))
-                print("- Folder Type: {0}".format(_result["type"]))
+                print("- Owner: {}".format(_result["owner"]))
+                print("- Status: {}".format(_result["status"]))
+                print("- Permission: {}".format(_result["perm"]))
+                print("- Folder Type: {}".format(_result["type"]))
                 shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")

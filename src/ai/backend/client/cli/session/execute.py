@@ -80,7 +80,7 @@ async def exec_loop(
             if files:
                 print("--- generated files ---", file=stdout)
                 for item in files:
-                    print("{0}: {1}".format(item["name"], item["url"]), file=stdout)
+                    print("{}: {}".format(item["name"], item["url"]), file=stdout)
                 print("--- end of generated files ---", file=stdout)
             if result["status"] == "clean-finished":
                 exitCode = result.get("exitCode")
@@ -137,7 +137,7 @@ def exec_loop_sync(
         if files:
             print("--- generated files ---", file=stdout)
             for item in files:
-                print("{0}: {1}".format(item["name"], item["url"]), file=stdout)
+                print("{}: {}".format(item["name"], item["url"]), file=stdout)
             print("--- end of generated files ---", file=stdout)
         if result["status"] == "clean-finished":
             exitCode = result.get("exitCode")
