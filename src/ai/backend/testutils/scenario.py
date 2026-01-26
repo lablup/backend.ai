@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Generic, Optional, Self, TypeVar
+from typing import Optional, Self, TypeVar
 
 import pytest
 
@@ -9,7 +9,7 @@ E = TypeVar("E", bound=BaseException)
 TException = type[E] | tuple[type[E], ...]
 
 
-class ScenarioBase(Generic[TInput, TResult]):
+class ScenarioBase[TInput, TResult]:
     description: str
     input: TInput
     expected: Optional[TResult]

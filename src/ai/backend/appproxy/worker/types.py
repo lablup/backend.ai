@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Generic,
     Optional,
     Self,
     TypeVar,
@@ -457,7 +456,7 @@ TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
-class InferenceMeasurement(Generic[TMeasurement]):
+class InferenceMeasurement[TMeasurement: Measurement | HistogramMeasurement]:
     """
     Collection of per-inference framework statistics for a specific metric.
     """

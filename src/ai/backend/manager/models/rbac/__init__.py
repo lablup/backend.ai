@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, Self, TypeVar, cast
+from typing import Any, Optional, Self, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -455,9 +455,7 @@ ObjectIDType = TypeVar("ObjectIDType")
 
 
 @dataclass
-class AbstractPermissionContext(
-    Generic[PermissionType, ObjectType, ObjectIDType], metaclass=ABCMeta
-):
+class AbstractPermissionContext[PermissionType, ObjectType, ObjectIDType](metaclass=ABCMeta):
     """
     Define permissions under given User, Project or Domain scopes.
     Each field of this class represents a mapping of ["accessible scope id", "permissions under the scope"].
@@ -558,12 +556,10 @@ class AbstractPermissionContext(
         pass
 
 
-PermissionContextType = TypeVar("PermissionContextType", bound=AbstractPermissionContext)
-
-
-class AbstractPermissionContextBuilder(
-    Generic[PermissionType, PermissionContextType], metaclass=ABCMeta
-):
+class AbstractPermissionContextBuilder[
+    PermissionType: BasePermission,
+    PermissionContextType: AbstractPermissionContext,
+](metaclass=ABCMeta):
     @abstractmethod
     async def calculate_permission(
         self,
@@ -678,7 +674,7 @@ class AbstractPermissionContextBuilder(
         pass
 
 
-class RBACModel(Generic[PermissionType]):
+class RBACModel[PermissionType: BasePermission]:
     @property
     @abstractmethod
     def permissions(self) -> Container[PermissionType]:

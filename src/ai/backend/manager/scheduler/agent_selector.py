@@ -21,10 +21,10 @@ from ai.backend.manager.models.session import SessionRow
 
 from .types import (
     AbstractAgentSelector,
+    AbstractResourceGroupState,
     NullAgentSelectorState,
     RoundRobinState,
     RRAgentSelectorState,
-    T_ResourceGroupState,
 )
 from .utils import (
     get_requested_architecture,
@@ -55,7 +55,9 @@ def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
     return num_extras
 
 
-class BaseAgentSelector(AbstractAgentSelector[T_ResourceGroupState]):
+class BaseAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractAgentSelector[T_ResourceGroupState]
+):
     @property
     @override
     def config_iv(self) -> t.Dict:

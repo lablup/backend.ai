@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, Optional, TypeVar
+from typing import Optional, TypeVar
 
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -45,7 +45,7 @@ class TaskResult(ABC):
 
 
 @dataclass
-class TaskSuccessResult(TaskResult, Generic[R]):
+class TaskSuccessResult[R: Optional[BaseBackgroundTaskResult]](TaskResult):
     """Successful task execution result."""
 
     result: R

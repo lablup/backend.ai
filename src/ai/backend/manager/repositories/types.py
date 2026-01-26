@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Optional, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
@@ -80,7 +80,7 @@ class ModelConverter(Protocol):
         ...
 
 
-class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
+class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering]:
     """
     Generic query builder for constructing SQLAlchemy queries with pagination support.
     """
@@ -314,7 +314,7 @@ class BaseFilterOptions(Protocol):
     NOT: Optional[list[Any]]
 
 
-class BaseFilterApplier(ABC, Generic[T]):
+class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
     """Base class for applying filters to queries with common logical operations"""
 
     def apply_filters(self, stmt: Select, filters: T) -> Select:
@@ -419,7 +419,7 @@ class BaseOrderingOptions(Protocol):
     order_by: list[tuple[Any, bool]]
 
 
-class BaseOrderingApplier(ABC, Generic[TOrderingOptions]):
+class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
     """Base class for applying ordering to queries"""
 
     def apply_ordering(

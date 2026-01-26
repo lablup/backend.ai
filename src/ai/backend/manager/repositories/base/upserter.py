@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 TRow = TypeVar("TRow", bound=Base)
 
 
-class UpserterSpec(ABC, Generic[TRow]):
+class UpserterSpec[TRow: Base](ABC):
     """Abstract base class for upsert operations.
 
     Implementations specify what to upsert by providing:
@@ -55,7 +55,7 @@ class UpserterSpec(ABC, Generic[TRow]):
 
 
 @dataclass
-class Upserter(Generic[TRow]):
+class Upserter[TRow: Base]:
     """Bundles upserter spec for upsert operations.
 
     Attributes:
@@ -66,7 +66,7 @@ class Upserter(Generic[TRow]):
 
 
 @dataclass
-class UpserterResult(Generic[TRow]):
+class UpserterResult[TRow: Base]:
     """Result of executing an upsert operation."""
 
     row: TRow
@@ -134,7 +134,7 @@ async def execute_upserter(
 
 
 @dataclass
-class BulkUpserter(Generic[TRow]):
+class BulkUpserter[TRow: Base]:
     """Bundles multiple upserter specs for bulk upsert operations.
 
     Attributes:

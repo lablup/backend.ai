@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -25,7 +25,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class Purger(Generic[TRow]):
+class Purger[TRow: Base]:
     """Single-row delete by primary key.
 
     Attributes:
@@ -38,7 +38,7 @@ class Purger(Generic[TRow]):
 
 
 @dataclass
-class PurgerResult(Generic[TRow]):
+class PurgerResult[TRow: Base]:
     """Result of executing a single-row delete operation."""
 
     row: TRow
@@ -92,7 +92,7 @@ async def execute_purger(
 # =============================================================================
 
 
-class BatchPurgerSpec(ABC, Generic[TRow]):
+class BatchPurgerSpec[TRow: Base](ABC):
     """Abstract base class for defining batch purge targets.
 
     Implementations specify what to delete by providing a subquery
@@ -116,7 +116,7 @@ class BatchPurgerSpec(ABC, Generic[TRow]):
 
 
 @dataclass
-class BatchPurger(Generic[TRow]):
+class BatchPurger[TRow: Base]:
     """Bundles batch purger spec and batch configuration for bulk delete operations.
 
     Attributes:

@@ -18,7 +18,6 @@ from typing import (
     Any,
     Concatenate,
     Final,
-    Generic,
     NamedTuple,
     Optional,
     Protocol,
@@ -268,7 +267,7 @@ def _build_gql_type_cache() -> dict[str, Any]:
     return cache
 
 
-class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
+class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
     """
     For every different combination of filtering conditions, we need to make a
     new DataLoader instance because it "batches" the database queries.

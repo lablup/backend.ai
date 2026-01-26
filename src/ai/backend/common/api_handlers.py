@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
-    Generic,
     Optional,
     Self,
     TypeVar,
@@ -74,7 +73,7 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
     return wrapped
 
 
-class BodyParam(Generic[TRequestModel]):
+class BodyParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
@@ -96,7 +95,7 @@ class BodyParam(Generic[TRequestModel]):
         return self
 
 
-class QueryParam(Generic[TRequestModel]):
+class QueryParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
@@ -118,7 +117,7 @@ class QueryParam(Generic[TRequestModel]):
         return self
 
 
-class HeaderParam(Generic[TRequestModel]):
+class HeaderParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 
@@ -140,7 +139,7 @@ class HeaderParam(Generic[TRequestModel]):
         return self
 
 
-class PathParam(Generic[TRequestModel]):
+class PathParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: Optional[TRequestModel]
 

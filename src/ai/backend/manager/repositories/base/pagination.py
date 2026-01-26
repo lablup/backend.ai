@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Optional
+from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 
@@ -55,7 +55,7 @@ class QueryPagination(ABC):
 
 
 @dataclass
-class PageInfoResult(Generic[TRow]):
+class PageInfoResult[TRow]:
     """Result of compute_page_info containing sliced rows and pagination flags."""
 
     rows: list[TRow]

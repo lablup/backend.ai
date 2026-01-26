@@ -3,7 +3,7 @@ Generic base handler for Sokovan operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
+from typing import Optional, TypeVar
 
 from ai.backend.manager.defs import LockID
 
@@ -11,7 +11,7 @@ from ai.backend.manager.defs import LockID
 TResult = TypeVar("TResult")
 
 
-class SokovanHandler(ABC, Generic[TResult]):
+class SokovanHandler[TResult](ABC):
     """Generic base class for Sokovan operation handlers."""
 
     @classmethod

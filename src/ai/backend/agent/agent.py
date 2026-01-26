@@ -38,11 +38,9 @@ from typing import (
     Any,
     Concatenate,
     Final,
-    Generic,
     Literal,
     Optional,
     ParamSpec,
-    TypeVar,
     cast,
 )
 from uuid import UUID
@@ -306,7 +304,6 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
 P = ParamSpec("P")
-KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 KernelIdContainerPair = tuple[KernelId, Container]
 
 
@@ -347,7 +344,7 @@ class AgentClass(enum.Enum):
     AUXILIARY = enum.auto()
 
 
-class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
+class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     kspec_version: int
     distro: str
     ownership_data: KernelOwnershipData
@@ -779,11 +776,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         return base_resource_spec, resource_opts
 
 
-KernelCreationContextType = TypeVar(
-    "KernelCreationContextType", bound=AbstractKernelCreationContext
-)
-
-
 @attrs.define(auto_attribs=True, slots=True)
 class RestartTracker:
     request_lock: asyncio.Lock
@@ -822,9 +814,10 @@ def _observe_stat_task(
     return decorator
 
 
-class AbstractAgent(
-    aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
-):
+class AbstractAgent[
+    KernelObjectType: AbstractKernel,
+    KernelCreationContextType: AbstractKernelCreationContext,
+](aobject, metaclass=ABCMeta):
     id: AgentId
     agent_class: AgentClass
     loop: asyncio.AbstractEventLoop

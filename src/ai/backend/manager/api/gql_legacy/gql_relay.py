@@ -9,10 +9,8 @@ from collections.abc import (
 )
 from typing import (
     Any,
-    Generic,
     NamedTuple,
     Protocol,
-    TypeVar,
 )
 
 import graphene
@@ -258,10 +256,7 @@ class ConnectionPaginationOrder(enum.Enum):
     BACKWARD = "backward"
 
 
-T_Node = TypeVar("T_Node", bound=ObjectType)
-
-
-class ConnectionResolverResult(Generic[T_Node], NamedTuple):
+class ConnectionResolverResult[T_Node: ObjectType](NamedTuple):
     node_list: list[T_Node] | Connection
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None

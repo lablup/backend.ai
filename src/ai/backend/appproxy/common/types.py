@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import (
     Annotated,
     Any,
-    Generic,
     Optional,
     TypeVar,
 )
@@ -302,7 +301,7 @@ TBaseModel = TypeVar("TBaseModel", bound=BaseModel | Sequence[BaseModel])
 
 
 @dataclass
-class PydanticResponse(Generic[TBaseModel]):
+class PydanticResponse[TBaseModel: BaseModel | Sequence[BaseModel]]:
     response: TBaseModel
     headers: dict[str, Any] = dataclasses.field(default_factory=dict)
     status: int = 200

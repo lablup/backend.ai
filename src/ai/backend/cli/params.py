@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import (
     Any,
-    Generic,
     Optional,
     Protocol,
     TypeVar,
@@ -217,7 +216,9 @@ class SingleValueConstructorType(Protocol):
 TScalar = TypeVar("TScalar", bound=SingleValueConstructorType | click.ParamType)
 
 
-class CommaSeparatedListType(click.ParamType, Generic[TScalar]):
+class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamType](
+    click.ParamType
+):
     name = "List Expression"
 
     def __init__(self, type_: Optional[type[TScalar]] = None) -> None:
@@ -235,7 +236,7 @@ class CommaSeparatedListType(click.ParamType, Generic[TScalar]):
             self.fail(repr(e), param, ctx)
 
 
-class OptionalType(click.ParamType, Generic[TScalar]):
+class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.ParamType):
     name = "Optional Type Wrapper"
 
     def __init__(self, type_: type[TScalar] | type[click.ParamType] | click.ParamType) -> None:

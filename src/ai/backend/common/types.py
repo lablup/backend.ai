@@ -23,7 +23,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Generic,
     Literal,
     NewType,
     NotRequired,
@@ -236,7 +235,7 @@ class CIStrEnum(enum.StrEnum):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """
@@ -663,10 +662,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         return f"{self.host}:{self.port}"
 
 
-_Address = TypeVar("_Address", bound=ipaddress.IPv4Network | ipaddress.IPv6Network)
-
-
-class ReadableCIDR(Generic[_Address]):
+class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     """
     Convert wild-card based IP address into CIDR.
 
@@ -674,16 +670,16 @@ class ReadableCIDR(Generic[_Address]):
     192.10.*.* -> 192.10.0.0/16
     """
 
-    _address: _Address | None
+    _address: Address | None
 
     def __init__(self, address: str | None, is_network: bool = True) -> None:
         self._is_network = is_network
         self._address = self._convert_to_cidr(address) if address is not None else None
 
-    def _convert_to_cidr(self, value: str) -> _Address:
+    def _convert_to_cidr(self, value: str) -> Address:
         str_val = str(value)
         if not self._is_network:
-            return cast(_Address, ip_address(str_val))
+            return cast(Address, ip_address(str_val))
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
@@ -695,14 +691,14 @@ class ReadableCIDR(Generic[_Address]):
         return self._to_ip_network(str_val)
 
     @staticmethod
-    def _to_ip_network(val: str) -> _Address:
+    def _to_ip_network(val: str) -> Address:
         try:
-            return cast(_Address, ip_network(val))
+            return cast(Address, ip_network(val))
         except ValueError:
             raise InvalidIpAddressValue
 
     @property
-    def address(self) -> _Address | None:
+    def address(self) -> Address | None:
         return self._address
 
     def __str__(self) -> str:
@@ -1899,10 +1895,7 @@ class PromMetric(metaclass=ABCMeta):
         pass
 
 
-MetricType = TypeVar("MetricType", bound=PromMetric)
-
-
-class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
+class PromMetricGroup[MetricType: PromMetric](metaclass=ABCMeta):
     """
     Support text format to expose metric data to Prometheus.
     ref: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
@@ -1959,7 +1952,7 @@ ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class DispatchResult(Generic[ResultType]):
+class DispatchResult[ResultType]:
     result: Optional[ResultType] = None
     errors: list[str] = field(default_factory=list)
 

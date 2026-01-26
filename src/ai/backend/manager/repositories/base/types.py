@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import sqlalchemy as sa
 
@@ -21,7 +21,7 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ExistenceCheck(Generic[T]):
+class ExistenceCheck[T]:
     """Defines an existence check for scope validation.
 
     Used to validate that required entities exist before executing a query.

@@ -5,7 +5,6 @@ from collections.abc import Callable
 from typing import (
     Any,
     ClassVar,
-    Generic,
     Self,
     TypeVar,
     cast,
@@ -46,7 +45,7 @@ pgsql_connect_opts = {
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[UUID_SubType]):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -95,7 +94,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
-class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """

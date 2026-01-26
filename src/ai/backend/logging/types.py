@@ -4,7 +4,7 @@ import enum
 from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, Self, TypedDict, TypeVar, override
+from typing import Any, Self, TypedDict, TypeVar, override
 
 import trafaret as t
 
@@ -37,7 +37,7 @@ class CIStrEnum(enum.StrEnum):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """

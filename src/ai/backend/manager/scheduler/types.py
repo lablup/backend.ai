@@ -8,10 +8,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Generic,
     Optional,
     Self,
-    TypeVar,
     override,
 )
 
@@ -205,10 +203,7 @@ class NullAgentSelectorState(AbstractResourceGroupState):
         return cls()
 
 
-T_ResourceGroupState = TypeVar("T_ResourceGroupState", bound=AbstractResourceGroupState)
-
-
-class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
+class AbstractAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](ABC):
     """
     The interface for agent-selection logic to choose one or more agents to map with the given
     scheduled session.
@@ -291,7 +286,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
         raise NotImplementedError
 
 
-class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
+class AbstractResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](ABC):
     """
     Store and load the state of the pending session scheduler and agent selector for each resource group.
     """
@@ -325,7 +320,9 @@ class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
         raise NotImplementedError
 
 
-class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class DefaultResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractResourceGroupStateStore[T_ResourceGroupState]
+):
     """
     The default AgentSelector state store using the etcd
     """
@@ -384,7 +381,9 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         )
 
 
-class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class InMemoryResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractResourceGroupStateStore[T_ResourceGroupState]
+):
     """
     An in-memory AgentSelector state store to use in test codes.
     This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the

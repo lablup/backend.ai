@@ -4,17 +4,17 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from typing import ClassVar, Generic, Optional
+from typing import ClassVar, Optional
+from uuid import UUID
 
 from .pool import RecordPool, _SharedPhaseContext
 from .types import (
-    EntityIdT,
     StepRecord,
     StepStatus,
 )
 
 
-class RecorderContext(Generic[EntityIdT]):
+class RecorderContext[EntityIdT: UUID]:
     """
     Manages the recording scope via ContextVar for coordinator operations.
 

@@ -17,7 +17,6 @@ from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
 from typing import (
     Any,
-    Generic,
     Literal,
     Optional,
     TypeVar,
@@ -147,7 +146,7 @@ class BinarySize(t.Trafaret):
 TItem = TypeVar("TItem")
 
 
-class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
+class DelimiterSeperatedList[TItem](t.Trafaret):
     def __init__(
         self,
         trafaret: type[t.Trafaret] | t.Trafaret,
@@ -198,7 +197,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret, Generic[T_enum]):
+class Enum[T_enum: enum.Enum](t.Trafaret):
     def __init__(self, enum_cls: type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name

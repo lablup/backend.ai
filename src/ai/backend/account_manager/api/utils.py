@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Generic,
     TypeVar,
 )
 
@@ -77,7 +76,7 @@ class RequestData(BaseModel):
 
 
 @dataclass
-class ResponseModel(Generic[TBaseModel]):
+class ResponseModel[TBaseModel: BaseModel]:
     data: TBaseModel
     headers: dict[str, Any] = field(default_factory=dict)
     status: int = 200
