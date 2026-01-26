@@ -16,6 +16,31 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.1.0 (2026-01-26)
+
+### Features
+* Add email notification support for model service endpoint lifecycle transitions. Notifications are sent through configured notification channels and include endpoint details, previous/new status, and transition result ([#8159](https://github.com/lablup/backend.ai/issues/8159))
+* Implement FairShareObserver with factor calculation ([#8208](https://github.com/lablup/backend.ai/issues/8208))
+* Add GQL mutations for fair share configuration ([#8215](https://github.com/lablup/backend.ai/issues/8215))
+* Add REST API endpoints for fair share weight and spec management ([#8220](https://github.com/lablup/backend.ai/issues/8220))
+* Add Fair Share weight management with bulk operations and resource validation ([#8278](https://github.com/lablup/backend.ai/issues/8278))
+
+### Improvements
+* Replace `RequesterCtx` with `UserData` from `ai.backend.common.data.user.types` in the model_serving module for improved code consistency and type standardization ([#8092](https://github.com/lablup/backend.ai/issues/8092))
+* Rename `ScalingGroup` to `ResourceGroup` in GraphQL API written in strawberry ([#8179](https://github.com/lablup/backend.ai/issues/8179))
+* Use DB time instead of Python time in Sokovan scheduler ([#8212](https://github.com/lablup/backend.ai/issues/8212))
+
+### Fixes
+* Fix Recalculate Usage API by using legacy SQLAlchemy APIs ([#8191](https://github.com/lablup/backend.ai/issues/8191))
+* Fix VFolder invitation accept failure caused by missing `permission_group_id` in object permission creation ([#8193](https://github.com/lablup/backend.ai/issues/8193))
+* Fix `VFolderHostPermissionMap` type consistency in `GroupRow.allowed_vfolder_hosts` field to ensure proper type conversion when returning data objects ([#8200](https://github.com/lablup/backend.ai/issues/8200))
+* Fix missing `.vimrc` in runner package by restricting gitignore patterns to project root ([#8238](https://github.com/lablup/backend.ai/issues/8238))
+* Fix App-proxy worker `last_used_time_marker_directory` doesn't auto-create parent directories ([#8242](https://github.com/lablup/backend.ai/issues/8242))
+
+### Miscellaneous
+* Add docstring to dump_gql_schema CLI function ([#8192](https://github.com/lablup/backend.ai/issues/8192))
+
+
 ## 26.1.0rc1 (2026-01-21)
 
 ### Features
