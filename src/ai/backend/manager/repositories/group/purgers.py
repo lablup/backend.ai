@@ -44,12 +44,12 @@ class GroupEndpointSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
     through the routing table.
     """
 
-    group_id: UUID
+    project_id: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
         # Subquery to get endpoint IDs for the group
-        endpoint_subquery = sa.select(EndpointRow.id).where(EndpointRow.project == self.group_id)
+        endpoint_subquery = sa.select(EndpointRow.id).where(EndpointRow.project == self.project_id)
 
         # Subquery to get session IDs from RoutingRow
         session_id_subquery = sa.select(RoutingRow.session).where(
@@ -66,11 +66,11 @@ class GroupEndpointSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
 class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
     """PurgerSpec for deleting all endpoints belonging to a group."""
 
-    group_id: UUID
+    project_id: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[EndpointRow]]:
-        return sa.select(EndpointRow).where(EndpointRow.project == self.group_id)
+        return sa.select(EndpointRow).where(EndpointRow.project == self.project_id)
 
 
 @dataclass
@@ -101,14 +101,14 @@ def create_group_session_purger(group_id: UUID) -> BatchPurger[SessionRow]:
 def create_group_endpoint_session_purger(group_id: UUID) -> BatchPurger[SessionRow]:
     """Create a BatchPurger for deleting sessions associated with group endpoints."""
     return BatchPurger(
-        spec=GroupEndpointSessionBatchPurgerSpec(group_id=group_id),
+        spec=GroupEndpointSessionBatchPurgerSpec(project_id=group_id),
     )
 
 
 def create_group_endpoint_purger(group_id: UUID) -> BatchPurger[EndpointRow]:
     """Create a BatchPurger for deleting all endpoints belonging to a group."""
     return BatchPurger(
-        spec=GroupEndpointBatchPurgerSpec(group_id=group_id),
+        spec=GroupEndpointBatchPurgerSpec(project_id=group_id),
     )
 
 
