@@ -3919,6 +3919,10 @@ enum SchedulingResult {
   SUCCESS
   FAILURE
   STALE
+  NEED_RETRY
+  EXPIRED
+  GIVE_UP
+  SKIPPED
 }
 
 """Status of session scheduling transitions"""
