@@ -148,9 +148,9 @@ class EntityType(enum.StrEnum):
 class FieldType(enum.StrEnum):
     """Field types for RBAC field-scoped entities.
 
-    Field types are objects that do not have their own permission checks.
-    Instead, permission checks are delegated to the parent entity.
-    See BEP-1012 entity-types.md for the complete list.
+    Fields are sub-resources that belong to a parent entity.
+    Unlike EntityType which represents scope-scoped entities,
+    FieldType represents entity-scoped sub-entities.
     """
 
     KERNEL = "kernel"
