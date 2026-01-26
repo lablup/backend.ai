@@ -205,14 +205,12 @@ class KernelNetworkInfoGQL:
 
 ### KernelLifecycleInfoGQL
 
-> **Note**: `status_history` is **omitted** (see types-to-skip.md), `status_info` is **removed** (unused)
+> **Note**: `status_history`, `status_info`, `status_data`, `status_changed` are **omitted** (see types-to-skip.md)
 
 ```python
 class KernelLifecycleInfoGQL:
     status: KernelStatusGQL
     result: SessionResultGQL
-    status_changed: datetime | None
-    status_data: KernelStatusDataContainerGQL | None
     created_at: datetime | None
     terminated_at: datetime | None
     starts_at: datetime | None

@@ -110,7 +110,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
   - `KernelSessionInfoGQL`: include `session_id`
   - `KernelResourceInfoGQL`: include `agent_id`, `scaling_group_name`
   - `KernelRuntimeInfoGQL`: include `vfolder_ids`
-- [ ] Update `KernelLifecycleInfoGQL` to remove `status_history` and `status_info` fields
+- [ ] Update `KernelLifecycleInfoGQL` to remove `status_history`, `status_info`, `status_data`, `status_changed` fields
 - [ ] Update `KernelStatusDataContainerGQL` to remove `scheduler` field
 - [ ] Update `from_kernel_info()` method to match new type structure
 
