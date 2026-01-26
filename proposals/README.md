@@ -127,6 +127,7 @@ BEP numbers start from 1000.
 | [1037](BEP-1037-storage-proxy-health-monitoring.md) | Volume Host Availability Check | Gyubong Lee | Draft |
 | [1038](BEP-1038-image-v2-gql-implementation.md) | ImageV2 GQL Implementation | Gyubong Lee | Draft |
 | [1039](BEP-1039-image-id-based-service-logic-migration.md) | Image ID Based Service Logic Migration | Gyubong Lee | Draft |
+| [1040](BEP-1040-multiple-path-zip-download-implementation.md) | Multiple Files Download in ZIP | TaekYoung Kwon | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
