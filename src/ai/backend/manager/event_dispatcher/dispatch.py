@@ -59,15 +59,12 @@ from ai.backend.common.events.event_types.notification.anycast import (
     NotificationTriggeredEvent,
 )
 from ai.backend.common.events.event_types.schedule.anycast import (
-    DoCheckPrecondEvent,
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
-    DoScheduleEvent,
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
-    DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
@@ -400,15 +397,6 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_agent_started,
             name="dispatcher.schedule",
-        )
-        event_dispatcher.consume(
-            DoScheduleEvent, None, self._schedule_event_handler.handle_do_schedule, coalescing_opts
-        )
-        event_dispatcher.consume(
-            DoStartSessionEvent, None, self._schedule_event_handler.handle_do_start_session
-        )
-        event_dispatcher.consume(
-            DoCheckPrecondEvent, None, self._schedule_event_handler.handle_do_check_precond
         )
         # Sokovan scheduler events
         event_dispatcher.consume(

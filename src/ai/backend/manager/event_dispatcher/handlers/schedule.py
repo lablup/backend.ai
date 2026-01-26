@@ -2,15 +2,12 @@ import logging
 
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
-    DoCheckPrecondEvent,
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
-    DoScheduleEvent,
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
-    DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
@@ -69,24 +66,6 @@ class ScheduleEventHandler:
     ) -> None:
         # Request scheduling for next cycle through SchedulingController
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
-
-    async def handle_do_schedule(self, context: None, agent_id: str, ev: DoScheduleEvent) -> None:
-        # Request scheduling for next cycle through SchedulingController
-        await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
-
-    async def handle_do_start_session(
-        self, context: None, agent_id: str, ev: DoStartSessionEvent
-    ) -> None:
-        # Request start scheduling through SchedulingController
-        await self._scheduling_controller.mark_scheduling_needed([ScheduleType.START])
-
-    async def handle_do_check_precond(
-        self, context: None, agent_id: str, ev: DoCheckPrecondEvent
-    ) -> None:
-        # Request check precondition through SchedulingController
-        await self._scheduling_controller.mark_scheduling_needed([
-            ScheduleType.CHECK_PRECONDITION,
-        ])
 
     async def handle_do_sokovan_process_if_needed(
         self, context: None, agent_id: str, ev: DoSokovanProcessIfNeededEvent

@@ -46,15 +46,11 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.event_types.schedule.anycast import (
-    DoStartSessionEvent,
-)
 from ai.backend.common.events.event_types.session.anycast import (
     SessionStartedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
-    SessionStartedBroadcastEvent,
     SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -1747,8 +1743,6 @@ class SessionLifecycleManager:
         session_row: SessionRow,
     ) -> None:
         match session_row.status:
-            case SessionStatus.PREPARED:
-                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 creation_id = session_row.creation_id or ""
                 log.debug(
@@ -1756,9 +1750,8 @@ class SessionLifecycleManager:
                     session_row.id,
                     creation_id,
                 )
-                await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedAnycastEvent(session_row.id, creation_id),
-                    SessionStartedBroadcastEvent(session_row.id, creation_id),
+                await self.event_producer.anycast_event(
+                    SessionStartedAnycastEvent(session_row.id, creation_id)
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",

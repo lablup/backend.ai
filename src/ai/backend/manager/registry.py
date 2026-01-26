@@ -73,7 +73,6 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
-    SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
@@ -2423,9 +2422,8 @@ class AgentRegistry:
 
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
-        await self.event_producer.anycast_and_broadcast_event(
-            SessionStartedAnycastEvent(session.id, session.creation_id or ""),
-            SessionStartedBroadcastEvent(session.id, session.creation_id or ""),
+        await self.event_producer.anycast_event(
+            SessionStartedAnycastEvent(session.id, session.creation_id or "")
         )
 
         if session.session_type == SessionTypes.BATCH:

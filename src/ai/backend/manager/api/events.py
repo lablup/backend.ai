@@ -259,14 +259,10 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     # Keep legacy event dispatcher subscriptions for backward compatibility
     # These now delegate to the event hub
     event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, _propagate_events)
-    # event_dispatcher.subscribe(SessionScheduledBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
     event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, _propagate_events)
-    # event_dispatcher.subscribe(SessionPreparingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
-    # event_dispatcher.subscribe(SessionCreatingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
-    # event_dispatcher.subscribe(SessionStartedBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
     event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, _propagate_events)

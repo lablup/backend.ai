@@ -26,8 +26,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionFailureBroadcastEvent,
-    SessionScheduledBroadcastEvent,
-    SessionStartedBroadcastEvent,
     SessionSuccessBroadcastEvent,
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
@@ -149,8 +147,6 @@ class SessionEventPropagator(EventPropagator):
                 return await self._fetch_kernel_data(event)
             case (
                 SessionEnqueuedBroadcastEvent()
-                | SessionScheduledBroadcastEvent()
-                | SessionStartedBroadcastEvent()
                 | SessionCancelledBroadcastEvent()
                 | SessionTerminatingBroadcastEvent()
                 | SessionTerminatedBroadcastEvent()
