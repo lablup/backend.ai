@@ -168,38 +168,42 @@ HTTP services can adopt request ID middleware incrementally - no breaking change
    - Option A: Agent advertises capabilities during registration
    - Option B: Always send headers (legacy Agents ignore unknown fields)
 
-2. **WebSocket Sessions**: How should long-lived WebSocket connections handle request IDs?
-   - Option A: One request_id per connection
-   - Option B: New request_id per message
-
-3. **Event System**: Should event handlers maintain the original request_id or generate new ones?
+2. **Event System**: Should event handlers maintain the original request_id or generate new ones?
    - Recommendation: Maintain original for causality tracking
 
 ## Ideation
 
 Ideas under consideration for future iterations. These are not part of the current proposal.
 
-### Source-Prefixed Request IDs
+### Structured Request ID Data
 
-Currently, all request IDs are plain UUIDs (e.g., `550e8400-e29b-41d4-a716-446655440000`). Consider adding a source prefix to indicate where the request originated:
+Instead of plain UUID strings, use a structured type to carry origin metadata:
 
-| Source | Format | Example |
-|--------|--------|---------|
-| Client SDK | `client-{uuid4}` | `client-550e8400-e29b-41d4-a716-446655440000` |
-| Web UI | `webui-{uuid4}` | `webui-6ba7b810-9dad-11d1-80b4-00c04fd430c8` |
-| Manager (internal) | `mgr-{uuid4}` | `mgr-f47ac10b-58cc-4372-a567-0e02b2c3d479` |
-| Agent (internal) | `agent-{uuid4}` | `agent-7c9e6679-7425-40de-944b-e07fc1f90ae7` |
-| Background task | `bgtask-{uuid4}` | `bgtask-a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11` |
+```python
+@dataclass
+class RequestIdData:
+    request_id: str                    # UUID string
+    component_source: str              # Where generated: "manager", "agent", "storage-proxy"
+    source_detail: str | None = None   # Optional detail: "event_handler", "background_task", "rpc_handler"
+```
+
+| component_source | source_detail (examples) | Description |
+|------------------|--------------------------|-------------|
+| `manager` | `None` | HTTP API request |
+| `manager` | `event_handler` | Event handler processing |
+| `manager` | `background_task` | Background task execution |
+| `agent` | `rpc_handler` | Agent RPC handler |
+| `storage-proxy` | `background_task` | Storage background task |
 
 **Benefits:**
 - Quickly identify request origin when debugging
-- Filter logs by source type
-- Understand request flow patterns
+- Filter logs by component and detail
+- Structured data enables better querying
+- No string parsing required (unlike prefix approach)
 
 **Considerations:**
-- Requires coordination across all entry points
-- Client SDK would need to be updated to use the prefix
-- Backward compatibility with existing plain UUID format
+- Requires updating context utilities to handle structured data
+- Serialization format for RPC/HTTP headers (JSON or separate headers)
 
 ## References
 
