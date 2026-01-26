@@ -111,54 +111,6 @@ class KernelEventHandler:
         finally:
             log_buffer.close()
 
-    async def handle_kernel_creation_lifecycle(
-        self,
-        context: None,
-        source: AgentId,
-        event: (
-            KernelPreparingAnycastEvent
-            | KernelPullingAnycastEvent
-            | KernelCreatingAnycastEvent
-            | KernelStartedAnycastEvent
-            | KernelCancelledAnycastEvent
-        ),
-    ) -> None:
-        """
-        Update the database and perform post_create_kernel() upon
-        the events for each step of kernel creation.
-
-        To avoid race condition between consumer and subscriber event handlers,
-        we only have this handler to subscribe all kernel creation events,
-        but distinguish which one to process using a unique creation_id
-        generated when initiating the create_kernels() agent RPC call.
-        """
-        log.debug(
-            "handle_kernel_creation_lifecycle: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
-        match event:
-            case KernelPreparingAnycastEvent():
-                # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
-                pass
-            case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
-                async with self._db.connect() as db_conn:
-                    await self._registry.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-            case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
-                async with self._db.connect() as db_conn:
-                    await self._registry.mark_kernel_creating(
-                        db_conn, kernel_id, session_id, reason
-                    )
-            case KernelStartedAnycastEvent(
-                kernel_id, session_id, reason=reason, creation_info=creation_info
-            ):
-                async with self._db.connect() as db_conn:
-                    await self._registry.mark_kernel_running(
-                        db_conn, kernel_id, session_id, reason, creation_info
-                    )
-            case KernelCancelledAnycastEvent():
-                log.warning(f"Kernel cancelled, {event.reason = }")
-
     async def handle_kernel_preparing(
         self,
         context: None,
