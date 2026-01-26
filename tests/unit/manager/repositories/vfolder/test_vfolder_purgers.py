@@ -15,8 +15,6 @@ import sqlalchemy as sa
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
-
-# Import Row classes to ensure SQLAlchemy mapper initialization
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
