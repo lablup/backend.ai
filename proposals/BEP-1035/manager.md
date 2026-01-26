@@ -47,38 +47,16 @@ Include `X-Backend-Request-ID` header in all outbound HTTP requests.
 
 ## Request Flow
 
-### Session Creation
-
 ```
-Client                    Manager                    Agent
-   │                         │                         │
-   │  POST /sessions         │                         │
+Client                    Manager                   Service
+   │                         │                    (Agent/Storage/App-Proxy)
+   │  HTTP Request           │                         │
    ├────────────────────────▶│                         │
    │                         │                         │
-   │               middleware generates request_id     │
+   │         middleware generates request_id           │
    │                         │                         │
-   │                         │  RPC: create_kernel     │
-   │                         │  headers.request_id     │
-   │                         ├────────────────────────▶│
-   │                         │                         │
-   │                         │◀────────────────────────┤
-   │                         │                         │
-   │  X-Backend-Request-ID   │                         │
-   │◀────────────────────────┤                         │
-```
-
-### VFolder Upload
-
-```
-Client                    Manager               Storage-Proxy
-   │                         │                         │
-   │  POST /folders/upload   │                         │
-   ├────────────────────────▶│                         │
-   │                         │                         │
-   │               middleware generates request_id     │
-   │                         │                         │
-   │                         │  POST /upload           │
-   │                         │  X-Backend-Request-ID   │
+   │                         │  RPC or HTTP call       │
+   │                         │  (with request_id)      │
    │                         ├────────────────────────▶│
    │                         │                         │
    │                         │◀────────────────────────┤
