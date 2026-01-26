@@ -154,6 +154,7 @@ class FieldType(enum.StrEnum):
     """
 
     KERNEL = "kernel"
+    MODEL_REVISION = "model_revision"
 
 
 class ScopeType(enum.StrEnum):

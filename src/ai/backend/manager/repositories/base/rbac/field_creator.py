@@ -9,7 +9,7 @@ from typing import Generic, TypeVar
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.data.permission.types import EntityType, FieldType
+from ai.backend.common.data.permission.types import EntityType, FieldType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow

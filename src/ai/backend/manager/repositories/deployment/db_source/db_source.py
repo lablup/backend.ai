@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.permission.types import EntityType, FieldType
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -24,7 +25,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -50,6 +51,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     ScalingGroupCleanupConfig,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
@@ -103,11 +105,21 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+)
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
     execute_purger,
+)
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.rbac.field_creator import (
+    RBACFieldCreator,
+    execute_rbac_field_creator,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -118,7 +130,9 @@ from ai.backend.manager.repositories.base.updater import (
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
+    DeploymentRevisionCreatorSpec,
 )
+from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,
     RouteServiceDiscoveryInfo,
@@ -210,7 +224,7 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        creator: Creator[EndpointRow],
+        creator: RBACEntityCreator[EndpointRow],
         policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo.
@@ -225,9 +239,10 @@ class DeploymentDBSource:
         spec = cast(DeploymentCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
-            endpoint = spec.build_row()
-            db_sess.add(endpoint)
-            await db_sess.flush()
+
+            # Create endpoint with RBAC scope association
+            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
+            endpoint = rbac_result.row
 
             # Create deployment policy if provided
             if policy_config is not None:
@@ -252,32 +267,30 @@ class DeploymentDBSource:
 
     async def create_endpoint_legacy(
         self,
-        creator: DeploymentCreator,
+        creator: RBACEntityCreator[EndpointRow],
     ) -> DeploymentInfo:
         """Create a new endpoint using legacy DeploymentCreator.
 
         This is for backward compatibility with legacy deployment creation flow.
 
         Args:
-            creator: Legacy DeploymentCreator with ImageIdentifier
+            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
+                The spec MUST be an instance of LegacyEndpointCreatorSpec.
 
         Returns:
             DeploymentInfo for the created endpoint
         """
+        spec = cast(LegacyEndpointCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
-            await self._check_group_exists(db_sess, creator.domain, creator.project)
-            endpoint = await EndpointRow.from_deployment_creator(db_sess, creator)
-            db_sess.add(endpoint)
-            await db_sess.flush()
+            await self._check_group_exists(db_sess, spec.domain, spec.project)
+
+            # Create endpoint with RBAC scope association
+            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
+            endpoint = rbac_result.row
 
             # Create deployment policy if provided
-            if creator.policy is not None:
-                policy_row = DeploymentPolicyRow(
-                    endpoint=endpoint.id,
-                    strategy=creator.policy.strategy,
-                    strategy_spec=creator.policy.strategy_spec.model_dump(),
-                    rollback_on_failure=creator.policy.rollback_on_failure,
-                )
+            if spec.policy is not None:
+                policy_row = spec.policy.build_row()
                 db_sess.add(policy_row)
                 await db_sess.flush()
 
@@ -310,6 +323,19 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         if result.first() is None:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
+
+    async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
+        """Get image ID from ImageIdentifier.
+
+        Args:
+            image: ImageIdentifier containing canonical and architecture
+
+        Returns:
+            UUID of the image
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            image_row = await ImageRow.lookup(db_sess, image)
+            return image_row.id
 
     async def get_endpoint(
         self,
@@ -1895,8 +1921,16 @@ class DeploymentDBSource:
         This requires adding a `revision_history_limit` column to EndpointRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
+            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
+
+            rbac_creator: RBACFieldCreator[DeploymentRevisionRow] = RBACFieldCreator(
+                spec=spec,
+                entity_type=EntityType.MODEL_DEPLOYMENT,
+                entity_id=str(spec.endpoint_id),
+                field_type=FieldType.MODEL_REVISION,
+            )
+            rbac_result = await execute_rbac_field_creator(db_sess, rbac_creator)
+            return rbac_result.row.to_data()
 
     async def get_revision(
         self,
