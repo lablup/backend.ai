@@ -76,8 +76,6 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -482,15 +480,9 @@ class Dispatchers:
             SessionEnqueuedAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
-            SessionScheduledAnycastEvent, None, self._session_event_handler.invoke_session_callback
-        )
-        evd.consume(
             SessionCheckingPrecondAnycastEvent,
             None,
             self._session_event_handler.invoke_session_callback,
-        )
-        evd.consume(
-            SessionPreparingAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
             SessionSuccessAnycastEvent, None, self._session_event_handler.handle_batch_result

@@ -90,14 +90,6 @@ class SessionEnqueuedBroadcastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledBroadcastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_scheduled"
-
-
-@dataclass
 class SessionCheckingPrecondBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
@@ -106,27 +98,11 @@ class SessionCheckingPrecondBroadcastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionPreparingBroadcastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_preparing"
-
-
-@dataclass
 class SessionCancelledBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "session_cancelled"
-
-
-@dataclass
-class SessionStartedBroadcastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_started"
 
 
 @dataclass

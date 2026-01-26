@@ -19,8 +19,6 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -194,9 +192,7 @@ class SessionEventHandler:
         source: AgentId,
         event: (
             SessionEnqueuedAnycastEvent
-            | SessionScheduledAnycastEvent
             | SessionCheckingPrecondAnycastEvent
-            | SessionPreparingAnycastEvent
             | SessionStartedAnycastEvent
             | SessionCancelledAnycastEvent
             | SessionTerminatingAnycastEvent

@@ -119,27 +119,11 @@ class SessionEnqueuedAnycastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_scheduled"
-
-
-@dataclass
 class SessionCheckingPrecondAnycastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "session_checking_precondition"
-
-
-@dataclass
-class SessionPreparingAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_preparing"
 
 
 @dataclass
