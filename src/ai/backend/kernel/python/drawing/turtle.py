@@ -42,7 +42,7 @@ class Vec2D(tuple):
         return (self[0], self[1])
 
     def __repr__(self) -> str:
-        return "(%.2f,%.2f)" % self
+        return "({:.2f},{:.2f})".format(*self)
 
 
 class Turtle:
