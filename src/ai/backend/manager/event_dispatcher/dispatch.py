@@ -110,7 +110,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -133,7 +132,6 @@ class DispatcherArgs:
     valkey_container_log: ValkeyContainerLogClient
     valkey_stat: ValkeyStatClient
     valkey_stream: ValkeyStreamClient
-    scheduler_dispatcher: SchedulerDispatcher
     schedule_coordinator: ScheduleCoordinator
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
@@ -190,7 +188,6 @@ class Dispatchers:
             args.schedule_coordinator,
         )
         self._schedule_event_handler = ScheduleEventHandler(
-            args.scheduler_dispatcher,
             args.schedule_coordinator,
             args.scheduling_controller,
             args.deployment_coordinator,

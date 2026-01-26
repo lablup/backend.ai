@@ -20,7 +20,6 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -33,24 +32,20 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ScheduleEventHandler:
-    _scheduler_dispatcher: SchedulerDispatcher
     _schedule_coordinator: ScheduleCoordinator
     _scheduling_controller: SchedulingController
     _deployment_coordinator: DeploymentCoordinator
     _route_coordinator: RouteCoordinator
     _event_hub: EventHub
-    _use_sokovan: bool
 
     def __init__(
         self,
-        scheduler_dispatcher: SchedulerDispatcher,
         schedule_coordinator: ScheduleCoordinator,
         scheduling_controller: SchedulingController,
         deployment_coordinator: DeploymentCoordinator,
         route_coordinator: RouteCoordinator,
         event_hub: EventHub,
     ) -> None:
-        self._scheduler_dispatcher = scheduler_dispatcher
         self._schedule_coordinator = schedule_coordinator
         self._scheduling_controller = scheduling_controller
         self._deployment_coordinator = deployment_coordinator
