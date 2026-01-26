@@ -196,12 +196,10 @@ class KernelMetadataInfoGQL:
 
 ### KernelV2GQL
 
-> **Note**: `image: ImageNode` is **deferred** (see types-to-defer.md)
-
 ```python
 class KernelV2GQL(Node):
     id: NodeID[str]
-    image_id: str | None
+    image: KernelImageInfoGQL
     session: KernelSessionInfoGQL
     user_permission: KernelUserPermissionInfoGQL
     network: KernelNetworkInfoGQL

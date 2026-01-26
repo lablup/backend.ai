@@ -77,7 +77,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 
 | Type/Field | ID Field (Include Now) | Future Node (Defer) |
 |------------|------------------------|---------------------|
-| `KernelV2GQL` | `image_id: str` | `image: ImageNode` |
+| `KernelImageInfoGQL` | `image_id: str` | `image: ImageNode` |
 | `KernelUserPermissionInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
 | `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
@@ -92,7 +92,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 - [ ] Implement all types listed in "Types to Include"
 - [ ] Skip all types listed in "Types to Skip"
 - [ ] Include ID fields for deferred Node types:
-  - `KernelV2GQL`: add `image_id`
+  - `KernelImageInfoGQL`: add `image_id`
   - `KernelUserPermissionInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id` (plus `uid`, `main_gid`, `gids`)
   - `KernelSessionInfoGQL`: include `session_id`
   - `KernelResourceInfoGQL`: include `agent_id`, `resource_group_name`
