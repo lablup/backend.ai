@@ -170,3 +170,20 @@ class InvalidStorageTargetError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class UploadOffsetMismatchError(BackendAIError, web.HTTPConflict):
+    """
+    Raised when the client's Upload-Offset header does not match the server's
+    actual file size per TUS protocol specification (returns 409 Conflict).
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/upload-offset-mismatch"
+    error_title = "Upload Offset Mismatch"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
