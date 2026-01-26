@@ -6,18 +6,24 @@ These types reference entities that should be represented as proper Relay Node c
 
 ## Summary
 
-| Type/Field | Future Node | Action |
-|------------|-------------|--------|
-| `KernelImageInfoGQL` | `ImageNode` | Do not include entire type |
-| `KernelV2GQL.image` | `ImageNode` | Omit field |
-| `KernelUserPermissionInfoGQL.user_uuid` | `UserNode` | Omit field |
-| `KernelUserPermissionInfoGQL.access_key` | `KeypairNode` | Omit field |
-| `KernelUserPermissionInfoGQL.domain_name` | `DomainNode` | Omit field |
-| `KernelUserPermissionInfoGQL.group_id` | `GroupNode` | Omit field |
-| `KernelSessionInfoGQL.session_id` | `SessionNode` | Omit field |
-| `KernelResourceInfoGQL.scaling_group` | `ScalingGroupNode` | Omit field |
-| `VFolderMountGQL` | `VFolderNode` | Do not include |
-| `KernelRuntimeInfoGQL.vfolder_mounts` | `VFolderNode` | Omit field |
+For each deferred Node type, we include the **ID field immediately** (for direct fetching) and defer only the **Node connection** (for full object resolution).
+
+| Type/Field | ID Field (Include Now) | Future Node (Defer) |
+|------------|------------------------|---------------------|
+| `KernelV2GQL.image` | `image_id: str` | `image: ImageNode` |
+| `KernelUserPermissionInfoGQL` | `user_id: uuid.UUID` | `user: UserNode` |
+| `KernelUserPermissionInfoGQL` | `access_key: str` | `keypair: KeypairNode` |
+| `KernelUserPermissionInfoGQL` | `domain_name: str` | `domain: DomainNode` |
+| `KernelUserPermissionInfoGQL` | `group_id: uuid.UUID` | `project: GroupNode` |
+| `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
+| `KernelResourceInfoGQL` | `scaling_group_name: str` | `scaling_group: ScalingGroupNode` |
+| `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
+
+### Types to Skip Entirely
+| Type | Reason |
+|------|--------|
+| `KernelImageInfoGQL` | Replaced by `ImageNode` connection |
+| `VFolderMountGQL` | Replaced by `VFolderNode` connection |
 
 ---
 
@@ -29,7 +35,7 @@ These types reference entities that should be represented as proper Relay Node c
 
 ### KernelV2GQL.image field
 
-**Action**: Omit this field from `KernelV2GQL`.
+**Action**: Include `image_ref: str | None` field now. Defer `image: ImageNode` connection.
 
 ---
 
@@ -37,28 +43,38 @@ These types reference entities that should be represented as proper Relay Node c
 
 ### KernelUserPermissionInfoGQL
 
-This type needs significant modification. Most fields should be deferred:
+This type includes ID fields immediately, with Node connections deferred:
 
-| Field | Future Node | Keep? |
-|-------|-------------|-------|
-| `user_uuid` | `UserNode` | No |
-| `access_key` | `KeypairNode` | No |
-| `domain_name` | `DomainNode` | No |
-| `group_id` | `GroupNode` | No |
-| `uid` | - | Yes (Unix UID, primitive) |
-| `main_gid` | - | Yes (Unix GID, primitive) |
-| `gids` | - | Yes (Unix GIDs, primitive) |
+| Field | Type | Include Now? | Future Node |
+|-------|------|--------------|-------------|
+| `user_id` | `uuid.UUID \| None` | Yes | `user: UserNode` |
+| `access_key` | `str \| None` | Yes | `keypair: KeypairNode` |
+| `domain_name` | `str \| None` | Yes | `domain: DomainNode` |
+| `group_id` | `uuid.UUID \| None` | Yes | `project: GroupNode` |
+| `uid` | `int \| None` | Yes | - |
+| `main_gid` | `int \| None` | Yes | - |
+| `gids` | `list[int] \| None` | Yes | - |
 
-**Action**: Only keep `uid`, `main_gid`, `gids` fields (Unix process permissions). All entity references should be Node connections.
+**Action**: Include all ID fields now. Defer Node connections to future PRs.
 
-**Resulting type**:
+**Resulting type (current PR)**:
 ```python
 @strawberry.type(name="KernelUserPermissionInfo")
 class KernelUserPermissionInfoGQL:
+    user_id: uuid.UUID | None
+    access_key: str | None
+    domain_name: str | None
+    group_id: uuid.UUID | None
     uid: int | None
     main_gid: int | None
     gids: list[int] | None
 ```
+
+**Future additions**:
+- `user: UserNode | None`
+- `keypair: KeypairNode | None`
+- `domain: DomainNode | None`
+- `project: GroupNode | None`
 
 ---
 
@@ -66,16 +82,20 @@ class KernelUserPermissionInfoGQL:
 
 ### KernelSessionInfoGQL.session_id
 
-**Action**: Omit `session_id` field. The session should be accessed via `SessionNode` connection.
+**Action**: Include `session_id` field now. Defer `session: SessionNode` connection.
 
-**Resulting type**:
+**Resulting type (current PR)**:
 ```python
 @strawberry.type(name="KernelSessionInfo")
 class KernelSessionInfoGQL:
+    session_id: uuid.UUID | None
     creation_id: str | None
     name: str | None
     session_type: SessionTypesGQL
 ```
+
+**Future additions**:
+- `session: SessionNode | None`
 
 ---
 
@@ -83,7 +103,10 @@ class KernelSessionInfoGQL:
 
 ### KernelResourceInfoGQL.scaling_group
 
-**Action**: Omit `scaling_group` field. Will be replaced by `ScalingGroupNode` connection.
+**Action**: Include `scaling_group_name: str | None` field now. Defer `scaling_group: ScalingGroupNode` connection.
+
+**Future additions**:
+- `scaling_group: ScalingGroupNode | None`
 
 ---
 
@@ -91,23 +114,26 @@ class KernelSessionInfoGQL:
 
 ### VFolderMountGQL
 
-**Action**: Do not include in `common/types.py`.
+**Action**: Do not include in `common/types.py`. Will be replaced by `VFolderNode` connection.
 
 ### KernelRuntimeInfoGQL.vfolder_mounts
 
-**Action**: Omit `vfolder_mounts` field.
+**Action**: Include `vfolder_ids: list[uuid.UUID] | None` field now. Defer `vfolders: list[VFolderNode]` connection.
+
+**Future additions**:
+- `vfolders: list[VFolderNode] | None`
 
 ---
 
 ## Future Implementation PRs
 
-| PR | Fields to Add |
-|----|---------------|
-| ImageNode PR | `KernelV2GQL.image` |
-| UserNode PR | `KernelV2GQL.owner` (replaces `user_uuid`) |
-| KeypairNode PR | `KernelV2GQL.keypair` (replaces `access_key`) |
-| DomainNode PR | `KernelV2GQL.domain` (replaces `domain_name`) |
-| GroupNode PR | `KernelV2GQL.project` (replaces `group_id`) |
-| SessionNode PR | `KernelV2GQL.session` (replaces `session_id`) |
-| ScalingGroupNode PR | `KernelV2GQL.scaling_group` |
-| VFolderNode PR | `KernelV2GQL.mounted_vfolders` |
+| PR | Node Connections to Add |
+|----|-------------------------|
+| ImageNode PR | `KernelV2GQL.image: ImageNode` |
+| UserNode PR | `KernelUserPermissionInfoGQL.user: UserNode` |
+| KeypairNode PR | `KernelUserPermissionInfoGQL.keypair: KeypairNode` |
+| DomainNode PR | `KernelUserPermissionInfoGQL.domain: DomainNode` |
+| GroupNode PR | `KernelUserPermissionInfoGQL.project: GroupNode` |
+| SessionNode PR | `KernelSessionInfoGQL.session: SessionNode` |
+| ScalingGroupNode PR | `KernelResourceInfoGQL.scaling_group: ScalingGroupNode` |
+| VFolderNode PR | `KernelRuntimeInfoGQL.vfolders: list[VFolderNode]` |

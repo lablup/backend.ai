@@ -84,18 +84,19 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 | `KernelStatusHistoryEntryGQL` | Replaced by new status tracking design |
 | `KernelStatusHistoryGQL` | Replaced by new status tracking design |
 
-### Types to Defer (Node Connections)
+### Types to Defer (Node Connections Only)
 
-| Type/Field | Future Node | Action |
-|------------|-------------|--------|
-| `KernelImageInfoGQL` | `ImageNode` | Do not include |
-| `KernelUserPermissionInfoGQL.user_uuid` | `UserNode` | Omit field |
-| `KernelUserPermissionInfoGQL.access_key` | `KeypairNode` | Omit field |
-| `KernelUserPermissionInfoGQL.domain_name` | `DomainNode` | Omit field |
-| `KernelUserPermissionInfoGQL.group_id` | `GroupNode` | Omit field |
-| `KernelSessionInfoGQL.session_id` | `SessionNode` | Omit field |
-| `KernelResourceInfoGQL.scaling_group` | `ScalingGroupNode` | Omit field |
-| `KernelRuntimeInfoGQL.vfolder_mounts` | `VFolderNode` | Omit field |
+For each deferred Node type, we include the **ID field now** and defer only the **Node connection**.
+
+| Type/Field | ID Field (Include Now) | Future Node (Defer) |
+|------------|------------------------|---------------------|
+| `KernelV2GQL` | `image_ref: str` | `image: ImageNode` |
+| `KernelUserPermissionInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
+| `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
+| `KernelResourceInfoGQL` | `scaling_group_name: str` | `scaling_group: ScalingGroupNode` |
+| `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
+
+**Types to skip entirely**: `KernelImageInfoGQL`, `VFolderMountGQL`
 
 ## Implementation Checklist
 
@@ -103,26 +104,26 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 
 - [ ] Implement all types listed in "Types to Include"
 - [ ] Skip all types listed in "Types to Skip"
-- [ ] Omit fields listed in "Types to Defer":
-  - `KernelImageInfoGQL` entire type
-  - `KernelUserPermissionInfoGQL`: keep only `uid`, `main_gid`, `gids`
-  - `KernelSessionInfoGQL`: omit `session_id`
-  - `KernelResourceInfoGQL`: omit `scaling_group`, add `agent: AgentNode`
-  - `KernelRuntimeInfoGQL`: omit `vfolder_mounts`
-- [ ] Update `KernelLifecycleInfoGQL` to remove `status_history` field
+- [ ] Include ID fields for deferred Node types:
+  - `KernelV2GQL`: add `image_id`
+  - `KernelUserPermissionInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id` (plus `uid`, `main_gid`, `gids`)
+  - `KernelSessionInfoGQL`: include `session_id`
+  - `KernelResourceInfoGQL`: include `agent_id`, `scaling_group_name`
+  - `KernelRuntimeInfoGQL`: include `vfolder_ids`
+- [ ] Update `KernelLifecycleInfoGQL` to remove `status_history` and `status_info` fields
 - [ ] Update `KernelStatusDataContainerGQL` to remove `scheduler` field
 - [ ] Update `from_kernel_info()` method to match new type structure
 
 ### Future PRs
 
-- [ ] ImageNode PR: Add `image` connection
-- [ ] UserNode PR: Add `owner` connection
-- [ ] KeypairNode PR: Add `keypair` connection
-- [ ] DomainNode PR: Add `domain` connection
-- [ ] GroupNode PR: Add `project` connection
-- [ ] SessionNode PR: Add `session` connection
-- [ ] ScalingGroupNode PR: Add `scaling_group` connection
-- [ ] VFolderNode PR: Add `mounted_vfolders` connection
+- [ ] ImageNode PR: Add `image: ImageNode` to `KernelV2GQL`
+- [ ] UserNode PR: Add `user: UserNode` to `KernelUserPermissionInfoGQL`
+- [ ] KeypairNode PR: Add `keypair: KeypairNode` to `KernelUserPermissionInfoGQL`
+- [ ] DomainNode PR: Add `domain: DomainNode` to `KernelUserPermissionInfoGQL`
+- [ ] GroupNode PR: Add `project: GroupNode` to `KernelUserPermissionInfoGQL`
+- [ ] SessionNode PR: Add `session: SessionNode` to `KernelSessionInfoGQL`
+- [ ] ScalingGroupNode PR: Add `scaling_group: ScalingGroupNode` to `KernelResourceInfoGQL`
+- [ ] VFolderNode PR: Add `vfolders: list[VFolderNode]` to `KernelRuntimeInfoGQL`
 
 ## References
 

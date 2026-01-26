@@ -104,10 +104,11 @@ class KernelInternalDataGQL:
 
 ### KernelSessionInfoGQL
 
-> **Note**: `session_id` is **omitted** (see types-to-defer.md)
+> **Note**: `session: SessionNode` is **deferred** (see types-to-defer.md)
 
 ```python
 class KernelSessionInfoGQL:
+    session_id: uuid.UUID | None
     creation_id: str | None
     name: str | None
     session_type: SessionTypesGQL
@@ -126,10 +127,14 @@ class KernelClusterInfoGQL:
 
 ### KernelUserPermissionInfoGQL
 
-> **Note**: `user_uuid`, `access_key`, `domain_name`, `group_id` are **omitted** (see types-to-defer.md)
+> **Note**: `user: UserNode`, `keypair: KeypairNode`, `domain: DomainNode`, `project: GroupNode` are **deferred** (see types-to-defer.md)
 
 ```python
 class KernelUserPermissionInfoGQL:
+    user_id: uuid.UUID | None
+    access_key: str | None
+    domain_name: str | None
+    group_id: uuid.UUID | None
     uid: int | None
     main_gid: int | None
     gids: list[int] | None
@@ -158,7 +163,7 @@ class KernelAttachedDevicesGQL:
 
 ### KernelResourceInfoGQL
 
-> **Note**: `scaling_group` is **omitted** (see types-to-defer.md)
+> **Note**: `scaling_group: ScalingGroupNode` is **deferred** (see types-to-defer.md)
 >
 > **Field Renames**: `occupied_slots` → `used`, `requested_slots` → `requested`, `occupied_shares` → `shares`
 
@@ -166,6 +171,7 @@ class KernelAttachedDevicesGQL:
 class KernelResourceInfoGQL:
     agent_id: uuid.UUID | None
     agent: AgentNode | None
+    scaling_group_name: str | None
     container_id: str | None
     used: ResourceSlotGQL
     requested: ResourceSlotGQL
@@ -176,10 +182,11 @@ class KernelResourceInfoGQL:
 
 ### KernelRuntimeInfoGQL
 
-> **Note**: `vfolder_mounts` is **omitted** (see types-to-defer.md)
+> **Note**: `vfolders: list[VFolderNode]` is **deferred** (see types-to-defer.md)
 
 ```python
 class KernelRuntimeInfoGQL:
+    vfolder_ids: list[uuid.UUID] | None
     environ: EnvironmentVariables | None
     bootstrap_script: str | None
     startup_command: str | None
@@ -234,11 +241,12 @@ class KernelMetadataInfoGQL:
 
 ### KernelV2GQL
 
-> **Note**: `image` field is **omitted** (see types-to-defer.md)
+> **Note**: `image: ImageNode` is **deferred** (see types-to-defer.md)
 
 ```python
 class KernelV2GQL(Node):
     id: NodeID[str]
+    image_id: str | None
     session: KernelSessionInfoGQL
     user_permission: KernelUserPermissionInfoGQL
     network: KernelNetworkInfoGQL
