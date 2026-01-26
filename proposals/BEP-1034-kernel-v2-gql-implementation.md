@@ -29,6 +29,9 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 
 ### Types to Include
 
+#### Enums
+- `KernelOrderField` - Ordering field enum
+
 #### Input Types (Filter/Order)
 - `KernelStatusFilterGQL` - Status filter input
 - `KernelFilterGQL` - Main filter input

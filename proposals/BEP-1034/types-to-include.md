@@ -4,6 +4,16 @@ This document lists all types to be implemented with their fields.
 
 ---
 
+## Enums
+
+### KernelOrderField
+```python
+class KernelOrderField(StrEnum):
+    CREATED_AT = "created_at"
+```
+
+---
+
 ## Input Types
 
 ### KernelStatusFilterGQL
