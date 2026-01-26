@@ -26,9 +26,9 @@ class KernelStatusFilterGQL:
 ### KernelFilterGQL
 ```python
 class KernelFilterGQL:
-    id: UUID | None
+    id: UUIDFilter | None
     status: KernelStatusFilterGQL | None
-    session_id: UUID | None
+    session_id: UUIDFilter | None
 ```
 
 ### KernelOrderByGQL
