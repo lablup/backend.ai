@@ -25,7 +25,7 @@ async def verify_user_access_scopes(db: ExtendedAsyncSAEngine, owner_uuid: uuid.
         try:
             await check_if_requester_is_eligible_to_act_as_target_user_uuid(
                 conn,
-                UserRole(user_data.role),
+                user_data.role,
                 user_data.domain_name,
                 owner_uuid,
             )
@@ -55,8 +55,7 @@ def validate_endpoint_access(
     if validation_data.session_owner_id is None:
         return True
 
-    user_role = UserRole(user_data.role)
-    match user_role:
+    match user_data.role:
         case UserRole.SUPERADMIN:
             return True
         case UserRole.ADMIN:

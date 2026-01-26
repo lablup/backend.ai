@@ -22,7 +22,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common import validators as tx
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -703,7 +703,7 @@ def _setup_user_context(request: web.Request) -> ExitStack:
                         is_authorized=request.get("is_authorized", False),
                         is_admin=request.get("is_admin", False),
                         is_superadmin=request.get("is_superadmin", False),
-                        role=request["user"]["role"],
+                        role=UserRole(request["user"]["role"]),
                         domain_name=request["user"]["domain_name"],
                     )
                 )

@@ -77,8 +77,7 @@ class MessageMetadata:
         if "user" in result:
             user_data = result["user"]
             if isinstance(user_data, dict):
-                user = UserData(**user_data)
-                result["user"] = user
+                result["user"] = UserData.from_dict(user_data)
             else:
                 result["user"] = None
         return cls(**result)

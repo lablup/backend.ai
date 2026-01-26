@@ -15,7 +15,7 @@ import pytest
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -38,14 +38,12 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 @pytest.fixture
 def user_data() -> UserData:
     """User data for tests."""
-    from ai.backend.manager.models.user import UserRole
-
     return UserData(
         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
         is_authorized=True,
         is_admin=False,
         is_superadmin=False,
-        role=UserRole.USER.value,
+        role=UserRole.USER,
         domain_name="default",
     )
 

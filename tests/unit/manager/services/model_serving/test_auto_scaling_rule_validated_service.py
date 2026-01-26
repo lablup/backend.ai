@@ -54,7 +54,7 @@ class TestAutoScalingServiceSearch:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role=UserRole.USER.value,
+            role=UserRole.USER,
             domain_name="default",
         )
 
