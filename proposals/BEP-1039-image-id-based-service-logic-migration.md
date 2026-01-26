@@ -1,17 +1,13 @@
 ---
-Author: (Author Name)
+Author: Gyubong Lee (gbl@lablup.com)
 Status: Draft
-Created: 2025-01-26
-Created-Version: 25.1.0
-Target-Version:
+Created: 2026-01-26
+Created-Version: 26.2.0
+Target-Version: 26.2.0
 Implemented-Version:
 ---
 
 # Image ID Based Service Logic Migration
-
-## Related Issues
-
-- JIRA: BA-4036
 
 ## Migration Roadmap
 
@@ -50,8 +46,8 @@ Switching to `image_id` (UUID-based) provides:
 
 | Identifier | Type | Storage Location | Purpose |
 |------------|------|------------------|---------|
-| `image_canonical` | `str` | `ImageRow.name` | User-friendly reference (e.g., `registry/project/image:tag`) |
 | `image_id` (ImageID) | `UUID` | `ImageRow.id` | Internal DB primary key |
+| `image_canonical` | `str` | `ImageRow.name` | User-friendly reference (e.g., `registry/project/image:tag`) |
 
 ### Current Data Flow
 
@@ -497,5 +493,3 @@ Service logic     New schema        Client migration
 
 - [BEP-1010: New GQL](BEP-1010-new-gql.md)
 - [BEP-1038: ImageV2 GQL Implementation](BEP-1038-image-v2-gql-implementation.md) (Stage 2: New schema addition)
-- `src/ai/backend/common/types.py` - ImageID, ImageCanonical type definitions
-- `src/ai/backend/manager/models/image/row.py` - ImageRow model
