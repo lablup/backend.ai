@@ -8236,6 +8236,10 @@ enum SchedulingResult
   SUCCESS @join__enumValue(graph: STRAWBERRY)
   FAILURE @join__enumValue(graph: STRAWBERRY)
   STALE @join__enumValue(graph: STRAWBERRY)
+  NEED_RETRY @join__enumValue(graph: STRAWBERRY)
+  EXPIRED @join__enumValue(graph: STRAWBERRY)
+  GIVE_UP @join__enumValue(graph: STRAWBERRY)
+  SKIPPED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Status of session scheduling transitions"""
