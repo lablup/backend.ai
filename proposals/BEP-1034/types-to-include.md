@@ -50,6 +50,15 @@ class KernelInternalDataGQL:
 
 ## Sub-Info Types
 
+### KernelImageInfoGQL
+
+> **Note**: `image: ImageNode` is **deferred** (see types-to-defer.md)
+
+```python
+class KernelImageInfoGQL:
+    image_id: str | None
+```
+
 ### KernelSessionInfoGQL
 
 > **Note**: `session: SessionNode` is **deferred** (see types-to-defer.md)

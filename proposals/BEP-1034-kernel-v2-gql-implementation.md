@@ -38,6 +38,7 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelInternalDataGQL` - Internal kernel data
 
 #### Sub-Info Types
+- `KernelImageInfoGQL` - Image info (image deferred)
 - `KernelSessionInfoGQL` - Session info (session_id deferred)
 - `KernelClusterInfoGQL` - Cluster config
 - `KernelUserPermissionInfoGQL` - Unix process permissions only (most fields deferred)
@@ -82,7 +83,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 | `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
 | `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
 
-**Types to skip entirely**: `KernelImageInfoGQL`, `VFolderMountGQL`
+**Types to skip entirely**: `VFolderMountGQL`
 
 ## Implementation Checklist
 

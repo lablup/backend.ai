@@ -22,7 +22,6 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 ### Types to Skip Entirely
 | Type | Reason |
 |------|--------|
-| `KernelImageInfoGQL` | Replaced by `ImageNode` connection |
 | `VFolderMountGQL` | Replaced by `VFolderNode` connection |
 
 ---
@@ -31,11 +30,15 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 
 ### KernelImageInfoGQL
 
-**Action**: Do not implement. Will be replaced by `ImageNode` connection.
+**Action**: Implement with `image_id` field now. Defer `image: ImageNode` connection.
 
-### KernelV2GQL.image field
+```python
+class KernelImageInfoGQL:
+    image_id: str | None
+```
 
-**Action**: Include `image_id: str | None` field now. Defer `image: ImageNode` connection.
+**Future additions**:
+- `image: ImageNode | None`
 
 ---
 
