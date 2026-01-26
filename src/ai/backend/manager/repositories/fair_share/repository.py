@@ -28,7 +28,13 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareSearchResult,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkUpserter,
+    BulkUpserterResult,
+    Creator,
+    Upserter,
+)
 
 from .db_source import FairShareDBSource
 from .types import (
@@ -212,6 +218,32 @@ class FairShareRepository:
     ) -> UserFairShareData:
         """Upsert a user fair share record."""
         return await self._db_source.upsert_user_fair_share(upserter)
+
+    # ==================== Bulk Upsert Operations ====================
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_domain_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[DomainFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert domain fair share records."""
+        return await self._db_source.bulk_upsert_domain_fair_share(bulk_upserter)
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_project_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[ProjectFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert project fair share records."""
+        return await self._db_source.bulk_upsert_project_fair_share(bulk_upserter)
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_user_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[UserFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert user fair share records."""
+        return await self._db_source.bulk_upsert_user_fair_share(bulk_upserter)
 
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share(

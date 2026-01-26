@@ -27,8 +27,11 @@ from .types import (
     UserFairShareSearchScope,
 )
 from .upserters import (
+    DomainFairShareBulkWeightUpserterSpec,
     DomainFairShareUpserterSpec,
+    ProjectFairShareBulkWeightUpserterSpec,
     ProjectFairShareUpserterSpec,
+    UserFairShareBulkWeightUpserterSpec,
     UserFairShareUpserterSpec,
 )
 
@@ -44,6 +47,10 @@ __all__ = (
     "DomainFairShareUpserterSpec",
     "ProjectFairShareUpserterSpec",
     "UserFairShareUpserterSpec",
+    # Bulk weight upserter specs
+    "DomainFairShareBulkWeightUpserterSpec",
+    "ProjectFairShareBulkWeightUpserterSpec",
+    "UserFairShareBulkWeightUpserterSpec",
     # Query conditions
     "DomainFairShareConditions",
     "ProjectFairShareConditions",

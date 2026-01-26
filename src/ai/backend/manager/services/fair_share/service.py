@@ -19,16 +19,25 @@ from ai.backend.manager.errors.fair_share import FairShareNotFoundError
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import BatchQuerier, Upserter
+from ai.backend.manager.repositories.base import BatchQuerier, BulkUpserter, Upserter
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.fair_share.upserters import (
+    DomainFairShareBulkWeightUpserterSpec,
     DomainFairShareUpserterSpec,
+    ProjectFairShareBulkWeightUpserterSpec,
     ProjectFairShareUpserterSpec,
+    UserFairShareBulkWeightUpserterSpec,
     UserFairShareUpserterSpec,
 )
 from ai.backend.manager.types import TriState
 
 from .actions import (
+    BulkUpsertDomainFairShareWeightAction,
+    BulkUpsertDomainFairShareWeightActionResult,
+    BulkUpsertProjectFairShareWeightAction,
+    BulkUpsertProjectFairShareWeightActionResult,
+    BulkUpsertUserFairShareWeightAction,
+    BulkUpsertUserFairShareWeightActionResult,
     GetDomainFairShareAction,
     GetDomainFairShareActionResult,
     GetProjectFairShareAction,
@@ -312,3 +321,65 @@ class FairShareService:
         upserter = Upserter(spec=spec)
         result = await self._repository.upsert_user_fair_share(upserter)
         return UpsertUserFairShareWeightActionResult(data=result)
+
+    # Bulk Upsert Weight Methods
+
+    async def bulk_upsert_domain_fair_share_weight(
+        self, action: BulkUpsertDomainFairShareWeightAction
+    ) -> BulkUpsertDomainFairShareWeightActionResult:
+        """Bulk upsert domain fair share weights."""
+        if not action.inputs:
+            return BulkUpsertDomainFairShareWeightActionResult(upserted_count=0)
+
+        specs = [
+            DomainFairShareBulkWeightUpserterSpec(
+                resource_group=action.resource_group,
+                domain_name=input_item.domain_name,
+                weight=input_item.weight,
+            )
+            for input_item in action.inputs
+        ]
+        bulk_upserter = BulkUpserter(specs=specs)
+        result = await self._repository.bulk_upsert_domain_fair_share(bulk_upserter)
+        return BulkUpsertDomainFairShareWeightActionResult(upserted_count=result.upserted_count)
+
+    async def bulk_upsert_project_fair_share_weight(
+        self, action: BulkUpsertProjectFairShareWeightAction
+    ) -> BulkUpsertProjectFairShareWeightActionResult:
+        """Bulk upsert project fair share weights."""
+        if not action.inputs:
+            return BulkUpsertProjectFairShareWeightActionResult(upserted_count=0)
+
+        specs = [
+            ProjectFairShareBulkWeightUpserterSpec(
+                resource_group=action.resource_group,
+                project_id=input_item.project_id,
+                domain_name=input_item.domain_name,
+                weight=input_item.weight,
+            )
+            for input_item in action.inputs
+        ]
+        bulk_upserter = BulkUpserter(specs=specs)
+        result = await self._repository.bulk_upsert_project_fair_share(bulk_upserter)
+        return BulkUpsertProjectFairShareWeightActionResult(upserted_count=result.upserted_count)
+
+    async def bulk_upsert_user_fair_share_weight(
+        self, action: BulkUpsertUserFairShareWeightAction
+    ) -> BulkUpsertUserFairShareWeightActionResult:
+        """Bulk upsert user fair share weights."""
+        if not action.inputs:
+            return BulkUpsertUserFairShareWeightActionResult(upserted_count=0)
+
+        specs = [
+            UserFairShareBulkWeightUpserterSpec(
+                resource_group=action.resource_group,
+                user_uuid=input_item.user_uuid,
+                project_id=input_item.project_id,
+                domain_name=input_item.domain_name,
+                weight=input_item.weight,
+            )
+            for input_item in action.inputs
+        ]
+        bulk_upserter = BulkUpserter(specs=specs)
+        result = await self._repository.bulk_upsert_user_fair_share(bulk_upserter)
+        return BulkUpsertUserFairShareWeightActionResult(upserted_count=result.upserted_count)

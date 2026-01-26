@@ -48,9 +48,12 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkUpserter,
+    BulkUpserterResult,
     Creator,
     Upserter,
     execute_batch_querier,
+    execute_bulk_upserter,
     execute_creator,
     execute_upserter,
 )
@@ -415,6 +418,65 @@ class FairShareDBSource:
             )
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
             return result.row.to_data(spec.default_weight)
+
+    # ==================== Bulk Upsert Operations ====================
+
+    async def bulk_upsert_domain_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[DomainFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert domain fair share records.
+
+        Args:
+            bulk_upserter: BulkUpserter containing specs for rows to insert/update
+
+        Returns:
+            BulkUpserterResult containing count of affected rows
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            return await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["resource_group", "domain_name"],
+            )
+
+    async def bulk_upsert_project_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[ProjectFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert project fair share records.
+
+        Args:
+            bulk_upserter: BulkUpserter containing specs for rows to insert/update
+
+        Returns:
+            BulkUpserterResult containing count of affected rows
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            return await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["resource_group", "project_id"],
+            )
+
+    async def bulk_upsert_user_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[UserFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert user fair share records.
+
+        Args:
+            bulk_upserter: BulkUpserter containing specs for rows to insert/update
+
+        Returns:
+            BulkUpserterResult containing count of affected rows
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            return await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["resource_group", "user_uuid", "project_id"],
+            )
 
     async def get_user_fair_share(
         self,

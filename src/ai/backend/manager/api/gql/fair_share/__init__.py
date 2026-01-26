@@ -1,6 +1,9 @@
 """Fair Share GraphQL API package."""
 
 from .resolver import (
+    bulk_upsert_domain_fair_share_weight,
+    bulk_upsert_project_fair_share_weight,
+    bulk_upsert_user_fair_share_weight,
     domain_fair_share,
     domain_fair_shares,
     project_fair_share,
@@ -26,4 +29,7 @@ __all__ = [
     "upsert_domain_fair_share_weight",
     "upsert_project_fair_share_weight",
     "upsert_user_fair_share_weight",
+    "bulk_upsert_domain_fair_share_weight",
+    "bulk_upsert_project_fair_share_weight",
+    "bulk_upsert_user_fair_share_weight",
 ]
