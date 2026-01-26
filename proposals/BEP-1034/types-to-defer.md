@@ -35,7 +35,7 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 
 ### KernelV2GQL.image field
 
-**Action**: Include `image_ref: str | None` field now. Defer `image: ImageNode` connection.
+**Action**: Include `image_id: str | None` field now. Defer `image: ImageNode` connection.
 
 ---
 
@@ -91,7 +91,7 @@ class KernelSessionInfoGQL:
     session_id: uuid.UUID | None
     creation_id: str | None
     name: str | None
-    session_type: SessionTypesGQL
+    session_type: SessionTypes
 ```
 
 **Future additions**:
