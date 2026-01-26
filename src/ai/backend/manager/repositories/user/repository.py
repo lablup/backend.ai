@@ -39,7 +39,6 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -71,6 +70,7 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
@@ -78,6 +78,13 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.purgers import (
+    create_user_error_log_purger,
+    create_user_group_association_purger,
+    create_user_keypair_purger,
+    create_user_purger,
+    create_user_vfolder_permission_purger,
+)
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -642,19 +649,17 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def purge_user(self, email: str) -> None:
         """Completely purge user and all associated data."""
-        async with self._db.begin() as conn:
-            user_uuid = await self._get_user_uuid_by_email(conn, email)
-            if not user_uuid:
-                raise UserNotFound()
+        async with self._db.begin_session() as session:
+            user_uuid = await self._get_user_uuid_by_email(session, email)
 
-            # Delete all user data in proper order
-            await self._delete_error_logs(conn, user_uuid)
-            await self._delete_keypairs(conn, user_uuid)
-            await self._delete_vfolder_permissions(conn, user_uuid)
-            await self._clear_user_groups(conn, user_uuid)
+            # Delete all user data in proper order using purger pattern
+            await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
+            await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
+            await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
+            await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
             # Finally delete the user
-            await conn.execute(sa.delete(users).where(users.c.email == email))
+            await execute_batch_purger(session, create_user_purger(user_uuid))
 
     @user_repository_resilience.apply()
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
@@ -745,28 +750,13 @@ class UserRepository:
     # Private helper methods for purge operations
     # ==========================================
 
-    async def _get_user_uuid_by_email(self, conn: SAConnection, email: str) -> Optional[UUID]:
+    async def _get_user_uuid_by_email(self, session: SASession, email: str) -> UUID:
         """Get user UUID by email."""
-        result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
+        result = await session.execute(sa.select(UserRow.uuid).where(UserRow.email == email))
         row = result.first()
-        return row.uuid if row else None
-
-    async def _delete_error_logs(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Delete user's error logs."""
-        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
-        return result.rowcount
-
-    async def _delete_keypairs(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Delete user's keypairs."""
-        result = await conn.execute(sa.delete(keypairs).where(keypairs.c.user == user_uuid))
-        return result.rowcount
-
-    async def _delete_vfolder_permissions(self, conn: SAConnection, user_uuid: UUID) -> int:
-        """Delete user's vfolder permissions."""
-        result = await conn.execute(
-            sa.delete(vfolder_permissions).where(vfolder_permissions.c.user == user_uuid)
-        )
-        return result.rowcount
+        if not row:
+            raise UserNotFound()
+        return row.uuid
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,
