@@ -77,7 +77,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 
 | Type/Field | ID Field (Include Now) | Future Node (Defer) |
 |------------|------------------------|---------------------|
-| `KernelImageInfoGQL` | `image_id: str` | `image: ImageNode` |
+| `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
 | `KernelUserPermissionInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
 | `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |

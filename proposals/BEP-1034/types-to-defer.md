@@ -10,7 +10,7 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 
 | Type/Field | ID Field (Include Now) | Future Node (Defer) |
 |------------|------------------------|---------------------|
-| `KernelImageInfoGQL` | `image_id: str` | `image: ImageNode` |
+| `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
 | `KernelUserPermissionInfoGQL` | `user_id: uuid.UUID` | `user: UserNode` |
 | `KernelUserPermissionInfoGQL` | `access_key: str` | `keypair: KeypairNode` |
 | `KernelUserPermissionInfoGQL` | `domain_name: str` | `domain: DomainNode` |
@@ -34,7 +34,7 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 
 ```python
 class KernelImageInfoGQL:
-    image_id: str | None
+    image_id: uuid.UUID | None
 ```
 
 **Future additions**:

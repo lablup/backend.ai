@@ -56,7 +56,7 @@ class KernelInternalDataGQL:
 
 ```python
 class KernelImageInfoGQL:
-    image_id: str | None
+    image_id: uuid.UUID | None
 ```
 
 ### KernelSessionInfoGQL
