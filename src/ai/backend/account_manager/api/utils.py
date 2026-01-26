@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from typing import (
     Any,
     Generic,
-    TypeAlias,
     TypeVar,
 )
 
@@ -90,10 +89,10 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-THandlerFuncWithoutParam: TypeAlias = Callable[
+type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
     [web.Request], Awaitable[ResponseModel | TAnyResponse]
 ]
-THandlerFuncWithParam: TypeAlias = Callable[
+type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
     [web.Request, TParamModel], Awaitable[ResponseModel | TAnyResponse]
 ]
 

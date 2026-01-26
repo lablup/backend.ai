@@ -28,7 +28,6 @@ from typing import (
     Optional,
     ParamSpec,
     Self,
-    TypeAlias,
     TypeVar,
     cast,
 )
@@ -116,9 +115,9 @@ def _slash(v: str):
 P = ParamSpec("P")
 R = TypeVar("R")
 
-GetPrefixValue: TypeAlias = "Mapping[str, GetPrefixValue | Optional[str]]"
-NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
-NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
+type GetPrefixValue = "Mapping[str, GetPrefixValue | Optional[str]]"
+type NestedStrKeyedMapping = "Mapping[str, str | NestedStrKeyedMapping]"
+type NestedStrKeyedDict = "dict[str, str | NestedStrKeyedDict]"
 
 
 class AbstractKVStore(ABC):

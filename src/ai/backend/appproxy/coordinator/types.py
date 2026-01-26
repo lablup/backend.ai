@@ -11,7 +11,6 @@ from typing import (
     Optional,
     Protocol,
     Self,
-    TypeAlias,
 )
 from uuid import UUID
 
@@ -294,7 +293,7 @@ class RootContext:
     leader_election: ValkeyLeaderElection
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):

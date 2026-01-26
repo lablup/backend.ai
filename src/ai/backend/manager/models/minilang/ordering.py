@@ -1,6 +1,6 @@
 import enum
 from collections.abc import Mapping
-from typing import NamedTuple, Optional, TypeAlias
+from typing import NamedTuple, Optional
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -28,7 +28,7 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-ColumnMapType: TypeAlias = Mapping[str, OrderSpecItem] | None
+type ColumnMapType = Mapping[str, OrderSpecItem] | None
 
 
 class OrderDirection(enum.Enum):

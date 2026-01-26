@@ -5,7 +5,7 @@ import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Final, Optional, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -35,7 +35,7 @@ from .defs import (
 )
 from .meta import BackendAIConfigMeta, ConfigExample
 
-TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
+type TVariousDelta = datetime.timedelta | relativedelta
 
 
 class _TimeDurationPydanticAnnotation:

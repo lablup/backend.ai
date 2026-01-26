@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional, TypeAlias, TypeVar
+from typing import Any, Optional, TypeVar
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -56,10 +56,10 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-FilterableSQLQuery: TypeAlias = sa.sql.Select | sa.sql.Update | sa.sql.Delete
+type FilterableSQLQuery = sa.sql.Select | sa.sql.Update | sa.sql.Delete
 _TQuery = TypeVar("_TQuery", sa.sql.Select, sa.sql.Update, sa.sql.Delete)
-FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
-WhereClauseType: TypeAlias = sa.sql.expression.ColumnElement[bool]
+type FieldSpecType = Mapping[str, FieldSpecItem] | None
+type WhereClauseType = sa.sql.expression.ColumnElement[bool]
 
 
 class QueryFilterTransformer(Transformer):

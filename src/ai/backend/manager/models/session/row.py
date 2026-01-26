@@ -14,7 +14,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
@@ -1947,9 +1946,7 @@ MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 class ComputeSessionPermissionContext(

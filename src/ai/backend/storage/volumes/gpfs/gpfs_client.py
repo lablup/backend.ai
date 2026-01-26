@@ -5,7 +5,7 @@ import urllib.parse
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, Optional, TypeAlias
+from typing import Any, Optional
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -42,7 +42,7 @@ from .types import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-ResponseHandler: TypeAlias = Callable[
+type ResponseHandler = Callable[
     [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]
 ]
 

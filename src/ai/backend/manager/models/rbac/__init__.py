@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, Self, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Optional, Self, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -362,7 +362,7 @@ class UserScope(BaseScope):
         return cls(uuid.UUID(raw_user_id))
 
 
-ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
+type ScopeType = SystemScope | DomainScope | ProjectScope | UserScope
 
 
 def deserialize_scope(val: str) -> ScopeType:

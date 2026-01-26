@@ -1,12 +1,12 @@
 from collections.abc import Awaitable, Callable
-from typing import Optional, TypeAlias
+from typing import Optional
 
 from aiohttp import web
 
 from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.logging.utils import with_log_context_fields
 
-Handler: TypeAlias = Callable[
+type Handler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]

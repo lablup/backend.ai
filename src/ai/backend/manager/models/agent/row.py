@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, TypeAlias, cast, override
+from typing import TYPE_CHECKING, Any, Optional, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -312,9 +312,7 @@ async def recalc_agent_resource_occupancy_using_orm(
     agent_row.occupied_slots = occupied_slots
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])

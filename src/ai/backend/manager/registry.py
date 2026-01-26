@@ -18,7 +18,6 @@ from typing import (
     Any,
     Literal,
     Optional,
-    TypeAlias,
     cast,
 )
 
@@ -179,7 +178,7 @@ from .models.vfolder import VFolderRow, verify_vfolder_name
 from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
-MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
+type MSetType = Mapping[str | bytes, bytes | float | int | str]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

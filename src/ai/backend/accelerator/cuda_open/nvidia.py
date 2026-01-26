@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import MutableMapping, Sequence
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, NamedTuple, TypeAlias, cast
+from typing import Any, NamedTuple, cast
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
@@ -509,7 +509,7 @@ class cudaDeviceProp(ctypes.Structure):
     ]
 
 
-cudaDeviceProp_t: TypeAlias = (
+type cudaDeviceProp_t = (
     cudaDeviceProp_v13
     | cudaDeviceProp_v12
     | cudaDeviceProp_v11

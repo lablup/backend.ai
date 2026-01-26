@@ -13,7 +13,6 @@ from typing import (
     Concatenate,
     Optional,
     ParamSpec,
-    TypeAlias,
     TypeVar,
     cast,
     overload,
@@ -530,7 +529,7 @@ async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
 
 
-JSONCoalesceExpr: TypeAlias = sa.sql.elements.ColumnElement[Any]
+type JSONCoalesceExpr = sa.sql.elements.ColumnElement[Any]
 
 
 def sql_json_merge(

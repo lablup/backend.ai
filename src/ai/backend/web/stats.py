@@ -1,11 +1,10 @@
 import asyncio
 import weakref
 from dataclasses import dataclass, field
-from typing import TypeAlias
 
 from aiohttp import web
 
-WeakTaskSet: TypeAlias = weakref.WeakSet[asyncio.Task]
+type WeakTaskSet = weakref.WeakSet[asyncio.Task]
 
 
 @dataclass

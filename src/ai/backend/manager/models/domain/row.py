@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Optional,
     Self,
-    TypeAlias,
     TypedDict,
     cast,
     override,
@@ -247,9 +246,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.READ_ATTRIBUTE])
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 @dataclass

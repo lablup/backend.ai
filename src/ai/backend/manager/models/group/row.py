@@ -10,7 +10,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     TypedDict,
     cast,
     overload,
@@ -547,7 +546,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
-WhereClauseType: TypeAlias = (
+type WhereClauseType = (
     sa.sql.expression.BinaryExpression[Any]
     | sa.sql.expression.BooleanClauseList
     | sa.sql.elements.ColumnElement[bool]

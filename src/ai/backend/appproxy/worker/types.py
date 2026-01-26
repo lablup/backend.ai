@@ -15,7 +15,6 @@ from typing import (
     Generic,
     Optional,
     Self,
-    TypeAlias,
     TypeVar,
 )
 from uuid import UUID
@@ -320,7 +319,7 @@ class RootContext:
     health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 

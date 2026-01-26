@@ -1839,7 +1839,7 @@ class VolumeMountableNodeType(enum.StrEnum):
     STORAGE_PROXY = enum.auto()
 
 
-SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
+type SSLContextType = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):

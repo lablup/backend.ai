@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, TypeVar
+from typing import Any, Optional, TypeVar
 from uuid import UUID
 
 import aiohttp
@@ -46,7 +46,7 @@ _default_list_fields = (
 )
 
 T = TypeVar("T")
-list_: TypeAlias = list[T]
+type list_[T] = list[T]
 
 
 class ResponseFailed(Exception):

@@ -15,7 +15,6 @@ from typing import (
     Final,
     NamedTuple,
     Optional,
-    TypeAlias,
     cast,
     overload,
     override,
@@ -1397,9 +1396,7 @@ async def get_sessions_by_mounted_folder(
 # UnsetQuotaScope) have been moved to api/gql_legacy/vfolder.py
 
 # RBAC
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([

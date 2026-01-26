@@ -11,7 +11,6 @@ from typing import (
     Generic,
     Optional,
     Self,
-    TypeAlias,
     TypeVar,
     get_args,
     get_origin,
@@ -170,7 +169,7 @@ class MiddlewareParam(ABC, BaseModel):
         pass
 
 
-JSONDict: TypeAlias = dict[str, Any]
+type JSONDict = dict[str, Any]
 
 
 @dataclass
@@ -202,8 +201,8 @@ class APIStreamResponse:
     headers: Mapping[str, str] = field(default_factory=dict)
 
 
-_ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
-_ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
+type _ParamType = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
+type _ParserType = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
@@ -266,13 +265,11 @@ class _HandlerParameters:
 
 HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
-BaseHandler: TypeAlias = Callable[..., HandlerReturn]
-ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
+type BaseHandler = Callable[..., HandlerReturn]
+type ParsedRequestHandler = Callable[..., Awaitable[web.StreamResponse]]
 
-StreamHandlerReturn: TypeAlias = (
-    Awaitable[APIStreamResponse] | Coroutine[Any, Any, APIStreamResponse]
-)
-StreamBaseHandler: TypeAlias = Callable[..., StreamHandlerReturn]
+type StreamHandlerReturn = Awaitable[APIStreamResponse] | Coroutine[Any, Any, APIStreamResponse]
+type StreamBaseHandler = Callable[..., StreamHandlerReturn]
 
 
 async def _parse_and_execute_handler(
