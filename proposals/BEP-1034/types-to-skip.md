@@ -43,10 +43,6 @@ These types are **not to be implemented**. They have been decided to be replaced
 
 The following types need modification to remove references to skipped types:
 
-### KernelStatusDataContainerGQL
-
-Remove `scheduler` field.
-
 ### KernelLifecycleInfoGQL
 
-Remove `status_history` field.
+Remove `status_history`, `status_info`, `status_data`, `status_changed` fields.

@@ -34,12 +34,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelFilterGQL` - Main filter input
 - `KernelOrderByGQL` - Ordering input
 
-#### Status Data Types
-- `KernelStatusErrorInfoGQL` - Error information
-- `KernelStatusDataGQL` - Kernel status data
-- `KernelSessionStatusDataGQL` - Session status data
-- `KernelStatusDataContainerGQL` - Container for status data
-
 #### Internal Data Types
 - `KernelInternalDataGQL` - Internal kernel data
 
@@ -103,7 +97,6 @@ For each deferred Node type, we include the **ID field now** and defer only the 
   - `KernelResourceInfoGQL`: include `agent_id`, `scaling_group_name`
   - `KernelRuntimeInfoGQL`: include `vfolder_ids`
 - [ ] Update `KernelLifecycleInfoGQL` to remove `status_history`, `status_info`, `status_data`, `status_changed` fields
-- [ ] Update `KernelStatusDataContainerGQL` to remove `scheduler` field
 - [ ] Update `from_kernel_info()` method to match new type structure
 
 ### Future PRs

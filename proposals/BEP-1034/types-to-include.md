@@ -30,43 +30,6 @@ class KernelOrderByGQL:
 
 ---
 
-## Status Data Types
-
-### KernelStatusErrorInfoGQL
-```python
-class KernelStatusErrorInfoGQL:
-    src: str
-    agent_id: uuid.UUID | None
-    agent: AgentNode | None
-    name: str
-    repr: str
-```
-
-### KernelStatusDataGQL
-```python
-class KernelStatusDataGQL:
-    exit_code: int | None
-```
-
-### KernelSessionStatusDataGQL
-```python
-class KernelSessionStatusDataGQL:
-    status: str | None
-```
-
-### KernelStatusDataContainerGQL
-
-> **Note**: `scheduler` field is **omitted** (see types-to-skip.md)
-
-```python
-class KernelStatusDataContainerGQL:
-    error: KernelStatusErrorInfoGQL | None
-    kernel: KernelStatusDataGQL | None
-    session: KernelSessionStatusDataGQL | None
-```
-
----
-
 ## Internal Data Types
 
 ### KernelInternalDataGQL
