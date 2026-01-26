@@ -17,7 +17,7 @@ from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rbac.handler import RBACAPIHandler
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
@@ -104,7 +104,7 @@ class TestGetScopeTypesHandler:
             is_authorized=True,
             is_admin=True,
             is_superadmin=True,
-            role="superadmin",
+            role=UserRole.SUPERADMIN,
             domain_name="default",
         )
 
@@ -116,7 +116,7 @@ class TestGetScopeTypesHandler:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
 
@@ -281,7 +281,7 @@ class TestSearchScopesHandler:
             is_authorized=True,
             is_admin=True,
             is_superadmin=True,
-            role="superadmin",
+            role=UserRole.SUPERADMIN,
             domain_name="default",
         )
 
@@ -293,7 +293,7 @@ class TestSearchScopesHandler:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
 

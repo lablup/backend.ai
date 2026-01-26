@@ -38,14 +38,14 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 @pytest.fixture
 def user_data() -> UserData:
     """User data for tests."""
-    from ai.backend.manager.models.user import UserRole
+    from ai.backend.common.data.user.types import UserRole
 
     return UserData(
         user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
         is_authorized=True,
         is_admin=False,
         is_superadmin=False,
-        role=UserRole.USER.value,
+        role=UserRole.USER,
         domain_name="default",
     )
 

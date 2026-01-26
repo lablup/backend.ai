@@ -738,8 +738,7 @@ class ModelServingRepository:
                     user_data = current_user()
                     if user_data is None:
                         raise GenericForbidden("User context not available.")
-                    user_role = UserRole(user_data.role)
-                    match user_role:
+                    match user_data.role:
                         case UserRole.SUPERADMIN:
                             pass
                         case UserRole.ADMIN:
