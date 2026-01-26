@@ -22,8 +22,7 @@ class WatcherAgentRestartAction(AgentAction):
 
 @dataclass
 class WatcherAgentRestartActionResult(BaseActionResult):
-    # TODO: Add proper type
-    resp: Any
+    data: dict[str, Any]
     agent_id: AgentId
 
     @override

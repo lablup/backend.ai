@@ -164,6 +164,7 @@ class ErrorDomain(enum.StrEnum):
     MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
+    WATCHER = "watcher"
     AGENT = "agent"
     PERMISSION = "permission"
     METRIC = "metric"
@@ -671,4 +672,22 @@ class AgentNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Wraps and forwards errors from agent watcher requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent-watcher-response-error"
+    error_title = "Agent Watcher Response Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
