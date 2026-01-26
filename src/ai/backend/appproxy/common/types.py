@@ -10,7 +10,6 @@ from typing import (
     Any,
     Generic,
     Optional,
-    TypeAlias,
     TypeVar,
 )
 from uuid import UUID
@@ -69,17 +68,17 @@ class DigestModType(enum.StrEnum):
     SHA512 = "sha512"
 
 
-WebRequestHandler: TypeAlias = Callable[
+type WebRequestHandler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Callable[
+type WebMiddleware = Callable[
     [web.Request, WebRequestHandler],
     Awaitable[web.StreamResponse],
 ]
 
-CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
-AppCreator: TypeAlias = Callable[
+type CORSOptions = Mapping[str, aiohttp_cors.ResourceOptions]
+type AppCreator = Callable[
     [CORSOptions],
     tuple[web.Application, Iterable[WebMiddleware]],
 ]

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
-from typing import TypeAlias
 
 import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-WebRequestHandler: TypeAlias = Callable[
+type WebRequestHandler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware
 
-CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
+type CORSOptions = Mapping[str, aiohttp_cors.ResourceOptions]

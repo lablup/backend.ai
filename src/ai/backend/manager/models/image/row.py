@@ -13,7 +13,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
@@ -1045,9 +1044,7 @@ class ImageAliasRow(Base):
         return ImageAliasData(id=self.id, alias=self.alias or "")
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])

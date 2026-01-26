@@ -222,7 +222,9 @@ TParamModel = TypeVar("TParamModel", bound=LegacyBaseRequestModel, contravariant
 TQueryModel = TypeVar("TQueryModel", bound=LegacyBaseRequestModel)
 TResponseModel = TypeVar("TResponseModel", bound=LegacyBaseResponseModel, covariant=True)
 
-TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
+type TPydanticResponse[TResponseModel: LegacyBaseResponseModel] = (
+    TResponseModel | list[TResponseModel]
+)
 
 
 class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):

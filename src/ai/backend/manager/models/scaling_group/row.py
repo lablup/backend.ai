@@ -9,7 +9,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     overload,
     override,
@@ -556,9 +555,7 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
 
 ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 @dataclass

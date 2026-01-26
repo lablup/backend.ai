@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -235,4 +235,4 @@ class KernelOwnershipData:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware

@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    TypeAlias,
     TypeVar,
 )
 from uuid import UUID
@@ -146,10 +145,10 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-THandlerFuncWithoutParam: TypeAlias = Callable[
+type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
     [web.Request], Awaitable[PydanticResponse | TAnyResponse]
 ]
-THandlerFuncWithParam: TypeAlias = Callable[
+type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
     [web.Request, TParamModel], Awaitable[PydanticResponse | TAnyResponse]
 ]
 

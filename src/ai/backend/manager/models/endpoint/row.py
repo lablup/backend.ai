@@ -15,7 +15,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
 )
 from uuid import UUID, uuid4
@@ -117,7 +116,7 @@ __all__ = (
 )
 
 
-ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
+type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 

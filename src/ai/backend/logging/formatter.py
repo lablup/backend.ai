@@ -7,12 +7,12 @@ import traceback
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
 
-_SysExcInfoType: TypeAlias = (
+type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
 

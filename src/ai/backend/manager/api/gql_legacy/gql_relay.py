@@ -12,7 +12,6 @@ from typing import (
     Generic,
     NamedTuple,
     Protocol,
-    TypeAlias,
     TypeVar,
 )
 
@@ -381,9 +380,9 @@ class AsyncListConnectionField(IterableConnectionField):
 
 ConnectionField = AsyncListConnectionField
 
-NodeTypeName: TypeAlias = str
-NodeID: TypeAlias = str
-ResolvedGlobalID: TypeAlias = tuple[NodeTypeName, NodeID]
+type NodeTypeName = str
+type NodeID = str
+type ResolvedGlobalID = tuple[NodeTypeName, NodeID]
 
 
 def _from_str(value: str) -> ResolvedGlobalID:

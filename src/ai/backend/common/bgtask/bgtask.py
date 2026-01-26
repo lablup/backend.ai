@@ -15,7 +15,6 @@ from typing import (
     Optional,
     ParamSpec,
     Self,
-    TypeAlias,
 )
 
 from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
@@ -77,7 +76,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 P = ParamSpec("P")
 
 
-BgtaskEvents: TypeAlias = (
+type BgtaskEvents = (
     BgtaskUpdatedEvent
     | BgtaskDoneEvent
     | BgtaskCancelledEvent

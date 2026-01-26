@@ -6,7 +6,7 @@ import os
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Generic, TypeAlias
+from typing import TYPE_CHECKING, Generic
 
 import aiotools
 from aiohttp import web
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
+type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
 class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):

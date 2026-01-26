@@ -24,7 +24,6 @@ from typing import (
     Any,
     Optional,
     TextIO,
-    TypeAlias,
     cast,
 )
 
@@ -79,7 +78,7 @@ if TYPE_CHECKING:
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 
-DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
+type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
@@ -518,8 +517,8 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return []
 
 
-ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
-SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
+type ComputersMap = Mapping[DeviceName, ComputerContext]
+type SlotsMap = Mapping[SlotName, Decimal]
 
 
 class ResourceAllocator(aobject):
