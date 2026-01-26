@@ -7,7 +7,7 @@ from typing import Optional, Self, cast
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import with_log_context_fields
 
@@ -77,10 +77,7 @@ class MessageMetadata:
         if "user" in result:
             user_data = result["user"]
             if isinstance(user_data, dict):
-                if "role" in user_data and isinstance(user_data["role"], str):
-                    user_data["role"] = UserRole(user_data["role"])
-                user = UserData(**user_data)
-                result["user"] = user
+                result["user"] = UserData.from_dict(user_data)
             else:
                 result["user"] = None
         return cls(**result)
