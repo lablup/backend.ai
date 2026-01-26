@@ -12,7 +12,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.manager.data.permission.id import FieldRef
-from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.data.permission.types import FieldType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec as BaseBatchPurgerSpec
@@ -30,11 +30,11 @@ class RBACFieldBatchPurgerSpec(BaseBatchPurgerSpec[TRow], ABC):
 
     Inherits build_subquery() from BaseBatchPurgerSpec.
     Implementations must provide:
-    - field_type(): Returns the EntityType for constructing FieldRefs from row PKs
+    - field_type(): Returns the FieldType for constructing FieldRefs from row PKs
     """
 
     @abstractmethod
-    def field_type(self) -> EntityType:
+    def field_type(self) -> FieldType:
         """Return the field type for constructing FieldRefs from row primary keys."""
         raise NotImplementedError
 
@@ -55,7 +55,7 @@ class RBACFieldPurger(BasePurger[TRow]):
         field_id: The field ID to delete.
     """
 
-    field_type: EntityType
+    field_type: FieldType
     field_id: str
 
 
