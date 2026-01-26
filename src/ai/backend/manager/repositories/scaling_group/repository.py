@@ -12,7 +12,11 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
+from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
+    ScalingGroupData,
+    ScalingGroupListResult,
+)
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -74,6 +78,24 @@ class ScalingGroupRepository:
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)
+
+    @scaling_group_repository_resilience.apply()
+    async def get_scaling_group_by_name(
+        self,
+        name: str,
+    ) -> ScalingGroupData:
+        """Get a single scaling group by name (primary key).
+
+        Args:
+            name: The name of the scaling group (primary key).
+
+        Returns:
+            ScalingGroupData for the requested scaling group.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_scaling_group_by_name(name=name)
 
     @scaling_group_repository_resilience.apply()
     async def purge_scaling_group(
@@ -170,3 +192,20 @@ class ScalingGroupRepository:
             scaling_group=scaling_group,
             user_group=user_group,
         )
+
+    async def get_resource_info(
+        self,
+        scaling_group: str,
+    ) -> ResourceInfo:
+        """Get aggregated resource information for a scaling group.
+
+        Args:
+            scaling_group: The name of the scaling group.
+
+        Returns:
+            ResourceInfo containing capacity, used, and free resource metrics.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_resource_info(scaling_group)

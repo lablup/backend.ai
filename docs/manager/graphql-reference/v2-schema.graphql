@@ -886,6 +886,63 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
+"""
+Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.
+"""
+input BulkUpsertDomainFairShareWeightInput {
+  """Name of the scaling group (resource group) for all fair shares."""
+  resourceGroup: String!
+
+  """List of domain weight updates to apply."""
+  inputs: [DomainWeightInputItem!]!
+}
+
+"""
+Added in 26.1.0. Payload for bulk domain fair share weight upsert mutation.
+"""
+type BulkUpsertDomainFairShareWeightPayload {
+  """Number of domain fair share records created or updated."""
+  upsertedCount: Int!
+}
+
+"""
+Added in 26.1.0. Input for bulk upserting project fair share weights. Allows updating multiple projects in a single transaction.
+"""
+input BulkUpsertProjectFairShareWeightInput {
+  """Name of the scaling group (resource group) for all fair shares."""
+  resourceGroup: String!
+
+  """List of project weight updates to apply."""
+  inputs: [ProjectWeightInputItem!]!
+}
+
+"""
+Added in 26.1.0. Payload for bulk project fair share weight upsert mutation.
+"""
+type BulkUpsertProjectFairShareWeightPayload {
+  """Number of project fair share records created or updated."""
+  upsertedCount: Int!
+}
+
+"""
+Added in 26.1.0. Input for bulk upserting user fair share weights. Allows updating multiple users in a single transaction.
+"""
+input BulkUpsertUserFairShareWeightInput {
+  """Name of the scaling group (resource group) for all fair shares."""
+  resourceGroup: String!
+
+  """List of user weight updates to apply."""
+  inputs: [UserWeightInputItem!]!
+}
+
+"""
+Added in 26.1.0. Payload for bulk user fair share weight upsert mutation.
+"""
+type BulkUpsertUserFairShareWeightPayload {
+  """Number of user fair share records created or updated."""
+  upsertedCount: Int!
+}
+
 scalar ByteSize
 
 """
@@ -1717,6 +1774,19 @@ input DomainUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+"""
+Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
+"""
+input DomainWeightInputItem {
+  """Name of the domain to update weight for."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
 """Input for email message settings"""
 input EmailMessageInput {
   fromEmail: String!
@@ -1867,9 +1937,14 @@ Added in 26.1.0. Configuration parameters that control how fair share factors ar
 """
 type FairShareSpec {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Null means using resource group's default_weight.
+  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. This is the effective weight - either the explicitly set value or the resource group's default_weight.
   """
-  weight: Decimal
+  weight: Decimal!
+
+  """
+  Added in 26.1.0. Whether this entity uses the resource group's default_weight. True means no explicit weight was set and the default is being used. False means an explicit weight value was configured for this entity.
+  """
+  usesDefault: Boolean!
 
   """
   Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
@@ -2573,7 +2648,22 @@ type Mutation {
   upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
 
   """
-  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values.
+  Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload!
+
+  """
+  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
 }
@@ -2993,6 +3083,22 @@ input ProjectUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+"""
+Added in 26.1.0. Input item for a single project weight in bulk upsert. Represents one project's weight configuration.
+"""
+input ProjectWeightInputItem {
+  """ID of the project to update weight for."""
+  projectId: UUID!
+
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
+}
+
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
@@ -3366,6 +3472,11 @@ type ResourceGroup implements Node {
   Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
   """
   fairShareSpec: FairShareScalingGroupSpec!
+
+  """
+  Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
+  """
+  resourceInfo: ResourceInfo!
 }
 
 """Added in 26.1.0. Resource group connection"""
@@ -3409,6 +3520,24 @@ input ResourceGroupOrderBy {
 """Added in 26.1.0. Fields available for ordering resource groups"""
 enum ResourceGroupOrderField {
   NAME
+}
+
+"""
+Added in 26.1.0. Resource information for a resource group. Provides aggregated resource metrics including capacity, used, and free resources.
+"""
+type ResourceInfo {
+  """
+  Total available resources from ALIVE, schedulable agents in this resource group.
+  """
+  capacity: ResourceSlot!
+
+  """
+  Currently occupied resources from active kernels (RUNNING/TERMINATING status).
+  """
+  used: ResourceSlot!
+
+  """Available resources (capacity - used)."""
+  free: ResourceSlot!
 }
 
 """
@@ -4613,6 +4742,25 @@ input UserUsageBucketOrderBy {
   Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
   """
   direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.1.0. Input item for a single user weight in bulk upsert. Represents one user's weight configuration within a project.
+"""
+input UserWeightInputItem {
+  """UUID of the user to update weight for."""
+  userUuid: UUID!
+
+  """ID of the project this user's fair share belongs to."""
+  projectId: UUID!
+
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
 }
 
 """Added in 25.16.0. VFS Storage configuration"""

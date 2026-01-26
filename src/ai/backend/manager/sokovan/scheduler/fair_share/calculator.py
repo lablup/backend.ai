@@ -167,9 +167,8 @@ class FairShareFactorCalculator:
             context.half_life_days,
         )
 
-        # Calculate time capacity based on half-life
-        # This normalizes usage relative to the decay window
-        time_capacity = Decimal(str(context.half_life_days)) * SECONDS_PER_DAY
+        cluster_capacity = context.cluster_capacity
+        lookback_days = context.lookback_days
 
         # Calculate domain factors
         for domain_name, usage in decayed_usages["domain"].items():
@@ -185,7 +184,8 @@ class FairShareFactorCalculator:
                 resource_weights=self._get_resource_weights(
                     fair_shares.domain.get(domain_name), default_resource_weights
                 ),
-                time_capacity=time_capacity,
+                cluster_capacity=cluster_capacity,
+                lookback_days=lookback_days,
             )
 
             result.domain_results[domain_name] = DomainFactorResult(
@@ -211,7 +211,8 @@ class FairShareFactorCalculator:
                 resource_weights=self._get_resource_weights(
                     fair_shares.project.get(project_id), default_resource_weights
                 ),
-                time_capacity=time_capacity,
+                cluster_capacity=cluster_capacity,
+                lookback_days=lookback_days,
             )
 
             result.project_results[project_id] = ProjectFactorResult(
@@ -238,7 +239,8 @@ class FairShareFactorCalculator:
                 resource_weights=self._get_resource_weights(
                     fair_shares.user.get(user_key), default_resource_weights
                 ),
-                time_capacity=time_capacity,
+                cluster_capacity=cluster_capacity,
+                lookback_days=lookback_days,
             )
 
             result.user_results[user_key] = UserFactorResult(
@@ -368,7 +370,8 @@ class FairShareFactorCalculator:
         usage: ResourceSlot,
         weight: Decimal,
         resource_weights: ResourceSlot,
-        time_capacity: Decimal,
+        cluster_capacity: ResourceSlot,
+        lookback_days: int,
     ) -> tuple[Decimal, Decimal]:
         """Calculate normalized_usage and fair_share_factor.
 
@@ -376,16 +379,16 @@ class FairShareFactorCalculator:
             usage: Total decayed resource usage (resource-seconds)
             weight: Priority weight multiplier
             resource_weights: Weights for each resource type
-            time_capacity: Time-based normalization factor (half_life_days * SECONDS_PER_DAY)
+            cluster_capacity: Total available slots from all agents in the scaling group
+            lookback_days: Number of days in lookback window
 
         Returns:
             Tuple of (normalized_usage, fair_share_factor)
         """
-        # Calculate weighted usage score
-        usage_score = self._calculate_usage_score(usage, resource_weights)
-
-        # Normalize by time capacity (derived from half-life)
-        normalized_usage = usage_score / time_capacity
+        # Calculate normalized usage based on per-resource capacity
+        normalized_usage = self._calculate_normalized_usage(
+            usage, cluster_capacity, lookback_days, resource_weights
+        )
 
         # Calculate fair share factor: F = 2^(-normalized_usage / weight)
         # Clamp to prevent overflow/underflow
@@ -400,31 +403,45 @@ class FairShareFactorCalculator:
 
         return normalized_usage, fair_share_factor
 
-    def _calculate_usage_score(
+    def _calculate_normalized_usage(
         self,
         usage: ResourceSlot,
+        cluster_capacity: ResourceSlot,
+        lookback_days: int,
         resource_weights: ResourceSlot,
     ) -> Decimal:
-        """Calculate weighted sum of resource usage.
+        """Calculate normalized usage as weighted average of per-resource usage ratios.
+
+        Formula:
+            capacity_seconds[r] = cluster_capacity[r] * lookback_days * SECONDS_PER_DAY
+            ratio[r] = usage[r] / capacity_seconds[r]  (0~1, can exceed 1 if over-utilized)
+            normalized = sum(ratio[r] * weight[r]) / sum(weight[r])
 
         Args:
             usage: Resource usage (resource-seconds)
+            cluster_capacity: Total available slots from all agents
+            lookback_days: Number of days in lookback window
             resource_weights: Weights for each resource type
 
         Returns:
-            Weighted usage score
+            Weighted average of per-resource usage ratios (typically 0.0 ~ 1.0)
         """
-        total_score = Decimal("0")
+        total_weighted_ratio = Decimal("0")
         total_weight = Decimal("0")
 
-        for resource_key, resource_value in usage.items():
-            weight = resource_weights.get(resource_key, Decimal("1.0"))
-            total_score += resource_value * weight
-            total_weight += weight
+        for resource_key, usage_value in usage.items():
+            capacity_value = cluster_capacity.get(resource_key, Decimal("0"))
+            res_weight = resource_weights.get(resource_key, Decimal("1.0"))
 
-        # Normalize by total weight to get weighted average
+            if capacity_value > 0:
+                # capacity_seconds = capacity * lookback_days * seconds_per_day
+                capacity_seconds = capacity_value * Decimal(str(lookback_days)) * SECONDS_PER_DAY
+                ratio = usage_value / capacity_seconds
+                total_weighted_ratio += ratio * res_weight
+                total_weight += res_weight
+
         if total_weight > 0:
-            return total_score / total_weight
+            return total_weighted_ratio / total_weight
 
         return Decimal("0")
 

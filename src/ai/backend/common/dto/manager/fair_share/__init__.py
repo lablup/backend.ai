@@ -7,6 +7,7 @@ from .request import (
     GetDomainFairShareRequest,
     GetProjectFairSharePathParam,
     GetProjectFairShareRequest,
+    GetResourceGroupFairShareSpecPathParam,
     GetUserFairSharePathParam,
     GetUserFairShareRequest,
     ResourceWeightEntryInput,
@@ -32,17 +33,20 @@ from .response import (
     FairShareSpecDTO,
     GetDomainFairShareResponse,
     GetProjectFairShareResponse,
+    GetResourceGroupFairShareSpecResponse,
     GetUserFairShareResponse,
     PaginationInfo,
     ProjectFairShareDTO,
     ProjectUsageBucketDTO,
     ResourceGroupFairShareSpecDTO,
+    ResourceGroupFairShareSpecItemDTO,
     ResourceSlotDTO,
     ResourceSlotEntryDTO,
     SearchDomainFairSharesResponse,
     SearchDomainUsageBucketsResponse,
     SearchProjectFairSharesResponse,
     SearchProjectUsageBucketsResponse,
+    SearchResourceGroupFairShareSpecsResponse,
     SearchUserFairSharesResponse,
     SearchUserUsageBucketsResponse,
     UpdateResourceGroupFairShareSpecResponse,
@@ -110,6 +114,8 @@ __all__ = (
     "UpsertDomainFairShareWeightPathParam",
     "UpsertProjectFairShareWeightPathParam",
     "UpsertUserFairShareWeightPathParam",
+    # Request - Path Parameters (Get Spec)
+    "GetResourceGroupFairShareSpecPathParam",
     # Request - Path Parameters (Update Spec)
     "UpdateResourceGroupFairShareSpecPathParam",
     # Request - Get (deprecated, use PathParam)
@@ -163,5 +169,8 @@ __all__ = (
     "SearchUserUsageBucketsResponse",
     # Response - Resource Group Fair Share Spec
     "ResourceGroupFairShareSpecDTO",
+    "ResourceGroupFairShareSpecItemDTO",
+    "GetResourceGroupFairShareSpecResponse",
+    "SearchResourceGroupFairShareSpecsResponse",
     "UpdateResourceGroupFairShareSpecResponse",
 )

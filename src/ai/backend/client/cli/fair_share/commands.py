@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -49,9 +50,9 @@ def domain_get_cmd(
                 print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
             else:
                 fs = response.item
-                print(f"ID: {fs.id}")
                 print(f"Resource Group: {fs.resource_group}")
                 print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
                 print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                 print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                 print(
@@ -147,10 +148,55 @@ def domain_list_cmd(
                     print(f"ID: {fs.id}")
                     print(f"Resource Group: {fs.resource_group}")
                     print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
                     print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                     print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                     print(f"Created: {fs.created_at}")
                     print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@domain.command("set-weight")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.option(
+    "--weight",
+    type=str,
+    default=None,
+    help="Weight value (omit to use resource group's default_weight)",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def domain_set_weight_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    weight: Optional[str],
+    as_json: bool,
+) -> None:
+    """Set domain fair share weight."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            weight_decimal = Decimal(weight) if weight is not None else None
+            response = api_session.FairShare.upsert_domain_fair_share_weight(
+                resource_group, domain_name, weight_decimal
+            )
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print("Updated domain fair share weight successfully.")
+                print(f"ID: {fs.id}")
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Updated: {fs.updated_at}")
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -194,10 +240,10 @@ def project_get_cmd(
                 print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
             else:
                 fs = response.item
-                print(f"ID: {fs.id}")
                 print(f"Resource Group: {fs.resource_group}")
                 print(f"Project ID: {fs.project_id}")
                 print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
                 print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                 print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                 print(
@@ -297,10 +343,64 @@ def project_list_cmd(
                     print(f"Resource Group: {fs.resource_group}")
                     print(f"Project ID: {fs.project_id}")
                     print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
                     print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                     print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                     print(f"Created: {fs.created_at}")
                     print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@project.command("set-weight")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("project_id", type=str)
+@click.option(
+    "--domain",
+    "domain_name",
+    type=str,
+    required=True,
+    help="Domain name the project belongs to",
+)
+@click.option(
+    "--weight",
+    type=str,
+    default=None,
+    help="Weight value (omit to use resource group's default_weight)",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def project_set_weight_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    project_id: str,
+    domain_name: str,
+    weight: Optional[str],
+    as_json: bool,
+) -> None:
+    """Set project fair share weight."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            weight_decimal = Decimal(weight) if weight is not None else None
+            response = api_session.FairShare.upsert_project_fair_share_weight(
+                resource_group, UUID(project_id), domain_name, weight_decimal
+            )
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print("Updated project fair share weight successfully.")
+                print(f"ID: {fs.id}")
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"Project ID: {fs.project_id}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Updated: {fs.updated_at}")
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -346,11 +446,11 @@ def user_get_cmd(
                 print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
             else:
                 fs = response.item
-                print(f"ID: {fs.id}")
                 print(f"Resource Group: {fs.resource_group}")
                 print(f"User UUID: {fs.user_uuid}")
                 print(f"Project ID: {fs.project_id}")
                 print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
                 print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                 print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                 print(
@@ -454,9 +554,253 @@ def user_list_cmd(
                     print(f"User UUID: {fs.user_uuid}")
                     print(f"Project ID: {fs.project_id}")
                     print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
                     print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
                     print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
                     print(f"Created: {fs.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@user.command("set-weight")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("project_id", type=str)
+@click.argument("user_uuid", type=str)
+@click.option(
+    "--domain",
+    "domain_name",
+    type=str,
+    required=True,
+    help="Domain name the user belongs to",
+)
+@click.option(
+    "--weight",
+    type=str,
+    default=None,
+    help="Weight value (omit to use resource group's default_weight)",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def user_set_weight_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    project_id: str,
+    user_uuid: str,
+    domain_name: str,
+    weight: Optional[str],
+    as_json: bool,
+) -> None:
+    """Set user fair share weight."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            weight_decimal = Decimal(weight) if weight is not None else None
+            response = api_session.FairShare.upsert_user_fair_share_weight(
+                resource_group, UUID(project_id), UUID(user_uuid), domain_name, weight_decimal
+            )
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print("Updated user fair share weight successfully.")
+                print(f"ID: {fs.id}")
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"User UUID: {fs.user_uuid}")
+                print(f"Project ID: {fs.project_id}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Updated: {fs.updated_at}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# Resource Group Fair Share Commands
+# =============================================================================
+
+
+@fair_share.group()
+def resource_group() -> None:
+    """Resource group fair share operations."""
+
+
+@resource_group.command("update-spec")
+@pass_ctx_obj
+@click.argument("name", type=str)
+@click.option(
+    "--half-life-days",
+    type=int,
+    default=None,
+    help="Half-life for exponential decay in days",
+)
+@click.option(
+    "--lookback-days",
+    type=int,
+    default=None,
+    help="Total lookback period in days",
+)
+@click.option(
+    "--decay-unit-days",
+    type=int,
+    default=None,
+    help="Granularity of decay buckets in days",
+)
+@click.option(
+    "--default-weight",
+    type=str,
+    default=None,
+    help="Default weight for entities",
+)
+@click.option(
+    "--resource-weight",
+    "resource_weights",
+    type=str,
+    multiple=True,
+    help="Resource weight in KEY=VALUE format (e.g., cpu=1.0, mem=0.5). Use VALUE=null to remove.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def resource_group_update_spec_cmd(
+    ctx: CLIContext,
+    name: str,
+    half_life_days: Optional[int],
+    lookback_days: Optional[int],
+    decay_unit_days: Optional[int],
+    default_weight: Optional[str],
+    resource_weights: tuple[str, ...],
+    as_json: bool,
+) -> None:
+    """Update resource group fair share specification."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import ResourceWeightEntryInput
+
+    # Parse resource_weights from "cpu=1.0,mem=null" format
+    parsed_weights: list[ResourceWeightEntryInput] | None = None
+    if resource_weights:
+        parsed_weights = []
+        for entry in resource_weights:
+            if "=" not in entry:
+                ctx.output.print_error(
+                    ValueError(
+                        f"Invalid resource weight format: {entry}. Expected KEY=VALUE format."
+                    )
+                )
+                sys.exit(ExitCode.FAILURE)
+            key, _, value = entry.partition("=")
+            weight: Decimal | None = None if value.lower() == "null" else Decimal(value)
+            parsed_weights.append(ResourceWeightEntryInput(resource_type=key, weight=weight))
+
+    default_weight_decimal = Decimal(default_weight) if default_weight is not None else None
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.update_resource_group_fair_share_spec(
+                name,
+                half_life_days,
+                lookback_days,
+                decay_unit_days,
+                default_weight_decimal,
+                parsed_weights,
+            )
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                spec = response.item
+                print("Updated resource group fair share spec successfully.")
+                print(f"Resource Group: {name}")
+                print(f"Half Life Days: {spec.half_life_days}")
+                print(f"Lookback Days: {spec.lookback_days}")
+                print(f"Decay Unit Days: {spec.decay_unit_days}")
+                print(f"Default Weight: {spec.default_weight}")
+                print("Resource Weights:")
+                for entry in spec.resource_weights.entries:
+                    print(f"  {entry.resource_type}: {entry.quantity}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@resource_group.command("spec")
+@pass_ctx_obj
+@click.argument("name", type=str)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def resource_group_spec_cmd(
+    ctx: CLIContext,
+    name: str,
+    as_json: bool,
+) -> None:
+    """Get resource group fair share specification."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.get_resource_group_fair_share_spec(name)
+
+            if as_json:
+                print(json.dumps(response.model_dump(mode="json"), indent=2, default=str))
+            else:
+                print(f"Resource Group: {response.resource_group}")
+                spec = response.fair_share_spec
+                print(f"Half Life Days: {spec.half_life_days}")
+                print(f"Lookback Days: {spec.lookback_days}")
+                print(f"Decay Unit Days: {spec.decay_unit_days}")
+                print(f"Default Weight: {spec.default_weight}")
+                print("Resource Weights:")
+                for entry in spec.resource_weights.entries:
+                    print(f"  {entry.resource_type}: {entry.quantity}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@resource_group.command("specs")
+@pass_ctx_obj
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def resource_group_specs_cmd(
+    ctx: CLIContext,
+    as_json: bool,
+) -> None:
+    """List all resource groups with their fair share specifications."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.list_resource_group_fair_share_specs()
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No resource groups found")
+                    return
+                print(f"Total: {response.total_count}")
+                print()
+                for item in items:
+                    print(f"Resource Group: {item.resource_group}")
+                    spec = item.fair_share_spec
+                    print(f"  Half Life Days: {spec.half_life_days}")
+                    print(f"  Lookback Days: {spec.lookback_days}")
+                    print(f"  Decay Unit Days: {spec.decay_unit_days}")
+                    print(f"  Default Weight: {spec.default_weight}")
+                    print("  Resource Weights:")
+                    for entry in spec.resource_weights.entries:
+                        print(f"    {entry.resource_type}: {entry.quantity}")
                     print("---")
         except Exception as e:
             ctx.output.print_error(e)

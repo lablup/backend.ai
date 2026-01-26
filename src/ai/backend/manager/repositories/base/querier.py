@@ -12,7 +12,7 @@ from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyE
 from ai.backend.manager.models.base import Base
 
 from .pagination import PageInfoResult, QueryPagination
-from .types import QueryCondition, QueryOrder
+from .types import ExistenceCheck, QueryCondition, QueryOrder, SearchScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -113,6 +113,34 @@ class BatchQuerierResult(Generic[TRow]):
     has_previous_page: bool
 
 
+async def _validate_scope(
+    db_sess: SASession,
+    checks: list[ExistenceCheck],
+) -> None:
+    """Validate scope existence checks in a single query.
+
+    Args:
+        db_sess: Database session
+        checks: List of existence checks to validate
+
+    Raises:
+        The error specified in the first failing ExistenceCheck.
+    """
+    if not checks:
+        return
+
+    select_clauses = [
+        sa.exists().where(check.column == check.value).label(f"check_{i}")
+        for i, check in enumerate(checks)
+    ]
+    result = await db_sess.execute(sa.select(*select_clauses))
+    row = result.mappings().one()
+
+    for i, check in enumerate(checks):
+        if not row[f"check_{i}"]:
+            raise check.error
+
+
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
@@ -149,6 +177,7 @@ async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
+    scope: SearchScope | None = None,
 ) -> BatchQuerierResult[Row]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
@@ -159,6 +188,7 @@ async def execute_batch_querier(
         db_sess: Database session
         query: Base SELECT query (without count window function)
         querier: BatchQuerier for filtering, ordering, and pagination
+        scope: Optional SearchScope that provides required query conditions
 
     Returns:
         BatchQuerierResult containing rows, total_count, and pagination info
@@ -173,6 +203,15 @@ async def execute_batch_querier(
         print(result.rows)  # List of matching rows
         print(result.total_count)  # Total count
     """
+    # Validate and add scope condition to querier if provided
+    if scope is not None:
+        await _validate_scope(db_sess, list(scope.existence_checks))
+        querier = BatchQuerier(
+            pagination=querier.pagination,
+            conditions=[*querier.conditions, scope.to_condition()],
+            orders=querier.orders,
+        )
+
     initial_query = query
 
     # Add window function for offset pagination

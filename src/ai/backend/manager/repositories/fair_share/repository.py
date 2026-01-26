@@ -27,9 +27,24 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareFactors,
     UserFairShareSearchResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkUpserter,
+    BulkUpserterResult,
+    Creator,
+    Upserter,
+)
 
 from .db_source import FairShareDBSource
+from .types import (
+    DomainFairShareEntitySearchResult,
+    DomainFairShareSearchScope,
+    ProjectFairShareEntitySearchResult,
+    ProjectFairShareSearchScope,
+    UserFairShareEntitySearchResult,
+    UserFairShareSearchScope,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.fair_share import (
@@ -107,6 +122,26 @@ class FairShareRepository:
         """Search domain fair shares with pagination."""
         return await self._db_source.search_domain_fair_shares(querier)
 
+    @fair_share_repository_resilience.apply()
+    async def search_domain_fair_share_entities(
+        self,
+        scope: DomainFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainFairShareEntitySearchResult:
+        """Search domain entities with their fair share records.
+
+        Returns all domains associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            DomainFairShareEntitySearchResult with domain entities and their optional details.
+        """
+        return await self._db_source.search_domain_fair_share_entities(scope, querier)
+
     # ==================== Project Fair Share ====================
 
     @fair_share_repository_resilience.apply()
@@ -146,6 +181,26 @@ class FairShareRepository:
         """Search project fair shares with pagination."""
         return await self._db_source.search_project_fair_shares(querier)
 
+    @fair_share_repository_resilience.apply()
+    async def search_project_fair_share_entities(
+        self,
+        scope: ProjectFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> ProjectFairShareEntitySearchResult:
+        """Search project entities with their fair share records.
+
+        Returns all projects associated with a resource group,
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            ProjectFairShareEntitySearchResult with project entities and their optional details.
+        """
+        return await self._db_source.search_project_fair_share_entities(scope, querier)
+
     # ==================== User Fair Share ====================
 
     @fair_share_repository_resilience.apply()
@@ -163,6 +218,32 @@ class FairShareRepository:
     ) -> UserFairShareData:
         """Upsert a user fair share record."""
         return await self._db_source.upsert_user_fair_share(upserter)
+
+    # ==================== Bulk Upsert Operations ====================
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_domain_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[DomainFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert domain fair share records."""
+        return await self._db_source.bulk_upsert_domain_fair_share(bulk_upserter)
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_project_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[ProjectFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert project fair share records."""
+        return await self._db_source.bulk_upsert_project_fair_share(bulk_upserter)
+
+    @fair_share_repository_resilience.apply()
+    async def bulk_upsert_user_fair_share(
+        self,
+        bulk_upserter: BulkUpserter[UserFairShareRow],
+    ) -> BulkUpserterResult:
+        """Bulk upsert user fair share records."""
+        return await self._db_source.bulk_upsert_user_fair_share(bulk_upserter)
 
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share(
@@ -185,6 +266,80 @@ class FairShareRepository:
     ) -> UserFairShareSearchResult:
         """Search user fair shares with pagination."""
         return await self._db_source.search_user_fair_shares(querier)
+
+    @fair_share_repository_resilience.apply()
+    async def search_user_fair_share_entities(
+        self,
+        scope: UserFairShareSearchScope,
+        querier: BatchQuerier,
+    ) -> UserFairShareEntitySearchResult:
+        """Search user entities with their fair share records.
+
+        Returns all users associated with a resource group (via project membership),
+        regardless of whether they have fair share records.
+
+        Args:
+            scope: Required scope with resource_group.
+            querier: Pagination, conditions, and orders for the query.
+
+        Returns:
+            UserFairShareEntitySearchResult with user entities and their optional details.
+        """
+        return await self._db_source.search_user_fair_share_entities(scope, querier)
+
+    # ==================== Entity Info & Spec ====================
+
+    @fair_share_repository_resilience.apply()
+    async def get_user_project_info(
+        self,
+        project_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if user exists in project.
+
+        Returns:
+            domain_name if user is member of project, None otherwise.
+        """
+        return await self._db_source.get_user_project_info(project_id, user_uuid)
+
+    @fair_share_repository_resilience.apply()
+    async def get_project_info(
+        self,
+        project_id: uuid.UUID,
+    ) -> str | None:
+        """Get domain_name if project exists.
+
+        Returns:
+            domain_name if project exists, None otherwise.
+        """
+        return await self._db_source.get_project_info(project_id)
+
+    @fair_share_repository_resilience.apply()
+    async def get_domain_exists(
+        self,
+        domain_name: str,
+    ) -> bool:
+        """Check if domain exists.
+
+        Returns:
+            True if domain exists, False otherwise.
+        """
+        return await self._db_source.get_domain_exists(domain_name)
+
+    @fair_share_repository_resilience.apply()
+    async def get_scaling_group_fair_share_spec(
+        self,
+        scaling_group: str,
+    ) -> FairShareScalingGroupSpec:
+        """Get fair share spec for scaling group.
+
+        Returns:
+            FairShareScalingGroupSpec with defaults if not configured.
+
+        Raises:
+            ScalingGroupNotFound: If scaling group doesn't exist.
+        """
+        return await self._db_source.get_scaling_group_fair_share_spec(scaling_group)
 
     @fair_share_repository_resilience.apply()
     async def get_user_scheduling_ranks_batch(

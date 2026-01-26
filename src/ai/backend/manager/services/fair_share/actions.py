@@ -320,3 +320,117 @@ class UpsertUserFairShareWeightActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.data.id)
+
+
+# Bulk Upsert Actions for Fair Share Weight
+
+
+@dataclass
+class DomainWeightInput:
+    """Input for a single domain weight in bulk upsert."""
+
+    domain_name: str
+    weight: Decimal | None
+
+
+@dataclass
+class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
+    """Action to bulk upsert domain fair share weights."""
+
+    resource_group: str
+    inputs: list[DomainWeightInput]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "bulk_upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:[{len(self.inputs)} domains]"
+
+
+@dataclass
+class BulkUpsertDomainFairShareWeightActionResult(BaseActionResult):
+    """Result of bulk upserting domain fair share weights."""
+
+    upserted_count: int
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"[{self.upserted_count} domains]"
+
+
+@dataclass
+class ProjectWeightInput:
+    """Input for a single project weight in bulk upsert."""
+
+    project_id: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+
+@dataclass
+class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
+    """Action to bulk upsert project fair share weights."""
+
+    resource_group: str
+    inputs: list[ProjectWeightInput]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "bulk_upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:[{len(self.inputs)} projects]"
+
+
+@dataclass
+class BulkUpsertProjectFairShareWeightActionResult(BaseActionResult):
+    """Result of bulk upserting project fair share weights."""
+
+    upserted_count: int
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"[{self.upserted_count} projects]"
+
+
+@dataclass
+class UserWeightInput:
+    """Input for a single user weight in bulk upsert."""
+
+    user_uuid: uuid.UUID
+    project_id: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+
+@dataclass
+class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
+    """Action to bulk upsert user fair share weights."""
+
+    resource_group: str
+    inputs: list[UserWeightInput]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "bulk_upsert_weight"
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"{self.resource_group}:[{len(self.inputs)} users]"
+
+
+@dataclass
+class BulkUpsertUserFairShareWeightActionResult(BaseActionResult):
+    """Result of bulk upserting user fair share weights."""
+
+    upserted_count: int
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return f"[{self.upserted_count} users]"

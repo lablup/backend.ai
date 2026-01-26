@@ -70,6 +70,9 @@ from .deployment import (
     update_route_traffic_status,
 )
 from .fair_share import (
+    bulk_upsert_domain_fair_share_weight,
+    bulk_upsert_project_fair_share_weight,
+    bulk_upsert_user_fair_share_weight,
     domain_fair_share,
     domain_fair_shares,
     project_fair_share,
@@ -256,6 +259,9 @@ class Mutation:
     upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
     upsert_project_fair_share_weight = upsert_project_fair_share_weight
     upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
+    bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
+    bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
 

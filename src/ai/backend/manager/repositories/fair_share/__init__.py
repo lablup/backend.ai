@@ -15,9 +15,23 @@ from .options import (
 )
 from .repositories import FairShareRepositories
 from .repository import FairShareRepository
+from .types import (
+    DomainFairShareEntityItem,
+    DomainFairShareEntitySearchResult,
+    DomainFairShareSearchScope,
+    ProjectFairShareEntityItem,
+    ProjectFairShareEntitySearchResult,
+    ProjectFairShareSearchScope,
+    UserFairShareEntityItem,
+    UserFairShareEntitySearchResult,
+    UserFairShareSearchScope,
+)
 from .upserters import (
+    DomainFairShareBulkWeightUpserterSpec,
     DomainFairShareUpserterSpec,
+    ProjectFairShareBulkWeightUpserterSpec,
     ProjectFairShareUpserterSpec,
+    UserFairShareBulkWeightUpserterSpec,
     UserFairShareUpserterSpec,
 )
 
@@ -33,6 +47,10 @@ __all__ = (
     "DomainFairShareUpserterSpec",
     "ProjectFairShareUpserterSpec",
     "UserFairShareUpserterSpec",
+    # Bulk weight upserter specs
+    "DomainFairShareBulkWeightUpserterSpec",
+    "ProjectFairShareBulkWeightUpserterSpec",
+    "UserFairShareBulkWeightUpserterSpec",
     # Query conditions
     "DomainFairShareConditions",
     "ProjectFairShareConditions",
@@ -41,4 +59,15 @@ __all__ = (
     "DomainFairShareOrders",
     "ProjectFairShareOrders",
     "UserFairShareOrders",
+    # Scope types
+    "DomainFairShareSearchScope",
+    "ProjectFairShareSearchScope",
+    "UserFairShareSearchScope",
+    # Entity-based result types
+    "DomainFairShareEntityItem",
+    "ProjectFairShareEntityItem",
+    "UserFairShareEntityItem",
+    "DomainFairShareEntitySearchResult",
+    "ProjectFairShareEntitySearchResult",
+    "UserFairShareEntitySearchResult",
 )

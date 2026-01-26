@@ -8,26 +8,34 @@ from .common import (
     ResourceWeightEntryInputGQL,
 )
 from .domain import (
+    BulkUpsertDomainFairShareWeightInput,
+    BulkUpsertDomainFairShareWeightPayload,
     DomainFairShareConnection,
     DomainFairShareEdge,
     DomainFairShareFilter,
     DomainFairShareGQL,
     DomainFairShareOrderBy,
     DomainFairShareOrderField,
+    DomainWeightInputItem,
     UpsertDomainFairShareWeightInput,
     UpsertDomainFairShareWeightPayload,
 )
 from .project import (
+    BulkUpsertProjectFairShareWeightInput,
+    BulkUpsertProjectFairShareWeightPayload,
     ProjectFairShareConnection,
     ProjectFairShareEdge,
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
     ProjectFairShareOrderField,
+    ProjectWeightInputItem,
     UpsertProjectFairShareWeightInput,
     UpsertProjectFairShareWeightPayload,
 )
 from .user import (
+    BulkUpsertUserFairShareWeightInput,
+    BulkUpsertUserFairShareWeightPayload,
     UpsertUserFairShareWeightInput,
     UpsertUserFairShareWeightPayload,
     UserFairShareConnection,
@@ -36,6 +44,7 @@ from .user import (
     UserFairShareGQL,
     UserFairShareOrderBy,
     UserFairShareOrderField,
+    UserWeightInputItem,
 )
 
 __all__ = [
@@ -54,6 +63,9 @@ __all__ = [
     "DomainFairShareOrderBy",
     "UpsertDomainFairShareWeightInput",
     "UpsertDomainFairShareWeightPayload",
+    "DomainWeightInputItem",
+    "BulkUpsertDomainFairShareWeightInput",
+    "BulkUpsertDomainFairShareWeightPayload",
     # Project
     "ProjectFairShareGQL",
     "ProjectFairShareConnection",
@@ -63,6 +75,9 @@ __all__ = [
     "ProjectFairShareOrderBy",
     "UpsertProjectFairShareWeightInput",
     "UpsertProjectFairShareWeightPayload",
+    "ProjectWeightInputItem",
+    "BulkUpsertProjectFairShareWeightInput",
+    "BulkUpsertProjectFairShareWeightPayload",
     # User
     "UserFairShareGQL",
     "UserFairShareConnection",
@@ -72,4 +87,7 @@ __all__ = [
     "UserFairShareOrderBy",
     "UpsertUserFairShareWeightInput",
     "UpsertUserFairShareWeightPayload",
+    "UserWeightInputItem",
+    "BulkUpsertUserFairShareWeightInput",
+    "BulkUpsertUserFairShareWeightPayload",
 ]

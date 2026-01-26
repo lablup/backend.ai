@@ -105,13 +105,7 @@ class DomainFairShareGQL(Node):
             id=ID(str(data.id)),
             resource_group=data.resource_group,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL(
-                weight=data.spec.weight,
-                half_life_days=data.spec.half_life_days,
-                lookback_days=data.spec.lookback_days,
-                decay_unit_days=data.spec.decay_unit_days,
-                resource_weights=ResourceSlotGQL.from_resource_slot(data.spec.resource_weights),
-            ),
+            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
             calculation_snapshot=FairShareCalculationSnapshotGQL(
                 fair_share_factor=data.calculation_snapshot.fair_share_factor,
                 total_decayed_usage=ResourceSlotGQL.from_resource_slot(
@@ -324,4 +318,57 @@ class UpsertDomainFairShareWeightPayload:
 
     domain_fair_share: DomainFairShareGQL = strawberry.field(
         description="The updated or created domain fair share record."
+    )
+
+
+# Bulk Upsert Mutation Input/Payload Types
+
+
+@strawberry.input(
+    name="DomainWeightInputItem",
+    description=(
+        "Added in 26.1.0. Input item for a single domain weight in bulk upsert. "
+        "Represents one domain's weight configuration."
+    ),
+)
+class DomainWeightInputItem:
+    """Input item for a single domain weight in bulk upsert."""
+
+    domain_name: str = strawberry.field(description="Name of the domain to update weight for.")
+    weight: Decimal | None = strawberry.field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority allocation ratio. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+@strawberry.input(
+    name="BulkUpsertDomainFairShareWeightInput",
+    description=(
+        "Added in 26.1.0. Input for bulk upserting domain fair share weights. "
+        "Allows updating multiple domains in a single transaction."
+    ),
+)
+class BulkUpsertDomainFairShareWeightInput:
+    """Input for bulk upserting domain fair share weights."""
+
+    resource_group: str = strawberry.field(
+        description="Name of the scaling group (resource group) for all fair shares."
+    )
+    inputs: list[DomainWeightInputItem] = strawberry.field(
+        description="List of domain weight updates to apply."
+    )
+
+
+@strawberry.type(
+    name="BulkUpsertDomainFairShareWeightPayload",
+    description="Added in 26.1.0. Payload for bulk domain fair share weight upsert mutation.",
+)
+class BulkUpsertDomainFairShareWeightPayload:
+    """Payload for bulk domain fair share weight upsert mutation."""
+
+    upserted_count: int = strawberry.field(
+        description="Number of domain fair share records created or updated."
     )

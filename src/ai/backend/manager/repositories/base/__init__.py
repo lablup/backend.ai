@@ -50,8 +50,10 @@ from .querier import (
 )
 from .types import (
     CursorConditionFactory,
+    ExistenceCheck,
     QueryCondition,
     QueryOrder,
+    SearchScope,
 )
 from .updater import (
     BatchUpdater,
@@ -64,9 +66,12 @@ from .updater import (
     execute_updater,
 )
 from .upserter import (
+    BulkUpserter,
+    BulkUpserterResult,
     Upserter,
     UpserterResult,
     UpserterSpec,
+    execute_bulk_upserter,
     execute_upserter,
 )
 from .utils import (
@@ -79,6 +84,8 @@ __all__ = [
     "QueryCondition",
     "QueryOrder",
     "CursorConditionFactory",
+    "ExistenceCheck",
+    "SearchScope",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
@@ -128,6 +135,10 @@ __all__ = [
     "Upserter",
     "UpserterResult",
     "execute_upserter",
+    # BulkUpserter
+    "BulkUpserter",
+    "BulkUpserterResult",
+    "execute_bulk_upserter",
     # Purger
     "Purger",
     "PurgerResult",

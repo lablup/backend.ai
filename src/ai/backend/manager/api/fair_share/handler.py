@@ -18,9 +18,12 @@ from ai.backend.common.dto.manager.fair_share import (
     GetDomainFairShareResponse,
     GetProjectFairSharePathParam,
     GetProjectFairShareResponse,
+    GetResourceGroupFairShareSpecPathParam,
+    GetResourceGroupFairShareSpecResponse,
     GetUserFairSharePathParam,
     GetUserFairShareResponse,
     PaginationInfo,
+    ResourceGroupFairShareSpecItemDTO,
     SearchDomainFairSharesRequest,
     SearchDomainFairSharesResponse,
     SearchDomainUsageBucketsRequest,
@@ -29,6 +32,7 @@ from ai.backend.common.dto.manager.fair_share import (
     SearchProjectFairSharesResponse,
     SearchProjectUsageBucketsRequest,
     SearchProjectUsageBucketsResponse,
+    SearchResourceGroupFairShareSpecsResponse,
     SearchUserFairSharesRequest,
     SearchUserFairSharesResponse,
     SearchUserUsageBucketsRequest,
@@ -50,18 +54,12 @@ from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    Updater,
 )
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
-)
-from ai.backend.manager.repositories.scaling_group.updaters import (
-    ResourceGroupFairShareUpdaterSpec,
-    ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
@@ -82,10 +80,10 @@ from ai.backend.manager.services.resource_usage.actions import (
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
+from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
+    ResourceWeightInput,
+    UpdateFairShareSpecAction,
 )
-from ai.backend.manager.types import TriState
 
 from .adapter import FairShareAdapter
 
@@ -477,17 +475,16 @@ class FairShareAPIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def update_resource_group_fair_share_spec(
+    async def get_resource_group_fair_share_spec(
         self,
-        path: PathParam[UpdateResourceGroupFairShareSpecPathParam],
-        body: BodyParam[UpdateResourceGroupFairShareSpecRequest],
+        path: PathParam[GetResourceGroupFairShareSpecPathParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Update resource group fair share spec with partial update (Read-Modify-Write pattern)."""
+        """Get resource group fair share spec."""
         self._check_superadmin()
         processors = processors_ctx.processors
 
-        # 1. Read: Get existing scaling group
+        # Get scaling group by name
         name_spec = StringMatchSpec(
             value=path.parsed.resource_group,
             case_insensitive=False,
@@ -506,25 +503,82 @@ class FairShareAPIHandler:
                 reason=f"Resource group '{path.parsed.resource_group}' not found"
             )
 
-        existing_data = search_result.scaling_groups[0]
+        scaling_group = search_result.scaling_groups[0]
 
-        # 2. Modify: Merge partial input with existing fair_share_spec
-        merged_spec = self._adapter.merge_fair_share_spec(
-            body.parsed, existing_data.fair_share_spec
+        resp = GetResourceGroupFairShareSpecResponse(
+            resource_group=scaling_group.name,
+            fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(
+                scaling_group.fair_share_spec
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def search_resource_group_fair_share_specs(
+        self,
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search all resource groups with their fair share specs."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Get all scaling groups
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[],
+        )
+        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+            SearchScalingGroupsAction(querier=querier)
         )
 
-        # 3. Write: Update using the updater
-        fair_share_updater = ResourceGroupFairShareUpdaterSpec(
-            fair_share_spec=TriState.update(merged_spec),
+        items = [
+            ResourceGroupFairShareSpecItemDTO(
+                resource_group=sg.name,
+                fair_share_spec=self._adapter.convert_scaling_group_spec_to_dto(sg.fair_share_spec),
+            )
+            for sg in search_result.scaling_groups
+        ]
+
+        resp = SearchResourceGroupFairShareSpecsResponse(
+            items=items,
+            total_count=len(items),
         )
-        updater: Updater[ScalingGroupRow] = Updater(
-            pk_value=path.parsed.resource_group,
-            spec=ScalingGroupUpdaterSpec(fair_share=fair_share_updater),
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def update_resource_group_fair_share_spec(
+        self,
+        path: PathParam[UpdateResourceGroupFairShareSpecPathParam],
+        body: BodyParam[UpdateResourceGroupFairShareSpecRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Update resource group fair share spec with partial update and validation."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Convert request to action
+        resource_weights = None
+        if body.parsed.resource_weights is not None:
+            resource_weights = [
+                ResourceWeightInput(
+                    resource_type=entry.resource_type,
+                    weight=entry.weight,
+                )
+                for entry in body.parsed.resource_weights
+            ]
+
+        action = UpdateFairShareSpecAction(
+            resource_group=path.parsed.resource_group,
+            half_life_days=body.parsed.half_life_days,
+            lookback_days=body.parsed.lookback_days,
+            decay_unit_days=body.parsed.decay_unit_days,
+            default_weight=body.parsed.default_weight,
+            resource_weights=resource_weights,
         )
 
-        result = await processors.scaling_group.modify_scaling_group.wait_for_complete(
-            ModifyScalingGroupAction(updater=updater)
-        )
+        result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
         resp = UpdateResourceGroupFairShareSpecResponse(
             resource_group=result.scaling_group.name,
@@ -640,7 +694,21 @@ def create_app(
         )
     )
 
-    # Resource group spec update route
+    # Resource group spec routes
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/resource-groups/{resource_group}/spec",
+            api_handler.get_resource_group_fair_share_spec,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/resource-groups/specs",
+            api_handler.search_resource_group_fair_share_specs,
+        )
+    )
     cors.add(
         app.router.add_route(
             "PATCH",

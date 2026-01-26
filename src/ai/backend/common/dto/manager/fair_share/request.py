@@ -209,6 +209,12 @@ class UpdateResourceGroupFairShareSpecPathParam(BaseRequestModel):
     resource_group: str = Field(description="Scaling group name")
 
 
+class GetResourceGroupFairShareSpecPathParam(BaseRequestModel):
+    """Path parameters for getting resource group fair share spec."""
+
+    resource_group: str = Field(description="Scaling group name")
+
+
 # Upsert Weight Request Bodies
 
 

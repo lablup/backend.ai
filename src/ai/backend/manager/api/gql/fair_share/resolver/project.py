@@ -12,6 +12,8 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.fair_share.fetcher import fetch_project_fair_shares
 from ai.backend.manager.api.gql.fair_share.types import (
+    BulkUpsertProjectFairShareWeightInput,
+    BulkUpsertProjectFairShareWeightPayload,
     ProjectFairShareConnection,
     ProjectFairShareFilter,
     ProjectFairShareGQL,
@@ -21,7 +23,9 @@ from ai.backend.manager.api.gql.fair_share.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.fair_share.actions import (
+    BulkUpsertProjectFairShareWeightAction,
     GetProjectFairShareAction,
+    ProjectWeightInput,
     UpsertProjectFairShareWeightAction,
 )
 
@@ -108,3 +112,38 @@ async def upsert_project_fair_share_weight(
     return UpsertProjectFairShareWeightPayload(
         project_fair_share=ProjectFairShareGQL.from_dataclass(action_result.data)
     )
+
+
+@strawberry.mutation(
+    description=(
+        "Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). "
+        "Creates new records if they don't exist, or updates weights if they do."
+    )
+)
+async def bulk_upsert_project_fair_share_weight(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpsertProjectFairShareWeightInput,
+) -> BulkUpsertProjectFairShareWeightPayload:
+    """Bulk upsert project fair share weights."""
+    me = current_user()
+    if me is None or not me.is_superadmin:
+        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+
+    processors = info.context.processors
+    action_result = (
+        await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
+            BulkUpsertProjectFairShareWeightAction(
+                resource_group=input.resource_group,
+                inputs=[
+                    ProjectWeightInput(
+                        project_id=item.project_id,
+                        domain_name=item.domain_name,
+                        weight=item.weight,
+                    )
+                    for item in input.inputs
+                ],
+            )
+        )
+    )
+
+    return BulkUpsertProjectFairShareWeightPayload(upserted_count=action_result.upserted_count)

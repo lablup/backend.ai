@@ -95,6 +95,8 @@ class DomainFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,8 @@ class ProjectFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
 
 
 @dataclass(frozen=True)
@@ -122,6 +126,8 @@ class UserFairShareData:
     spec: FairShareSpec
     calculation_snapshot: FairShareCalculationSnapshot
     metadata: FairShareMetadata
+    default_weight: Decimal
+    """Resource group's default weight for entities without explicit weight."""
     scheduling_rank: int | None = None
     """Computed scheduling priority rank. Lower value = higher priority.
     None means rank calculation has not been performed yet."""
@@ -248,6 +254,11 @@ class FairShareCalculationContext:
 
     resource_weights: ResourceSlot
     """Default resource weights for normalized usage calculation."""
+
+    cluster_capacity: ResourceSlot
+    """Total available slots from all ALIVE schedulable agents in the scaling group.
+    Used to normalize usage: usage[r] / (capacity[r] * lookback_days * SECONDS_PER_DAY).
+    """
 
     today: date
     """Current date for decay calculation."""

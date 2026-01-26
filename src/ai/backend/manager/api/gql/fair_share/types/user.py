@@ -68,13 +68,7 @@ class UserFairShareGQL(Node):
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL(
-                weight=data.spec.weight,
-                half_life_days=data.spec.half_life_days,
-                lookback_days=data.spec.lookback_days,
-                decay_unit_days=data.spec.decay_unit_days,
-                resource_weights=ResourceSlotGQL.from_resource_slot(data.spec.resource_weights),
-            ),
+            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
             calculation_snapshot=FairShareCalculationSnapshotGQL(
                 fair_share_factor=data.calculation_snapshot.fair_share_factor,
                 total_decayed_usage=ResourceSlotGQL.from_resource_slot(
@@ -313,4 +307,61 @@ class UpsertUserFairShareWeightPayload:
 
     user_fair_share: UserFairShareGQL = strawberry.field(
         description="The updated or created user fair share record."
+    )
+
+
+# Bulk Upsert Mutation Input/Payload Types
+
+
+@strawberry.input(
+    name="UserWeightInputItem",
+    description=(
+        "Added in 26.1.0. Input item for a single user weight in bulk upsert. "
+        "Represents one user's weight configuration within a project."
+    ),
+)
+class UserWeightInputItem:
+    """Input item for a single user weight in bulk upsert."""
+
+    user_uuid: UUID = strawberry.field(description="UUID of the user to update weight for.")
+    project_id: UUID = strawberry.field(
+        description="ID of the project this user's fair share belongs to."
+    )
+    domain_name: str = strawberry.field(description="Name of the domain this project belongs to.")
+    weight: Decimal | None = strawberry.field(
+        default=None,
+        description=(
+            "Priority weight multiplier. Higher weight = higher priority allocation ratio. "
+            "Set to null to use resource group's default_weight."
+        ),
+    )
+
+
+@strawberry.input(
+    name="BulkUpsertUserFairShareWeightInput",
+    description=(
+        "Added in 26.1.0. Input for bulk upserting user fair share weights. "
+        "Allows updating multiple users in a single transaction."
+    ),
+)
+class BulkUpsertUserFairShareWeightInput:
+    """Input for bulk upserting user fair share weights."""
+
+    resource_group: str = strawberry.field(
+        description="Name of the scaling group (resource group) for all fair shares."
+    )
+    inputs: list[UserWeightInputItem] = strawberry.field(
+        description="List of user weight updates to apply."
+    )
+
+
+@strawberry.type(
+    name="BulkUpsertUserFairShareWeightPayload",
+    description="Added in 26.1.0. Payload for bulk user fair share weight upsert mutation.",
+)
+class BulkUpsertUserFairShareWeightPayload:
+    """Payload for bulk user fair share weight upsert mutation."""
+
+    upserted_count: int = strawberry.field(
+        description="Number of user fair share records created or updated."
     )

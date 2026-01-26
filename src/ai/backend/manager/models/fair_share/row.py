@@ -207,8 +207,12 @@ class DomainFairShareRow(Base):
         sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
 
-    def to_data(self) -> DomainFairShareData:
-        """Convert to DomainFairShareData."""
+    def to_data(self, default_weight: Decimal) -> DomainFairShareData:
+        """Convert to DomainFairShareData.
+
+        Args:
+            default_weight: The resource group's default weight for entities without explicit weight.
+        """
         return DomainFairShareData(
             id=self.id,
             resource_group=self.resource_group,
@@ -232,6 +236,7 @@ class DomainFairShareRow(Base):
                 created_at=self.created_at,
                 updated_at=self.updated_at,
             ),
+            default_weight=default_weight,
         )
 
 
@@ -391,8 +396,12 @@ class ProjectFairShareRow(Base):
         sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
 
-    def to_data(self) -> ProjectFairShareData:
-        """Convert to ProjectFairShareData."""
+    def to_data(self, default_weight: Decimal) -> ProjectFairShareData:
+        """Convert to ProjectFairShareData.
+
+        Args:
+            default_weight: The resource group's default weight for entities without explicit weight.
+        """
         return ProjectFairShareData(
             id=self.id,
             resource_group=self.resource_group,
@@ -417,6 +426,7 @@ class ProjectFairShareRow(Base):
                 created_at=self.created_at,
                 updated_at=self.updated_at,
             ),
+            default_weight=default_weight,
         )
 
 
@@ -606,8 +616,12 @@ class UserFairShareRow(Base):
         sa.Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
 
-    def to_data(self) -> UserFairShareData:
-        """Convert to UserFairShareData."""
+    def to_data(self, default_weight: Decimal) -> UserFairShareData:
+        """Convert to UserFairShareData.
+
+        Args:
+            default_weight: The resource group's default weight for entities without explicit weight.
+        """
         return UserFairShareData(
             id=self.id,
             resource_group=self.resource_group,
@@ -633,5 +647,6 @@ class UserFairShareRow(Base):
                 created_at=self.created_at,
                 updated_at=self.updated_at,
             ),
+            default_weight=default_weight,
             scheduling_rank=self.scheduling_rank,
         )

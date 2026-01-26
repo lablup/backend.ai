@@ -2,20 +2,32 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
+    ExistenceCheck,
     OffsetPagination,
     Querier,
     QuerierResult,
+    QueryCondition,
+    SearchScope,
     execute_batch_querier,
     execute_querier,
 )
@@ -328,3 +340,376 @@ class TestBatchQuerierBasic:
             assert result.total_count == 0
             assert result.has_next_page is False
             assert result.has_previous_page is False
+
+
+# =============================================================================
+# Scope Validation Tests
+# =============================================================================
+
+
+class TestScopeValidationError(BackendAIError):
+    """Test error for scope validation tests."""
+
+    error_type = "https://api.backend.ai/probs/test-scope-error"
+    error_title = "Test scope validation error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class TestScopeValidationError2(BackendAIError):
+    """Second test error for scope validation tests."""
+
+    error_type = "https://api.backend.ai/probs/test-scope-error-2"
+    error_title = "Test scope validation error 2."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScopeValidationTestRow(Base):
+    """ORM model for scope validation testing."""
+
+    __tablename__ = "test_scope_validation"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False, unique=True)
+    category: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+@dataclass(frozen=True)
+class MockSearchScope(SearchScope):
+    """Mock SearchScope for testing."""
+
+    checks: Sequence[ExistenceCheck]
+    filter_category: str | None = None
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition."""
+        category = self.filter_category
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if category:
+                return ScopeValidationTestRow.category == category
+            return sa.literal(True)
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck]:
+        """Return existence checks for scope validation."""
+        return self.checks
+
+
+class TestBatchQuerierScopeValidation:
+    """Tests for batch querier with scope validation."""
+
+    @pytest.fixture
+    async def scope_test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[ScopeValidationTestRow], None]:
+        """Create ORM test table for scope validation and return row class."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [ScopeValidationTestRow.__table__])
+            )
+
+        yield ScopeValidationTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_scope_validation CASCADE"))
+
+    @pytest.fixture
+    async def sample_data(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+        """Insert sample data for scope validation tests."""
+        data: list[dict[str, int | str]] = [
+            {"id": 1, "name": "item-a", "category": "cat1"},
+            {"id": 2, "name": "item-b", "category": "cat1"},
+            {"id": 3, "name": "item-c", "category": "cat2"},
+            {"id": 4, "name": "item-d", "category": "cat2"},
+        ]
+
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            await db_sess.execute(table.insert(), data)
+
+        yield data
+
+    @pytest.mark.asyncio
+    async def test_skips_validation_when_scope_is_none(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When scope is None, skip validation and execute query."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=None)
+
+            assert len(result.rows) == 4
+            assert result.total_count == 4
+
+    @pytest.mark.asyncio
+    async def test_skips_validation_when_existence_checks_empty(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When existence_checks is empty list, skip validation."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(checks=[])
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert len(result.rows) == 4
+            assert result.total_count == 4
+
+    @pytest.mark.asyncio
+    async def test_passes_validation_when_single_check_succeeds(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When single existence_check passes, execute query normally."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",  # exists
+                        error=TestScopeValidationError("item-a not found"),
+                    ),
+                ],
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert len(result.rows) == 4
+            assert result.total_count == 4
+
+    @pytest.mark.asyncio
+    async def test_raises_error_when_single_check_fails(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When single existence_check fails, raise its error."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent",  # does not exist
+                        error=TestScopeValidationError("nonexistent not found"),
+                    ),
+                ],
+            )
+
+            with pytest.raises(TestScopeValidationError):
+                await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+    @pytest.mark.asyncio
+    async def test_passes_validation_when_all_checks_succeed(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When all existence_checks pass, execute query normally."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",
+                        error=TestScopeValidationError("item-a not found"),
+                    ),
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-b",
+                        error=TestScopeValidationError2("item-b not found"),
+                    ),
+                ],
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert len(result.rows) == 4
+            assert result.total_count == 4
+
+    @pytest.mark.asyncio
+    async def test_raises_first_error_when_first_check_fails(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When first check fails, raise first error."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent-1",  # fails
+                        error=TestScopeValidationError("first error"),
+                    ),
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",  # succeeds
+                        error=TestScopeValidationError2("second error"),
+                    ),
+                ],
+            )
+
+            with pytest.raises(TestScopeValidationError) as exc_info:
+                await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert "first error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_raises_second_error_when_second_check_fails(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When only second check fails, raise second error."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",  # succeeds
+                        error=TestScopeValidationError("first error"),
+                    ),
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent-2",  # fails
+                        error=TestScopeValidationError2("second error"),
+                    ),
+                ],
+            )
+
+            with pytest.raises(TestScopeValidationError2) as exc_info:
+                await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert "second error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_raises_first_error_when_multiple_checks_fail(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When multiple checks fail, raise first (highest priority) error."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent-1",  # fails
+                        error=TestScopeValidationError("first error - priority"),
+                    ),
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent-2",  # fails
+                        error=TestScopeValidationError2("second error"),
+                    ),
+                ],
+            )
+
+            with pytest.raises(TestScopeValidationError) as exc_info:
+                await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert "first error - priority" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_scope_condition_filters_results(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """scope.to_condition() is added to query conditions and filters results."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",
+                        error=TestScopeValidationError("not found"),
+                    ),
+                ],
+                filter_category="cat1",  # filter by cat1 category
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            assert len(result.rows) == 2  # item-a, item-b belong to cat1
+            assert result.total_count == 2
+            for row in result.rows:
+                assert row.category == "cat1"

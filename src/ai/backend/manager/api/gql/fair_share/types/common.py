@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Self
 
 import strawberry
+
+from ai.backend.manager.data.fair_share.types import FairShareSpec
 
 
 @strawberry.type(
@@ -106,10 +109,17 @@ class ResourceSlotGQL:
 class FairShareSpecGQL:
     """Specification parameters for fair share calculation."""
 
-    weight: Decimal | None = strawberry.field(
+    weight: Decimal = strawberry.field(
         description=(
             "Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. "
-            "Null means using resource group's default_weight."
+            "This is the effective weight - either the explicitly set value or the resource group's default_weight."
+        )
+    )
+    uses_default: bool = strawberry.field(
+        description=(
+            "Added in 26.1.0. Whether this entity uses the resource group's default_weight. "
+            "True means no explicit weight was set and the default is being used. "
+            "False means an explicit weight value was configured for this entity."
         )
     )
     half_life_days: int = strawberry.field(
@@ -137,6 +147,29 @@ class FairShareSpecGQL:
             "For example, GPU usage might be weighted higher than CPU usage."
         )
     )
+
+    @classmethod
+    def from_spec(cls, spec: FairShareSpec, default_weight: Decimal) -> Self:
+        """Convert from data layer FairShareSpec to GQL type.
+
+        Args:
+            spec: The fair share spec from data layer.
+            default_weight: The default weight from the resource group's fair share spec.
+
+        Returns:
+            FairShareSpecGQL with effective weight and uses_default flag.
+        """
+        uses_default = spec.weight is None
+        effective_weight = default_weight if spec.weight is None else spec.weight
+
+        return cls(
+            weight=effective_weight,
+            uses_default=uses_default,
+            half_life_days=spec.half_life_days,
+            lookback_days=spec.lookback_days,
+            decay_unit_days=spec.decay_unit_days,
+            resource_weights=ResourceSlotGQL.from_resource_slot(spec.resource_weights),
+        )
 
 
 @strawberry.type(

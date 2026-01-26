@@ -39,3 +39,21 @@ class FairShareNotFoundError(FairShareError):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InvalidResourceWeightError(FairShareError):
+    """Raised when resource_weights contains resource types not available in capacity."""
+
+    error_type = "https://api.backend.ai/probs/invalid-resource-weight"
+    error_title = "Invalid resource weight configuration."
+
+    def __init__(self, invalid_types: list[str]) -> None:
+        self.invalid_types = invalid_types
+        super().__init__(f"Resource types not available in capacity: {', '.join(invalid_types)}")
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

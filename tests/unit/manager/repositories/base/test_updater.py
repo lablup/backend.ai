@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
@@ -372,6 +373,13 @@ class TestUpdaterStrPK:
             assert result is None
 
 
+def _make_int_pk_in_condition(
+    ids: list[int],
+) -> Callable[[], ColumnElement[bool]]:
+    """Create a typed condition for IN clause with integer PKs."""
+    return lambda: UpdaterTestRowInt.__table__.c.id.in_(ids)
+
+
 class TestBatchUpdater:
     """Tests for batch updater operations."""
 
@@ -502,6 +510,110 @@ class TestBatchUpdater:
                 conditions=[
                     lambda: UpdaterTestRowInt.__table__.c.status == "pending",
                 ],
+            )
+
+            result = await execute_batch_updater(db_sess, updater)
+
+            assert isinstance(result, BatchUpdaterResult)
+            assert result.updated_count == 0
+
+    async def test_bulk_update_by_pk_list_all_exist(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test batch update with IN clause when all PKs exist."""
+        async with database_connection.begin_session() as db_sess:
+            target_ids = sample_data[:2]  # First two IDs
+            spec = IntPKBatchUpdaterSpec(new_status="processed")
+            updater: BatchUpdater[UpdaterTestRowInt] = BatchUpdater(
+                spec=spec,
+                conditions=[_make_int_pk_in_condition(target_ids)],
+            )
+
+            result = await execute_batch_updater(db_sess, updater)
+
+            assert isinstance(result, BatchUpdaterResult)
+            assert result.updated_count == 2  # All requested PKs updated
+
+            # Verify only requested rows were updated
+            query = (
+                sa.select(UpdaterTestRowInt.__table__.c.id)
+                .select_from(UpdaterTestRowInt.__table__)
+                .where(UpdaterTestRowInt.__table__.c.status == "processed")
+            )
+            updated_ids = [row[0] for row in (await db_sess.execute(query)).fetchall()]
+            assert set(updated_ids) == set(target_ids)
+
+    async def test_bulk_update_by_pk_list_partial_exist(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test batch update with IN clause when some PKs don't exist (partial failure)."""
+        async with database_connection.begin_session() as db_sess:
+            existing_id = sample_data[0]
+            non_existing_id = 99999
+            target_ids = [existing_id, non_existing_id]
+            requested_count = len(target_ids)
+
+            spec = IntPKBatchUpdaterSpec(new_status="processed")
+            updater: BatchUpdater[UpdaterTestRowInt] = BatchUpdater(
+                spec=spec,
+                conditions=[_make_int_pk_in_condition(target_ids)],
+            )
+
+            result = await execute_batch_updater(db_sess, updater)
+
+            assert isinstance(result, BatchUpdaterResult)
+            assert result.updated_count == 1  # Only one exists
+
+            # Partial failure detection: requested - updated = failed
+            failed_count = requested_count - result.updated_count
+            assert failed_count == 1
+
+    async def test_bulk_update_by_pk_list_none_exist(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test batch update with IN clause when no PKs exist."""
+        async with database_connection.begin_session() as db_sess:
+            non_existing_ids = [99998, 99999]
+            requested_count = len(non_existing_ids)
+
+            spec = IntPKBatchUpdaterSpec(new_status="processed")
+            updater: BatchUpdater[UpdaterTestRowInt] = BatchUpdater(
+                spec=spec,
+                conditions=[_make_int_pk_in_condition(non_existing_ids)],
+            )
+
+            result = await execute_batch_updater(db_sess, updater)
+
+            assert isinstance(result, BatchUpdaterResult)
+            assert result.updated_count == 0
+
+            # All failed
+            failed_count = requested_count - result.updated_count
+            assert failed_count == 2
+
+    async def test_bulk_update_by_pk_list_empty_list(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test batch update with empty PK list."""
+        async with database_connection.begin_session() as db_sess:
+            empty_ids: list[int] = []
+
+            spec = IntPKBatchUpdaterSpec(new_status="processed")
+            updater: BatchUpdater[UpdaterTestRowInt] = BatchUpdater(
+                spec=spec,
+                conditions=[_make_int_pk_in_condition(empty_ids)],
             )
 
             result = await execute_batch_updater(db_sess, updater)

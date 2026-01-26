@@ -9,25 +9,19 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
-from ai.backend.manager.api.gql.base import StringMatchSpec, encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, Updater
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
     ScalingGroupOrders,
 )
-from ai.backend.manager.repositories.scaling_group.updaters import (
-    ResourceGroupFairShareUpdaterSpec,
-    ScalingGroupUpdaterSpec,
-)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
+from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
+    ResourceWeightInput,
+    UpdateFairShareSpecAction,
 )
-from ai.backend.manager.types import TriState
 
 from .types import (
     ResourceGroupFilterGQL,
@@ -122,50 +116,39 @@ async def resource_groups(
 @strawberry.mutation(
     description=(
         "Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). "
-        "Only provided fields are updated; others retain their existing values."
+        "Only provided fields are updated; others retain their existing values. "
+        "Resource weights are validated against capacity - only resource types available in "
+        "the scaling group's capacity can be specified."
     )
 )
 async def update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
 ) -> UpdateResourceGroupFairShareSpecPayload:
-    """Update fair share spec with partial update (Read-Modify-Write pattern)."""
+    """Update fair share spec with partial update and validation."""
     processors = info.context.processors
 
-    # 1. Read: Get existing scaling group
-    name_spec = StringMatchSpec(
-        value=input.resource_group,
-        case_insensitive=False,
-        negated=False,
-    )
-    querier = BatchQuerier(
-        pagination=NoPagination(),
-        conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
-    )
-    search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
-        SearchScalingGroupsAction(querier=querier)
+    # Convert GQL input to action
+    resource_weights = None
+    if input.resource_weights is not None:
+        resource_weights = [
+            ResourceWeightInput(
+                resource_type=entry.resource_type,
+                weight=entry.weight,
+            )
+            for entry in input.resource_weights
+        ]
+
+    action = UpdateFairShareSpecAction(
+        resource_group=input.resource_group,
+        half_life_days=input.half_life_days,
+        lookback_days=input.lookback_days,
+        decay_unit_days=input.decay_unit_days,
+        default_weight=input.default_weight,
+        resource_weights=resource_weights,
     )
 
-    if not search_result.scaling_groups:
-        raise ValueError(f"Resource group '{input.resource_group}' not found")
-
-    existing_data = search_result.scaling_groups[0]
-
-    # 2. Modify: Merge partial input with existing fair_share_spec
-    merged_spec = input.merge_with(existing_data.fair_share_spec)
-
-    # 3. Write: Update using the updater
-    fair_share_updater = ResourceGroupFairShareUpdaterSpec(
-        fair_share_spec=TriState.update(merged_spec),
-    )
-    updater = Updater[ScalingGroupRow](
-        pk_value=input.resource_group,
-        spec=ScalingGroupUpdaterSpec(fair_share=fair_share_updater),
-    )
-
-    result = await processors.scaling_group.modify_scaling_group.wait_for_complete(
-        ModifyScalingGroupAction(updater=updater)
-    )
+    result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
     return UpdateResourceGroupFairShareSpecPayload(
         resource_group=ResourceGroupGQL.from_dataclass(result.scaling_group),
