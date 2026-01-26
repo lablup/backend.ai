@@ -58,6 +58,7 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
@@ -411,6 +412,19 @@ class VfolderRepository:
             await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+
+    @vfolder_repository_resilience.apply()
+    async def purge_vfolder(self, purger: Purger[VFolderRow]) -> VFolderData:
+        """
+        Permanently delete a VFolder from DB.
+        This should only be called for VFolders with DELETE_COMPLETE status.
+        """
+        async with self._db.begin_session() as session:
+            result = await execute_purger(session, purger)
+            if result is None:
+                raise VFolderNotFound(extra_data=str(purger.pk_value))
+            return self._vfolder_row_to_data(result.row)
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:

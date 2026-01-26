@@ -21,6 +21,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
@@ -45,6 +47,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     delete_forever_vfolder: SingleEntityActionProcessor[
         DeleteForeverVFolderAction, DeleteForeverVFolderActionResult
     ]
+    purge_vfolder: SingleEntityActionProcessor[PurgeVFolderAction, PurgeVFolderActionResult]
     force_delete_vfolder: SingleEntityActionProcessor[
         ForceDeleteVFolderAction, ForceDeleteVFolderActionResult
     ]
@@ -67,6 +70,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.delete_forever_vfolder = SingleEntityActionProcessor(
             service.delete_forever, action_monitors
         )
+        self.purge_vfolder = SingleEntityActionProcessor(service.purge, action_monitors)
         self.force_delete_vfolder = SingleEntityActionProcessor(
             service.force_delete, action_monitors
         )
@@ -83,6 +87,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             MoveToTrashVFolderAction.spec(),
             RestoreVFolderFromTrashAction.spec(),
             DeleteForeverVFolderAction.spec(),
+            PurgeVFolderAction.spec(),
             ForceDeleteVFolderAction.spec(),
             CloneVFolderAction.spec(),
             GetTaskLogsAction.spec(),
