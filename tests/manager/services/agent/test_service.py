@@ -1,4 +1,6 @@
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from http import HTTPStatus
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -7,6 +9,7 @@ from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.exception import AgentWatcherResponseError
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -14,9 +17,21 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, UpsertResult
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.services.agent.actions.get_watcher_status import (
+    GetWatcherStatusAction,
+)
 from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
+)
+from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
+    WatcherAgentRestartAction,
+)
+from ai.backend.manager.services.agent.actions.watcher_agent_start import (
+    WatcherAgentStartAction,
+)
+from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
+    WatcherAgentStopAction,
 )
 from ai.backend.manager.services.agent.service import AgentService
 
@@ -355,8 +370,6 @@ class TestAgentService:
         mock_agent_repository.add_agent_to_images.return_value = None
 
         # When - simulate concurrent heartbeats
-        import asyncio
-
         tasks = [agent_service.handle_heartbeat(action) for action in actions]
         results = await asyncio.gather(*tasks)
 
@@ -371,3 +384,172 @@ class TestAgentService:
         assert mock_agent_cache.update.call_count == 5
         assert mock_agent_repository.add_agent_to_images.call_count == 5
         assert mock_hook_plugin_ctx.notify.call_count == 5
+
+
+class TestWatcher:
+    @pytest.fixture
+    def agent_id(self) -> AgentId:
+        return AgentId("test-agent-watcher")
+
+    @pytest.fixture
+    def _setup_http_mock(self, mock_etcd: AsyncMock):
+        def _setup(agent_id: AgentId, status: int, data: dict | str):
+            # Setup etcd
+            mock_etcd.get.side_effect = lambda key: {
+                f"nodes/agents/{agent_id}/ip": "192.168.1.100",
+                f"nodes/agents/{agent_id}/watcher_port": "6099",
+            }.get(key)
+
+            # Setup HTTP response
+            mock_response = AsyncMock()
+            mock_response.status = status
+            mock_response.ok = status // 100 == 2
+            if isinstance(data, dict):
+                mock_response.json = AsyncMock(return_value=data)
+            else:
+                mock_response.text = AsyncMock(return_value=data)
+            mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_response.__aexit__ = AsyncMock(return_value=None)
+
+            # Setup HTTP session
+            mock_session = AsyncMock()
+            mock_session.request = MagicMock(return_value=mock_response)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            return mock_session, mock_response
+
+        return _setup
+
+    @pytest.fixture
+    def watcher_service_ok(self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock):
+        mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"})
+
+        with patch(
+            "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
+            return_value=mock_session,
+        ):
+            yield agent_service
+
+    @pytest.fixture
+    def watcher_service_ok_get(
+        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
+    ):
+        mock_session, _ = _setup_http_mock(
+            agent_id,
+            HTTPStatus.OK,
+            {"agent-status": "active", "watcher-status": "active"},
+        )
+
+        with patch(
+            "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
+            return_value=mock_session,
+        ):
+            yield agent_service
+
+    @pytest.fixture
+    def watcher_service_forbidden(
+        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
+    ):
+        mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.FORBIDDEN, "Invalid token")
+
+        with patch(
+            "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
+            return_value=mock_session,
+        ):
+            yield agent_service
+
+    @pytest.fixture
+    def watcher_service_error(
+        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
+    ):
+        mock_session, _ = _setup_http_mock(
+            agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed"
+        )
+
+        with patch(
+            "ai.backend.manager.services.agent.service.aiohttp.ClientSession",
+            return_value=mock_session,
+        ):
+            yield agent_service
+
+    @pytest.mark.asyncio
+    async def test_agent_start_success(
+        self, watcher_service_ok: AgentService, agent_id: AgentId
+    ) -> None:
+        # When
+        result = await watcher_service_ok.watcher_agent_start(
+            WatcherAgentStartAction(agent_id=agent_id)
+        )
+
+        # Then
+        assert result.data == {"result": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_agent_stop_success(
+        self, watcher_service_ok: AgentService, agent_id: AgentId
+    ) -> None:
+        # When
+        result = await watcher_service_ok.watcher_agent_stop(
+            WatcherAgentStopAction(agent_id=agent_id)
+        )
+
+        # Then
+        assert result.data == {"result": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_agent_restart_success(
+        self, watcher_service_ok: AgentService, agent_id: AgentId
+    ) -> None:
+        # When
+        result = await watcher_service_ok.watcher_agent_restart(
+            WatcherAgentRestartAction(agent_id=agent_id)
+        )
+
+        # Then
+        assert result.data == {"result": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_get_status_success(
+        self, watcher_service_ok_get: AgentService, agent_id: AgentId
+    ) -> None:
+        # When
+        result = await watcher_service_ok_get.get_watcher_status(
+            GetWatcherStatusAction(agent_id=agent_id)
+        )
+
+        # Then
+        assert result.data["agent-status"] == "active"
+        assert result.data["watcher-status"] == "active"
+
+    # ==================== Error Tests ====================
+
+    @pytest.mark.asyncio
+    async def test_agent_start_forbidden(
+        self, watcher_service_forbidden: AgentService, agent_id: AgentId
+    ) -> None:
+        # When/Then
+        with pytest.raises(AgentWatcherResponseError) as exc_info:
+            await watcher_service_forbidden.watcher_agent_start(
+                WatcherAgentStartAction(agent_id=agent_id)
+            )
+
+        assert exc_info.value.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+        assert exc_info.value.extra_data is not None
+        assert exc_info.value.extra_data["Agent Response Status"] == HTTPStatus.FORBIDDEN
+
+    @pytest.mark.asyncio
+    async def test_agent_stop_internal_error(
+        self, watcher_service_error: AgentService, agent_id: AgentId
+    ) -> None:
+        # When/Then
+        with pytest.raises(AgentWatcherResponseError) as exc_info:
+            await watcher_service_error.watcher_agent_stop(
+                WatcherAgentStopAction(agent_id=agent_id)
+            )
+
+        assert exc_info.value.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+        assert exc_info.value.extra_data is not None
+        assert (
+            exc_info.value.extra_data["Agent Response Status"] == HTTPStatus.INTERNAL_SERVER_ERROR
+        )
