@@ -11322,6 +11322,33 @@
       }
     },
     "/fair-share/resource-groups/{resource_group}/spec": {
+      "get": {
+        "operationId": "fair-share.get_resource_group_fair_share_spec",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get resource group fair share spec.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
       "patch": {
         "operationId": "fair-share.update_resource_group_fair_share_spec",
         "tags": [
@@ -11347,7 +11374,27 @@
             }
           }
         ],
-        "description": "Update resource group fair share spec with partial update (Read-Modify-Write pattern).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update resource group fair share spec with partial update and validation.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/resource-groups/specs": {
+      "get": {
+        "operationId": "fair-share.search_resource_group_fair_share_specs",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search all resource groups with their fair share specs.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/export/reports": {
