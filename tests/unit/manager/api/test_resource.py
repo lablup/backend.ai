@@ -184,8 +184,9 @@ class TestGetContainerRegistries:
         mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected registries
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        json_response = cast(web.Response, response)
+        assert json_response.body is not None
+        response_body = json.loads(cast(bytes, json_response.body))
         assert response_body == expected_registries
 
     @pytest.mark.asyncio
@@ -222,8 +223,9 @@ class TestListPresets:
         mock_root_ctx.processors.resource_preset.list_presets.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
         # Verify response body contains presets wrapped in dict
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        json_response = cast(web.Response, response)
+        assert json_response.body is not None
+        response_body = json.loads(cast(bytes, json_response.body))
         assert response_body == {"presets": expected_presets}
 
     @pytest.mark.asyncio

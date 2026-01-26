@@ -146,8 +146,9 @@ class TestGetScopeTypesHandler:
             response = await handler.get_scope_types(superadmin_request)
 
         assert response.status == HTTPStatus.OK
-        assert response.body is not None
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        assert response_body is not None
+        response_data = json.loads(cast(bytes, response_body))
         assert "items" in response_data
         assert len(response_data["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
 
@@ -364,8 +365,9 @@ class TestSearchScopesHandler:
             response = await handler.search_scopes(superadmin_request)
 
         assert response.status == HTTPStatus.OK
-        assert response.body is not None
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        assert response_body is not None
+        response_data = json.loads(cast(bytes, response_body))
         assert "items" in response_data
         assert "pagination" in response_data
         assert len(response_data["items"]) == len(single_scope_result.items)
@@ -406,7 +408,8 @@ class TestSearchScopesHandler:
         ):
             response = await handler.search_scopes(superadmin_request)
 
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        response_data = json.loads(cast(bytes, response_body))
         assert response_data is not None
         assert response_data["pagination"]["total"] == self.PAGINATION_TOTAL
         assert response_data["pagination"]["offset"] == self.DEFAULT_OFFSET
