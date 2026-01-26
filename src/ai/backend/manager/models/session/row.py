@@ -50,7 +50,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
-    DoUpdateSessionStatusEvent,
     SessionStartedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
@@ -1838,7 +1837,6 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{e!r})")
-        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         try:

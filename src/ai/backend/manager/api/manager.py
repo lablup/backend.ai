@@ -22,7 +22,6 @@ from aiotools import aclosing
 from ai.backend.common import validators as tx
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
-    DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
@@ -287,8 +286,6 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
             await root_ctx.event_producer.anycast_event(DoCheckPrecondEvent())
         case SchedulerEvent.START_SESSION:
             await root_ctx.event_producer.anycast_event(DoStartSessionEvent())
-        case SchedulerEvent.SCALE_SERVICES:
-            await root_ctx.event_producer.anycast_event(DoScaleEvent())
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 

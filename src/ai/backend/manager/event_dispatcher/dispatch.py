@@ -64,7 +64,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
-    DoScaleEvent,
     DoScheduleEvent,
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
@@ -72,7 +71,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 )
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    DoUpdateSessionStatusEvent,
     ExecutionCancelledAnycastEvent,
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -151,7 +149,6 @@ class DispatcherArgs:
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
-    use_sokovan: bool = True  # Always True, to be removed in Phase 2
 
 
 class Dispatchers:
@@ -181,7 +178,6 @@ class Dispatchers:
         self._image_event_handler = ImageEventHandler(
             args.agent_registry,
             args.db,
-            args.use_sokovan,
             args.schedule_coordinator,
         )
 
@@ -192,7 +188,6 @@ class Dispatchers:
             args.agent_registry,
             args.db,
             args.schedule_coordinator,
-            args.use_sokovan,
         )
         self._schedule_event_handler = ScheduleEventHandler(
             args.scheduler_dispatcher,
@@ -201,7 +196,6 @@ class Dispatchers:
             args.deployment_coordinator,
             args.route_coordinator,
             args.event_hub,
-            args.use_sokovan,
         )
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
@@ -418,12 +412,6 @@ class Dispatchers:
         )
         event_dispatcher.consume(
             DoCheckPrecondEvent, None, self._schedule_event_handler.handle_do_check_precond
-        )
-        event_dispatcher.consume(DoScaleEvent, None, self._schedule_event_handler.handle_do_scale)
-        event_dispatcher.consume(
-            DoUpdateSessionStatusEvent,
-            None,
-            self._schedule_event_handler.handle_do_update_session_status,
         )
         # Sokovan scheduler events
         event_dispatcher.consume(

@@ -12,4 +12,3 @@ class SchedulerEvent(enum.StrEnum):
     SCHEDULE = "schedule"
     CHECK_PRECOND = "check_precondition"
     START_SESSION = "start_session"
-    SCALE_SERVICES = "scale_services"

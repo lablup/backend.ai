@@ -50,7 +50,6 @@ class KernelEventHandler:
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         schedule_coordinator: ScheduleCoordinator,
-        use_sokovan: bool = False,
     ) -> None:
         self._valkey_container_log = valkey_container_log
         self._valkey_stat = valkey_stat
@@ -58,7 +57,6 @@ class KernelEventHandler:
         self._registry = registry
         self._db = db
         self._schedule_coordinator = schedule_coordinator
-        self._use_sokovan = use_sokovan
 
     async def handle_kernel_log(
         self,
@@ -174,9 +172,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_preparing(event)
+        await self._schedule_coordinator.handle_kernel_preparing(event)
 
     async def handle_kernel_pulling(
         self,
@@ -190,15 +186,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_pulling(event)
-        else:
-            # Use legacy registry method
-            async with self._db.connect() as db_conn:
-                await self._registry.mark_kernel_pulling(
-                    db_conn, event.kernel_id, event.session_id, event.reason
-                )
+        await self._schedule_coordinator.handle_kernel_pulling(event)
 
     async def handle_kernel_creating(
         self,
@@ -212,15 +200,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_creating(event)
-        else:
-            # Use legacy registry method
-            async with self._db.connect() as db_conn:
-                await self._registry.mark_kernel_creating(
-                    db_conn, event.kernel_id, event.session_id, event.reason
-                )
+        await self._schedule_coordinator.handle_kernel_creating(event)
 
     async def handle_kernel_started(
         self,
@@ -234,15 +214,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_running(event)
-        else:
-            # Use legacy registry method
-            async with self._db.connect() as db_conn:
-                await self._registry.mark_kernel_running(
-                    db_conn, event.kernel_id, event.session_id, event.reason, event.creation_info
-                )
+        await self._schedule_coordinator.handle_kernel_running(event)
 
     async def handle_kernel_cancelled(
         self,
@@ -256,12 +228,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_cancelled(event)
-        else:
-            # Legacy code doesn't handle cancelled state
-            log.warning(f"Kernel cancelled, {event.reason = }")
+        await self._schedule_coordinator.handle_kernel_cancelled(event)
 
     async def handle_kernel_terminating(
         self,
@@ -279,12 +246,4 @@ class KernelEventHandler:
         source: AgentId,
         event: KernelTerminatedAnycastEvent,
     ) -> None:
-        if self._use_sokovan:
-            # Use Sokovan coordinator's kernel handlers
-            await self._schedule_coordinator.handle_kernel_terminated(event)
-        else:
-            # Use legacy registry method
-            async with self._db.connect() as db_conn:
-                await self._registry.mark_kernel_terminated(
-                    db_conn, event.kernel_id, event.session_id, event.reason, event.exit_code
-                )
+        await self._schedule_coordinator.handle_kernel_terminated(event)
