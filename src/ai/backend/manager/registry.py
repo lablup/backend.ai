@@ -8,8 +8,6 @@ import secrets
 import uuid
 from collections import defaultdict
 from collections.abc import (
-    Coroutine,
-    Iterable,
     Mapping,
     MutableMapping,
     Sequence,
@@ -86,19 +84,14 @@ from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
-    AutoPullBehavior,
     BinarySize,
-    ClusterInfo,
     ClusterMode,
     ClusterSSHKeyPair,
-    ClusterSSHPortMapping,
     CommitStatus,
     DeviceId,
     HardwareMetadata,
     ImageAlias,
-    ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelEnqueueingConfig,
     KernelId,
     ResourceSlot,
@@ -146,16 +139,12 @@ from .errors.resource import (
     NoCurrentTaskContext,
     ScalingGroupNotFound,
     ScalingGroupSessionTypeNotAllowed,
-    SessionNotAllocated,
 )
-from .exceptions import MultiAgentError
 from .models.agent import AgentRow, agents
-from .models.container_registry import ContainerRegistryRow
 from .models.domain import domains
 from .models.endpoint import EndpointRow
 from .models.image import (
     ImageRow,
-    bulk_get_image_configs,
 )
 from .models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -163,9 +152,8 @@ from .models.kernel import (
     KernelRow,
     kernels,
 )
-from .models.keypair import KeyPairRow, query_bootstrap_script
+from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
-from .models.resource_policy import KeyPairResourcePolicyRow
 from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -188,7 +176,7 @@ from .models.utils import (
     sql_json_merge,
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
-from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
+from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
 MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
@@ -1025,354 +1013,6 @@ class AgentRegistry:
             startup_command=startup_command,
         )
 
-    async def _check_and_pull_in_one_agent(
-        self,
-        agent_alloc_ctx: AgentAllocationContext,
-        kernel_agent_bindings: Sequence[KernelAgentBinding],
-        image_configs: Mapping[str, ImageConfig],
-    ) -> dict[str, uuid.UUID]:
-        """
-        Initiates image verification and pulling tasks and returns their mapping.
-
-        This function makes RPC calls to agents to:
-        1. Spawn background tasks that verify image existence
-        2. Pull missing images if necessary
-
-        Returns:
-            dict[str, uuid.UUID]: A dictionary where:
-                - keys are image names as strings
-                - values are background task IDs
-        """
-        if agent_alloc_ctx.agent_id is None:
-            raise AgentNotAllocated("Agent ID is not allocated")
-
-        async with self._agent_client_pool.acquire(agent_alloc_ctx.agent_id) as client:
-            resp = await client.check_and_pull(image_configs)
-        resp = cast(dict[str, str], resp)
-        return {img: uuid.UUID(hex=bgtask_id) for img, bgtask_id in resp.items()}
-
-    async def check_and_pull_images(
-        self,
-        bindings: Iterable[KernelAgentBinding],
-    ) -> None:
-        if not bindings:
-            return
-        auto_pull = self.config_provider.config.docker.image.auto_pull.value
-
-        def _keyfunc(binding: KernelAgentBinding) -> AgentId:
-            if binding.agent_alloc_ctx.agent_id is None:
-                allocated_agent = cast(Optional[AgentId], binding.kernel.agent)
-                if allocated_agent is None:
-                    log.exception(
-                        f"Scheduled kernels should be assigned to a valid agent, skip pulling image (k:{binding.kernel.id})"
-                    )
-                    return AgentId("")
-                binding.agent_alloc_ctx.agent_id = allocated_agent
-            return binding.agent_alloc_ctx.agent_id
-
-        async with aiotools.PersistentTaskGroup() as tg:
-            for agent_id, group_iterator in itertools.groupby(
-                sorted(bindings, key=_keyfunc),
-                key=_keyfunc,
-            ):
-                if not agent_id or agent_id == AgentId(""):
-                    continue
-                items: list[KernelAgentBinding] = [*group_iterator]
-                # Within a group, agent_alloc_ctx are same.
-                agent_alloc_ctx = items[0].agent_alloc_ctx
-                _img_conf_map: dict[str, ImageConfig] = {}
-                for binding in items:
-                    img_row = cast(Optional[ImageRow], binding.kernel.image_row)
-                    if img_row is not None:
-                        img_ref = img_row.image_ref
-                        registry_row = cast(ContainerRegistryRow, img_row.registry_row)
-                        _img_conf_map[str(img_ref)] = {
-                            "architecture": img_row.architecture,
-                            "project": img_row.project,
-                            "canonical": img_ref.canonical,
-                            "is_local": img_row.is_local,
-                            "digest": img_row.trimmed_digest,
-                            "labels": img_row.labels,
-                            "repo_digest": None,
-                            "registry": {
-                                "name": img_ref.registry,
-                                "url": registry_row.url,
-                                "username": registry_row.username,
-                                "password": registry_row.password,
-                            },
-                            "auto_pull": AutoPullBehavior(auto_pull),
-                        }
-                tg.create_task(
-                    self._check_and_pull_in_one_agent(agent_alloc_ctx, items, _img_conf_map)
-                )
-
-    async def start_session(
-        self,
-        sched_ctx: SchedulingContext,
-        scheduled_session: SessionRow,
-    ) -> None:
-        from .scheduler.types import AgentAllocationContext, KernelAgentBinding
-
-        kernel_agent_bindings: Sequence[KernelAgentBinding] = [
-            KernelAgentBinding(
-                kernel=k,
-                agent_alloc_ctx=AgentAllocationContext(
-                    agent_id=AgentId(k.agent) if k.agent else None,
-                    agent_addr=k.agent_addr or "",
-                    scaling_group=scheduled_session.scaling_group_name or "",
-                ),
-                allocated_host_ports=set(),
-            )
-            for k in scheduled_session.kernels
-        ]
-
-        hook_result = await self.hook_plugin_ctx.dispatch(
-            "PRE_START_SESSION",
-            (
-                scheduled_session.id,
-                scheduled_session.name,
-                scheduled_session.access_key,
-            ),
-            return_when=ALL_COMPLETED,
-        )
-        if hook_result.status != PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-        # Get resource policy for the session
-        # TODO: memoize with TTL
-        async with self.db.connect() as db_conn:
-            async with self.db.begin_readonly_session(db_conn) as db_sess:
-                resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
-                    KeyPairRow.access_key == scheduled_session.access_key
-                )
-                query = sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
-                )
-                result = await db_sess.execute(query)
-                resource_policy = result.scalars().first()
-                if resource_policy is None:
-                    raise InvalidAPIParameters("Resource policy not found")
-                idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = self.config_provider.config.docker.image.auto_pull.value
-
-                # Aggregate image registry information
-                image_refs: set[ImageRef] = set()
-
-                for binding in kernel_agent_bindings:
-                    assert binding.kernel.image is not None
-                    assert binding.kernel.architecture is not None
-                    image_refs.add(
-                        (
-                            await ImageRow.resolve(
-                                db_sess,
-                                [
-                                    ImageIdentifier(
-                                        binding.kernel.image, binding.kernel.architecture
-                                    )
-                                ],
-                            )
-                        ).image_ref
-                    )
-
-                _log_msg = ",".join([
-                    f"image ref => {ref} ({ref.architecture})" for ref in image_refs
-                ])
-                log.debug(f"start_session(): {_log_msg}")
-                configs = await bulk_get_image_configs(
-                    image_refs,
-                    AutoPullBehavior(auto_pull),
-                    db_session=db_sess,
-                )
-        img_configs = {item["canonical"]: item for item in configs}
-
-        network_name: Optional[str] = None
-        network_config: Mapping[str, Any] = {}
-        cluster_ssh_port_mapping: Optional[dict[str, tuple[str, int]]] = None
-        match scheduled_session.network_type:
-            case NetworkType.PERSISTENT:
-                if scheduled_session.network_id is None:
-                    raise InvalidAPIParameters("Network ID is required for persistent network")
-                async with self.db.begin_readonly_session() as db_sess:
-                    import uuid as uuid_module
-
-                    network = await NetworkRow.get(
-                        db_sess, uuid_module.UUID(scheduled_session.network_id)
-                    )
-                    network_name = network.ref_name
-                    network_config = {"mode": network.driver, **network.options}
-            case NetworkType.VOLATILE:
-                if (
-                    ClusterMode(scheduled_session.cluster_mode) == ClusterMode.SINGLE_NODE
-                    and scheduled_session.cluster_size > 1
-                ):
-                    network_name = f"bai-singlenode-{scheduled_session.id}"
-                    agent_alloc_ctx = kernel_agent_bindings[0].agent_alloc_ctx
-                    if agent_alloc_ctx.agent_id is None:
-                        raise AgentNotAllocated("Agent ID is not allocated")
-                    if scheduled_session.id is None:
-                        raise SessionNotAllocated("Session ID is not available")
-                    try:
-                        async with self._agent_client_pool.acquire(
-                            agent_alloc_ctx.agent_id
-                        ) as client:
-                            await client.create_local_network(network_name)
-                    except Exception:
-                        log.exception(f"Failed to create an agent-local network {network_name}")
-                        raise
-                    network_config = {
-                        "mode": "bridge",
-                        "network_name": network_name,
-                    }
-                elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
-                    # Create overlay network for multi-node sessions
-                    driver = self.config_provider.config.network.inter_container.default_driver
-                    if driver is None:
-                        raise ValueError("No inter-container network driver is configured.")
-
-                    network_plugin = self.network_plugin_ctx.plugins[driver]
-                    try:
-                        network_info = await network_plugin.create_network(
-                            identifier=str(scheduled_session.id)
-                        )
-                        network_config = network_info.options
-                        network_name = network_info.network_id
-                    except Exception:
-                        log.exception(
-                            f"Failed to create the inter-container network (plugin: {driver})"
-                        )
-                        raise
-            case NetworkType.HOST:
-                network_config = {"mode": "host"}
-                network_name = "host"
-                if scheduled_session.cluster_size > 1:
-                    keyfunc = lambda binding: binding.kernel.cluster_role
-                    cluster_ssh_port_mapping = {}
-                    for cluster_role, group_iterator in itertools.groupby(
-                        sorted(kernel_agent_bindings, key=keyfunc),
-                        key=keyfunc,
-                    ):
-                        for index, item in enumerate(group_iterator):
-                            if item.agent_alloc_ctx.agent_id is None:
-                                raise AgentNotAllocated("Agent ID is not allocated")
-                            async with self._agent_client_pool.acquire(
-                                item.agent_alloc_ctx.agent_id
-                            ) as client:
-                                port = await client.assign_port()
-                            agent_addr = item.agent_alloc_ctx.agent_addr.replace(
-                                "tcp://", ""
-                            ).split(":", maxsplit=1)[0]
-                            cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
-                                agent_addr,
-                                port,
-                            )
-                            item.allocated_host_ports.add(port)
-        log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
-
-        if scheduled_session.network_type == NetworkType.VOLATILE:
-
-            async def _update_network_id(db_sess: AsyncSession) -> None:
-                query = (
-                    sa.update(SessionRow)
-                    .values({
-                        "network_id": network_name,
-                    })
-                    .where(SessionRow.id == scheduled_session.id)
-                )
-                await db_sess.execute(query)
-
-            async with self.db.connect() as db_conn:
-                await execute_with_txn_retry(_update_network_id, self.db.begin_session, db_conn)
-
-        keyfunc = lambda binding: binding.kernel.cluster_role
-        replicas = {
-            cluster_role: len([*group_iterator])
-            for cluster_role, group_iterator in itertools.groupby(
-                sorted(kernel_agent_bindings, key=keyfunc),
-                key=keyfunc,
-            )
-        }
-
-        cluster_info = ClusterInfo(
-            mode=ClusterMode(scheduled_session.cluster_mode),
-            size=scheduled_session.cluster_size,
-            replicas=replicas,
-            network_config=network_config,
-            ssh_keypair=await self.create_cluster_ssh_keypair(),
-            cluster_ssh_port_mapping=cast(
-                Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
-            ),
-        )
-
-        async with self.db.begin_readonly_session() as db_sess:
-            user_row = (
-                await db_sess.execute(
-                    sa.select(UserRow.uuid, UserRow.email, UserRow.username).where(
-                        UserRow.uuid == scheduled_session.user_uuid
-                    )
-                )
-            ).fetchone()
-            if user_row is None:
-                raise InvalidAPIParameters(f"User not found: {scheduled_session.user_uuid}")
-            uuid, email, username = user_row
-
-        if scheduled_session.environ is None:
-            scheduled_session.environ = {}
-        scheduled_session.environ.update({
-            "BACKENDAI_USER_UUID": str(uuid),
-            "BACKENDAI_USER_EMAIL": email,
-            "BACKENDAI_USER_NAME": username,
-            "BACKENDAI_SESSION_ID": str(scheduled_session.id),
-            "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
-            "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),
-            "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
-            "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                binding.kernel.cluster_hostname for binding in kernel_agent_bindings
-            ),
-            "BACKENDAI_ACCESS_KEY": scheduled_session.access_key or "",
-            # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
-            # (In the future, each kernel in a cluster session may use different images)
-            "BACKENDAI_PREOPEN_PORTS": (
-                ",".join(str(port) for port in scheduled_session.main_kernel.preopen_ports)
-                if scheduled_session.main_kernel.preopen_ports is not None
-                else ""
-            ),
-        })
-
-        # Aggregate by agents to minimize RPC calls
-        per_agent_coros: list[Coroutine[Any, Any, None]] = []
-        keyfunc = lambda binding: binding.agent_alloc_ctx.agent_id
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_agent_bindings, key=keyfunc),
-            key=keyfunc,
-        ):
-            items = [*group_iterator]
-            # Within a group, agent_alloc_ctx are same.
-            agent_alloc_ctx = items[0].agent_alloc_ctx
-            per_agent_coros.append(
-                self._create_kernels_in_one_agent(
-                    agent_alloc_ctx,
-                    scheduled_session,
-                    items,
-                    img_configs,
-                    cluster_info,
-                    idle_timeout,
-                ),
-            )
-        agent_errors: list[BaseException] = []
-        async for task in aiotools.as_completed_safe(per_agent_coros):
-            try:
-                await task
-            except ExceptionGroup as e:
-                agent_errors.extend(e.exceptions)
-            except Exception as e:
-                agent_errors.append(e)
-        if agent_errors:
-            raise MultiAgentError(
-                "agent(s) raise errors during kernel creation",
-                agent_errors,
-            )
-        await self.settle_agent_alloc(kernel_agent_bindings)
-
     def convert_resource_spec_to_resource_slot(
         self,
         allocations: Mapping[str, Mapping[SlotName, Mapping[DeviceId, str]]],
@@ -1395,138 +1035,6 @@ class AgentRegistry:
                         total_allocs.append(Decimal(allocation))
                 slots[slot_name] = str(sum(total_allocs))
         return slots
-
-    async def _create_kernels_in_one_agent(
-        self,
-        agent_alloc_ctx: AgentAllocationContext,
-        scheduled_session: SessionRow,
-        items: Sequence[KernelAgentBinding],
-        image_configs: Mapping[str, ImageConfig],
-        cluster_info: ClusterInfo,
-        idle_timeout: float | int,
-    ) -> None:
-        if agent_alloc_ctx.agent_id is None:
-            raise AgentNotAllocated("Agent ID is not allocated")
-        if scheduled_session.id is None:
-            raise SessionNotAllocated("Session ID is not available")
-
-        async def _update_kernel() -> None:
-            async with self.db.begin_session() as db_sess:
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=agent_alloc_ctx.scaling_group,
-                    )
-                )
-                await db_sess.execute(kernel_query)
-
-        await execute_with_retry(_update_kernel)
-
-        try:
-
-            def get_image_conf(kernel: KernelRow) -> ImageConfig:
-                assert kernel.image is not None
-                return image_configs[kernel.image]
-
-            kernel_image_refs: dict[KernelId, ImageRef] = {}
-
-            raw_configs: list[KernelCreationConfig] = []
-            async with self.db.begin_readonly_session() as db_sess:
-                for binding in items:
-                    assert binding.kernel.image is not None
-                    assert binding.kernel.architecture is not None
-                    kernel_image_refs[binding.kernel.id] = (
-                        await ImageRow.resolve(
-                            db_sess,
-                            [ImageIdentifier(binding.kernel.image, binding.kernel.architecture)],
-                        )
-                    ).image_ref
-
-                    raw_configs.append({
-                        "image": {
-                            # TODO: refactor registry and is_local to be specified per kernel.
-                            "registry": get_image_conf(binding.kernel)["registry"],
-                            "project": get_image_conf(binding.kernel)["project"],
-                            "digest": get_image_conf(binding.kernel)["digest"],
-                            "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
-                            "canonical": get_image_conf(binding.kernel)["canonical"],
-                            "architecture": get_image_conf(binding.kernel)["architecture"],
-                            "labels": get_image_conf(binding.kernel)["labels"],
-                            "is_local": get_image_conf(binding.kernel)["is_local"],
-                            "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
-                        },
-                        "network_id": str(scheduled_session.id),
-                        "session_type": scheduled_session.session_type,
-                        "kernel_id": str(binding.kernel.id),
-                        "session_id": str(scheduled_session.id),
-                        "owner_user_id": str(scheduled_session.user_uuid),
-                        "owner_project_id": None,  # TODO: Implement project-owned sessions
-                        "cluster_role": binding.kernel.cluster_role,
-                        "cluster_idx": binding.kernel.cluster_idx,
-                        "cluster_mode": ClusterMode(binding.kernel.cluster_mode),
-                        "package_directory": tuple(),
-                        "local_rank": binding.kernel.local_rank,
-                        "cluster_hostname": binding.kernel.cluster_hostname,
-                        "uid": binding.kernel.uid,
-                        "main_gid": binding.kernel.main_gid,
-                        "supplementary_gids": binding.kernel.gids or [],
-                        "idle_timeout": int(idle_timeout),
-                        "mounts": [
-                            item.to_json() for item in scheduled_session.vfolder_mounts or []
-                        ],
-                        "environ": {
-                            # inherit per-session environment variables
-                            **(scheduled_session.environ or {}),
-                            # set per-kernel environment variables
-                            "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
-                            "BACKENDAI_KERNEL_IMAGE": get_image_conf(binding.kernel)["canonical"],
-                            "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
-                            "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
-                            "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
-                            "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
-                            "BACKENDAI_SERVICE_PORTS": str(
-                                get_image_conf(binding.kernel)["labels"].get(
-                                    "ai.backend.service-ports"
-                                )
-                            ),
-                        },
-                        "resource_slots": binding.kernel.requested_slots.to_json(),
-                        "resource_opts": binding.kernel.resource_opts or {},
-                        "bootstrap_script": binding.kernel.bootstrap_script,
-                        "startup_command": binding.kernel.startup_command,
-                        "internal_data": scheduled_session.main_kernel.internal_data,
-                        "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
-                        "preopen_ports": scheduled_session.main_kernel.preopen_ports or [],
-                        "allocated_host_ports": list(binding.allocated_host_ports),
-                        "agent_addr": binding.agent_alloc_ctx.agent_addr,
-                        "scaling_group": binding.agent_alloc_ctx.scaling_group,
-                        "endpoint_id": None,
-                    })
-
-                kernel_ids = [binding.kernel.id for binding in items]
-
-            # Issue a batched RPC call to create kernels on this agent
-            async with self._agent_client_pool.acquire(agent_alloc_ctx.agent_id) as client:
-                await client.create_kernels(
-                    scheduled_session.id,
-                    kernel_ids,
-                    raw_configs,
-                    cluster_info,
-                    kernel_image_refs,
-                )
-            log.debug(
-                "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
-                scheduled_session.name,
-                scheduled_session.access_key,
-                [binding.kernel.id for binding in items],
-                agent_alloc_ctx.agent_id,
-            )
-        except (TimeoutError, asyncio.CancelledError):
-            log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-            raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         key = rsa.generate_private_key(

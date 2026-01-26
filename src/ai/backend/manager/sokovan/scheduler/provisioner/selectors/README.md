@@ -27,12 +27,12 @@ Selectors are plugins that select the optimal agent to run a session. Different 
 └─────────────────┬─────────────────────┘
                   │
         ┌─────────┼─────────┬─────────┐
-        │         │         │         │
-        ▼         ▼         ▼         ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│Concentrated│ │Dispersed│ │RoundRobin│ │ Legacy  │
-│(Bin-pack) │ │(Spread) │ │(Rotation)│ │(Compat) │
-└──────────┘ └──────────┘ └──────────┘ └──────────┘
+        │         │         │
+        ▼         ▼         ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│Concentrated│ │Dispersed│ │RoundRobin│
+│(Bin-pack) │ │(Spread) │ │(Rotation)│
+└──────────┘ └──────────┘ └──────────┘
 ```
 
 ## Core Classes
@@ -174,15 +174,6 @@ Selection Order:
   Request 3 → Agent C
   Request 4 → Agent A (cycle)
 ```
-
-### LegacySelector (Compatibility Mode)
-
-Selector for compatibility with existing scheduler.
-
-**Features:**
-- Maintains existing scheduler logic
-- Supports gradual migration
-- Compatible with existing configurations
 
 ## Exception Hierarchy
 
@@ -333,7 +324,6 @@ scaling_group = {
 | `concentrated` | Bin-packing | GPU clusters, cost optimization |
 | `dispersed` | Spreading | High availability requirements, production |
 | `roundrobin` | Sequential rotation | Development/test environments |
-| `legacy` | Compatibility mode | Migration period |
 
 ## Performance Considerations
 
