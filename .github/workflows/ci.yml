@@ -130,7 +130,19 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
-      run: pants tailor --check update-build-files --check '::'
+      run: |
+        IS_RELEASE="${{ needs.optimize-ci.outputs.release }}"
+        if [ "$IS_RELEASE" == "true" ]; then
+          # For releases, check all BUILD files
+          pants tailor --check update-build-files --check '::'
+        elif [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          pants tailor --check update-build-files --check --changed-since=$BASE_REF
+        else
+          BASE_REF="HEAD~1"
+          pants tailor --check update-build-files --check --changed-since=$BASE_REF
+        fi
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
