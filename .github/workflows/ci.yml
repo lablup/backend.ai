@@ -138,6 +138,11 @@ jobs:
         elif [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
+          # Ensure the base branch exists locally to avoid 'bad revision' errors
+          git remote set-branches origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
           pants tailor --check update-build-files --check --changed-since=$BASE_REF
         else
           BASE_REF="HEAD~1"
