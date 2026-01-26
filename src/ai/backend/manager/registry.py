@@ -4,11 +4,9 @@ import asyncio
 import base64
 import copy
 import itertools
-import json
 import logging
 import re
 import secrets
-import time
 import uuid
 from collections import defaultdict
 from collections.abc import (
@@ -18,7 +16,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
     Any,
@@ -29,7 +27,6 @@ from typing import (
 )
 
 import aiodocker
-import aiohttp
 import aiotools
 import sqlalchemy as sa
 import yarl
@@ -43,7 +40,6 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 from typeguard import check_type
 from yarl import URL
 
@@ -64,39 +60,19 @@ from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.agent.anycast import (
-    DoAgentResourceCheckEvent,
-)
-from ai.backend.common.events.event_types.image.anycast import (
-    ImagePullFailedEvent,
-    ImagePullFinishedEvent,
-    ImagePullStartedEvent,
-)
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
-    KernelCreatingAnycastEvent,
-    KernelPreparingAnycastEvent,
-    KernelPullingAnycastEvent,
-    KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.model_serving.anycast import (
     EndpointRouteListUpdatedEvent,
-    ModelServiceStatusAnycastEvent,
-    RouteCreatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
-    DoTerminateSessionEvent,
     SessionCancelledAnycastEvent,
     SessionEnqueuedAnycastEvent,
-    SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
-    SessionSuccessAnycastEvent,
-    SessionTerminatedAnycastEvent,
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
@@ -133,7 +109,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelEnqueueingConfig,
     KernelId,
-    ModelServiceStatus,
     ResourceSlot,
     RuntimeVariant,
     SessionEnqueueingConfig,
@@ -171,7 +146,6 @@ from ai.backend.manager.repositories.session.creators import (
     SessionRowCreatorSpec,
 )
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
 from .clients.agent import AgentClientPool
@@ -215,7 +189,7 @@ from .models.kernel import (
 from .models.keypair import KeyPairRow, query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
 from .models.resource_policy import KeyPairResourcePolicyRow
-from .models.routing import RouteStatus, RoutingRow
+from .models.routing import RoutingRow
 from .models.scaling_group import ScalingGroupRow, query_allowed_sgroups, scaling_groups
 from .models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -3770,512 +3744,6 @@ class AgentRegistry:
         await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
 
 
-async def handle_image_pull_started(
-    context: AgentRegistry,
-    agent_id: AgentId,
-    ev: ImagePullStartedEvent,
-) -> None:
-    dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
-    log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
-    async with context.db.connect() as db_conn:
-        await context.mark_image_pull_started(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
-
-
-async def handle_image_pull_finished(
-    context: AgentRegistry, agent_id: AgentId, ev: ImagePullFinishedEvent
-) -> None:
-    dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
-    log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
-    async with context.db.connect() as db_conn:
-        await context.mark_image_pull_finished(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
-
-
-async def handle_image_pull_failed(
-    context: AgentRegistry,
-    agent_id: AgentId,
-    ev: ImagePullFailedEvent,
-) -> None:
-    log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
-    async with context.db.connect() as db_conn:
-        await context.handle_image_pull_failed(
-            ev.agent_id, ev.image, ev.msg, ev.image_ref, db_conn=db_conn
-        )
-
-
-async def handle_kernel_creation_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: KernelPreparingAnycastEvent
-    | KernelPullingAnycastEvent
-    | KernelCreatingAnycastEvent
-    | KernelStartedAnycastEvent
-    | KernelCancelledAnycastEvent,
-) -> None:
-    """
-    Update the database and perform post_create_kernel() upon
-    the events for each step of kernel creation.
-
-    To avoid race condition between consumer and subscriber event handlers,
-    we only have this handler to subscribe all kernel creation events,
-    but distinguish which one to process using a unique creation_id
-    generated when initiating the create_kernels() agent RPC call.
-    """
-    log.debug(
-        "handle_kernel_creation_lifecycle: ev:{} k:{}",
-        event.event_name(),
-        event.kernel_id,
-    )
-    match event:
-        case KernelPreparingAnycastEvent():
-            # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
-            pass
-        case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
-            async with context.db.connect() as db_conn:
-                await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-        case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
-            async with context.db.connect() as db_conn:
-                await context.mark_kernel_creating(db_conn, kernel_id, session_id, reason)
-        case KernelStartedAnycastEvent(
-            kernel_id, session_id, reason=reason, creation_info=creation_info
-        ):
-            async with context.db.connect() as db_conn:
-                await context.mark_kernel_running(
-                    db_conn, kernel_id, session_id, reason, creation_info
-                )
-        case KernelCancelledAnycastEvent():
-            log.warning(f"Kernel cancelled, {event.reason = }")
-
-
-async def handle_kernel_termination_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: KernelTerminatingAnycastEvent | KernelTerminatedAnycastEvent,
-) -> None:
-    match event:
-        case KernelTerminatingAnycastEvent():
-            # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
-            pass
-        case KernelTerminatedAnycastEvent(kernel_id, session_id, reason, exit_code):
-            async with context.db.connect() as db_conn:
-                await context.mark_kernel_terminated(
-                    db_conn, kernel_id, session_id, reason, exit_code
-                )
-
-
-async def handle_session_creation_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
-) -> None:
-    """
-    Update the database according to the session-level lifecycle events
-    published by the manager.
-    """
-    if event.creation_id not in context.session_creation_tracker:
-        return
-    log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, (SessionStartedAnycastEvent, SessionCancelledAnycastEvent)):
-        if tracker := context.session_creation_tracker.get(event.creation_id):
-            tracker.set()
-
-    await invoke_session_callback(context, source, event)
-    if event.creation_id in context.session_creation_tracker:
-        del context.session_creation_tracker[event.creation_id]
-
-
-async def handle_session_termination_lifecycle(
-    context: AgentRegistry,
-    agent_id: AgentId,
-    event: SessionTerminatingAnycastEvent | SessionTerminatedAnycastEvent,
-) -> None:
-    """
-    Update the database according to the session-level lifecycle events
-    published by the manager.
-    """
-    match event:
-        case SessionTerminatingAnycastEvent():
-            pass
-        case SessionTerminatedAnycastEvent(session_id=session_id):
-            await context.clean_session(session_id)
-
-    await invoke_session_callback(context, agent_id, event)
-
-
-async def handle_destroy_session(
-    context: AgentRegistry,
-    source: AgentId,
-    event: DoTerminateSessionEvent,
-) -> None:
-    async with context.db.begin_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
-        )
-    await context.destroy_session(
-        session,
-        forced=False,
-        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
-    )
-
-
-async def handle_model_service_status_update(
-    context: AgentRegistry,
-    source: AgentId,
-    event: ModelServiceStatusAnycastEvent,
-) -> None:
-    log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
-    try:
-        async with context.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                event.session_id,
-                allow_stale=False,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-            route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-    except SessionNotFound:
-        return
-    except NoResultFound:
-        return
-
-    async def _update() -> None:
-        async with context.db.begin_session() as db_sess:
-            data: dict[str, Any] = {}
-            match event.new_status:
-                case ModelServiceStatus.HEALTHY:
-                    data["status"] = RouteStatus.HEALTHY
-                case ModelServiceStatus.UNHEALTHY:
-                    data["status"] = RouteStatus.UNHEALTHY
-            query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
-            await db_sess.execute(query)
-
-    await execute_with_retry(_update)
-
-
-async def invoke_session_callback(
-    context: AgentRegistry,
-    source: AgentId,
-    event: (
-        SessionEnqueuedAnycastEvent
-        | SessionScheduledAnycastEvent
-        | SessionPreparingAnycastEvent
-        | SessionStartedAnycastEvent
-        | SessionCancelledAnycastEvent
-        | SessionTerminatingAnycastEvent
-        | SessionTerminatedAnycastEvent
-        | SessionSuccessAnycastEvent
-        | SessionFailureAnycastEvent
-    ),
-) -> None:
-    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
-    try:
-        allow_stale = isinstance(
-            event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
-        )
-        async with context.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                event.session_id,
-                allow_stale=allow_stale,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-    except SessionNotFound:
-        return
-
-    try:
-        # Update routing status
-        # TODO: Check session health
-        if session.session_type == SessionTypes.INFERENCE:
-
-            async def _update() -> None:
-                async with context.db.begin_session() as db_sess:
-                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                    match event:
-                        case SessionCancelledAnycastEvent():
-                            update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
-                            if session.status_data and "error" in session.status_data:
-                                if session.status_data["error"]["name"] == "MultiAgentError":
-                                    errors = session.status_data["error"]["collection"]
-                                else:
-                                    errors = [session.status_data["error"]]
-                                update_data["error_data"] = {
-                                    "type": "session_cancelled",
-                                    "errors": errors,
-                                    "session_id": session.id,
-                                }
-                            update_query = (
-                                sa.update(RoutingRow)
-                                .values(update_data)
-                                .where(RoutingRow.id == route.id)
-                            )
-                            await db_sess.execute(update_query)
-                            update_query2 = (
-                                sa.update(EndpointRow)
-                                .values({"retries": endpoint.retries + 1})
-                                .where(EndpointRow.id == endpoint.id)
-                            )
-                            await db_sess.execute(update_query2)
-                        case SessionTerminatedAnycastEvent():
-                            delete_query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
-                            await db_sess.execute(delete_query)
-                        case SessionStartedAnycastEvent() | SessionTerminatingAnycastEvent():
-                            target_kernels = await KernelRow.batch_load_by_session_id(
-                                db_sess,
-                                [
-                                    r.session_id
-                                    for r in endpoint.routings
-                                    if r.status in RouteStatus.active_route_statuses()
-                                ],
-                            )
-                            connection_info: defaultdict[str, dict[str, tuple[str, int]]] = (
-                                defaultdict()
-                            )
-                            for kernel in target_kernels:
-                                if kernel.service_ports is None:
-                                    continue
-                                service_ports_list = cast(
-                                    list[dict[str, Any]], kernel.service_ports
-                                )
-                                for port_info in service_ports_list:
-                                    if port_info["is_inference"]:
-                                        host_ports = cast(list[int], port_info["host_ports"])
-                                        connection_info[port_info["name"]][str(kernel.id)] = (
-                                            kernel.kernel_host or "",
-                                            host_ports[0],
-                                        )
-                            await context.valkey_live.delete_key(
-                                f"endpoint.{endpoint.id}.route_connection_info"
-                            )
-                            await context.valkey_live.store_live_data(
-                                f"endpoint.{endpoint.id}.route_connection_info",
-                                json.dumps(connection_info),
-                                ex=3600,
-                            )
-                    await db_sess.commit()
-
-            await execute_with_retry(_update)
-
-            async def _clear_error() -> None:
-                async with context.db.begin_session() as db_sess:
-                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-
-                    count_query = sa.select(sa.func.count("*")).where(
-                        (RoutingRow.endpoint == endpoint.id)
-                        & (RoutingRow.status == RouteStatus.HEALTHY)
-                    )
-                    healthy_routes = await db_sess.scalar(count_query)
-                    if endpoint.replicas == healthy_routes:
-                        reset_query = (
-                            sa.update(EndpointRow)
-                            .where(EndpointRow.id == endpoint.id)
-                            .values({"retries": 0})
-                        )
-                        await db_sess.execute(reset_query)
-                        cleanup_query = sa.delete(RoutingRow).where(
-                            (RoutingRow.endpoint == endpoint.id)
-                            & (RoutingRow.status == RouteStatus.FAILED_TO_START)
-                        )
-                        await db_sess.execute(cleanup_query)
-
-            await execute_with_retry(_clear_error)
-    except NoResultFound:
-        pass  # Cases when we try to create a inference session for validation (/services/_/try API)
-    except Exception:
-        log.exception("error while updating route status:")
-
-    if (callback_url := session.callback_url) is None:
-        return
-
-    data = {
-        "type": "session_lifecycle",
-        "event": event.event_name().removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
-
-    context.webhook_ptask_group.create_task(
-        _make_session_callback(data, callback_url),
-    )
-
-
-async def handle_batch_result(
-    context: AgentRegistry,
-    source: AgentId,
-    event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
-) -> None:
-    """
-    Update the database according to the batch-job completion results
-    """
-    match event:
-        case SessionSuccessAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
-            await SessionRow.set_session_result(context.db, session_id, True, exit_code)
-        case SessionFailureAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
-            await SessionRow.set_session_result(context.db, session_id, False, exit_code)
-    async with context.db.begin_session() as db_sess:
-        try:
-            session = await SessionRow.get_session(
-                db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
-            )
-        except SessionNotFound:
-            return
-    await context.destroy_session(
-        session,
-        reason=reason,
-    )
-
-    await invoke_session_callback(context, source, event)
-
-
-async def handle_route_creation(
-    context: AgentRegistry,
-    source: AgentId,
-    event: RouteCreatedAnycastEvent,
-) -> None:
-    endpoint: EndpointRow | None = None
-
-    try:
-        async with context.db.begin_readonly_session() as db_sess:
-            log.debug("Route ID: {}", event.route_id)
-            route = await RoutingRow.get(db_sess, event.route_id)
-            endpoint = await EndpointRow.get(
-                db_sess, route.endpoint, load_image=True, load_model=True
-            )
-
-            query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
-                UserRow.uuid == endpoint.created_user
-            )
-            created_user = (await db_sess.execute(query)).fetchone()
-            if created_user is None:
-                raise InvalidAPIParameters("Created user not found for endpoint")
-            if endpoint.session_owner != endpoint.created_user:
-                query = sa.select(
-                    sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
-                ).where(UserRow.uuid == endpoint.session_owner)
-                session_owner = (await db_sess.execute(query)).fetchone()
-                if session_owner is None:
-                    raise InvalidAPIParameters("Session owner not found for endpoint")
-            else:
-                session_owner = created_user
-
-            conn = await db_sess.connection()
-            _, group_id, resource_policy = await query_userinfo(
-                conn,
-                created_user.uuid,
-                created_user.access_key,
-                created_user.role,
-                created_user.domain_name,
-                None,
-                endpoint.domain,
-                endpoint.project,
-                query_on_behalf_of=session_owner.access_key,
-            )
-
-            if endpoint.image_row is None:
-                raise InvalidAPIParameters("Image not loaded for endpoint")
-            if endpoint.model_row is None:
-                raise InvalidAPIParameters("Model not loaded for endpoint")
-
-            image_row = await ImageRow.resolve(
-                db_sess,
-                [
-                    ImageIdentifier(endpoint.image_row.name, endpoint.image_row.architecture),
-                    ImageAlias(endpoint.image_row.name),
-                ],
-            )
-
-            environ = dict(endpoint.environ or {})
-            if "BACKEND_MODEL_NAME" not in environ:
-                environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
-
-            await context.create_session(
-                f"{endpoint.name}-{event.route_id!s}",
-                image_row.image_ref,
-                UserScope(
-                    domain_name=endpoint.domain,
-                    group_id=group_id,
-                    user_uuid=session_owner.uuid,
-                    user_role=session_owner.role,
-                ),
-                session_owner.access_key,
-                resource_policy,
-                SessionTypes.INFERENCE,
-                {
-                    "mounts": [endpoint.model, *[m.vfid.folder_id for m in endpoint.extra_mounts]],
-                    "mount_map": {
-                        endpoint.model: endpoint.model_mount_destination,
-                        **{
-                            m.vfid.folder_id: m.kernel_path.as_posix()
-                            for m in endpoint.extra_mounts
-                        },
-                    },
-                    "mount_options": {
-                        m.vfid.folder_id: {"permission": m.mount_perm}
-                        for m in endpoint.extra_mounts
-                    },
-                    "model_definition_path": endpoint.model_definition_path,
-                    "runtime_variant": endpoint.runtime_variant.value,
-                    "environ": environ,
-                    "scaling_group": endpoint.resource_group,
-                    "resources": endpoint.resource_slots,
-                    "resource_opts": endpoint.resource_opts,
-                    "preopen_ports": None,
-                    "agent_list": None,
-                },
-                ClusterMode(endpoint.cluster_mode),
-                endpoint.cluster_size,
-                bootstrap_script=endpoint.bootstrap_script,
-                startup_command=endpoint.startup_command,
-                tag=endpoint.tag,
-                callback_url=endpoint.callback_url,
-                enqueue_only=True,
-                route_id=route.id,
-                sudo_session_enabled=session_owner.sudo_session_enabled,
-            )
-    except Exception as e:
-        log.exception("error while creating session:")
-        error_data = {
-            "type": "creation_failed",
-            "errors": [
-                {
-                    "src": "",
-                    "name": e.__class__.__name__,
-                    "repr": e.__repr__(),
-                }
-            ],
-        }
-
-        async def _update():
-            async with context.db.begin_session() as db_sess:
-                query = (
-                    sa.update(RoutingRow)
-                    .values({"status": RouteStatus.FAILED_TO_START, "error_data": error_data})
-                    .where(RoutingRow.id == event.route_id)
-                )
-                await db_sess.execute(query)
-                if endpoint:
-                    query = (
-                        sa.update(EndpointRow)
-                        .values({"retries": endpoint.retries + 1})
-                        .where(EndpointRow.id == endpoint.id)
-                    )
-                    await db_sess.execute(query)
-
-        await execute_with_retry(_update)
-
-
-async def handle_check_agent_resource(
-    context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
-) -> None:
-    async with context.db.begin_readonly() as conn:
-        query = sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
-        result = await conn.execute(query)
-        row = result.first()
-        if not row:
-            raise InstanceNotFound(source)
-        log.info("agent@{0} occupied slots: {1}", source, row.occupied_slots.to_json())
-
-
 async def check_scaling_group(
     conn: SAConnection,
     scaling_group: str | None,
@@ -4333,46 +3801,3 @@ async def check_scaling_group(
     if scaling_group is None:
         raise ScalingGroupNotFound("Scaling group not found")
     return scaling_group
-
-
-async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
-    log_func = log.info
-    log_msg: str = ""
-    log_fmt: str = ""
-    log_arg: Any = None
-    begin = time.monotonic()
-    try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30.0),
-        ) as session:
-            try:
-                async with session.post(url, json=data) as response:
-                    if response.content_length is not None and response.content_length > 0:
-                        log_func = log.warning
-                        log_msg = "warning"
-                        log_fmt = (
-                            "{3[0]} {3[1]} - the callback response body was not empty! "
-                            "(len: {3[2]:,} bytes)"
-                        )
-                        log_arg = (response.status, response.reason, response.content_length)
-                    else:
-                        log_msg = "result"
-                        log_fmt = "{3[0]} {3[1]}"
-                        log_arg = (response.status, response.reason)
-            except aiohttp.ClientError as e:
-                log_func = log.warning
-                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
-    except asyncio.CancelledError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except TimeoutError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    finally:
-        log_func(
-            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
-            data["event"],
-            data["session_id"],
-            url,
-            log_arg,
-        )
