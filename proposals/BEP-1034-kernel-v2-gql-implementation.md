@@ -29,10 +29,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 
 ### Types to Include
 
-#### Enums
-- `KernelStatusGQL` - Kernel status enum
-- `KernelOrderFieldGQL` - Ordering field enum
-
 #### Input Types (Filter/Order)
 - `KernelStatusFilterGQL` - Status filter input
 - `KernelFilterGQL` - Main filter input
@@ -67,9 +63,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelConnectionV2GQL` - Connection type
 
 #### Common Types (from common/types.py)
-- `SessionTypesGQL`, `SessionResultGQL` - Session enums
-- `MountPermissionGQL`, `VFolderUsageModeGQL` - VFolder enums
-- `ServicePortProtocolGQL` - Service port protocol enum
 - `ResourceOptsEntryGQL`, `ResourceOptsGQL` - Resource options
 - `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options input
 - `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports

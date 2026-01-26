@@ -4,28 +4,13 @@ This document lists all types to be implemented with their fields.
 
 ---
 
-## Enums
-
-### KernelStatusGQL
-```python
-KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus")
-```
-
-### KernelOrderFieldGQL
-```python
-class KernelOrderFieldGQL(StrEnum):
-    CREATED_AT = "created_at"
-```
-
----
-
 ## Input Types
 
 ### KernelStatusFilterGQL
 ```python
 class KernelStatusFilterGQL:
-    in_: list[KernelStatusGQL] | None
-    not_in: list[KernelStatusGQL] | None
+    in_: list[KernelStatus] | None
+    not_in: list[KernelStatus] | None
 ```
 
 ### KernelFilterGQL
@@ -39,7 +24,7 @@ class KernelFilterGQL:
 ### KernelOrderByGQL
 ```python
 class KernelOrderByGQL:
-    field: KernelOrderFieldGQL
+    field: KernelOrderField
     direction: OrderDirection
 ```
 
@@ -111,7 +96,7 @@ class KernelSessionInfoGQL:
     session_id: uuid.UUID | None
     creation_id: str | None
     name: str | None
-    session_type: SessionTypesGQL
+    session_type: SessionTypes
 ```
 
 ### KernelClusterInfoGQL
@@ -209,8 +194,8 @@ class KernelNetworkInfoGQL:
 
 ```python
 class KernelLifecycleInfoGQL:
-    status: KernelStatusGQL
-    result: SessionResultGQL
+    status: KernelStatus
+    result: SessionResult
     created_at: datetime | None
     terminated_at: datetime | None
     starts_at: datetime | None
@@ -271,25 +256,11 @@ class KernelConnectionV2GQL(Connection[KernelV2GQL]):
 
 ## Common Types
 
-### Session Enums
-```python
-SessionTypesGQL = strawberry.enum(SessionTypes)
-SessionResultGQL = strawberry.enum(SessionResult)
-```
-
-### VFolder Enums
-```python
-MountPermissionGQL = strawberry.enum(MountPermission)
-VFolderUsageModeGQL = strawberry.enum(VFolderUsageMode)
-```
-
 ### Service Port Types
 ```python
-ServicePortProtocolGQL = strawberry.enum(ServicePortProtocols)
-
 class ServicePortEntryGQL:
     name: str
-    protocol: ServicePortProtocolGQL
+    protocol: ServicePortProtocol
     container_ports: list[int]
     host_ports: list[int | None]
     is_inference: bool
