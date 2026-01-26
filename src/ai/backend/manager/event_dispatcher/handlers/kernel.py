@@ -40,7 +40,6 @@ class KernelEventHandler:
     _registry: AgentRegistry
     _db: ExtendedAsyncSAEngine
     _schedule_coordinator: ScheduleCoordinator
-    _use_sokovan: bool
 
     def __init__(
         self,
