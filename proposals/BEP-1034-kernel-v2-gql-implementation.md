@@ -108,9 +108,9 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 - [ ] DomainNode PR: Add `domain: DomainNode` to `KernelUserPermissionInfoGQL`
 - [ ] GroupNode PR: Add `project: GroupNode` to `KernelUserPermissionInfoGQL`
 - [ ] SessionNode PR: Add `session: SessionNode` to `KernelSessionInfoGQL`
-- [ ] ResourceGroupNode PR: Add `resource_group: ResourceGroupNode` to `KernelResourceInfoGQL`
 - [ ] VFolderNode PR: Add `vfolders: list[VFolderNode]` to `KernelRuntimeInfoGQL`
 
 ## References
 
 - [BEP-1010: GraphQL API Migration to Strawberry](BEP-1010-new-gql.md)
+- [PR #8292: ImageNode Implementation](https://github.com/lablup/backend.ai/pull/8292)
