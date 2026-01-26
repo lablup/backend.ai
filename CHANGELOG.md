@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.8 (2026-01-26)
+
+### Fixes
+* Fix missing `.vimrc` in runner package by restricting gitignore patterns to project root ([#8238](https://github.com/lablup/backend.ai/issues/8238))
+
+### External Dependency Updates
+* Fix pycares version to 4.11 because aiohttp does not support pycares 5.0, which introduced breaking changes. ([#7451](https://github.com/lablup/backend.ai/issues/7451))
+
+
 ## 25.15.7 (2026-01-21)
 
 ### Fixes
