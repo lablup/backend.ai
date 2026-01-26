@@ -13773,30 +13773,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "event": {
-                    "type": "string",
-                    "enum": [
-                      "schedule",
-                      "check_precondition",
-                      "start_session",
-                      "scale_services"
-                    ]
-                  }
-                },
-                "required": [
-                  "event"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }

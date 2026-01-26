@@ -15,7 +15,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
@@ -123,7 +122,7 @@ class TestProvisionerAllocation:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         """Create a mock repository."""
-        repo = MagicMock(spec=ScheduleRepository)
+        repo = MagicMock()
         repo.get_scheduling_config = AsyncMock(
             return_value=SchedulingConfig(
                 max_container_count_per_agent=100,

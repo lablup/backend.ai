@@ -1190,23 +1190,6 @@ class ManagerConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="9090"),
         ),
     ]
-    use_sokovan: Annotated[
-        bool,
-        Field(
-            default=True,
-            validation_alias=AliasChoices("use-sokovan", "use_sokovan"),
-            serialization_alias="use-sokovan",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Whether to use the Sokovan orchestrator for session scheduling. "
-                "Sokovan provides improved scheduling performance with better resource utilization. "
-                "When disabled, falls back to the legacy scheduling system."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="true", prod="true"),
-        ),
-    ]
 
     @property
     def aiomonitor_terminal_ui_port(self) -> int:

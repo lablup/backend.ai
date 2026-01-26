@@ -28,34 +28,6 @@ class BaseScheduleEvent(AbstractAnycastEvent):
         return None
 
 
-class DoScheduleEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_schedule"
-
-
-class DoCheckPrecondEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_check_precond"
-
-
-class DoStartSessionEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_start_session"
-
-
-class DoScaleEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_scale"
-
-
 class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
     """Event to trigger Sokovan scheduler to process if marks are present (short cycle)."""
 

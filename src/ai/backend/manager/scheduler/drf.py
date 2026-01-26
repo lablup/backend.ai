@@ -95,7 +95,7 @@ class DRFScheduler(AbstractScheduler):
         scheduled_session_or_kernel: SessionRow | KernelRow,
     ) -> None:
         # In such case, we just skip updating self.per_user_dominant_share state
-        # and the scheduler dispatcher continues to pick another session within the same scaling group.
+        # and the scheduler continues to pick another session within the same scaling group.
         raw_access_key = scheduled_session_or_kernel.access_key
         if raw_access_key is None:
             return

@@ -866,7 +866,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.valkey_container_log,
             root_ctx.valkey_stat,
             root_ctx.valkey_stream,
-            root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
             root_ctx.scheduling_controller,
             root_ctx.sokovan_orchestrator.deployment_coordinator,
@@ -882,7 +881,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.storage_manager,
             root_ctx.config_provider,
             root_ctx.event_producer,
-            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -1109,7 +1107,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
-        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     try:
@@ -1117,26 +1114,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     finally:
         await root_ctx.agent_client_pool.close()
         await root_ctx.registry.shutdown()
-
-
-@asynccontextmanager
-async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .scheduler.dispatcher import SchedulerDispatcher
-
-    root_ctx.scheduler_dispatcher = await SchedulerDispatcher.create(
-        root_ctx.config_provider,
-        root_ctx.etcd,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-        root_ctx.registry,
-        root_ctx.valkey_live,
-        root_ctx.valkey_stat,
-        root_ctx.repositories.schedule.repository,
-    )
-    try:
-        yield
-    finally:
-        await root_ctx.scheduler_dispatcher.close()
 
 
 @asynccontextmanager
@@ -1565,7 +1542,6 @@ def build_root_app(
             event_dispatcher_plugin_ctx,
             idle_checker_ctx,
             agent_registry_ctx,
-            sched_dispatcher_ctx,
             service_discovery_ctx,
             sokovan_orchestrator_ctx,
             leader_election_ctx,

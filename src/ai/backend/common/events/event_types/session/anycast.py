@@ -34,14 +34,6 @@ class SessionLifecycleEvent(AbstractAnycastEvent):
 
 
 @dataclass
-class DoUpdateSessionStatusEvent(SessionLifecycleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_update_session_status"
-
-
-@dataclass
 class BaseSessionEvent(AbstractAnycastEvent):
     session_id: SessionId
 
@@ -119,27 +111,11 @@ class SessionEnqueuedAnycastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_scheduled"
-
-
-@dataclass
 class SessionCheckingPrecondAnycastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "session_checking_precondition"
-
-
-@dataclass
-class SessionPreparingAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_preparing"
 
 
 @dataclass
