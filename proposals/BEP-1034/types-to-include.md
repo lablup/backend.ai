@@ -51,6 +51,7 @@ class KernelOrderByGQL:
 ```python
 class KernelStatusErrorInfoGQL:
     src: str
+    agent_id: uuid.UUID | None
     agent: AgentNode | None
     name: str
     repr: str
@@ -159,15 +160,16 @@ class KernelAttachedDevicesGQL:
 
 > **Note**: `scaling_group` is **omitted** (see types-to-defer.md)
 >
-> **Field Renames**: `occupied_slots` → `used`, `requested_slots` → `requested`
+> **Field Renames**: `occupied_slots` → `used`, `requested_slots` → `requested`, `occupied_shares` → `shares`
 
 ```python
 class KernelResourceInfoGQL:
+    agent_id: uuid.UUID | None
     agent: AgentNode | None
     container_id: str | None
     used: ResourceSlotGQL
     requested: ResourceSlotGQL
-    occupied_shares: ResourceSlotGQL
+    shares: ResourceSlotGQL
     attached_devices: KernelAttachedDevicesGQL | None
     resource_opts: ResourceOptsGQL | None
 ```
@@ -196,14 +198,13 @@ class KernelNetworkInfoGQL:
 
 ### KernelLifecycleInfoGQL
 
-> **Note**: `status_history` is **omitted** (see types-to-skip.md)
+> **Note**: `status_history` is **omitted** (see types-to-skip.md), `status_info` is **removed** (unused)
 
 ```python
 class KernelLifecycleInfoGQL:
     status: KernelStatusGQL
     result: SessionResultGQL
     status_changed: datetime | None
-    status_info: str | None
     status_data: KernelStatusDataContainerGQL | None
     created_at: datetime | None
     terminated_at: datetime | None
