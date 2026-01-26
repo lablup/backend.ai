@@ -149,9 +149,9 @@ class TestRBACFieldPurgerBasic:
             db_sess.add(field_row)
 
             entity_field = EntityFieldRow(
-                entity_type=EntityType.VFOLDER.value,
+                entity_type=EntityType.SESSION.value,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER.value,
+                field_type=FieldType.KERNEL.value,
                 field_id=str(field_uuid),
             )
             db_sess.add(entity_field)
@@ -187,9 +187,9 @@ class TestRBACFieldPurgerBasic:
                 db_sess.add(field_row)
 
                 entity_field = EntityFieldRow(
-                    entity_type=EntityType.VFOLDER.value,
+                    entity_type=EntityType.SESSION.value,
                     entity_id=parent_entity_id,
-                    field_type=EntityType.VFOLDER.value,
+                    field_type=FieldType.KERNEL.value,
                     field_id=str(field_uuid),
                 )
                 db_sess.add(entity_field)
@@ -324,9 +324,9 @@ class TestRBACFieldBatchPurger:
                 db_sess.add(field_row)
 
                 entity_field = EntityFieldRow(
-                    entity_type=EntityType.VFOLDER.value,
+                    entity_type=EntityType.SESSION.value,
                     entity_id=parent_entity_id,
-                    field_type=EntityType.VFOLDER.value,
+                    field_type=FieldType.KERNEL.value,
                     field_id=str(field_uuid),
                 )
                 db_sess.add(entity_field)
