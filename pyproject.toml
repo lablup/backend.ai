@@ -82,7 +82,7 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
-extend-safe-fixes = ["UP030"]
+extend-safe-fixes = ["UP030", "UP031"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
     "W",      # pycodestyle warnings: PEP8 style warnings
@@ -165,7 +165,6 @@ ignore = [
     "B904",
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # UP (pyupgrade) - defer large-scale changes for gradual adoption
-    "UP031",  # printf-string-formatting - percent format to f-string (11 violations, defer)
     "UP040",  # non-pep695-type-alias - TypeAlias -> type statement (77 violations, Python 3.12+ syntax)
     "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
     "UP045",  # non-pep604-annotation-optional - Optional[X] -> X | None (5392 violations, defer)

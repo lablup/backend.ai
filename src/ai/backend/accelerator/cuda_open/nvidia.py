@@ -571,26 +571,26 @@ class libcudart(LibraryBase):
                 arch = platform.architecture()[0]
                 for major, minor in TARGET_CUDA_VERSIONS:
                     ver = f"{major}{minor}"
-                    cudart = _load_library("cudart%s_%d.dll" % (arch[:2], ver))
+                    cudart = _load_library(f"cudart{arch[:2]}_{ver}.dll")
                     if cudart is not None:
                         return cudart
             case "Darwin":
                 for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library("libcudart.%d.dylib" % major)
+                    cudart = _load_library(f"libcudart.{major}.dylib")
                     if cudart is not None:
                         return cudart
                 for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library("libcudart.%d.%d.dylib" % (major, minor))
+                    cudart = _load_library(f"libcudart.{major}.{minor}.dylib")
                     if cudart is not None:
                         return cudart
                 return _load_library("libcudart.dylib")
             case _:
                 for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library("libcudart.so.%d" % major)
+                    cudart = _load_library(f"libcudart.so.{major}")
                     if cudart is not None:
                         return cudart
                 for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library("libcudart.so.%d.%d" % (major, minor))
+                    cudart = _load_library(f"libcudart.so.{major}.{minor}")
                     if cudart is not None:
                         return cudart
                 return _load_library("libcudart.so")
