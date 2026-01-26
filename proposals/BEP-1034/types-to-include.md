@@ -184,15 +184,6 @@ class KernelLifecycleInfoGQL:
     last_seen: datetime | None
 ```
 
-### KernelMetricsInfoGQL
-
-> **Note**: `last_stat` is **removed**
-
-```python
-class KernelMetricsInfoGQL:
-    num_queries: int
-```
-
 ### KernelMetadataInfoGQL
 ```python
 class KernelMetadataInfoGQL:
@@ -217,7 +208,6 @@ class KernelV2GQL(Node):
     resource: KernelResourceInfoGQL
     runtime: KernelRuntimeInfoGQL
     lifecycle: KernelLifecycleInfoGQL
-    metrics: KernelMetricsInfoGQL
     metadata: KernelMetadataInfoGQL
 ```
 

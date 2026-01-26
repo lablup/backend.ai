@@ -52,7 +52,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelRuntimeInfoGQL` - Runtime config (partial - see deferred)
 - `KernelNetworkInfoGQL` - Network config
 - `KernelLifecycleInfoGQL` - Lifecycle info (partial - see skipped)
-- `KernelMetricsInfoGQL` - Metrics info
 - `KernelMetadataInfoGQL` - Metadata
 
 #### Main Types
