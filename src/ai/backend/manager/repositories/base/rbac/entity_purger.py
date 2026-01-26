@@ -21,6 +21,7 @@ from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyE
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
@@ -379,6 +380,21 @@ async def _delete_orphan_permission_groups(
     )
 
 
+async def _delete_entity_fields(
+    db_sess: SASession,
+    entity_id: ObjectId,
+) -> None:
+    """Delete all EntityFieldRows for the given entity."""
+    await db_sess.execute(
+        sa.delete(EntityFieldRow).where(
+            sa.and_(
+                EntityFieldRow.entity_type == entity_id.entity_type.value,
+                EntityFieldRow.entity_id == entity_id.entity_id,
+            )
+        )
+    )
+
+
 async def _delete_scope_associations(
     db_sess: SASession,
     entity_id: ObjectId,
@@ -497,6 +513,7 @@ async def _delete_rbac_for_entity(
     1. ObjectPermissionRows - permissions granted on this entity
     2. PermissionGroupRows - orphaned groups with no remaining permissions/entities
     3. AssociationScopesEntitiesRows - scope-entity mappings
+    4. EntityFieldRows - field mappings for this entity
     """
     # Collect related data
     role_rows = await _get_related_roles(db_sess, entity_id)
@@ -507,6 +524,9 @@ async def _delete_rbac_for_entity(
     await _delete_object_permissions(db_sess, object_permission_ids)
     await _delete_orphan_permission_groups(db_sess, permission_group_ids)
     await _delete_scope_associations(db_sess, entity_id)
+
+    # Delete EntityFieldRows for this entity
+    await _delete_entity_fields(db_sess, entity_id)
 
 
 async def _batch_delete_rbac_for_entities(
