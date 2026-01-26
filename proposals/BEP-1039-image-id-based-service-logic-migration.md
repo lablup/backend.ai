@@ -18,10 +18,10 @@ The Image-related ID-based migration consists of three stages:
 │  1. BEP-1039 (this doc)     2. BEP-1038               3. (future)          │
 │  Service Logic Migration  → ImageV2 Schema Addition → API Migration        │
 │  ───────────────────────    ─────────────────────     ────────────────     │
-│  • Action Layer             • New GQL schema design   • Client SDK ext.    │
+│  • Add ById Actions         • New GQL schema design   • Client SDK ext.    │
 │  • Repository Layer         • gql_relay impl.         • CLI extension      │
 │  • Cache Layer              • ID-based Query/Mutation • REST API ext.      │
-│  • Internal logic change    • Coexist with legacy API • Deprecation        │
+│  • Keep legacy Actions      • Coexist with legacy API • Deprecation        │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -111,7 +111,7 @@ Some code already operates on `image_id` basis:
 - `ValkeyImageClient.remove_agent_from_images(image_ids)`
 - GraphQL: `ForgetImageById`, `PurgeImageById` mutations
 
-The remaining Actions will be migrated to image_id basis following these existing patterns.
+New ById versions of the remaining Actions will be added following these existing patterns.
 
 ## Proposed Design
 
@@ -120,11 +120,11 @@ The remaining Actions will be migrated to image_id basis following these existin
 This BEP focuses on **Stage 1: Internal service logic migration** of the three-stage migration.
 
 **What this BEP covers:**
-- Action Layer: canonical-based → image_id-based
+- Action Layer: Add new ById Actions (keep legacy Actions unchanged)
 - Repository Layer: Add image_id-based query methods
-- Cache Layer: Unify to image_id keys
-- DataLoader: Add batch loading for canonical → image_id conversion
-- Convert internal logic of existing API (gql_legacy) to image_id-based (maintain external interface)
+- Cache Layer: Unify to image_id keys for new ById Actions
+- DataLoader: Add batch loading by image_id for new API
+- New API (BEP-1038) will use ById Actions directly
 
 **What this BEP does NOT cover:**
 - New GraphQL schema → BEP-1038
@@ -132,34 +132,68 @@ This BEP focuses on **Stage 1: Internal service logic migration** of the three-s
 
 ### Goals
 
-1. Convert **internal service logic** to `image_id` basis (this BEP scope)
-2. Existing API (`gql_legacy`) receives canonical input but **internally converts to image_id immediately** for processing
-3. New ID-based API to be designed in BEP-1038 (outside this BEP scope)
+1. Add new **ById Actions** for `image_id`-based operations (this BEP scope)
+2. Keep existing **legacy Actions unchanged** for backward compatibility with gql_legacy
+3. New ID-based API (BEP-1038) will use ById Actions directly
+4. Legacy Actions to be deprecated in Stage 3 (future)
 
-### New Data Flow
+### Data Flow After Migration
 
-**Current:**
-```
-API (canonical) → Action (canonical) → Repository (canonical lookup) → Cache (canonical key)
-```
-
-**After migration:**
+**Legacy API (gql_legacy) - Unchanged:**
 ```
 Legacy API (canonical)
-  → ImageDataLoader (canonical → image_id conversion via SearchImagesAction)
-  → Action (image_id)
-  → Repository (image_id lookup)
-  → Cache (image_id key)
-
-New API (image_id) ───────────────────────────────────────────────────────────┘
-  (implemented in BEP-1038)
+  → Legacy Action (canonical)
+  → Repository (canonical lookup)
+  → Cache (canonical key)
 ```
 
-### Legacy API Internal Migration (gql_legacy)
+**New API (gql_relay, BEP-1038) - Uses ById Actions:**
+```
+New API (image_id)
+  → ById Action (image_id)
+  → Repository (image_id lookup)
+  → Cache (image_id key)
+```
 
-Existing GraphQL API maintains external interface but **converts canonical → image_id via ImageDataLoader before calling Action**.
+Both flows coexist until legacy API deprecation in Stage 3.
 
-#### DataLoader Pattern
+### Legacy API - No Changes (gql_legacy)
+
+Existing GraphQL API (gql_legacy) **continues to use legacy canonical-based Actions without modification**.
+
+#### Legacy API Flow (Unchanged)
+
+```python
+# api/gql_legacy/image.py - AliasImage mutation (NO CHANGES)
+class AliasImage(graphene.Mutation):
+    async def mutate(cls, info, target: str, alias: str, architecture: str):
+        # Continue using legacy canonical-based Action
+        await AliasImageAction(
+            image_canonical=target,
+            architecture=architecture,
+            alias=alias,
+        ).execute(ctx)
+```
+
+**Legacy API flow (unchanged):**
+
+```
+Legacy API Handler (canonical input)
+  → Legacy Action (canonical)
+  → Repository (canonical lookup)
+```
+
+| Legacy API Input | Legacy Action Call |
+|------------------|-------------------|
+| `target: str` (canonical) | `AliasImageAction(image_canonical, architecture, alias)` |
+| `references: [str]` | `PreloadImageAction(references)` |
+| `image_canonical: str` | `ClearImageCustomResourceLimitAction(image_canonical, architecture)` |
+
+### New API - Uses ById Actions (gql_relay, BEP-1038)
+
+New GraphQL API (gql_relay) **uses new ById Actions directly**.
+
+#### DataLoader Pattern for New API
 
 Following the existing DataLoader pattern from other domains:
 
@@ -184,28 +218,6 @@ async def load_images_by_ids(
 
     image_map = {image.id: image for image in action_result.data}
     return [image_map.get(image_id) for image_id in image_ids]
-
-
-async def load_images_by_canonicals(
-    processor: ImageProcessors,
-    canonicals: Sequence[tuple[str, str]],  # (canonical, architecture)
-) -> list[Optional[ImageData]]:
-    """Batch load images by canonical references."""
-    if not canonicals:
-        return []
-
-    querier = BatchQuerier(
-        pagination=OffsetPagination(limit=len(canonicals)),
-        conditions=[ImageConditions.by_canonicals(canonicals)],
-    )
-
-    action_result = await processor.search_images.wait_for_complete(
-        SearchImagesAction(querier=querier)
-    )
-
-    # Map by canonical+arch combination
-    image_map = {(img.canonical, img.architecture): img for img in action_result.data}
-    return [image_map.get(canonical) for canonical in canonicals]
 ```
 
 ```python
@@ -214,50 +226,32 @@ class DataLoaders:
     @cached_property
     def image_loader(self) -> DataLoader[uuid.UUID, Optional[ImageData]]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
-
-    @cached_property
-    def image_by_canonical_loader(
-        self,
-    ) -> DataLoader[tuple[str, str], Optional[ImageData]]:
-        return DataLoader(
-            load_fn=partial(load_images_by_canonicals, self._processors.image)
-        )
 ```
 
-#### Usage in API Handler
+#### Usage in New API Handler
 
 ```python
-# api/gql_legacy/image.py - AliasImage mutation
-class AliasImage(graphene.Mutation):
-    async def mutate(cls, info, target: str, alias: str, architecture: str):
-        # Convert canonical → ImageData via DataLoader
-        image_data = await info.context.data_loaders.image_by_canonical_loader.load(
-            (target, architecture)
-        )
-        if image_data is None:
-            raise ImageNotFoundError(target)
-
-        # Action only receives image_id
-        await AliasImageAction(image_id=image_data.id, alias=alias).execute(ctx)
+# api/gql_relay/image.py - AliasImageById mutation (NEW)
+class AliasImageById(relay.Mutation):
+    async def mutate(cls, info, image_id: uuid.UUID, alias: str):
+        # Directly use ById Action - no conversion needed
+        await AliasImageByIdAction(image_id=image_id, alias=alias).execute(ctx)
 ```
 
-**Conversion flow:**
+**New API flow:**
 
 ```
-API Handler (canonical input)
-  → ImageDataLoader.load((canonical, arch))
-  → SearchImagesAction call (batch processing)
-  → ImageData returned
-  → Action(image_id) call
+New API Handler (image_id input)
+  → ById Action (image_id)
+  → Repository (image_id lookup)
+  → Cache (image_id key)
 ```
 
-**Conversion responsibility: DataLoader (used by caller)**
-
-| Legacy API Input | DataLoader | Action Call |
-|------------------|------------|-------------|
-| `target: str` (canonical) | `image_by_canonical_loader.load()` | `AliasImageAction(image_id)` |
-| `references: [str]` | `image_by_canonical_loader.load_many()` | `PreloadImageAction(image_ids)` |
-| `image_canonical: str` | `image_by_canonical_loader.load()` | `ClearImageCustomResourceLimitAction(image_id)` |
+| New API Input | ById Action Call |
+|---------------|-----------------|
+| `image_id: UUID` | `AliasImageByIdAction(image_id, alias)` |
+| `image_ids: [UUID]` | `PreloadImageByIdAction(image_ids)` |
+| `image_id: UUID` | `ClearImageCustomResourceLimitByIdAction(image_id)` |
 
 ### New API (BEP-1038 Scope)
 
@@ -266,27 +260,47 @@ The new API receives image_id directly, so no conversion is needed before callin
 
 ### Service/Action Layer Migration
 
-**Change existing Action signatures to image_id-based:**
+**Add new `ById` Actions while keeping legacy Actions unchanged:**
 
-| Action | Before | After |
-|--------|--------|-------|
-| `AliasImageAction` | `(image_canonical, architecture, alias)` | `(image_id, alias)` |
-| `GetImagesAction` | `(image_canonicals)` | `(image_ids)` |
-| `ClearImageCustomResourceLimitAction` | `(image_canonical, architecture)` | `(image_id)` |
-| `PreloadImageAction` | `(references)` | `(image_ids)` |
-| `UnloadImageAction` | `(references)` | `(image_ids)` |
+| Legacy Action (Keep) | New ById Action |
+|---------------------|-----------------|
+| `AliasImageAction(image_canonical, architecture, alias)` | `AliasImageByIdAction(image_id, alias)` |
+| `GetImagesAction(image_canonicals)` | `GetImagesByIdsAction(image_ids)` |
+| `ClearImageCustomResourceLimitAction(image_canonical, architecture)` | `ClearImageCustomResourceLimitByIdAction(image_id)` |
+| `PreloadImageAction(references)` | `PreloadImageByIdAction(image_ids)` |
+| `UnloadImageAction(references)` | `UnloadImageByIdAction(image_ids)` |
+| `RescanImagesAction(registry)` | `RescanImagesByIdAction(image_ids)` |
+| `SetImageResourceLimitAction(image_canonical, architecture, ...)` | `SetImageResourceLimitByIdAction(image_id, ...)` |
 
 **Migration strategy:**
 
-1. **Change Action signatures**: canonical → image_id based (keep Action names)
-2. **Modify callers**: API handler converts canonical → image_id via DataLoader, then calls Action
-3. **Delete existing `*ByCanonicalsAction`**: Remove unnecessary canonical-based Actions
+1. **Add new ById Actions**: Create new Actions that accept `image_id` instead of canonical
+2. **Keep legacy Actions unchanged**: Existing canonical-based Actions remain for backward compatibility with legacy API
+3. **New API uses ById Actions**: BEP-1038 new GraphQL schema calls ById Actions directly
+4. **Legacy API continues using legacy Actions**: No changes to gql_legacy handlers
+5. **Future deprecation**: Legacy Actions will be deprecated when legacy API is removed (Stage 3)
 
 ```python
-# After: ai/backend/manager/services/image/actions/alias_image.py
+# ai/backend/manager/services/image/actions/alias_image.py
+
+# Legacy Action - unchanged
 @dataclass
 class AliasImageAction:
-    """Operates on image_id basis"""
+    """Legacy: Operates on canonical basis"""
+    image_canonical: str
+    architecture: str
+    alias: str
+
+    async def execute(self, ctx: ImageServiceContext) -> None:
+        await ctx.image_repository.create_alias_by_canonical(
+            self.image_canonical, self.architecture, self.alias
+        )
+
+
+# New ById Action
+@dataclass
+class AliasImageByIdAction:
+    """New: Operates on image_id basis"""
     image_id: ImageID
     alias: str
 
@@ -295,9 +309,19 @@ class AliasImageAction:
 ```
 
 ```python
-# After: ai/backend/manager/services/image/actions/get_images.py
+# ai/backend/manager/services/image/actions/get_images.py
+
+# Legacy Action - unchanged
 @dataclass
 class GetImagesAction:
+    image_canonicals: list[ImageCanonical]
+    load_installed_agents: bool = False
+    ...
+
+
+# New ById Action
+@dataclass
+class GetImagesByIdsAction:
     image_ids: list[ImageID]
     load_installed_agents: bool = False
 
@@ -342,10 +366,10 @@ This BEP focuses only on **server internal logic migration**.
 ├───────────────────────────────────────────────────────────────────────┤
 │  BEP-1039 (this doc)    │  BEP-1038             │  Future (Stage 3)   │
 │  ─────────────────────  │  ──────────────────   │  ─────────────────  │
-│  ✓ Action Layer         │  ✓ New GQL schema     │  ✓ Client SDK ext.  │
+│  ✓ Add ById Actions     │  ✓ New GQL schema     │  ✓ Client SDK ext.  │
 │  ✓ Repository Layer     │  ✓ gql_relay impl.    │  ✓ CLI extension    │
 │  ✓ Cache Layer          │                       │  ✓ REST API ext.    │
-│  ✓ DataLoader addition  │                       │  ✓ Deprecation      │
+│  ✓ DataLoader addition  │                       │  ✓ Legacy deprecate │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -354,8 +378,9 @@ This BEP focuses only on **server internal logic migration**.
 ### Backward Compatibility
 
 1. **No external API changes**: All existing GraphQL/REST APIs work identically
-2. **Internal refactoring**: Only Action/Repository layer changes
-3. **Transparent migration**: No changes from external user perspective
+2. **Additive changes only**: New ById Actions added, legacy Actions unchanged
+3. **Transparent to users**: Legacy API continues to work without modification
+4. **Parallel operation**: Legacy and ById Actions coexist until Stage 3 deprecation
 
 ### Cache Migration
 
@@ -390,42 +415,57 @@ This BEP focuses on **service layer migration**; API extension will proceed in B
    - Unify all `ValkeyImageClient` methods to ImageID key basis
    - Keep legacy canonical keys as read-only (during migration period)
 
-### Phase 2: DataLoader Addition
+### Phase 2: DataLoader Addition (for New API)
 
 1. **ImageDataLoader implementation**
-   - `load_images_by_ids()` - ID-based batch load
-   - `load_images_by_canonicals()` - canonical-based batch load (for conversion)
+   - `load_images_by_ids()` - ID-based batch load for new API
 
 2. **DataLoaders registration**
-   - Add `DataLoaders.image_loader`
-   - Add `DataLoaders.image_by_canonical_loader`
+   - Add `DataLoaders.image_loader` - for gql_relay (new API)
 
 3. **SearchImagesAction implementation/extension**
    - Support `BatchQuerier`
    - `ImageConditions`-based queries
 
-### Phase 3: Action Layer Migration
+### Phase 3: Action Layer - Add ById Actions
 
-1. **Change existing Action signatures to image_id-based**
-   - `AliasImageAction(image_canonical, arch, alias)` → `AliasImageAction(image_id, alias)`
-   - `GetImagesAction(canonicals)` → `GetImagesAction(image_ids)`
-   - `PreloadImageAction(references)` → `PreloadImageAction(image_ids)`
-   - `UnloadImageAction(references)` → `UnloadImageAction(image_ids)`
-   - `ClearImageCustomResourceLimitAction(canonical, arch)` → `ClearImageCustomResourceLimitAction(image_id)`
+1. **Add new ById Actions**
+   - Add `AliasImageByIdAction(image_id, alias)` - new ID-based alias creation
+   - Add `GetImagesByIdsAction(image_ids)` - new ID-based image retrieval
+   - Add `PreloadImageByIdAction(image_ids)` - new ID-based image preload
+   - Add `UnloadImageByIdAction(image_ids)` - new ID-based image unload
+   - Add `ClearImageCustomResourceLimitByIdAction(image_id)` - new ID-based resource limit clearing
+   - Add `RescanImagesByIdAction(image_ids)` - new ID-based image rescan
+   - Add `SetImageResourceLimitByIdAction(image_id, ...)` - new ID-based resource limit setting
 
-2. **Delete unnecessary Actions**
-   - Delete `GetImagesByCanonicalsAction` (merged into GetImagesAction)
-   - Delete `RemoveAgentFromImagesByCanonicalsAction` (use RemoveAgentFromImagesAction)
+2. **Keep existing legacy Actions unchanged**
+   - `AliasImageAction` - remains canonical-based for legacy API
+   - `GetImagesAction` - remains canonical-based for legacy API
+   - `PreloadImageAction` - remains reference-based for legacy API
+   - `UnloadImageAction` - remains reference-based for legacy API
+   - `ClearImageCustomResourceLimitAction` - remains canonical-based for legacy API
+   - `RescanImagesAction` - remains registry-based for legacy API
+   - `SetImageResourceLimitAction` - remains canonical-based for legacy API
 
-### Phase 4: API Handler Modification
+3. **Mark legacy Actions for future deprecation**
+   - Add deprecation notices to legacy Actions
+   - Document migration path to ById versions
 
-1. **gql_legacy handler modification**
-   - Convert via `image_by_canonical_loader` in each mutation/query
-   - Call modified Action after conversion
-   - No external interface changes (maintain backward compatibility)
+### Phase 4: API Handler Separation
 
-2. **Session creation logic**
-   - Use ID internally after image resolution via DataLoader in `SessionService.create_from_params()`
+1. **gql_legacy handlers - NO changes required**
+   - Continue using existing legacy Actions (canonical-based)
+   - Existing behavior preserved without modification
+   - No DataLoader conversion needed for legacy API
+
+2. **New gql_relay handlers (BEP-1038)**
+   - Use new ById Actions directly
+   - Receive image_id from client, pass directly to ById Actions
+   - No canonical → image_id conversion needed
+
+3. **Session creation logic**
+   - Keep existing canonical-based flow for legacy session creation API
+   - New session creation API (if added) will use ById Actions
 
 ### Phase 5: Testing
 
@@ -482,8 +522,10 @@ Service logic     New schema        Client migration
 
 | Item | BEP-1039 | BEP-1038 | Future |
 |------|----------|----------|--------|
-| Action/Repository | ✓ Migrate | - | - |
-| Cache | ✓ Migrate | - | - |
+| ById Actions | ✓ Add new | - | - |
+| Legacy Actions | Keep unchanged | - | ✓ Deprecate |
+| Repository | ✓ Add ID methods | - | - |
+| Cache | ✓ Add ID keys | - | - |
 | GraphQL schema | - | ✓ Add new | - |
 | Client SDK | - | - | ✓ Extend |
 | CLI | - | - | ✓ Extend |
