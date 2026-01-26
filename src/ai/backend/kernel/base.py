@@ -879,7 +879,7 @@ class BaseRunner(metaclass=ABCMeta):
                             cmdargs, env = start_info
                     if cmdargs is None:
                         # still not found?
-                        error_reason = "unsupported service: {0}".format(service_info["name"])
+                        error_reason = "unsupported service: {}".format(service_info["name"])
                         return {
                             "status": "failed",
                             "error": error_reason,

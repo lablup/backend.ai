@@ -145,7 +145,7 @@ def create(name, host, group, host_path, unmanaged_path, usage_mode, permission,
                 permission=permission,
                 cloneable=cloneable,
             )
-            print('Virtual folder "{0}" is created.'.format(result["name"]))
+            print('Virtual folder "{}" is created.'.format(result["name"]))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -268,18 +268,18 @@ def info(name):
     with Session() as session:
         try:
             result = session.VFolder(name).info()
-            print('Virtual folder "{0}" (ID: {1})'.format(result["name"], result["id"]))
+            print('Virtual folder "{}" (ID: {})'.format(result["name"], result["id"]))
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
-            print("- Status: {0}".format(result["status"]))
-            print("- Number of files: {0}".format(result["numFiles"]))
-            print("- Ownership Type: {0}".format(result["type"]))
+            print("- Status: {}".format(result["status"]))
+            print("- Number of files: {}".format(result["numFiles"]))
+            print("- Ownership Type: {}".format(result["type"]))
             print("- Permission:", result["permission"])
             print("- Status:", result["status"])
-            print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
-            print("- Group ID: {0}".format(result["group"]))
-            print("- User ID: {0}".format(result["user"]))
-            print("- Clone Allowed: {0}".format(result["cloneable"]))
+            print("- Usage Mode: {}".format(result.get("usage_mode", "")))
+            print("- Group ID: {}".format(result["group"]))
+            print("- User ID: {}".format(result["user"]))
+            print("- Clone Allowed: {}".format(result["cloneable"]))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

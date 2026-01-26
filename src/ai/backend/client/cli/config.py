@@ -22,7 +22,7 @@ def config():
     """
     config = get_config()
     click.echo(
-        "API endpoint: {0} (mode: {1})".format(
+        "API endpoint: {} (mode: {})".format(
             click.style(str(config.endpoint), bold=True),
             click.style(str(config.endpoint_type), fg="cyan", bold=True),
         )
@@ -41,7 +41,7 @@ def config():
                 click.echo("Server version: (failed to fetch)")
             else:
                 click.echo(
-                    "Server version: {0} (API: {1})".format(
+                    "Server version: {} (API: {})".format(
                         versions.get("manager", "pre-19.03"),
                         versions["version"],
                     )
@@ -65,7 +65,7 @@ def config():
         ).exists():
             sess_config = json.loads((local_state_path / "config.json").read_text())
             click.echo(
-                'Username: "{0}"'.format(click.style(sess_config.get("username", ""), bold=True))
+                'Username: "{}"'.format(click.style(sess_config.get("username", ""), bold=True))
             )
             nrows += 1
     else:
@@ -88,20 +88,20 @@ def config():
                 versions = sess.System.get_versions()
             except BackendClientError:
                 click.echo(
-                    "Server version: {0}".format(
+                    "Server version: {}".format(
                         click.style("(failed to fetch)", fg="red", bold=True),
                     )
                 )
             else:
                 click.echo(
-                    "Server version: {0} (API: {1})".format(
+                    "Server version: {} (API: {})".format(
                         click.style(versions.get("manager", "pre-19.03"), bold=True),
                         click.style(versions["version"], bold=True),
                     )
                 )
             click.echo("\u001b[2K", nl=False)
             click.echo(
-                "Negotiated API version: {0}".format(
+                "Negotiated API version: {}".format(
                     click.style(f"v{sess.api_version[0]}.{sess.api_version[1]}", bold=True),
                 )
             )

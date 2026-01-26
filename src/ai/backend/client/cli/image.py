@@ -89,7 +89,7 @@ def forget(reference_or_id, arch):
         if result["ok"]:
             print_done(f"Image forgotten: {reference_or_id}")
         else:
-            print_fail("Image forget has failed: {0}".format(result["msg"]))
+            print_fail("Image forget has failed: {}".format(result["msg"]))
 
 
 @image.command()
