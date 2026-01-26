@@ -63,6 +63,40 @@ BEP documents define architectural decisions, API designs, and implementation st
 - Test additions
 
 
+## Issue Creation Guidelines
+
+### Story Point Estimation
+
+Story points should reflect realistic minimum effort assuming AI coding tools (Claude) are used for direct coding work. **Story points include the entire lifecycle: implementation, testing, and code review time.**
+
+| Story Point | Criteria |
+|-------------|----------|
+| **0.5** | Minimum value. Tasks completable within 1 hour are still estimated as 0.5 |
+| **1** | Tasks requiring roughly one day (~8 hours) even with Claude assistance |
+| **2** | Tasks requiring roughly two days (~16 hours) even with Claude assistance |
+| **> 2** | Split the issue into smaller units |
+
+### Issue Splitting Principles
+
+* **Nearly all story points should be 2 or less**
+* When story points exceed 2:
+  - Split work into logical units as separate issues
+  - Design each sub-issue to be independently completable and verifiable
+  - Link sub-issues from the parent issue for tracking
+* Splitting strategies:
+  - By feature: Minimum unit that implements a single feature
+  - By layer: API, service, repository, etc.
+  - By phase: Refactoring → Implementation → Test addition
+
+### Required Content in Issues
+
+* **Clear objective**: Specific deliverables expected upon completion
+* **Background and context**: Why this work is needed
+* **Acceptance criteria**: Conditions to determine issue completion
+* **Related documents**: Links to BEP, RFC, or related issues
+* **Story point**: Estimated effort based on the criteria above
+
+
 ## General
 
 ### Tidy First Approach
