@@ -14,8 +14,7 @@ Implemented-Version:
 This document defines the implementation plan for `ImageV2GQL` types as part of the Strawberry GraphQL migration (BEP-1010). It specifies:
 
 1. **Types to Include** - Types that will be implemented
-2. **Types to Skip** - Types replaced by other designs or deprecated
-3. **Types to Defer** - Types requiring Node connections (implement later)
+2. **Types to Defer** - Types requiring Node connections (implement later)
 
 > **Note**: Enums are directly exposed from existing definitions. Mutations, Filters, and OrderBy types are out of scope for this BEP.
 
@@ -24,7 +23,6 @@ This document defines the implementation plan for `ImageV2GQL` types as part of 
 | Document | Description |
 |----------|-------------|
 | [types-to-include.md](BEP-1038/types-to-include.md) | Detailed specifications of types to implement |
-| [types-to-skip.md](BEP-1038/types-to-skip.md) | Types replaced by other designs |
 | [types-to-defer.md](BEP-1038/types-to-defer.md) | Types requiring Node connections |
 
 ## Summary
@@ -47,12 +45,6 @@ This document defines the implementation plan for `ImageV2GQL` types as part of 
 - `ImageEdgeGQL` - Edge type
 - `ImageConnectionV2GQL` - Connection type
 
-### Types to Skip (Do Not Implement)
-
-| Type | Reason |
-|------|--------|
-| `Image` (legacy) | Replaced by `ImageV2GQL` with improved structure |
-
 ### Types to Defer (Node Connections)
 
 | Type/Field | Future Node | Action |
@@ -65,13 +57,13 @@ This document defines the implementation plan for `ImageV2GQL` types as part of 
 ImageV2GQL
 ├── id: NodeID[UUID]
 │
-├── identity: ImageIdentityInfoGQL       # 이미지 식별 정보
+├── identity: ImageIdentityInfoGQL       # Image identity information
 │   ├── canonical_name
 │   ├── namespace
 │   ├── architecture
 │   └── aliases
 │
-├── metadata: ImageMetadataInfoGQL       # 메타데이터 정보
+├── metadata: ImageMetadataInfoGQL       # Metadata information
 │   ├── tags
 │   ├── labels
 │   ├── digest
@@ -79,14 +71,14 @@ ImageV2GQL
 │   ├── status
 │   └── created_at
 │
-├── requirements: ImageRequirementsInfoGQL  # 실행 요구사항
+├── requirements: ImageRequirementsInfoGQL  # Runtime requirements
 │   ├── resource_limits
 │   └── supported_accelerators
 │
-├── permission: ImagePermissionInfoGQL   # RBAC 권한
+├── permission: ImagePermissionInfoGQL   # RBAC permissions
 │   └── permissions
 │
-├── registry_id: UUID                    # 레지스트리 ID (직접 쿼리용)
+├── registry_id: UUID                    # Registry ID (for direct query)
 └── registry: ContainerRegistryNode      # (deferred)
 ```
 
@@ -95,7 +87,6 @@ ImageV2GQL
 ### PR Scope
 
 - [ ] Implement all types listed in "Types to Include"
-- [ ] Skip all types listed in "Types to Skip"
 - [ ] Implement `from_row()` factory method for `ImageV2GQL`
 - [ ] Implement connection resolver with pagination
 
