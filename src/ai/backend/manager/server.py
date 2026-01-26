@@ -882,7 +882,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.storage_manager,
             root_ctx.config_provider,
             root_ctx.event_producer,
-            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -1109,7 +1108,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
-        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     try:

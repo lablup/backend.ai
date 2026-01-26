@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import copy
 import itertools
 import logging
-import re
 import secrets
 import uuid
 from collections import defaultdict
@@ -36,7 +34,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -54,7 +51,6 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
@@ -71,14 +67,12 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 )
 from ai.backend.common.events.event_types.session.anycast import (
     SessionCancelledAnycastEvent,
-    SessionEnqueuedAnycastEvent,
     SessionStartedAnycastEvent,
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
-    SessionEnqueuedBroadcastEvent,
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
@@ -86,9 +80,8 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
+from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReport,
@@ -132,31 +125,17 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACBulkFieldCreator,
-    execute_rbac_bulk_field_creator,
-)
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
-from ai.backend.manager.repositories.session.creators import (
-    KernelRowCreatorSpec,
-    SessionRowCreatorSpec,
-)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .agent_cache import AgentRPCCache
 from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
 from .errors.image import ImageNotFound
 from .errors.kernel import (
-    InvalidKernelConfig,
-    QuotaExceeded,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
@@ -174,7 +153,6 @@ from .exceptions import MultiAgentError
 from .models.agent import AgentRow, agents
 from .models.container_registry import ContainerRegistryRow
 from .models.domain import domains
-from .models.dotfile import prepare_dotfiles
 from .models.endpoint import EndpointRow
 from .models.image import (
     ImageRow,
@@ -189,17 +167,14 @@ from .models.kernel import (
 from .models.keypair import KeyPairRow, query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
 from .models.resource_policy import KeyPairResourcePolicyRow
-from .models.routing import RoutingRow
-from .models.scaling_group import ScalingGroupRow, query_allowed_sgroups, scaling_groups
+from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
     PRIVATE_SESSION_TYPES,
     SESSION_KERNEL_STATUS_MAPPING,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
-    SessionDependencyRow,
     SessionLifecycleManager,
     SessionRow,
     handle_session_exception,
@@ -213,7 +188,7 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
-from .models.vfolder import VFolderRow, prepare_vfolder_mounts, verify_vfolder_name
+from .models.vfolder import VFolderRow, verify_vfolder_name
 from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 from .types import UserScope
 
@@ -237,7 +212,6 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
     _scheduling_controller: SchedulingController
-    _use_sokovan: bool
     _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
@@ -266,7 +240,6 @@ class AgentRegistry:
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
-        use_sokovan: bool = True,
     ) -> None:
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
@@ -283,7 +256,6 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self._scheduling_controller = scheduling_controller
-        self._use_sokovan = use_sokovan
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
@@ -1028,529 +1000,31 @@ class AgentRegistry:
         network: NetworkRow | None = None,
         startup_command: str | None = None,
     ) -> SessionId:
-        # Use sokovan scheduling controller if enabled
-        if self._use_sokovan:
-            return await self._enqueue_session_via_sokovan(
-                session_creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=access_key,
-                session_enqueue_configs=session_enqueue_configs,
-                scaling_group=scaling_group,
-                session_type=session_type,
-                resource_policy=resource_policy,
-                user_scope=user_scope,
-                priority=priority,
-                public_sgroup_only=public_sgroup_only,
-                cluster_mode=cluster_mode,
-                cluster_size=cluster_size,
-                session_tag=session_tag,
-                internal_data=internal_data,
-                starts_at=starts_at,
-                batch_timeout=batch_timeout,
-                agent_list=agent_list,
-                dependency_sessions=dependency_sessions,
-                callback_url=callback_url,
-                route_id=route_id,
-                sudo_session_enabled=sudo_session_enabled,
-                network=network,
-                startup_command=startup_command,
-            )
-
-        # Original implementation
-        session_id = SessionId(uuid.uuid4())
-
-        kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
-        if len(kernel_enqueue_configs) < 1:
-            raise InvalidKernelConfig("At least one kernel configuration is required")
-        main_kernel_config = kernel_enqueue_configs[0]
-        if main_kernel_config["cluster_role"] != DEFAULT_ROLE:
-            raise InvalidKernelConfig("Main kernel must have the default cluster role")
-        session_creation_config: Mapping = session_enqueue_configs["creation_config"]
-
-        # Check keypair resource limit
-        if cluster_size > int(resource_policy["max_containers_per_session"]):
-            raise QuotaExceeded(
-                "You cannot create session with more than "
-                f"{resource_policy['max_containers_per_session']} containers.",
-            )
-
-        async with self.db.begin_readonly_session() as sess:
-            conn = await sess.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection not available")
-            checked_scaling_group = await check_scaling_group(
-                conn,
-                scaling_group,
-                session_type,
-                access_key,
-                user_scope.domain_name,
-                user_scope.group_id,
-                public_sgroup_only,
-            )
-            if scaling_group is None:
-                log.warning(
-                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                    "The client did not specify the scaling group for session; "
-                    f"falling back to {checked_scaling_group}",
-                )
-
-            scaling_group_query = sa.select(ScalingGroupRow).where(
-                ScalingGroupRow.name == checked_scaling_group
-            )
-            scaling_group_query_result = await sess.execute(scaling_group_query)
-            _scaling_group_row = scaling_group_query_result.scalar()
-            if _scaling_group_row is None:
-                raise InvalidAPIParameters(f"Scaling group not found: {checked_scaling_group}")
-            scaling_group_row: ScalingGroupRow = _scaling_group_row
-
-            # Translate mounts (mount_ids) / mount_map (mount_id_map) / mount_options into vfolder mounts
-            requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
-            requested_mount_ids = session_enqueue_configs["creation_config"].get("mount_ids") or []
-            requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
-            requested_mount_id_map = (
-                session_enqueue_configs["creation_config"].get("mount_id_map") or {}
-            )
-
-            requested_mount_options = (
-                session_enqueue_configs["creation_config"].get("mount_options") or {}
-            )
-            allowed_vfolder_types = (
-                await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-
-            combined_mounts = requested_mounts + requested_mount_ids
-            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
-
-            vfolder_mounts = await prepare_vfolder_mounts(
-                conn,
-                self.storage_manager,
-                allowed_vfolder_types,
-                user_scope,
-                resource_policy,
-                combined_mounts,
-                combined_mount_map,
-                requested_mount_options,
-            )
-
-            # Prepare internal data for common dotfiles.
-            dotfile_data = await prepare_dotfiles(
-                conn,
-                user_scope,
-                access_key,
-                vfolder_mounts,
-            )
-
-        is_multicontainer = cluster_size > 1
-        if is_multicontainer:
-            if len(kernel_enqueue_configs) == 1:
-                log.debug(
-                    "enqueue_session(): replicating kernel_enqueue_config with cluster_size={}",
-                    cluster_size,
-                )
-                # the main_kernel_config is repliacted to sub-containers
-                main_kernel_config["cluster_idx"] = 1  # main1
-                main_kernel_config["local_rank"] = 0  # main1: 0
-                for i in range(cluster_size - 1):
-                    sub_kernel_config = cast(KernelEnqueueingConfig, {**main_kernel_config})
-                    sub_kernel_config["cluster_role"] = "sub"
-                    sub_kernel_config["cluster_idx"] = i + 1  # subN
-                    sub_kernel_config["local_rank"] = i + 1  # sub1: 1, sub2: 2, ...
-                    sub_kernel_config["cluster_hostname"] = sub_kernel_config["cluster_role"] + str(
-                        sub_kernel_config["cluster_idx"]
-                    )
-                    kernel_enqueue_configs.append(sub_kernel_config)
-            elif len(kernel_enqueue_configs) > 1:
-                # each container should have its own kernel_config
-                log.debug(
-                    "enqueue_session(): using given kernel_enqueue_configs with cluster_size={}",
-                    cluster_size,
-                )
-                if len(kernel_enqueue_configs) != cluster_size:
-                    raise InvalidAPIParameters(
-                        "The number of kernel configs differs from the cluster size"
-                    )
-            else:
-                raise InvalidAPIParameters("Missing kernel configurations")
-
-        # Prepare internal data.
-        internal_data = {} if internal_data is None else internal_data
-        internal_data.update(dotfile_data)
-        if _fname := session_enqueue_configs["creation_config"].get("model_definition_path"):
-            internal_data["model_definition_path"] = _fname
-        if _variant := session_enqueue_configs["creation_config"].get("runtime_variant"):
-            internal_data["runtime_variant"] = _variant
-
-        if sudo_session_enabled:
-            internal_data["sudo_session_enabled"] = True
-
-        hook_result = await self.hook_plugin_ctx.dispatch(
-            "PRE_ENQUEUE_SESSION",
-            (session_id, session_name, access_key),
-            return_when=ALL_COMPLETED,
+        return await self._enqueue_session_via_sokovan(
+            session_creation_id=session_creation_id,
+            session_name=session_name,
+            access_key=access_key,
+            session_enqueue_configs=session_enqueue_configs,
+            scaling_group=scaling_group,
+            session_type=session_type,
+            resource_policy=resource_policy,
+            user_scope=user_scope,
+            priority=priority,
+            public_sgroup_only=public_sgroup_only,
+            cluster_mode=cluster_mode,
+            cluster_size=cluster_size,
+            session_tag=session_tag,
+            internal_data=internal_data,
+            starts_at=starts_at,
+            batch_timeout=batch_timeout,
+            agent_list=agent_list,
+            dependency_sessions=dependency_sessions,
+            callback_url=callback_url,
+            route_id=route_id,
+            sudo_session_enabled=sudo_session_enabled,
+            network=network,
+            startup_command=startup_command,
         )
-        if hook_result.status != PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-        session_requested_slots = ResourceSlot()
-        session_data = {
-            "id": session_id,
-            "priority": priority,
-            "status": SessionStatus.PENDING,
-            "status_history": {
-                SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
-            },
-            "creation_id": session_creation_id,
-            "name": session_name,
-            "session_type": session_type,
-            "cluster_mode": cluster_mode.value,
-            "cluster_size": cluster_size,
-            "scaling_group_name": checked_scaling_group,
-            "domain_name": user_scope.domain_name,
-            "group_id": user_scope.group_id,
-            "user_uuid": user_scope.user_uuid,
-            "access_key": access_key,
-            "tag": session_tag,
-            "starts_at": starts_at,
-            "batch_timeout": int(batch_timeout.total_seconds())
-            if batch_timeout is not None
-            else None,
-            "callback_url": callback_url,
-            "occupying_slots": ResourceSlot(),
-            "vfolder_mounts": vfolder_mounts,
-        }
-
-        kernel_shared_data = {
-            "status": KernelStatus.PENDING,
-            "status_history": {
-                KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
-            },
-            "session_creation_id": session_creation_id,
-            "session_id": session_id,
-            "session_name": session_name,
-            "session_type": session_type,
-            "cluster_mode": cluster_mode.value,
-            "cluster_size": cluster_size,
-            "scaling_group": checked_scaling_group,
-            "domain_name": user_scope.domain_name,
-            "group_id": user_scope.group_id,
-            "user_uuid": user_scope.user_uuid,
-            "access_key": access_key,
-            "tag": session_tag,
-            "starts_at": starts_at,
-            "internal_data": internal_data,
-            "callback_url": callback_url,
-            "occupied_shares": {},
-            "mounts": [*{mount.name for mount in vfolder_mounts}],  # TODO: keep for legacy?
-            "vfolder_mounts": vfolder_mounts,
-            "repl_in_port": 0,
-            "repl_out_port": 0,
-            "stdin_port": 0,
-            "stdout_port": 0,
-            "preopen_ports": sa.bindparam("preopen_ports"),
-            "use_host_network": scaling_group_row.use_host_network,
-        }
-
-        if network:
-            session_data["network_type"] = NetworkType.PERSISTENT
-            session_data["network_id"] = str(network.id)
-        elif scaling_group_row.use_host_network:
-            session_data["network_type"] = NetworkType.HOST
-        else:
-            session_data["network_type"] = NetworkType.VOLATILE
-
-        kernel_data = []
-        session_images: list[str] = []
-
-        for idx, kernel in enumerate(kernel_enqueue_configs):
-            kernel_id = KernelId(uuid.uuid4())
-            creation_config = kernel["creation_config"]
-            image_ref = kernel["image_ref"]
-            resource_opts = creation_config.get("resource_opts") or {}
-
-            creation_config["mounts"] = [vfmount.to_json() for vfmount in vfolder_mounts]
-
-            # TODO: merge into a single call
-            async with self.db.begin_readonly_session() as session:
-                log.debug(
-                    "enqueue_session(): image ref => {} ({})", image_ref, image_ref.architecture
-                )
-                image_row = await ImageRow.resolve(session, [image_ref])
-            image_min_slots = await image_row.get_min_slot(
-                self.config_provider.legacy_etcd_config_loader
-            )
-            known_slot_types = (
-                await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
-            )
-
-            labels = cast(dict, image_row.labels)
-
-            # Check if the image is available for a given session type.
-            if (_img_role := labels.get("ai.backend.role")) is not None:
-                if _img_role not in ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE[session_type]:
-                    raise InvalidAPIParameters(
-                        f"Cannot create {session_type} session with the given image. (img:"
-                        f" {image_ref.name}, img role: {_img_role})"
-                    )
-
-            # Parse service ports to check for port errors
-            service_ports = parse_service_ports(
-                labels.get("ai.backend.service-ports", ""),
-                labels.get("ai.backend.endpoint-ports", ""),
-                BackendAIError,
-            )
-            preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
-
-            for preopen_port in preopen_ports:
-                if preopen_port in (2000, 2001, 2200, 7681):
-                    raise InvalidAPIParameters(
-                        "Port 2000, 2001, 2200 and 7681 are reserved for internal use"
-                    )
-                for service_port in service_ports:
-                    if preopen_port in service_port["container_ports"]:
-                        raise InvalidAPIParameters(
-                            "Preopen port allocation cannot overlap with service port predefined by image"
-                        )
-
-            # Shared memory.
-            # We need to subtract the amount of shared memory from the memory limit of
-            # a container, since tmpfs including /dev/shm uses host-side kernel memory
-            # and cgroup's memory limit does not apply.
-            raw_shmem: Optional[str] = resource_opts.get("shmem")
-            if raw_shmem is None:
-                raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
-            if not raw_shmem:
-                # raw_shmem is None or empty string ("")
-                raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
-            try:
-                shmem = BinarySize.from_str(raw_shmem)
-            except ValueError:
-                log.warning(
-                    f"Failed to convert raw `shmem({raw_shmem})` "
-                    f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
-                )
-                shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
-            allow_fractional_resource_fragmentation = resource_opts.get(
-                "allow_fractional_resource_fragmentation"
-            )
-            if allow_fractional_resource_fragmentation is None:
-                allow_fractional_resource_fragmentation = (
-                    scaling_group_row.scheduler_opts.allow_fractional_resource_fragmentation
-                )
-            resource_opts["allow_fractional_resource_fragmentation"] = (
-                allow_fractional_resource_fragmentation
-            )
-            resource_opts["shmem"] = shmem
-            image_min_slots = copy.deepcopy(image_min_slots)
-            image_min_slots["mem"] += shmem
-
-            # Sanitize user input: does it have resource config?
-            if (resources := creation_config.get("resources")) is not None:
-                # Sanitize user input: does it have "known" resource slots only?
-                for slot_key, slot_value in resources.items():
-                    if slot_value != 0 and slot_key not in known_slot_types:
-                        raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
-                try:
-                    requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
-                except ValueError:
-                    log.exception("request_slots & image_slots calculation error")
-                    # happens when requested_slots have more keys
-                    # than the image-defined slots
-                    # (e.g., image does not support accelerators
-                    #  requested by the client)
-                    raise InvalidAPIParameters(
-                        "Your resource request has resource type(s) not supported by the image."
-                    )
-
-                # If intrinsic resources are not specified,
-                # fill them with image minimums.
-                for k, v in requested_slots.items():
-                    if (v is None or v == 0) and k in INTRINSIC_SLOTS:
-                        requested_slots[k] = image_min_slots[k]
-            else:
-                # Handle the legacy clients (prior to v19.03)
-                # We support CPU/memory conversion, but to use accelerators users
-                # must update their clients because the slots names are not provided
-                # by the accelerator plugins.
-                cpu = creation_config.get("instanceCores")
-                if cpu is None:  # the key is there but may be null.
-                    cpu = image_min_slots["cpu"]
-                mem = creation_config.get("instanceMemory")
-                if mem is None:  # the key is there but may be null.
-                    mem = image_min_slots["mem"]
-                else:
-                    # In legacy clients, memory is normalized to GiB.
-                    mem = str(mem) + "g"
-                requested_slots = ResourceSlot.from_user_input(
-                    {
-                        "cpu": cpu,
-                        "mem": mem,
-                    },
-                    known_slot_types,
-                )
-                gpu = creation_config.get("instanceGPUs")
-                if gpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required to use GPUs (v19.03+).")
-                tpu = creation_config.get("instanceTPUs")
-                if tpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
-
-            # Check the image resource slots.
-            log_fmt = "s:{} k:{} r:{}-{}"
-            log_args = (session_id, kernel_id, kernel["cluster_role"], kernel["cluster_idx"])
-            log.debug(log_fmt + " -> requested_slots: {}", *log_args, requested_slots)
-            log.debug(log_fmt + " -> resource_opts: {}", *log_args, resource_opts)
-            log.debug(log_fmt + " -> image_min_slots: {}", *log_args, image_min_slots)
-
-            # Check if: requested >= image-minimum
-            if image_min_slots > requested_slots:
-                raise InvalidAPIParameters(
-                    "Your resource request is smaller than "
-                    "the minimum required by the image. ({})".format(
-                        " ".join(
-                            f"{k}={v}"
-                            for k, v in image_min_slots.to_humanized(known_slot_types).items()
-                        )
-                    )
-                )
-
-            # Check if: shmem < memory
-            if shmem >= requested_slots["mem"]:
-                raise InvalidAPIParameters(
-                    "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
-                    ),
-                )
-
-            # Add requested resource slot data to session
-            session_requested_slots += requested_slots
-
-            environ = session_creation_config.get("environ") or {}
-
-            # Create kernel object in PENDING state.
-            mapped_agent = None
-            if not agent_list:
-                pass
-            else:
-                mapped_agent = agent_list[idx]
-
-            kernel_data.append({
-                **kernel_shared_data,
-                "id": kernel_id,
-                "agent": mapped_agent,
-                "cluster_role": kernel["cluster_role"],
-                "cluster_idx": kernel["cluster_idx"],
-                "local_rank": kernel["local_rank"],
-                "cluster_hostname": (
-                    f"{kernel['cluster_role']}{kernel['cluster_idx']}"
-                    if not kernel["cluster_hostname"]
-                    else kernel["cluster_hostname"]
-                ),
-                "uid": kernel["uid"],
-                "main_gid": kernel["main_gid"],
-                "gids": kernel["supplementary_gids"],
-                "image": image_ref.canonical,
-                # "image_id": image_row.id,
-                "architecture": image_ref.architecture,
-                "registry": image_ref.registry,
-                "startup_command": kernel.get("startup_command"),
-                "occupied_slots": requested_slots,
-                "requested_slots": requested_slots,
-                "resource_opts": resource_opts,
-                "environ": [f"{k}={v}" for k, v in environ.items()],
-                "bootstrap_script": kernel.get("bootstrap_script"),
-                "preopen_ports": preopen_ports,
-            })
-
-            if image_ref.canonical not in session_images:
-                if kernel["cluster_role"] == DEFAULT_ROLE:
-                    session_images.insert(0, image_ref.canonical)
-                else:
-                    session_images.append(image_ref.canonical)
-        session_data["images"] = session_images
-        try:
-
-            async def _enqueue() -> None:
-                async with self.db.begin_session() as db_sess:
-                    matched_dependency_session_ids = []
-                    if dependency_sessions:
-                        for dependency_id in dependency_sessions:
-                            try:
-                                match_info = await SessionRow.get_session(
-                                    db_sess,
-                                    dependency_id,
-                                    access_key,
-                                    allow_stale=True,
-                                )
-                            except SessionNotFound:
-                                raise InvalidAPIParameters(
-                                    "Unknown session ID or name in the dependency list",
-                                    extra_data={"session_ref": dependency_id},
-                                )
-                            else:
-                                matched_dependency_session_ids.append(match_info.id)
-
-                    if sudo_session_enabled:
-                        environ["SUDO_SESSION_ENABLED"] = "1"
-
-                    session_data["environ"] = environ
-                    session_data["requested_slots"] = session_requested_slots
-                    session = SessionRow(**session_data)
-                    kernels = [KernelRow(**kernel) for kernel in kernel_data]
-
-                    # Use RBACEntityCreator to create session with RBAC scope association
-                    rbac_creator = RBACEntityCreator(
-                        spec=SessionRowCreatorSpec(row=session),
-                        scope_type=ScopeType.USER,
-                        scope_id=str(session_data["user_uuid"]),
-                        entity_type=EntityType.SESSION,
-                    )
-                    await execute_rbac_entity_creator(db_sess, rbac_creator)
-
-                    # Use RBACBulkFieldCreator to create kernels with RBAC field association
-                    kernel_field_creator = RBACBulkFieldCreator(
-                        specs=[KernelRowCreatorSpec(row=k) for k in kernels],
-                        entity_type=EntityType.SESSION,
-                        entity_id=str(session_id),
-                        field_type=FieldType.KERNEL,
-                    )
-                    await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
-                    await db_sess.flush()
-
-                    if matched_dependency_session_ids:
-                        dependency_rows = [
-                            SessionDependencyRow(session_id=session_id, depends_on=depend_id)
-                            for depend_id in matched_dependency_session_ids
-                        ]
-                        db_sess.add_all(dependency_rows)
-
-            await execute_with_retry(_enqueue)
-
-            async def _post_enqueue() -> None:
-                async with self.db.begin_session() as db_sess:
-                    if route_id:
-                        routing_row = await RoutingRow.get(db_sess, route_id)
-                        routing_row.session = session_id
-
-                    await db_sess.commit()
-
-            await execute_with_retry(_post_enqueue)
-        except DBAPIError as e:
-            if getattr(e.orig, "pgcode", None) == "23503":
-                match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
-                if match:
-                    raise InvalidAPIParameters(f"No such agent: {match.group('agent')}")
-                raise InvalidAPIParameters("No such agent")
-            raise
-
-        await self.hook_plugin_ctx.notify(
-            "POST_ENQUEUE_SESSION",
-            (session_id, session_name, access_key),
-        )
-        await self.event_producer.anycast_and_broadcast_event(
-            SessionEnqueuedAnycastEvent(session_id, session_creation_id),
-            SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
-        )
-        return session_id
 
     async def _check_and_pull_in_one_agent(
         self,

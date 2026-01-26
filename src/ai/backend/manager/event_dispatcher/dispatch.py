@@ -151,7 +151,7 @@ class DispatcherArgs:
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
-    use_sokovan: bool = True
+    use_sokovan: bool = True  # Always True, to be removed in Phase 2
 
 
 class Dispatchers:
