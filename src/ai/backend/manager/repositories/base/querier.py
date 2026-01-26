@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -27,7 +27,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class Querier(Generic[TRow]):
+class Querier[TRow: Base]:
     """Single-row query by primary key.
 
     Attributes:
@@ -40,7 +40,7 @@ class Querier(Generic[TRow]):
 
 
 @dataclass
-class QuerierResult(Generic[TRow]):
+class QuerierResult[TRow: Base]:
     """Result of executing a single-row query operation."""
 
     row: TRow
@@ -104,7 +104,7 @@ class BatchQuerier:
 
 
 @dataclass
-class BatchQuerierResult(Generic[TRow]):
+class BatchQuerierResult[TRow: Base]:
     """Result of executing a batch query with querier."""
 
     rows: list[TRow]

@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from typing import Optional
+from uuid import UUID
 
 from .recorder import TransitionRecorder
 from .types import (
-    EntityIdT,
     ExecutionRecord,
     PhaseRecord,
     RecordBuildData,
@@ -17,7 +17,7 @@ from .types import (
 
 
 @dataclass
-class _SharedPhaseContext(Generic[EntityIdT]):
+class _SharedPhaseContext[EntityIdT: UUID]:
     """Internal context for tracking an in-progress shared phase."""
 
     name: str
@@ -29,14 +29,14 @@ class _SharedPhaseContext(Generic[EntityIdT]):
 
 
 @dataclass
-class _SharedPhaseRecord(Generic[EntityIdT]):
+class _SharedPhaseRecord[EntityIdT: UUID]:
     """Internal record for a shared phase with entity filtering info."""
 
     phase: PhaseRecord
     entity_ids: Optional[set[EntityIdT]]  # None means all entities
 
 
-class RecordPool(Generic[EntityIdT]):
+class RecordPool[EntityIdT: UUID]:
     """Storage for all entity execution records within a scope.
 
     This class holds the operation metadata, recorders for each entity,

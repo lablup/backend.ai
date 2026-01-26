@@ -4,14 +4,14 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from typing import Optional
+from uuid import UUID
 
 from .exceptions import (
     NestedPhaseError,
     StepWithoutPhaseError,
 )
 from .types import (
-    EntityIdT,
     ExecutionRecord,
     PhaseRecord,
     RecordBuildData,
@@ -31,7 +31,7 @@ class _PhaseContext:
     failed: bool = False
 
 
-class TransitionRecorder(Generic[EntityIdT]):
+class TransitionRecorder[EntityIdT: UUID]:
     """
     Records execution steps during lifecycle operations.
 

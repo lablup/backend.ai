@@ -8,7 +8,6 @@ from collections.abc import Callable
 from typing import (
     Any,
     ClassVar,
-    Generic,
     Optional,
     TypeVar,
     cast,
@@ -109,7 +108,7 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
         return self._enum_class
 
 
-class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -221,7 +220,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class StructuredJSONObjectListColumn(TypeDecorator, Generic[TBaseModel]):
+class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
     """
     A column type to convert JSON values back and forth using BaseModel,
     but store and load a list of the objects.
@@ -295,7 +294,7 @@ class IPColumn(TypeDecorator):
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[UUID_SubType]):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.

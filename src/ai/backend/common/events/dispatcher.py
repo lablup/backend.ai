@@ -10,7 +10,6 @@ from collections import defaultdict
 from collections.abc import Callable, Coroutine, Sequence
 from typing import (
     Any,
-    Generic,
     Optional,
     Protocol,
     TypedDict,
@@ -76,7 +75,7 @@ class EventHandlerType(enum.Enum):
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
-class EventHandler(Generic[TContext, TEvent]):
+class EventHandler[TContext, TEvent: "AbstractEvent"]:
     event_cls: type[TEvent]
     name: str
     context: TContext

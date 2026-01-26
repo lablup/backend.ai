@@ -2,13 +2,11 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import ClusterInfo, KernelCreationConfig
-
-TKernel = TypeVar("TKernel", bound=AbstractKernel)
 
 
 class ContainerNetworkCapability(StrEnum):
@@ -22,7 +20,7 @@ class ContainerNetworkInfo:
     services: Mapping[str, Mapping[int, int]]  # {service name: {container port: host port}}
 
 
-class AbstractNetworkAgentPlugin(Generic[TKernel], AbstractPlugin, metaclass=ABCMeta):
+class AbstractNetworkAgentPlugin[TKernel: AbstractKernel](AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
         """

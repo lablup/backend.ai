@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 TRow = TypeVar("TRow", bound=Base)
 
 
-class UpdaterSpec(ABC, Generic[TRow]):
+class UpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for single-row updates.
 
     Implementations specify what to update by providing:
@@ -59,7 +59,7 @@ class UpdaterSpec(ABC, Generic[TRow]):
             setattr(row, field, value)
 
 
-class BatchUpdaterSpec(ABC, Generic[TRow]):
+class BatchUpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for batch updates.
 
     Implementations specify what to update by providing:
@@ -84,7 +84,7 @@ class BatchUpdaterSpec(ABC, Generic[TRow]):
 
 
 @dataclass
-class Updater(Generic[TRow]):
+class Updater[TRow: Base]:
     """Bundles updater spec with target info for single-row update operations.
 
     Attributes:
@@ -97,7 +97,7 @@ class Updater(Generic[TRow]):
 
 
 @dataclass
-class BatchUpdater(Generic[TRow]):
+class BatchUpdater[TRow: Base]:
     """Bundles batch updater spec with conditions for batch update operations.
 
     Attributes:
@@ -110,7 +110,7 @@ class BatchUpdater(Generic[TRow]):
 
 
 @dataclass
-class UpdaterResult(Generic[TRow]):
+class UpdaterResult[TRow: Base]:
     """Result of executing a single-row update operation."""
 
     row: TRow

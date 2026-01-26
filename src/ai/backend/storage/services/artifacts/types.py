@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
@@ -37,7 +37,7 @@ class VerifyStepResult:
 InputType = TypeVar("InputType")
 
 
-class ImportStep(abc.ABC, Generic[InputType]):
+class ImportStep[InputType](abc.ABC):
     """Base class for import pipeline steps"""
 
     @property

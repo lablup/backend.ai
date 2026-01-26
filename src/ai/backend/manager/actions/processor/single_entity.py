@@ -2,15 +2,15 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from typing import Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
 from ai.backend.manager.actions.action.single_entity import (
-    TSingleEntityAction,
-    TSingleEntityActionResult,
+    BaseSingleEntityAction,
+    BaseSingleEntityActionResult,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
@@ -20,7 +20,10 @@ from .base import ActionRunner
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
+class SingleEntityActionProcessor[
+    TSingleEntityAction: BaseSingleEntityAction,
+    TSingleEntityActionResult: BaseSingleEntityActionResult,
+]:
     _validators: Sequence[SingleEntityActionValidator]
 
     _runner: ActionRunner[TSingleEntityAction, TSingleEntityActionResult]

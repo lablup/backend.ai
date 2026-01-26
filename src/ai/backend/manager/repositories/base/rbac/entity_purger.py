@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Generic, cast
+from typing import cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -18,6 +18,7 @@ from sqlalchemy.orm import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -101,7 +102,7 @@ class RBACEntityPurgerResult(PurgerResult[TRow]):
 
 
 @dataclass
-class RBACEntityBatchPurger(Generic[TRow]):
+class RBACEntityBatchPurger[TRow: Base]:
     """Batch purger for RBAC scope-scoped entities.
 
     Attributes:

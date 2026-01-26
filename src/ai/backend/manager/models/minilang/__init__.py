@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import sqlalchemy as sa
 
@@ -21,7 +21,7 @@ class ORMFieldItem(NamedTuple):
 TEnum = TypeVar("TEnum", bound=Enum)
 
 
-class EnumFieldItem(NamedTuple, Generic[TEnum]):
+class EnumFieldItem[TEnum: Enum](NamedTuple):
     column_name: str
     enum_cls: TEnum
 

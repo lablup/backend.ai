@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -24,7 +24,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class RBACFieldCreator(Generic[TRow]):
+class RBACFieldCreator[TRow: Base]:
     """Creator for a single field-scoped entity.
 
     Attributes:
@@ -41,7 +41,7 @@ class RBACFieldCreator(Generic[TRow]):
 
 
 @dataclass
-class RBACFieldCreatorResult(Generic[TRow]):
+class RBACFieldCreatorResult[TRow: Base]:
     """Result of executing a single field creation."""
 
     row: TRow
@@ -105,7 +105,7 @@ async def execute_rbac_field_creator(
 
 
 @dataclass
-class RBACBulkFieldCreator(Generic[TRow]):
+class RBACBulkFieldCreator[TRow: Base]:
     """Bulk creator for multiple field-scoped entities.
 
     Attributes:
@@ -122,7 +122,7 @@ class RBACBulkFieldCreator(Generic[TRow]):
 
 
 @dataclass
-class RBACBulkFieldCreatorResult(Generic[TRow]):
+class RBACBulkFieldCreatorResult[TRow: Base]:
     """Result of executing a bulk field creation."""
 
     rows: list[TRow]

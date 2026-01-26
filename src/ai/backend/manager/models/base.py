@@ -15,7 +15,6 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    Generic,
     Optional,
     Self,
     TypeVar,
@@ -120,7 +119,7 @@ T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
+class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -161,7 +160,7 @@ class EnumType(TypeDecorator, SchemaType, Generic[T_Enum]):
         return self._enum_class
 
 
-class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
+class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -202,7 +201,7 @@ class EnumValueType(TypeDecorator, SchemaType, Generic[T_Enum]):
         return self._enum_cls
 
 
-class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -438,7 +437,7 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticColumn(TypeDecorator, Generic[TBaseModel]):
+class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
     """
     A column type for storing a single Pydantic model in JSONB.
     Handles nullable columns - returns None for null values.
@@ -475,7 +474,7 @@ class PydanticColumn(TypeDecorator, Generic[TBaseModel]):
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticListColumn(TypeDecorator, Generic[TBaseModel]):
+class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
     """
     A column type for storing a list of Pydantic models in JSONB.
     Always returns empty list instead of None for null values.
@@ -636,7 +635,7 @@ class CurrencyTypes(enum.Enum):
 TUUIDSubType = TypeVar("TUUIDSubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[TUUIDSubType]):
+class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.

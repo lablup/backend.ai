@@ -19,7 +19,6 @@ from typing import (
     Annotated,
     Any,
     Concatenate,
-    Generic,
     Optional,
     ParamSpec,
     Protocol,
@@ -227,7 +226,7 @@ type TPydanticResponse[TResponseModel: LegacyBaseResponseModel] = (
 )
 
 
-class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):
+class THandlerFuncWithoutParam[**P, TResponseModel: LegacyBaseResponseModel](Protocol):
     def __call__(
         self,
         request: web.Request,
@@ -236,7 +235,11 @@ class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):
     ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
 
 
-class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
+class THandlerFuncWithParam[
+    **P,
+    TParamModel: LegacyBaseRequestModel,
+    TResponseModel: LegacyBaseResponseModel,
+](Protocol):
     def __call__(
         self,
         request: web.Request,

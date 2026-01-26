@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar, TypeVar
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
@@ -84,7 +84,7 @@ class AbstractPlugin(metaclass=ABCMeta):
 P = TypeVar("P", bound=AbstractPlugin)
 
 
-class BasePluginContext(Generic[P]):
+class BasePluginContext[P: AbstractPlugin]:
     """
     A minimal plugin manager which controls the lifecycles of the given plugins
     and watches & applies the configuration changes in etcd.

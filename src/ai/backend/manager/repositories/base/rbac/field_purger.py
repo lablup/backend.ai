@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Generic, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.manager.data.permission.id import FieldRef
 from ai.backend.manager.data.permission.types import FieldType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec as BaseBatchPurgerSpec
 from ai.backend.manager.repositories.base.purger import Purger as BasePurger
@@ -67,7 +68,7 @@ class RBACFieldPurgerResult(BasePurgerResult[TRow]):
 
 
 @dataclass
-class RBACFieldBatchPurger(Generic[TRow]):
+class RBACFieldBatchPurger[TRow: Base]:
     """Batch purger for RBAC field-scoped entities.
 
     Attributes:

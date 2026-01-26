@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Optional, TypeVar, final
+from typing import Optional, TypeVar, final
 
 T = TypeVar("T")
 
@@ -53,7 +53,7 @@ class ContextName(enum.StrEnum):
     CREATED_GROUP = "created_group"
 
 
-class BaseTestContext(Generic[T]):
+class BaseTestContext[T]:
     """
     Base class for tester's context management.
     This class provides a way to manage context variables for test scenarios.
