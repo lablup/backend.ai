@@ -15,7 +15,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.image.types import ImageDataWithDetails
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -171,5 +171,5 @@ class DataLoaders:
     @cached_property
     def image_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ImageData | None]:
+    ) -> DataLoader[uuid.UUID, ImageDataWithDetails | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
