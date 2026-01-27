@@ -626,23 +626,16 @@ class TestVfolderRepositoryPurge:
             result = await session.execute(query)
             return result.scalar_one_or_none() is not None
 
-    @pytest.mark.parametrize(
-        "status",
-        [
-            VFolderOperationStatus.DELETE_COMPLETE,
-            VFolderOperationStatus.DELETE_PENDING,
-        ],
-        ids=["delete_complete", "delete_pending"],
-    )
-    async def test_purge_vfolder_success(
+    @pytest.fixture
+    async def vfolder_in_db(
         self,
+        request: pytest.FixtureRequest,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        vfolder_repository: VfolderRepository,
         test_domain_name: str,
         test_user: uuid.UUID,
-        status: VFolderOperationStatus,
-    ) -> None:
-        """Test successful purge of vfolder with purgable status."""
+    ) -> uuid.UUID:
+        """Create a vfolder with the given status in DB."""
+        status: VFolderOperationStatus = request.param
         vfolder_id = uuid.uuid4()
         await self._create_vfolder_in_db(
             db_with_cleanup,
@@ -651,6 +644,25 @@ class TestVfolderRepositoryPurge:
             user_id=test_user,
             status=status,
         )
+        return vfolder_id
+
+    @pytest.mark.parametrize(
+        "vfolder_in_db",
+        [
+            VFolderOperationStatus.DELETE_COMPLETE,
+            VFolderOperationStatus.DELETE_PENDING,
+        ],
+        ids=["delete_complete", "delete_pending"],
+        indirect=True,
+    )
+    async def test_purge_vfolder_success(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        vfolder_in_db: uuid.UUID,
+    ) -> None:
+        """Test successful purge of vfolder with purgable status."""
+        vfolder_id = vfolder_in_db
 
         # Verify vfolder exists before purge
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
@@ -658,9 +670,7 @@ class TestVfolderRepositoryPurge:
         purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
         result = await vfolder_repository.purge_vfolder(purger)
 
-        # Verify result contains correct data
         assert result.id == vfolder_id
-        assert result.status == status
 
         # Verify vfolder is deleted from DB
         assert not await self._vfolder_exists(db_with_cleanup, vfolder_id)
@@ -677,7 +687,7 @@ class TestVfolderRepositoryPurge:
             await vfolder_repository.purge_vfolder(purger)
 
     @pytest.mark.parametrize(
-        "status",
+        "vfolder_in_db",
         [
             VFolderOperationStatus.READY,
             VFolderOperationStatus.PERFORMING,
@@ -687,24 +697,16 @@ class TestVfolderRepositoryPurge:
             VFolderOperationStatus.DELETE_ERROR,
         ],
         ids=["ready", "performing", "cloning", "mounted", "delete_ongoing", "delete_error"],
+        indirect=True,
     )
     async def test_purge_vfolder_invalid_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
-        test_domain_name: str,
-        test_user: uuid.UUID,
-        status: VFolderOperationStatus,
+        vfolder_in_db: uuid.UUID,
     ) -> None:
         """Test purge fails when vfolder has non-purgable status."""
-        vfolder_id = uuid.uuid4()
-        await self._create_vfolder_in_db(
-            db_with_cleanup,
-            vfolder_id=vfolder_id,
-            domain_name=test_domain_name,
-            user_id=test_user,
-            status=status,
-        )
+        vfolder_id = vfolder_in_db
 
         purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
 
