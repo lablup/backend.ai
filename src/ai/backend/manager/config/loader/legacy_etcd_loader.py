@@ -8,9 +8,9 @@ from typing import Any, Optional, override
 import aiotools
 import yarl
 
-from ai.backend.common.etcd import AsyncEtcd, Event, GetPrefixValue, QueueSentinel
+from ai.backend.common.etcd import AsyncEtcd, Event, GetPrefixValue
 from ai.backend.common.identity import get_instance_id
-from ai.backend.common.types import SlotName, SlotTypes, current_resource_slots
+from ai.backend.common.types import QueueSentinel, SlotName, SlotTypes, current_resource_slots
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.defs import INTRINSIC_SLOTS
