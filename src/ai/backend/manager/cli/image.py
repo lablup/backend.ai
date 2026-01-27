@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from decimal import Decimal
 from typing import Optional
 
 import click
@@ -33,7 +34,7 @@ def cli() -> None:
 @click.option("-s", "--short", is_flag=True, help="Show only the image references and digests.")
 @click.option("-i", "--installed", is_flag=True, help="Show only the installed images.")
 @click.pass_obj
-def list_images(cli_ctx, short, installed) -> None:
+def list_images(cli_ctx: CLIContext, short: bool, installed: bool) -> None:
     """List all configured images."""
     asyncio.run(list_images_impl(cli_ctx, short, installed))
 
@@ -42,7 +43,7 @@ def list_images(cli_ctx, short, installed) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def inspect(cli_ctx, canonical_or_alias, architecture) -> None:
+def inspect(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Show the details of the given image or alias."""
     asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
 
@@ -51,7 +52,7 @@ def inspect(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def forget(cli_ctx, canonical_or_alias, architecture) -> None:
+def forget(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Forget (soft-delete) a specific image."""
     asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
 
@@ -75,11 +76,11 @@ def purge(
 @click.argument("architecture")
 @click.pass_obj
 def set_resource_limit(
-    cli_ctx,
-    canonical_or_alias,
-    slot_type,
-    range_value,
-    architecture,
+    cli_ctx: CLIContext,
+    canonical_or_alias: str,
+    slot_type: str,
+    range_value: tuple[Decimal | None, Decimal | None],
+    architecture: str,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
     asyncio.run(
@@ -99,7 +100,7 @@ def set_resource_limit(
     "-p", "--project", default=None, help="The name of the project to which the images belong."
 )
 @click.pass_obj
-def rescan(cli_ctx, registry_or_image: str, project: Optional[str] = None) -> None:
+def rescan(cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
 
@@ -115,7 +116,7 @@ def rescan(cli_ctx, registry_or_image: str, project: Optional[str] = None) -> No
 @click.argument("target")
 @click.argument("architecture")
 @click.pass_obj
-def alias(cli_ctx, alias, target, architecture) -> None:
+def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
     """Add an image alias from the given alias to the target image reference."""
     asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
 
@@ -123,7 +124,7 @@ def alias(cli_ctx, alias, target, architecture) -> None:
 @cli.command()
 @click.argument("alias")
 @click.pass_obj
-def dealias(cli_ctx, alias) -> None:
+def dealias(cli_ctx: CLIContext, alias: str) -> None:
     """Remove an alias."""
     asyncio.run(dealias_impl(cli_ctx, alias))
 

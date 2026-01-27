@@ -16,7 +16,7 @@ log = logging.getLogger(__spec__.name)
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 

@@ -88,7 +88,7 @@ def make_dict_from_pairs(
     result: dict[str, Any] = {}
     len_prefix = len(key_prefix)
     if isinstance(pairs, dict):
-        iterator = pairs.items()
+        iterator: Iterable[tuple[str, str]] = pairs.items()
     else:
         iterator = pairs
     for k, v in iterator:
@@ -576,7 +576,7 @@ class AsyncEtcd(AbstractKVStore):
             scope_prefixes = [_scope_prefix_map[ConfigScopes.GLOBAL]]
         else:
             raise ValueError("Invalid scope prefix value")
-        pair_sets: list[list[Mapping | tuple]] = []
+        pair_sets: list[list[tuple[str, str]]] = []
         async with self.etcd.connect() as communicator:
             for scope_prefix in scope_prefixes:
                 mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")

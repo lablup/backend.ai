@@ -141,6 +141,7 @@ from ai.backend.manager.types import OptionalState
 
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+from .types import CORSOptions
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
@@ -2816,7 +2817,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

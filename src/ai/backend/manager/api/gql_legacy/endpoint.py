@@ -428,7 +428,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint: str,
         props: EndpointAutoScalingRuleInput,
@@ -476,7 +476,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyEndpointAutoScalingRuleInput,
@@ -522,7 +522,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> Self:
@@ -659,7 +659,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
         creator = cast(Optional[UserRow], row.created_user_row)
@@ -699,13 +699,13 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
+            routings=[await Routing.from_row(ctx, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
             runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
-    def from_dto(cls, ctx, dto: Optional[EndpointData]) -> Optional[Self]:
+    def from_dto(cls, ctx: GraphQueryContext, dto: Optional[EndpointData]) -> Optional[Self]:
         if dto is None:
             return None
         return cls(
@@ -749,7 +749,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         project: UUID | None = None,
         domain_name: Optional[str] = None,
@@ -776,12 +776,12 @@ class Endpoint(graphene.ObjectType):
 
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  #: GraphQueryContext,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -831,7 +831,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         domain_name: Optional[str] = None,
         user_uuid: Optional[UUID] = None,
@@ -852,7 +852,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: UUID,
         domain_name: Optional[str] = None,
@@ -1111,7 +1111,7 @@ class ModifyEndpoint(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint_id: UUID,
         props: ModifyEndpointInput,
@@ -1149,7 +1149,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointTokenRow,
     ) -> Self:
         return cls(
@@ -1164,7 +1164,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: Optional[UUID] = None,
         project: Optional[UUID] = None,
@@ -1182,12 +1182,12 @@ class EndpointToken(graphene.ObjectType):
             query = query.filter(EndpointTokenRow.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -1247,7 +1247,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         token: str,
         *,
         project: Optional[UUID] = None,

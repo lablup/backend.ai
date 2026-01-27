@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import graphene
@@ -240,7 +240,7 @@ class CreateResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: CreateResourcePresetInput,
@@ -278,7 +278,7 @@ class ModifyResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: Optional[UUID],
         name: Optional[str],
@@ -316,7 +316,7 @@ class DeleteResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: Optional[UUID],
         name: Optional[str],

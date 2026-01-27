@@ -99,7 +99,7 @@ class AuditLogNode(graphene.ObjectType):
     }
 
     @classmethod
-    def from_row(cls, ctx, row: AuditLogRow) -> Self:
+    def from_row(cls, ctx: GraphQueryContext, row: AuditLogRow) -> Self:
         return cls(
             id=row.id,
             row_id=row.id,

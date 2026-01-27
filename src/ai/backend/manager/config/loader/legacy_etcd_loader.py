@@ -97,7 +97,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         if updates:
             await self._etcd.put_dict(updates)
 
-    async def update_manager_status(self, status) -> None:
+    async def update_manager_status(self, status: ManagerStatus) -> None:
         await self._etcd.put("manager/status", status.value)
         self.get_manager_status.cache_clear()
 

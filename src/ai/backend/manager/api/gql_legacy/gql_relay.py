@@ -22,7 +22,6 @@ from graphene.relay.connection import (
 )
 from graphene.relay.node import Node, NodeField, is_node
 from graphene.types import Field, NonNull, ObjectType, String
-from graphene.types.objecttype import ObjectTypeMeta
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
 
@@ -37,7 +36,7 @@ def get_edge_class(
     base_name: str,
     strict_types: bool = False,
     description: str | None = None,
-) -> ObjectTypeMeta:
+) -> type[ObjectType]:
     edge_class = getattr(connection_class, "Edge", None)
 
     class EdgeBase:
@@ -302,7 +301,7 @@ class AsyncListConnectionField(IterableConnectionField):
     @classmethod
     def resolve_connection(
         cls,
-        connection_type: ConnectionConstructor,
+        connection_type: Any,
         args: dict[str, Any] | None,
         resolver_result: ConnectionResolverResult,
     ) -> Connection:
@@ -325,7 +324,7 @@ class AsyncListConnectionField(IterableConnectionField):
             resolved = resolved[:page_size]
         if pagination_order == ConnectionPaginationOrder.BACKWARD:
             resolved = resolved[::-1]
-        edge_type = connection_type.Edge
+        edge_type = connection_type.Edge  # type: ignore[attr-defined]
         edges = [
             edge_type(
                 node=value,
@@ -333,7 +332,7 @@ class AsyncListConnectionField(IterableConnectionField):
             )
             for value in resolved
         ]
-        return connection_type(
+        return connection_type(  # type: ignore[operator]
             edges=edges,
             page_info=PageInfo(
                 start_cursor=edges[0].cursor if edges else None,
@@ -356,10 +355,10 @@ class AsyncListConnectionField(IterableConnectionField):
     async def connection_resolver(
         cls,
         resolver: Resolver,
-        connection_type: ConnectionConstructor,
-        root,
-        info,
-        **args,
+        connection_type: Any,
+        root: Any,
+        info: graphene.ResolveInfo,
+        **args: Any,
     ) -> Connection:
         _result = resolver(root, info, **args)
         match _result:

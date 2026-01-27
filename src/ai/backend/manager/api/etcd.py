@@ -211,7 +211,7 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
     if isinstance(params["value"], Mapping):
         updates = {}
 
-        def flatten(prefix, o) -> None:
+        def flatten(prefix: str, o: Mapping[str, Any]) -> None:
             for k, v in o.items():
                 inner_prefix = prefix if k == "" else f"{prefix}/{k}"
                 if isinstance(v, Mapping):

@@ -19,7 +19,7 @@ class StringFilterData:
     i_equals: Optional[str] = None
     i_not_equals: Optional[str] = None
 
-    def apply_to_column(self, column) -> Optional[ColumnElement[bool]]:
+    def apply_to_column(self, column: ColumnElement[str]) -> Optional[ColumnElement[bool]]:
         """Apply this string filter to a SQLAlchemy column and return the condition.
 
         Args:
@@ -63,7 +63,7 @@ class IntFilterData:
     less_than: Optional[int] = None
     less_than_or_equal: Optional[int] = None
 
-    def apply_to_column(self, column) -> Optional[ColumnElement[bool]]:
+    def apply_to_column(self, column: ColumnElement[int]) -> Optional[ColumnElement[bool]]:
         """Apply this int filter to a SQLAlchemy column and return the condition.
 
         Args:

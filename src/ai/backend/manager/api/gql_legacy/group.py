@@ -673,7 +673,7 @@ class CreateGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: GroupInput,
@@ -711,7 +711,7 @@ class ModifyGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
         props: ModifyGroupInput,
@@ -745,7 +745,7 @@ class DeleteGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
         await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
         return cls(ok=True, msg="success")
@@ -773,7 +773,7 @@ class PurgeGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))

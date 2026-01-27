@@ -60,9 +60,9 @@ class SchedulerOps(enum.Enum):
 def server_status_required(
     allowed_status: frozenset[ManagerStatus],
 ) -> Callable[[Handler], Handler]:
-    def decorator(handler) -> Handler:
+    def decorator(handler: Handler) -> Handler:
         @functools.wraps(handler)
-        async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
+        async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
             if status not in allowed_status:
@@ -85,7 +85,7 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if (
             info.operation.operation == "mutation"

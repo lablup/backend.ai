@@ -13,7 +13,15 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Generator, Hashable, Mapping, MutableMapping
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Generator,
+    Hashable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+)
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -57,8 +65,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
 
-def method_placeholder(orig_method) -> Callable[[web.Request], Awaitable[web.Response]]:
-    async def _handler(request) -> web.Response:
+def method_placeholder(orig_method: str) -> Callable[[web.Request], Awaitable[web.Response]]:
+    async def _handler(request: web.Request) -> web.Response:
         raise web.HTTPMethodNotAllowed(request.method, [orig_method])
 
     return _handler
@@ -374,16 +382,16 @@ def trim_text(value: str, maxlen: int) -> str:
 
 
 class _Infinity(numbers.Number):
-    def __lt__(self, o) -> bool:
+    def __lt__(self, o: Any) -> bool:
         return False
 
-    def __le__(self, o) -> bool:
+    def __le__(self, o: Any) -> bool:
         return False
 
-    def __gt__(self, o) -> bool:
+    def __gt__(self, o: Any) -> bool:
         return True
 
-    def __ge__(self, o) -> bool:
+    def __ge__(self, o: Any) -> bool:
         return False
 
     def __float__(self) -> float:
@@ -400,7 +408,7 @@ numbers.Number.register(_Infinity)
 Infinity = _Infinity()
 
 
-def prettify_traceback(exc) -> str:
+def prettify_traceback(exc: BaseException | None) -> str:
     # Make a compact stack trace string
     with io.StringIO() as buf:
         while exc is not None:
@@ -415,10 +423,10 @@ def prettify_traceback(exc) -> str:
         return f"Traceback:\n{buf.getvalue()}"
 
 
-def catch_unexpected(log, reraise_cancellation: bool = True, raven=None) -> Callable:
-    def _wrap(func) -> Callable:
+def catch_unexpected(log: Any, reraise_cancellation: bool = True, raven: Any = None) -> Callable:
+    def _wrap(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def _wrapped(*args, **kwargs) -> Any:
+        async def _wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await func(*args, **kwargs)
             except asyncio.CancelledError:
@@ -435,7 +443,7 @@ def catch_unexpected(log, reraise_cancellation: bool = True, raven=None) -> Call
     return _wrap
 
 
-def set_handler_attr(func, key, value) -> None:
+def set_handler_attr(func: Any, key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
@@ -443,7 +451,7 @@ def set_handler_attr(func, key, value) -> None:
     func._backend_attrs = attrs
 
 
-def get_handler_attr(request, key, default=None) -> Any:
+def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -465,7 +473,7 @@ def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamRes
     return deprecated_stub_impl
 
 
-def chunked(iterable, n) -> Generator[tuple, None, None]:
+def chunked(iterable: Iterable, n: int) -> Generator[tuple, None, None]:
     it = iter(iterable)
     while True:
         chunk = tuple(itertools.islice(it, n))
@@ -532,7 +540,7 @@ async def call_non_bursty(
 class Singleton(type):
     _instances: MutableMapping[Any, Any] = {}
 
-    def __call__(cls, *args, **kwargs) -> Any:
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
         if cls not in cls._instances:
             cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]

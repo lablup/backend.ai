@@ -99,7 +99,9 @@ def main(
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
+def dbshell(
+    cli_ctx: CLIContext, container_name: str | None, psql_help: bool, psql_args: tuple[str, ...]
+) -> None:
     """
     Run the database shell.
 
@@ -118,8 +120,11 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
 
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
     db_config = bootstrap_config.db
+    _psql_args: list[str]
     if psql_help:
-        psql_args = ["--help"]
+        _psql_args = ["--help"]
+    else:
+        _psql_args = list(psql_args)
     if not container_name:
         # Try to get the database container name of the halfstack
         candidate_container_names = subprocess.check_output(
@@ -151,7 +156,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
         cmd = [
             "psql",
             (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
-            *psql_args,
+            *_psql_args,
         ]
         subprocess.run(cmd)
         return
@@ -168,7 +173,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
         db_config.user,
         "-d",
         db_config.name,
-        *psql_args,
+        *_psql_args,
     ]
     subprocess.run(cmd)
 
@@ -246,7 +251,7 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     ),
 )
 @click.pass_obj
-def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
+def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> None:
     """
     Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.

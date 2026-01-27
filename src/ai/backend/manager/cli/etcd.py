@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 import sys
-from typing import TYPE_CHECKING
+from decimal import Decimal
+from typing import TYPE_CHECKING, BinaryIO
 
 import click
 
@@ -47,7 +48,7 @@ def cli() -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def put(cli_ctx: CLIContext, key, value, scope) -> None:
+def put(cli_ctx: CLIContext, key: str, value: str, scope: ConfigScopes) -> None:
     """Put a single key-value pair into the etcd."""
 
     async def _impl() -> None:
@@ -71,7 +72,7 @@ def put(cli_ctx: CLIContext, key, value, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
+def put_json(cli_ctx: CLIContext, key: str, file: BinaryIO, scope: ConfigScopes) -> None:
     """
     Put a JSON object from FILE to the etcd as flattened key-value pairs
     under the given KEY prefix.
@@ -103,7 +104,9 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     ),
 )
 @click.pass_obj
-def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
+def move_subtree(
+    cli_ctx: CLIContext, src_prefix: str, dst_prefix: str, scope: ConfigScopes
+) -> None:
     """
     Move a subtree to another key prefix.
     """
@@ -135,7 +138,7 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
+def get(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> None:
     """
     Get the value of a key in the configured etcd namespace.
     """
@@ -168,7 +171,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
+def delete(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> None:
     """Delete the key in the configured etcd namespace."""
 
     async def _impl() -> None:
@@ -198,7 +201,7 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
 @click.option("-s", "--short", is_flag=True, help="Show only the image references and digests.")
 @click.option("-i", "--installed", is_flag=True, help="Show only the installed images.")
 @click.pass_obj
-def list_images(cli_ctx, short, installed) -> None:
+def list_images(cli_ctx: CLIContext, short: bool, installed: bool) -> None:
     """List all configured images."""
     log.warning("etcd list-images command is deprecated, use image list instead")
     asyncio.run(list_images_impl(cli_ctx, short, installed))
@@ -208,7 +211,7 @@ def list_images(cli_ctx, short, installed) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
+def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Show the details of the given image or alias."""
     log.warning("etcd inspect-image command is deprecated, use image inspect instead")
     asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
@@ -218,7 +221,7 @@ def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
+def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Forget (delete) a specific image."""
     log.warning("etcd forget-image command is deprecated, use image forget instead")
     asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
@@ -231,11 +234,11 @@ def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("architecture")
 @click.pass_obj
 def set_image_resource_limit(
-    cli_ctx,
-    canonical_or_alias,
-    slot_type,
-    range_value,
-    architecture,
+    cli_ctx: CLIContext,
+    canonical_or_alias: str,
+    slot_type: str,
+    range_value: tuple[Decimal | None, Decimal | None],
+    architecture: str,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
     log.warning(

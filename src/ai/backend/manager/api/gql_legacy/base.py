@@ -291,7 +291,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         return cls._type_cache
 
     @staticmethod
-    def _get_key(otname: str, args, kwargs) -> int:
+    def _get_key(otname: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> int:
         """
         Calculate the hash of the all arguments and keyword arguments.
         """
@@ -809,7 +809,7 @@ def set_if_set(
     target: MutableMapping[str, Any],
     name: str,
     *,
-    clean_func=None,
+    clean_func: Callable[[Any], Any] | None = None,
     target_key: Optional[str] = None,
 ) -> None:
     """
@@ -835,7 +835,7 @@ def orm_set_if_set(
     target: MutableMapping[str, Any],
     name: str,
     *,
-    clean_func=None,
+    clean_func: Callable[[Any], Any] | None = None,
     target_key: Optional[str] = None,
 ) -> None:
     """
@@ -943,7 +943,7 @@ class _StmtWithConditions:
 
 def _apply_ordering(
     stmt: sa.sql.Select,
-    id_column: sa.Column | InstrumentedAttribute,
+    id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     pagination_order: ConnectionPaginationOrder | None,
 ) -> sa.sql.Select:
@@ -956,16 +956,21 @@ def _apply_ordering(
         case ConnectionPaginationOrder.FORWARD | None:
             # Default ordering by id column (ascending for forward pagination)
             id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
-            set_ordering = lambda col, direction: (
-                col.asc() if direction == OrderDirection.ASC else col.desc()
-            )
+
+            def set_ordering(
+                col: sa.Column[Any] | InstrumentedAttribute[Any], direction: OrderDirection
+            ) -> Any:
+                return col.asc() if direction == OrderDirection.ASC else col.desc()
+
         case ConnectionPaginationOrder.BACKWARD:
             # Default ordering by id column (descending for backward pagination)
             id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
+
             # Reverse ordering direction for backward pagination
-            set_ordering = lambda col, direction: (
-                col.desc() if direction == OrderDirection.ASC else col.asc()
-            )
+            def set_ordering(
+                col: sa.Column[Any] | InstrumentedAttribute[Any], direction: OrderDirection
+            ) -> Any:
+                return col.desc() if direction == OrderDirection.ASC else col.asc()
 
     # Apply ordering to stmt (id column should be applied last for deterministic ordering)
     for col, direction in [*ordering_item_list, id_ordering_item]:
@@ -976,7 +981,7 @@ def _apply_ordering(
 
 def _apply_filter_conditions(
     stmt: sa.sql.Select,
-    orm_class,
+    orm_class: type[Any],
     filter_expr: FilterExprArg,
 ) -> _StmtWithConditions:
     """
@@ -995,7 +1000,7 @@ def _apply_filter_conditions(
 def _apply_cursor_pagination(
     info: graphene.ResolveInfo,
     stmt: sa.sql.Select,
-    id_column: sa.Column | InstrumentedAttribute,
+    id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     cursor_id: str,
     pagination_order: ConnectionPaginationOrder | None,
@@ -1014,8 +1019,8 @@ def _apply_cursor_pagination(
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
-        column_to_be_compared: sa.Column | InstrumentedAttribute,
-        subquery: ScalarSelect,
+        column_to_be_compared: sa.Column[Any] | InstrumentedAttribute[Any],
+        subquery: ScalarSelect[Any],
         direction: OrderDirection,
     ) -> WhereClauseType:
         """Generate cursor condition for a specific ordering column.
@@ -1071,8 +1076,8 @@ def _apply_cursor_pagination(
 
 def _build_sql_stmt_from_connection_args(
     info: graphene.ResolveInfo,
-    orm_class,
-    id_column: sa.Column | InstrumentedAttribute,
+    orm_class: type[Any],
+    id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
@@ -1118,8 +1123,8 @@ def _build_sql_stmt_from_connection_args(
 
 def _build_sql_stmt_from_sql_arg(
     info: graphene.ResolveInfo,
-    orm_class,
-    id_column: sa.Column | InstrumentedAttribute,
+    orm_class: type[Any],
+    id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
@@ -1173,7 +1178,7 @@ class OrderExprArg(NamedTuple):
 
 def generate_sql_info_for_gql_connection(
     info: graphene.ResolveInfo,
-    orm_class,
+    orm_class: type[Any],
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,

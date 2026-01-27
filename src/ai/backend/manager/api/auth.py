@@ -301,7 +301,7 @@ _whois_timezone_info: Final = {
 whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
-def _extract_auth_params(request) -> tuple[str, str, str] | None:
+def _extract_auth_params(request: web.Request) -> tuple[str, str, str] | None:
     """
     HTTP Authorization header must be formatted as:
     "Authorization: BackendAI signMethod=HMAC-SHA256,
@@ -717,7 +717,7 @@ def _setup_user_context(request: web.Request) -> ExitStack:
 
 
 @web.middleware
-async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+async def auth_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     """
     Unified authentication middleware - routes to appropriate authentication flow.
 
