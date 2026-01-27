@@ -77,7 +77,7 @@ def env_info() -> str:
     return f"{pyver} (env: {sys.prefix})"
 
 
-def odict(*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
+def odict[KT, VT](*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
     """
     A short-hand for the constructor of OrderedDict.
     :code:`odict(('a',1), ('b',2))` is equivalent to
@@ -86,7 +86,7 @@ def odict(*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
     return OrderedDict(args)
 
 
-def dict2kvlist(o: Mapping[KT, VT]) -> Iterable[KT | VT]:
+def dict2kvlist[KT, VT](o: Mapping[KT, VT]) -> Iterable[KT | VT]:
     """
     Serializes a dict-like object into a generator of the flatten list of
     repeating key-value pairs.  It is useful when using HMSET method in Redis.

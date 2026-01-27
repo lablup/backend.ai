@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import (
     Any,
     Optional,
-    TypeVar,
     cast,
 )
 
@@ -72,10 +71,7 @@ A struct that represents an attached file to the API request.
 """
 
 
-_T = TypeVar("_T")
-
-
-async def _coro_return(val: _T) -> _T:
+async def _coro_return[T](val: T) -> T:
     return val
 
 

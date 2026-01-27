@@ -712,7 +712,7 @@ async def gql_mutation_wrapper(
         return result_cls(False, f"unexpected error: {e}")
 
 
-async def simple_db_mutate(
+async def simple_db_mutate[ResultType: graphene.ObjectType](
     result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update
@@ -749,7 +749,10 @@ async def simple_db_mutate(
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
 
-async def simple_db_mutate_returning_item(
+async def simple_db_mutate_returning_item[
+    ResultType: graphene.ObjectType,
+    ItemType: graphene.ObjectType,
+](
     result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],

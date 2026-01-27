@@ -53,7 +53,7 @@ class CreatorResult[TRow: Base]:
     row: TRow
 
 
-async def execute_creator(
+async def execute_creator[TRow: Base](
     db_sess: SASession,
     creator: Creator[TRow],
 ) -> CreatorResult[TRow]:
@@ -108,7 +108,7 @@ class BulkCreatorResult[TRow: Base]:
     rows: list[TRow]
 
 
-async def execute_bulk_creator(
+async def execute_bulk_creator[TRow: Base](
     db_sess: SASession,
     bulk_creator: BulkCreator[TRow],
 ) -> BulkCreatorResult[TRow]:

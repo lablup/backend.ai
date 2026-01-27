@@ -72,7 +72,7 @@ class UpserterResult[TRow: Base]:
     row: TRow
 
 
-async def execute_upserter(
+async def execute_upserter[TRow: Base](
     db_sess: SASession,
     upserter: Upserter[TRow],
     *,
@@ -151,7 +151,7 @@ class BulkUpserterResult:
     upserted_count: int
 
 
-async def execute_bulk_upserter(
+async def execute_bulk_upserter[TRow: Base](
     db_sess: SASession,
     bulk_upserter: BulkUpserter[TRow],
     *,

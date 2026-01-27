@@ -226,7 +226,7 @@ class ParallelBgtask(BackgroundTaskMeta):
         return self._tasks
 
 
-def _exception_to_task_result(
+def _exception_to_task_result[**P](
     func: Callable[P, Awaitable[Optional[BaseBackgroundTaskResult]]],
 ) -> Callable[P, Awaitable[TaskResult]]:
     """

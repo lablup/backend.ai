@@ -428,7 +428,7 @@ class HasCursor(Protocol):
 TEdge = TypeVar("TEdge", bound=HasCursor)
 
 
-def build_page_info(
+def build_page_info[TEdge: HasCursor](
     edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
 ) -> PageInfo:
     """Build PageInfo from edges and pagination options"""
