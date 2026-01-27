@@ -18,7 +18,7 @@ class libtpu:
     zone: ClassVar[Optional[str]] = None
 
     @classmethod
-    async def _run_ctpu(cls, cmd) -> str:
+    async def _run_ctpu(cls, cmd: list[str]) -> str:
         if not cls.zone:
             try:
                 proc = await subprocess.create_subprocess_exec(

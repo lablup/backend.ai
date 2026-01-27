@@ -9,7 +9,7 @@ except ImportError:
     from asynctest import CoroutineMock as AsyncMock  # type: ignore
 
 
-def mock_corofunc(return_value) -> mock.Mock:
+def mock_corofunc(return_value: Any) -> mock.Mock:
     """
     Return mock coroutine function.
 
@@ -50,5 +50,7 @@ class AsyncContextManagerMock:
     async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: Any
+    ) -> None:
         pass

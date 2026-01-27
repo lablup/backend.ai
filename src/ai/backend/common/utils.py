@@ -266,7 +266,7 @@ class FstabEntry:
     """
 
     def __init__(
-        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d: int = 0, p: int = 0
     ) -> None:
         self.device = device
         self.mountpoint = mountpoint
@@ -277,7 +277,7 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    def __eq__(self, o) -> bool:
+    def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)
 
     def __str__(self) -> str:
@@ -326,7 +326,13 @@ class Fstab:
         await self._fp.truncate()
 
     async def add(
-        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+        self,
+        device: str,
+        mountpoint: str,
+        fstype: str,
+        options: str | None = None,
+        d: int = 0,
+        p: int = 0,
     ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 

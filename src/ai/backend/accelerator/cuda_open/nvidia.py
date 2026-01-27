@@ -548,7 +548,7 @@ class LibraryBase(metaclass=ABCMeta):
             raise ImportError(f"Could not load the {cls.name} library!")
 
     @classmethod
-    def invoke(cls, func_name, *args, check_rc=True) -> int:
+    def invoke(cls, func_name: str, *args: Any, check_rc: bool = True) -> int:
         try:
             cls._ensure_lib()
         except ImportError:

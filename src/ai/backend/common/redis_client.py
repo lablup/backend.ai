@@ -58,7 +58,7 @@ class RedisClient(aobject):
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        verbose=False,
+        verbose: bool = False,
     ) -> None:
         self.reader = reader
         self.writer = writer
@@ -99,7 +99,7 @@ class RedisClient(aobject):
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> Any:
         return await self._send(
             commands,
@@ -112,7 +112,7 @@ class RedisClient(aobject):
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> list[Any]:
         """
         Executes a function that issues Redis commands or returns a pipeline/transaction of commands,

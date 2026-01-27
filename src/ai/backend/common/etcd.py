@@ -82,7 +82,9 @@ class ConfigScopes(enum.Enum):
 quote = functools.partial(_quote, safe="")
 
 
-def make_dict_from_pairs(key_prefix, pairs, path_sep="/") -> dict[str, Any]:
+def make_dict_from_pairs(
+    key_prefix: str, pairs: Iterable[tuple[str, str]], path_sep: str = "/"
+) -> dict[str, Any]:
     result: dict[str, Any] = {}
     len_prefix = len(key_prefix)
     if isinstance(pairs, dict):

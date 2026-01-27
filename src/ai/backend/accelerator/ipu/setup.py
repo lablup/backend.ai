@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from zipfile import ZipInfo
 
 from Cython.Build import cythonize
 from setuptools import setup
@@ -15,7 +16,9 @@ pure_python_mods = (
 )
 
 
-def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None) -> None:
+def _filtered_writestr(
+    self: WheelFile, zinfo_or_arcname: ZipInfo | str, bytes: bytes, compress_type: int | None = None
+) -> None:
     global exclude_source_files
     if exclude_source_files:
         if isinstance(zinfo_or_arcname, str):

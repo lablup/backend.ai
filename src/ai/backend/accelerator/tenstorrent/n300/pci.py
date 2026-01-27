@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 
-async def read_sysfs(path, attr) -> str:
+async def read_sysfs(path: Path, attr: str) -> str:
     def _blocking() -> str:
         return (path / attr).read_text().strip()
 

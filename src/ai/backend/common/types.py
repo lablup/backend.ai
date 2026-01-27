@@ -830,7 +830,7 @@ class BinarySize(int):
         value = self._quantize(self, multiplier)
         return f"{value:f} {suffix.upper()}iB"
 
-    def __format__(self, format_spec) -> str:
+    def __format__(self, format_spec: str) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
@@ -1228,7 +1228,7 @@ class VFolderID:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
     def __hash__(self) -> int:
@@ -1744,7 +1744,7 @@ class RedisProfileTarget:
         return self._base_target
 
     @staticmethod
-    def _parse_addr(addr_data) -> HostPortPair:
+    def _parse_addr(addr_data: Any) -> HostPortPair:
         match addr_data:
             case HostPortPair(host=host, port=port):
                 return HostPortPair(host, port)
