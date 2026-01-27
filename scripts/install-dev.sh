@@ -507,17 +507,43 @@ install_system_pkg() {
 }
 
 install_node() {
-  if ! command -v nvm &> /dev/null; then
+  # Set NVM_DIR first
+  export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+
+  # Check if NVM is already installed by checking the directory and nvm.sh
+  if [ ! -d "$NVM_DIR" ] || [ ! -s "$NVM_DIR/nvm.sh" ]; then
     show_info "Installing latest version of NVM..."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
-    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
   fi
 
+  # Always source nvm.sh to ensure it's loaded in the current shell
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    show_info "Loading NVM..."
+    # Use --no-use flag to prevent automatic version switching from .nvmrc
+    # This avoids exit code 3 when the version specified in .nvmrc is not installed
+    # See: https://github.com/nvm-sh/nvm/issues/1985
+    \. "$NVM_DIR/nvm.sh" --no-use
+  else
+    show_error "NVM installation failed - nvm.sh not found"
+    return 1
+  fi
 
-  show_info "Installing Node.js v${NODE_VERSION} via NVM..."
-  nvm install $NODE_VERSION
-  nvm use $NODE_VERSION
+  # Check if the required Node.js version is already installed
+  # Use grep pattern to match only installed versions (starting with whitespace)
+  # to avoid false positives from LTS aliases like "lts/krypton -> v24.11.1 (-> N/A)"
+  set +e  # Temporarily disable exit on error for the version check
+  nvm list 2>/dev/null | grep -qE "^[[:space:]]+v${NODE_VERSION}\."
+  local version_installed=$?
+  set -e  # Re-enable exit on error
+
+  if [ $version_installed -eq 0 ]; then
+    show_info "Node.js v${NODE_VERSION} is already installed, setting as active version..."
+    nvm use $NODE_VERSION
+  else
+    show_info "Installing Node.js v${NODE_VERSION} via NVM..."
+    nvm install $NODE_VERSION
+    nvm use $NODE_VERSION
+  fi
 }
 
 set_brew_python_build_flags() {
