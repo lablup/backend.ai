@@ -6,7 +6,7 @@ Triggers batch execution when the session transitions to running.
 import logging
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 
 from ..types import SessionTransitionData
 from .base import AbstractSessionHook
@@ -15,9 +15,9 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class BatchSessionHook(AbstractSessionHook):
-    _agent_pool: AgentPool
+    _agent_pool: AgentClientPool
 
-    def __init__(self, agent_pool: AgentPool) -> None:
+    def __init__(self, agent_pool: AgentClientPool) -> None:
         self._agent_pool = agent_pool
 
     async def on_transition_to_running(self, session: SessionTransitionData) -> None:
