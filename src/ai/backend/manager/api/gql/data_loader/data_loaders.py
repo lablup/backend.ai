@@ -16,6 +16,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.data.image.types import ImageDataWithDetails
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -35,6 +36,7 @@ from .deployment import (
     load_routes_by_ids,
 )
 from .huggingface_registry import load_huggingface_registries_by_ids
+from .image import load_images_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
@@ -166,3 +168,9 @@ class DataLoaders:
         self,
     ) -> DataLoader[AgentId, int]:
         return DataLoader(load_fn=partial(load_container_counts, self._processors.agent))
+
+    @cached_property
+    def image_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, Optional[ImageDataWithDetails]]:
+        return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
