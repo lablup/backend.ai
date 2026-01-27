@@ -234,6 +234,19 @@ class AbstractAllocMap(metaclass=ABCMeta):
                     hint_for_next_allocation.append(dev)
         affinity_hint.devices = hint_for_next_allocation
 
+    @final
+    def set_device_slots(
+        self,
+        new_device_slots: Mapping[DeviceId, DeviceSlotInfo],
+    ) -> None:
+        """
+        Replace device_slots with new values and reset allocations.
+
+        This is used for multi-agent partitioning to set up each agent's device slots.
+        """
+        self.device_slots = dict(new_device_slots)
+        self.clear()
+
     @abstractmethod
     def allocate(
         self,

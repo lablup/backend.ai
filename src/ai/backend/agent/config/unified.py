@@ -11,7 +11,6 @@ import logging
 import os
 import sys
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
 from pathlib import Path
 from typing import (
     Annotated,
@@ -54,9 +53,9 @@ from ai.backend.common.typed_validators import (
 from ai.backend.common.types import (
     BinarySize,
     BinarySizeField,
+    DeviceId,
+    DeviceName,
     ResourceGroupType,
-    SlotName,
-    SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
@@ -1594,17 +1593,17 @@ class ResourceAllocationConfig(BaseConfigSchema):
         ),
     ]
     devices: Annotated[
-        Mapping[SlotNameField, Decimal],
+        Mapping[DeviceName, Sequence[DeviceId]],
         Field(default_factory=dict),
         BackendAIConfigMeta(
             description=(
-                "Device-specific resource allocations as key-value pairs. "
+                "Device-specific allocations as device IDs per device type. "
                 "Only used when resource allocation_mode is 'manual'. "
-                "Keys are slot names (e.g., 'cuda.mem', 'cuda.shares'), values are decimal amounts. "
-                "Use to allocate GPU memory, compute shares, and other accelerator resources."
+                "Keys are device names (e.g., 'cuda', 'rocm'), values are lists of device IDs. "
+                "Use to assign specific accelerator devices to this agent."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod='{"cuda.mem": "0.5", "cuda.shares": "0.5"}'),
+            example=ConfigExample(local="", prod='{"cuda": ["cuda0", "cuda1"]}'),
         ),
     ]
 
@@ -1619,8 +1618,6 @@ class ResourceAllocationConfig(BaseConfigSchema):
             raise ValueError(f"Allocated cpu must not be a negative value, but given {self.cpu}")
         if self.mem is not None and self.mem < 0:
             raise ValueError(f"Allocated mem must not be a negative value, but given {self.mem}")
-        if any(value < 0 for value in self.devices.values()):
-            raise ValueError("All allocated device resource values must not be a negative value")
         return self
 
 
@@ -2373,16 +2370,19 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
                         )
 
             case ResourceAllocationMode.MANUAL:
-                slot_names: list[set[SlotName]] = []
+                device_names: list[set[DeviceName]] = []
                 for config in agent_configs:
                     if config.resource.allocations is None:
                         raise ValueError(
                             "On MANUAL mode, config must specify cpu and mem resource allocations"
                         )
 
-                    slot_names.append(set(config.resource.allocations.devices.keys()))
+                    if config.resource.allocations.devices is not None:
+                        device_names.append(set(config.resource.allocations.devices.keys()))
+                    else:
+                        device_names.append(set())
 
-                if not all(slot_name == slot_names[0] for slot_name in slot_names):
-                    raise ValueError("All agents must have the same slots defined in the devices!")
+                if device_names and not all(names == device_names[0] for names in device_names):
+                    raise ValueError("All agents must have the same device names defined!")
 
         return self
