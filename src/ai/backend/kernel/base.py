@@ -63,7 +63,7 @@ class HealthStatus(enum.Enum):
     UNDETERMINED = 2
 
 
-async def pipe_output(stream, outsock, target, log_fd):
+async def pipe_output(stream, outsock, target, log_fd) -> None:
     if target not in ("stdout", "stderr"):
         raise ValueError(f"Invalid target: {target}. Must be 'stdout' or 'stderr'")
     target = target.encode("ascii")
@@ -651,7 +651,7 @@ class BaseRunner(metaclass=ABCMeta):
             # this is a unidirectional command -- no explicit finish!
             pass
 
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """Interrupt the running user code (only called for query-mode).
 
         The default interface is jupyter kernel. To use different interface,
@@ -723,7 +723,7 @@ class BaseRunner(metaclass=ABCMeta):
         ])
 
     @abstractmethod
-    async def start_service(self, service_info):
+    async def start_service(self, service_info) -> tuple[None, dict]:
         """Start an application service daemon."""
         return None, {}
 
@@ -983,7 +983,7 @@ class BaseRunner(metaclass=ABCMeta):
         )
         self.services_running.pop(service_name, None)
 
-    async def run_subproc(self, cmd: str | list[str], batch: bool = False):
+    async def run_subproc(self, cmd: str | list[str], batch: bool = False) -> int:
         """A thin wrapper for an external command."""
         loop = current_loop()
         if Path("/home/work/.logs").is_dir():
@@ -1033,7 +1033,7 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             self.subproc = None
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         pass
 
     async def _shutdown_service(self, service_name: str) -> None:

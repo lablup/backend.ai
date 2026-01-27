@@ -523,7 +523,7 @@ async def batch_multiresult_in_scalar_stream(
     return [*objs_per_key.values()]
 
 
-def privileged_query(required_role: UserRole):
+def privileged_query(required_role: UserRole) -> Callable:
     def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(
@@ -548,7 +548,7 @@ def scoped_query(
     *,
     autofill_user: bool = False,
     user_key: str = "access_key",
-):
+) -> Callable:
     """
     Prepends checks for domain/group/user access rights depending
     on the client's user and keypair information.
@@ -622,7 +622,7 @@ def scoped_query(
     return wrap
 
 
-def privileged_mutation(required_role, target_func=None):
+def privileged_mutation(required_role, target_func=None) -> Callable:
     def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:

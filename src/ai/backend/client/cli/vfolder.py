@@ -36,12 +36,12 @@ from .types import CLIContext
 
 
 @main.group()
-def vfolder():
+def vfolder() -> None:
     """Set of vfolder operations"""
 
 
 @vfolder.command()
-def list_hosts():
+def list_hosts() -> None:
     """List the hosts of virtual folders that is accessible to the current user."""
     with Session() as session:
         try:
@@ -54,7 +54,7 @@ def list_hosts():
 
 
 @vfolder.command()
-def list_allowed_types():
+def list_allowed_types() -> None:
     """List allowed vfolder types."""
     with Session() as session:
         try:
@@ -127,7 +127,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable):
+def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable) -> None:
     """Create a new virtual folder.
 
     \b
@@ -153,7 +153,7 @@ def create(name, host, group, host_path, unmanaged_path, usage_mode, permission,
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete(name):
+def delete(name) -> None:
     """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
     This operation can be retracted by
     calling `restore()`.
@@ -172,7 +172,7 @@ def delete(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def purge(name):
+def purge(name) -> None:
     """Purge the given virtual folder. This operation is irreversible!
 
     NAME: Name of a virtual folder.
@@ -188,7 +188,7 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete_trash(name):
+def delete_trash(name) -> None:
     """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
 
@@ -205,7 +205,7 @@ def delete_trash(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def recover(name):
+def recover(name) -> None:
     """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
 
     NAME: Name of a virtual folder.
@@ -221,7 +221,7 @@ def recover(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def restore(name):
+def restore(name) -> None:
     """Restore the given virtual folder from deleted status, from trash bin.
 
     NAME: Name of a virtual folder.
@@ -238,7 +238,7 @@ def restore(name):
 @vfolder.command()
 @click.argument("old_name", type=str)
 @click.argument("new_name", type=str)
-def rename(old_name, new_name):
+def rename(old_name, new_name) -> None:
     """Rename the given virtual folder. This operation is irreversible!
     You cannot change the vfolders that are shared by other users,
     and the new name must be unique among all your accessible vfolders
@@ -259,7 +259,7 @@ def rename(old_name, new_name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def info(name):
+def info(name) -> None:
     """Show the information of the given virtual folder.
 
     \b
@@ -324,7 +324,7 @@ def info(name):
         " include the protocol part and the port number to replace."
     ),
 )
-def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
+def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy) -> None:
     """
     TUS Upload a file to the virtual folder from the current working directory.
     The files with the same names will be overwritten.
@@ -389,7 +389,7 @@ def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_pr
     default=20,
     help="Maximum retry attempt when any failure occurs.",
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
+def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries) -> None:
     """
     Download a file from the virtual folder to the current working directory.
     The files with the same names will be overwritten.
@@ -418,7 +418,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("filename", type=Path)
-def request_download(name, filename):
+def request_download(name, filename) -> None:
     """
     Request JWT-formatted download token for later use.
 
@@ -437,7 +437,7 @@ def request_download(name, filename):
 
 @vfolder.command()
 @click.argument("filenames", nargs=-1)
-def cp(filenames):
+def cp(filenames) -> None:
     """An scp-like shortcut for download/upload commands.
 
     \b
@@ -496,7 +496,7 @@ def mkdir(
 @click.argument("name", type=str)
 @click.argument("target_path", type=str)
 @click.argument("new_name", type=str)
-def rename_file(name, target_path, new_name):
+def rename_file(name, target_path, new_name) -> None:
     """
     Rename a file or a directory in a virtual folder.
 
@@ -518,7 +518,7 @@ def rename_file(name, target_path, new_name):
 @click.argument("name", type=str)
 @click.argument("src", type=str)
 @click.argument("dst", type=str)
-def mv(name, src, dst):
+def mv(name, src, dst) -> None:
     """
     Move a file or a directory within a virtual folder.
     If the destination is a file and already exists, it will be overwritten.
@@ -543,7 +543,7 @@ def mv(name, src, dst):
 @click.argument("name", type=str)
 @click.argument("filenames", nargs=-1, required=True)
 @click.option("-r", "--recursive", is_flag=True, help="Enable recursive deletion of directories.")
-def rm(name, filenames, recursive):
+def rm(name, filenames, recursive) -> None:
     """
     Delete files in a virtual folder.
     If one of the given paths is a directory and the recursive option is enabled,
@@ -570,7 +570,7 @@ def rm(name, filenames, recursive):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("path", metavar="PATH", nargs=1, default=".")
-def ls(name, path):
+def ls(name, path) -> None:
     """
     List files in a path of a virtual folder.
 
@@ -610,7 +610,7 @@ def ls(name, path):
     default="rw",
     help='Permission to give. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).',
 )
-def invite(name, emails, perm):
+def invite(name, emails, perm) -> None:
     """Invite other users to access a user-type virtual folder.
 
     \b
@@ -635,7 +635,7 @@ def invite(name, emails, perm):
 
 
 @vfolder.command()
-def invitations():
+def invitations() -> None:
     """List and manage received invitations."""
     with Session() as session:
         try:
@@ -700,7 +700,7 @@ def invitations():
     default="rw",
     help='Permission to give. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).',
 )
-def share(name, emails, perm):
+def share(name, emails, perm) -> None:
     """Share a group folder to users with overriding permission.
 
     \b
@@ -727,7 +727,7 @@ def share(name, emails, perm):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("emails", type=str, nargs=-1, required=True)
-def unshare(name, emails):
+def unshare(name, emails) -> None:
     """Unshare a group folder from users.
 
     \b
@@ -759,7 +759,7 @@ def unshare(name, emails):
     default=None,
     help="The ID of the person who wants to leave (the person who shared the vfolder).",
 )
-def leave(name, shared_user_uuid):
+def leave(name, shared_user_uuid) -> None:
     """Leave the shared virtual folder.
 
     \b
@@ -802,7 +802,7 @@ def leave(name, shared_user_uuid):
     default="rw",
     help="Cloned virtual folder's permission. Default value is 'rw'.",
 )
-def clone(name, target_name, target_host, usage_mode, permission):
+def clone(name, target_name, target_host, usage_mode, permission) -> None:
     """Clone a virtual folder.
 
     \b
@@ -895,7 +895,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
         "If not set, the cloneable property is not changed."
     ),
 )
-def update_options(name, permission, set_cloneable):
+def update_options(name, permission, set_cloneable) -> None:
     """Update an existing virtual folder.
 
     \b

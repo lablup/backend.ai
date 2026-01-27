@@ -394,7 +394,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ])
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         for i, mount in enumerate(mounts):
             if mount.type == MountTypes.K8S_GENERIC:
                 name = (mount.opts or {})["name"]
@@ -885,7 +885,7 @@ class KubernetesAgent(
         # Agent socket handler initialization
         # K8s event monitor task initialization
 
-    async def check_krunner_pv_status(self):
+    async def check_krunner_pv_status(self) -> None:
         capacity = format(self.local_config.container.scratch_size, "g")[:-1]
 
         await kube_config.load_kube_config()
@@ -964,7 +964,7 @@ class KubernetesAgent(
                 log.exception("Error: {}", e)
                 raise
 
-    async def fetch_workers(self):
+    async def fetch_workers(self) -> None:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         nodes = await core_api.list_node()
@@ -978,7 +978,7 @@ class KubernetesAgent(
                 if addr.type == "ExternalIP":
                     self.workers[node.metadata.name]["ExternalIP"] = addr.address
 
-    async def shutdown(self, stop_signal: signal.Signals):
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop agent socket handler task
 
         try:
@@ -1079,7 +1079,7 @@ class KubernetesAgent(
     ) -> None:
         raise NotImplementedError
 
-    async def handle_agent_socket(self):
+    async def handle_agent_socket(self) -> None:
         # TODO: Add support for remote agent socket mechanism
         pass
 

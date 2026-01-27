@@ -22,7 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 

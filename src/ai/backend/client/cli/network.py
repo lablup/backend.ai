@@ -23,7 +23,7 @@ _default_list_fields = (
 
 
 @click.group()
-def network():
+def network() -> None:
     """Set of inter-container network operations"""
 
 
@@ -32,7 +32,7 @@ def network():
 @click.argument("project", type=str, metavar="PROJECT_ID_OR_NAME")
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--driver", default=None, help="Set the network driver.")
-def create(ctx: CLIContext, project, name, driver):
+def create(ctx: CLIContext, project, name, driver) -> None:
     """Create a new network interface."""
 
     with Session() as session:
@@ -73,7 +73,7 @@ def create(ctx: CLIContext, project, name, driver):
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, format, filter_, order, offset, limit):
+def list(ctx: CLIContext, format, filter_, order, offset, limit) -> None:
     """List all available network interfaces."""
 
     if format:
@@ -112,7 +112,7 @@ def list(ctx: CLIContext, format, filter_, order, offset, limit):
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, network, format):
+def get(ctx: CLIContext, network, format) -> None:
     fields: Iterable[Any]
     if format:
         try:
@@ -144,7 +144,7 @@ def get(ctx: CLIContext, network, format):
 @network.command()
 @pass_ctx_obj
 @click.argument("network", type=str, metavar="NETWORK_ID_OR_NAME")
-def delete(ctx: CLIContext, network):
+def delete(ctx: CLIContext, network) -> None:
     with Session() as session:
         try:
             network_info = session.Network(uuid.UUID(network)).get(fields=[network_fields["id"]])

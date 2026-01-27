@@ -7,7 +7,7 @@ import json
 import logging
 import socket
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Optional, cast
 
@@ -57,7 +57,9 @@ class SchedulerOps(enum.Enum):
     EXCLUDE_AGENTS = "exclude-agents"
 
 
-def server_status_required(allowed_status: frozenset[ManagerStatus]):
+def server_status_required(
+    allowed_status: frozenset[ManagerStatus],
+) -> Callable[[Handler], Handler]:
     def decorator(handler) -> Handler:
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:

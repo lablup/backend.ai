@@ -59,7 +59,7 @@ class Model(BaseFunction):
         )
 
     @api_function
-    async def info(self):
+    async def info(self) -> None:
         rqst = Request("GET", f"/folders/{self.model_name}")
         async with rqst.fetch() as resp:
             info = await resp.json()
@@ -111,7 +111,7 @@ class Model(BaseFunction):
         return result
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> None:
         rqst = Request("DELETE", f"/folders/{self.model_name}")
         rqst.set_json({"id": self.model_name})
         async with rqst.fetch():

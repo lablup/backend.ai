@@ -3173,7 +3173,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> ModelCard | None:
         return await ModelCard.get_node(info, id)
 
     @staticmethod

@@ -39,7 +39,7 @@ def _wrap_method(cls: type, orig_name: str, meth: Callable) -> Callable:
     return _method
 
 
-def api_function(meth):
+def api_function(meth) -> None:
     """
     Mark the wrapped method as the API function method.
     """

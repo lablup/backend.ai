@@ -121,7 +121,7 @@ class AliasedKey(t.Key):
 
 
 class MultiKey(t.Key):
-    def get_data(self, data, default):
+    def get_data(self, data, default) -> list[Any]:
         if isinstance(data, (multidict.MultiDict, multidict.MultiDictProxy)):
             return data.getall(self.name, default)
         # fallback for plain dicts

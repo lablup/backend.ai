@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+from typing import Any, Optional
 
 import click
 from click.exceptions import Abort, ClickException
@@ -78,7 +79,7 @@ class AliasGroupMixin(click.Group):
         self._commands: dict[str, click.Command] = {}
         self._aliases: dict[str, str] = {}
 
-    def command(self, *args, **kwargs):
+    def command(self, *args, **kwargs) -> Any:
         aliases = kwargs.pop("aliases", [])
         decorator = super().command(*args, **kwargs)
         if not aliases:
@@ -94,7 +95,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def group(self, *args, **kwargs):
+    def group(self, *args, **kwargs) -> Any:
         aliases = kwargs.pop("aliases", [])
         # keep the same class type unless explicitly specified
         if "cls" not in kwargs:
@@ -113,7 +114,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def get_command(self, ctx, cmd_name):
+    def get_command(self, ctx, cmd_name) -> Optional[click.Command]:
         if cmd_name in self._aliases:
             cmd_name = self._aliases[cmd_name]
         command = super().get_command(ctx, cmd_name)
@@ -121,7 +122,7 @@ class AliasGroupMixin(click.Group):
             return command
         return None
 
-    def format_commands(self, ctx, formatter):
+    def format_commands(self, ctx, formatter) -> None:
         commands = []
         for subcommand in self.list_commands(ctx):
             cmd = self.get_command(ctx, subcommand)

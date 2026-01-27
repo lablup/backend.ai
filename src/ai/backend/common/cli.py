@@ -63,14 +63,14 @@ class EnumChoice(click.Choice):
         super().__init__(enum_members)
         self.enum = enum
 
-    def convert(self, value: Any, param, ctx):
+    def convert(self, value: Any, param, ctx) -> str:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
             return next(e for e in self.enum if e == value)
         value = super().convert(value, param, ctx)
         return next(k for k in self.enum.__members__.keys() if k == value)
 
-    def get_metavar(self, param):
+    def get_metavar(self, param) -> str:
         name = self.enum.__name__
         name = re.sub(r"([A-Z\d]+)([A-Z][a-z])", r"\1_\2", name)
         name = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", name)
@@ -80,7 +80,7 @@ class EnumChoice(click.Choice):
 class MinMaxRangeParamType(click.ParamType):
     name = "min-max decimal range"
 
-    def convert(self, value, param, ctx):
+    def convert(self, value, param, ctx) -> tuple[Decimal | None, Decimal | None]:
         try:
             left, _, right = value.partition(":")
             if left:
@@ -95,7 +95,7 @@ class MinMaxRangeParamType(click.ParamType):
         except (ArithmeticError, ValueError):
             self.fail(f"{value!r} contains an invalid number", param, ctx)
 
-    def get_metavar(self, param):
+    def get_metavar(self, param) -> str:
         return "MIN:MAX"
 
 

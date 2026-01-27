@@ -81,12 +81,12 @@ pruned_disk_types = frozenset([
 ])
 
 
-def netstat_ns_work(ns_path: Path):
+def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
     with nsenter(ns_path):
         return psutil.net_io_counters(pernic=True)
 
 
-async def netstat_ns(ns_path: Path):
+async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     # Linux namespace is per-thread state. Therefore we need to ensure
     # IO is executed in the same thread where we switched the namespace.

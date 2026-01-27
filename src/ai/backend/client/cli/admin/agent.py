@@ -14,7 +14,7 @@ from . import admin
 
 
 @admin.group()
-def agent():
+def agent() -> None:
     """
     Agent administration commands.
     """
@@ -112,7 +112,7 @@ def list(
 
 
 @admin.group()
-def watcher():
+def watcher() -> None:
     """
     Agent watcher commands.
 

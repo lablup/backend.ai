@@ -19,7 +19,7 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
-from ai.backend.agent.types import AgentEventData, KernelOwnershipData
+from ai.backend.agent.types import AgentEventData, CommitStatus, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
@@ -106,7 +106,7 @@ class KubernetesKernel(AbstractKernel):
 
         return runner
 
-    async def scale(self, num: int):
+    async def scale(self, num: int) -> Any:
         await kube_config.load_kube_config()
         apps_api = kube_client.AppsV1Api()
         try:
@@ -127,7 +127,7 @@ class KubernetesKernel(AbstractKernel):
         except Exception as e:
             log.exception("scale failed: {}", e)
 
-    async def is_scaled(self):
+    async def is_scaled(self) -> bool:
         await kube_config.load_kube_config()
         apps_api = kube_client.AppsV1Api()
         core_api = kube_client.CoreV1Api()
@@ -164,13 +164,13 @@ class KubernetesKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()
 
     @override
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -178,14 +178,14 @@ class KubernetesKernel(AbstractKernel):
         return {"logs": result.data.decode("utf-8")}
 
     @override
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
     @override
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
@@ -207,25 +207,25 @@ class KubernetesKernel(AbstractKernel):
         })
 
     @override
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_start_model_service(model_service)
 
     @override
-    async def shutdown_service(self, service: str):
+    async def shutdown_service(self, service: str) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
     @override
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_service_apps()
 
     @override
-    async def check_duplicate_commit(self, kernel_id, subdir):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
@@ -300,7 +300,7 @@ class KubernetesKernel(AbstractKernel):
         raise NotImplementedError
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
@@ -357,7 +357,7 @@ class KubernetesKernel(AbstractKernel):
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
     @override
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
 

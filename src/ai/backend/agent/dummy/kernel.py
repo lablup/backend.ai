@@ -82,7 +82,7 @@ class DummyKernel(AbstractKernel):
         )
 
     @override
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["check-status"]
         await asyncio.sleep(delay)
         return {}
@@ -94,29 +94,29 @@ class DummyKernel(AbstractKernel):
         return CodeCompletionResp(result=CodeCompletionResult.success({"suggestions": []}))
 
     @override
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["get-logs"]
         await asyncio.sleep(delay)
         return {"logs": "my logs"}
 
     @override
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["interrupt-kernel"]
         await asyncio.sleep(delay)
 
     @override
-    async def start_service(self, service, opts):
+    async def start_service(self, service, opts) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["start-service"]
         await asyncio.sleep(delay)
 
     @override
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["start-model-service"]
         await asyncio.sleep(delay)
         return {}
 
     @override
-    async def shutdown_service(self, service):
+    async def shutdown_service(self, service) -> None:
         delay = self.dummy_kernel_cfg["delay"]["shutdown-service"]
         await asyncio.sleep(delay)
 
@@ -144,7 +144,7 @@ class DummyKernel(AbstractKernel):
         self.is_commiting = False
 
     @override
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["get-service-apps"]
         await asyncio.sleep(delay)
         return {
@@ -170,13 +170,13 @@ class DummyKernel(AbstractKernel):
         return b""
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
 
     @override
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
 
@@ -296,43 +296,43 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         return None
 
     @override
-    async def ping_status(self):
+    async def ping_status(self) -> None:
         return None
 
     @override
-    async def feed_batch(self, opts):
+    async def feed_batch(self, opts) -> None:
         return None
 
     @override
-    async def feed_code(self, text: str):
+    async def feed_code(self, text: str) -> None:
         return None
 
     @override
-    async def feed_input(self, text: str):
+    async def feed_input(self, text: str) -> None:
         return None
 
     @override
-    async def feed_interrupt(self):
+    async def feed_interrupt(self) -> None:
         return None
 
     @override
-    async def feed_and_get_status(self):
+    async def feed_and_get_status(self) -> None:
         return None
 
     @override
-    async def feed_and_get_completion(self, code_text, opts):
+    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
         return CodeCompletionResult.failure("not-implemented")
 
     @override
-    async def feed_start_model_service(self, model_info):
+    async def feed_start_model_service(self, model_info) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
     @override
-    async def feed_start_service(self, service_info):
+    async def feed_start_service(self, service_info) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
     @override
-    async def feed_service_apps(self):
+    async def feed_service_apps(self) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
     @override

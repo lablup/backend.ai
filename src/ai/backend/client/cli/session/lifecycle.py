@@ -58,7 +58,7 @@ list_expr: click.ParamType = CommaSeparatedListType()
 
 
 @main.group()
-def session():
+def session() -> None:
     """Set of compute session operations"""
 
 
@@ -732,7 +732,7 @@ session.command()(_restart_cmd())
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", type=click.Path(exists=True), nargs=-1)
-def upload(session_id, files):
+def upload(session_id, files) -> None:
     """
     Upload the files to a compute session's home directory.
     If the target directory is in a storage folder mount, the operation is
@@ -764,7 +764,7 @@ def upload(session_id, files):
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", nargs=-1)
 @click.option("--dest", type=Path, default=".", help="Destination path to store downloaded file(s)")
-def download(session_id, files, dest):
+def download(session_id, files, dest) -> None:
     """
     Download files from a compute session's home directory.
     If the source path is in a storage folder mount, the operation is
@@ -795,7 +795,7 @@ def download(session_id, files, dest):
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("path", metavar="PATH", nargs=1, default="/home/work")
-def ls(session_id, path):
+def ls(session_id, path) -> None:
     """
     List files in a path of a running compute session.
 
@@ -1580,7 +1580,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:  # type
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
 @click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
-def show_dependency_graph(session_id: UUID | str, table: bool):
+def show_dependency_graph(session_id: UUID | str, table: bool) -> None:
     """
     Shows the dependency graph of a compute session.
     \b

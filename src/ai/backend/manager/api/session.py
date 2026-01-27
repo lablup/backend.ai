@@ -336,7 +336,7 @@ overwritten_param_check = t.Dict({
 }).allow_extra("*")
 
 
-def sub(d, old, new):
+def sub(d, old, new) -> dict:
     for k, v in d.items():
         if isinstance(v, (Mapping, dict)):
             d[k] = sub(v, old, new)
@@ -345,7 +345,7 @@ def sub(d, old, new):
     return d
 
 
-def drop_undefined(d):
+def drop_undefined(d) -> dict:
     newd = {}
     for k, v in d.items():
         if isinstance(v, (Mapping, dict)):
@@ -1383,7 +1383,7 @@ async def find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-):
+) -> dict[str, list | str]:
     return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
 
 

@@ -317,7 +317,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -325,23 +325,23 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts):
+    async def start_service(self, service, opts) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service):
+    async def start_model_service(self, model_service) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def shutdown_service(self, service):
+    async def shutdown_service(self, service) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -357,11 +357,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         canonical: str | None = None,
         filename: str | None = None,
         extra_labels: dict[str, str] | None = None,
-    ):
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -403,7 +403,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         """
         List the directory entries of the designated path.
         The path should be inside /home/work of the container.
@@ -412,7 +412,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
     async def ping(self) -> dict[str, float] | None:
@@ -607,7 +607,7 @@ class RobustSocket:
             _zctx = zmq.asyncio.Context()
         self._zctx = _zctx
 
-    def recreate_socket(self):
+    def recreate_socket(self) -> None:
         self._init_zctx()
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
@@ -829,7 +829,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("AbstractCodeRunner.ping(): unexpected error")
             return None
 
-    async def ping_status(self):
+    async def ping_status(self) -> None:
         """
         This is to keep the REPL in/out port mapping in the Linux
         kernel's NAT table alive.
@@ -845,7 +845,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except Exception:
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
-    async def feed_batch(self, opts):
+    async def feed_batch(self, opts) -> None:
         sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
@@ -869,15 +869,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             exec_cmd.encode("utf8"),
         ])
 
-    async def feed_code(self, text: str):
+    async def feed_code(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"code", text.encode("utf8")])
 
-    async def feed_input(self, text: str):
+    async def feed_input(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"input", text.encode("utf8")])
 
-    async def feed_event(self, evdata: AgentEventData):
+    async def feed_event(self, evdata: AgentEventData) -> None:
         sock = await self._get_socket_pair()
         data = {
             "type": evdata.type,
@@ -885,7 +885,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         }
         await sock.send_multipart([b"event", _dump_json_bytes(data)])
 
-    async def feed_interrupt(self):
+    async def feed_interrupt(self) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"interrupt", b""])
 
@@ -916,7 +916,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return CodeCompletionResult.failure()
 
-    async def feed_start_model_service(self, model_info):
+    async def feed_start_model_service(self, model_info) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
@@ -938,7 +938,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_start_service(self, service_info):
+    async def feed_start_service(self, service_info) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
@@ -954,14 +954,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_shutdown_service(self, service_name: str):
+    async def feed_shutdown_service(self, service_name: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
             _dump_json_bytes(service_name),
         ])
 
-    async def feed_service_apps(self):
+    async def feed_service_apps(self) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"get-apps",

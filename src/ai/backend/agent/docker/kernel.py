@@ -110,13 +110,13 @@ class DockerKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()
 
     @override
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         container_id = self.data["container_id"]
         async with closing_async(Docker()) as docker:
             container = await docker.containers.get(container_id)
@@ -124,14 +124,14 @@ class DockerKernel(AbstractKernel):
         return {"logs": "".join(logs)}
 
     @override
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
     @override
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
@@ -153,19 +153,19 @@ class DockerKernel(AbstractKernel):
         })
 
     @override
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_start_model_service(model_service)
 
     @override
-    async def shutdown_service(self, service: str):
+    async def shutdown_service(self, service: str) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
     @override
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_service_apps()
@@ -385,7 +385,7 @@ class DockerKernel(AbstractKernel):
         return content_bytes
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
@@ -439,7 +439,7 @@ class DockerKernel(AbstractKernel):
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
     @override
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_event(evdata)

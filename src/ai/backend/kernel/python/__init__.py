@@ -29,7 +29,7 @@ class Runner(BaseRunner):
         self.input_queue = None
         self.output_queue = None
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         self.input_queue = janus.Queue()
         self.output_queue = janus.Queue()
 
@@ -83,7 +83,7 @@ class Runner(BaseRunner):
         log.error('cannot find the main script ("main.py").')
         return 127
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info) -> tuple[list, dict]:
         if service_info["name"] in ["jupyter", "jupyterlab"]:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", suffix=".py", delete=False

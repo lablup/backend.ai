@@ -12,7 +12,7 @@ from .pretty import print_error
 
 @main.command()
 @click.argument("task_id", metavar="TASKID")
-def task_logs(task_id):
+def task_logs(task_id) -> None:
     """
     Shows the output logs of a batch task.
 

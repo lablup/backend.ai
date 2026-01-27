@@ -37,12 +37,12 @@ class bdist_wheel(_bdist_wheel):
         ("exclude-source-files", None, "remove all .py files from the generated wheel"),
     )
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         super().initialize_options()
         self.python_tag = None
         self.exclude_source_files = False
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         global exclude_source_files
         if self.python_tag is None:
             if self.exclude_source_files:

@@ -400,7 +400,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature") from e
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]):
+def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     allowed_client_ip = user.get("allowed_client_ip", None)
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list

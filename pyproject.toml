@@ -174,7 +174,7 @@ ignore = [
     "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
     "ANN002",  # missing-type-args - *args type annotation, low practical value
     "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
-    "ANN201",  # missing-return-type-undocumented-public-function - 597 violations, defer for gradual migration
+    # "ANN201",  # missing-return-type-undocumented-public-function - ENABLING: analyzing patterns
     # "ANN202",  # missing-return-type-private-function - ENABLED: fixing violations incrementally
     # "ANN205",  # missing-return-type-static-method - ENABLED: fixing violations incrementally
     # "ANN206",  # missing-return-type-class-method - ENABLED: fixing violations incrementally

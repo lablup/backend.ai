@@ -79,7 +79,7 @@ format_fail = functools.partial(format_pretty, status=PrintStatus.FAILED)
 format_warn = functools.partial(format_pretty, status=PrintStatus.WARNING)
 
 
-def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
+def print_pretty(msg, *, status=PrintStatus.NONE, file=None) -> None:
     if file is None:
         file = sys.stderr
     if status == PrintStatus.NONE:
@@ -182,7 +182,7 @@ def format_error(exc: Exception) -> Iterator[str]:
         yield ("*** Traceback ***\n" + "".join(traceback.format_tb(exc.__traceback__)).strip())
 
 
-def print_error(exc: Exception, *, file=None):
+def print_error(exc: Exception, *, file=None) -> None:
     if file is None:
         file = sys.stderr
     indicator = style("\u2718", fg="bright_red", reset=False)
@@ -196,7 +196,7 @@ def print_error(exc: Exception, *, file=None):
     file.flush()
 
 
-def show_warning(message, category, filename, lineno, file=None, line=None):
+def show_warning(message, category, filename, lineno, file=None, line=None) -> None:
     echo(
         "{}: {}".format(
             style(str(category.__name__), fg="yellow", bold=True),

@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-def extract_dotfiles():
+def extract_dotfiles() -> None:
     try:
         with open("/home/config/dotfiles.json") as fr:
             dotfiles = json.loads(fr.read())

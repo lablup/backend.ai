@@ -363,63 +363,63 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
-def schema():
+def schema() -> None:
     """Command set for managing the database schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.etcd:cli")
-def etcd():
+def etcd() -> None:
     """Command set for putting/getting data to/from etcd."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.fixture:cli")
-def fixture():
+def fixture() -> None:
     """Command set for managing fixtures."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
-def api():
+def api() -> None:
     """Command set for API schema inspection and manipulation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
-def gql():
+def gql() -> None:
     """Command set for GraphQL schema."""
     # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")
-def image():
+def image() -> None:
     """Command set for managing images."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
-def redis():
+def redis() -> None:
     """Command set for Redis related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.agent:cli")
-def agent():
+def agent() -> None:
     """Command set for agent related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.scheduler:cli")
-def scheduler():
+def scheduler() -> None:
     """Command set for scheduler related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.config:cli")
-def config():
+def config() -> None:
     """Command set for configuration management."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> None:
     """Command set for dependency verification and validation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.health:cli")
-def health():
+def health() -> None:
     """Command set for health checking."""
 
 

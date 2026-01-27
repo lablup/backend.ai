@@ -19,7 +19,7 @@ class Runner(BaseRunner):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         pass
 
     async def build_heuristic(self) -> int:
@@ -30,6 +30,6 @@ class Runner(BaseRunner):
         log.warning("batch-mode execution is not supported")
         return 0
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info) -> tuple[None, dict]:
         # app kernels use service-definition templates.
         return None, {}

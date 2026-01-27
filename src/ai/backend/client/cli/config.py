@@ -16,7 +16,7 @@ from .pretty import print_done, print_error, print_fail, print_warn
 
 
 @main.command()
-def config():
+def config() -> None:
     """
     Shows the current configuration.
     """
@@ -112,7 +112,7 @@ def config():
 
 
 @main.command()
-def login():
+def login() -> None:
     """
     Log-in to the console API proxy.
     It stores the current session cookie in the OS-default
@@ -151,7 +151,7 @@ def login():
 
 
 @main.command()
-def logout():
+def logout() -> None:
     """
     Log-out from the console API proxy and clears the local cookie data.
     """
@@ -177,7 +177,7 @@ def logout():
 @click.argument("old_password", metavar="OLD_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
 @click.argument("new_password2", metavar="NEW_PASSWORD2")
-def update_password(old_password, new_password, new_password2):
+def update_password(old_password, new_password, new_password2) -> None:
     """
     Update user's password.
     """
@@ -199,7 +199,7 @@ def update_password(old_password, new_password, new_password2):
 @click.argument("user_id", metavar="USER_ID")
 @click.argument("current_password", metavar="CURRENT_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
-def update_password_no_auth(domain, user_id, current_password, new_password):
+def update_password_no_auth(domain, user_id, current_password, new_password) -> None:
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 
-def setns(fd: int):
+def setns(fd: int) -> None:
     libc_path = ctypes.util.find_library("c")
     libc = ctypes.CDLL(libc_path)
     CLONE_NEWNET = 1 << 30

@@ -32,15 +32,15 @@ class Color:
         r, g, b, a = rgba.unpack(value)
         return Color(r, g, b, a)
 
-    def to_hex(self, include_alpha=True):
+    def to_hex(self, include_alpha=True) -> str:
         if include_alpha:
             return f"#{self.red:02x}{self.green:02x}{self.blue:02x}{self.alpha:02x}"
         return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         return rgba.pack(self.red, self.green, self.blue, self.alpha)
 
-    def to_rgba(self):
+    def to_rgba(self) -> str:
         return f"rgba({self.red},{self.green},{self.blue},{self.alpha})"
 
 

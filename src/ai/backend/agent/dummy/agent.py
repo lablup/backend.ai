@@ -146,7 +146,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         await asyncio.sleep(delay)
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         return
 
     @override
@@ -177,7 +177,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
-    ):
+    ) -> Mount:
         return Mount(MountTypes.BIND, Path(), Path())
 
     @override
@@ -264,7 +264,7 @@ class DummyAgent(
         opts: Mapping[str, Any],
         api_version: int,
         flush_timeout: float,
-    ):
+    ) -> dict[str, Any]:
         return {"status": "not-implemented"}
 
     @override

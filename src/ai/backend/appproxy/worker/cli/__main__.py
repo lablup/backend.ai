@@ -129,17 +129,17 @@ def generate_openapi_spec(output: Path) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> click.Group:
     """Command set for dependency verification and validation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.health:cli")
-def health():
+def health() -> click.Group:
     """Command set for health checking."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.config:cli")
-def config():
+def config() -> click.Group:
     """Configuration management commands."""
 
 

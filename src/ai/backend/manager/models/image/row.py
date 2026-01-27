@@ -865,7 +865,7 @@ class ImageRow(Base):
         self,
         slot_type: str,
         value_range: tuple[Optional[Decimal], Optional[Decimal]],
-    ):
+    ) -> None:
         resources = self._resources
         if resources.get(slot_type) is None:
             resources[slot_type] = {}

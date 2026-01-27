@@ -17,7 +17,7 @@ async def aexecute_interactive(
     timeout=None,
     output_hook=None,
     stdin_hook=None,
-):
+) -> dict:
     """Async version of jupyter_client's execute_interactive method.
 
     https://github.com/jupyter/jupyter_client/blob/9f1c379/jupyter_client/client.py#L415

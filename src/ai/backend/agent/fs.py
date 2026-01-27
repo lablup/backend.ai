@@ -2,7 +2,7 @@ import asyncio
 from subprocess import CalledProcessError
 
 
-async def create_scratch_filesystem(scratch_dir, size):
+async def create_scratch_filesystem(scratch_dir, size) -> None:
     """
     Create scratch folder size quota by using tmpfs filesystem.
 
@@ -27,7 +27,7 @@ async def create_scratch_filesystem(scratch_dir, size):
         raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
 
 
-async def destroy_scratch_filesystem(scratch_dir):
+async def destroy_scratch_filesystem(scratch_dir) -> None:
     """
     Destroy scratch folder size quota by using tmpfs filesystem.
 

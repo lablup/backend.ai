@@ -11,7 +11,7 @@ from .pretty import print_error, print_info, print_warn
 
 
 @main.group(aliases=["sesstpl"])
-def session_template():
+def session_template() -> None:
     """Set of session template operations"""
 
 
@@ -52,7 +52,7 @@ def session_template():
     metavar="ACCESS_KEY",
     help="Set the owner of the target session explicitly.",
 )
-def create(template_path, domain, group, owner_access_key):
+def create(template_path, domain, group, owner_access_key) -> None:
     """
     Store task template to Backend.AI Manager and return template ID.
     Template can be used when creating new session.
@@ -94,7 +94,7 @@ def create(template_path, domain, group, owner_access_key):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def get(template_id, template_format, owner_access_key):
+def get(template_id, template_format, owner_access_key) -> None:
     """
     Print task template associated with given template ID
     """
@@ -115,7 +115,7 @@ def get(template_id, template_format, owner_access_key):
     is_flag=True,
     help="List all virtual folders (superadmin privilege is required).",
 )
-def list(list_all):
+def list(list_all) -> None:
     """
     List all available task templates by user.
     """
@@ -160,7 +160,7 @@ def list(list_all):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def update(template_id, template_path, owner_access_key):
+def update(template_id, template_path, owner_access_key) -> None:
     """
     Update task template stored in Backend.AI Manager.
     """
@@ -198,7 +198,7 @@ def update(template_id, template_path, owner_access_key):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def delete(template_id, force, owner_access_key):
+def delete(template_id, force, owner_access_key) -> None:
     """
     Delete task template from Backend.AI Manager.
     """

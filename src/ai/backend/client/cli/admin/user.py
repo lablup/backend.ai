@@ -282,7 +282,7 @@ def add(
     container_main_gid: int | None,
     container_gids: Iterable[int] | None,
     groups: Iterable[str],
-):
+) -> None:
     """
     Create a new user. As the user must belong to a domain,
     you should provide DOMAIN_NAME explicitly.
@@ -517,7 +517,7 @@ def update(
     unset_container_main_gid: bool,
     container_gids: Iterable[int] | Undefined,
     unset_container_gids: bool,
-):
+) -> None:
     """
     Update an existing user.
 
@@ -585,7 +585,7 @@ def update(
 @user.command()
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
-def delete(ctx: CLIContext, email):
+def delete(ctx: CLIContext, email) -> None:
     """
     Inactivate an existing user.
 
@@ -640,7 +640,7 @@ def delete(ctx: CLIContext, email):
         "and delegate the ownership to the requested admin."
     ),
 )
-def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership):
+def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership) -> None:
     """
     Delete an existing user. This action cannot be undone.
 

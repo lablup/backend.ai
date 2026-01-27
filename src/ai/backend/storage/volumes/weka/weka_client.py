@@ -41,7 +41,7 @@ class WekaQuota:
             data["used_bytes"],
         )
 
-    def to_json(self):
+    def to_json(self) -> dict[str, int | str]:
         return {
             "quota_id": self.quota_id,
             "inode_id": self.inode_id,
@@ -90,7 +90,7 @@ class WekaFs:
         )
 
 
-def error_handler(inner):
+def error_handler(inner) -> Any:
     async def outer(*args, **kwargs) -> Any:
         try:
             return await inner(*args, **kwargs)

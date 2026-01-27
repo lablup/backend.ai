@@ -103,7 +103,7 @@ class Dotfile(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update(self, data: str, permission: str):
+    async def update(self, data: str, permission: str) -> None:
         body = {
             "data": data,
             "path": self.path,
@@ -128,7 +128,7 @@ class Dotfile(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> None:
         params = {"path": self.path}
         if self.group:
             params["group"] = self.group

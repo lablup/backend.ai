@@ -21,7 +21,7 @@ def mock_corofunc(return_value) -> Mock:
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs):
+async def mock_awaitable(**kwargs) -> AsyncMock:
     """
     Mock awaitable.
 
@@ -62,25 +62,25 @@ class MockableZMQAsyncSock:
     def create_mock(cls) -> Mock:
         return mock.Mock(cls())
 
-    def bind(self, addr):
+    def bind(self, addr) -> None:
         pass
 
-    def connect(self, addr):
+    def connect(self, addr) -> None:
         pass
 
-    def close(self):
+    def close(self) -> None:
         pass
 
-    async def send(self, frame):
+    async def send(self, frame) -> None:
         pass
 
-    async def send_multipart(self, msg):
+    async def send_multipart(self, msg) -> None:
         pass
 
-    async def recv(self):
+    async def recv(self) -> None:
         pass
 
-    async def recv_multipart(self):
+    async def recv_multipart(self) -> None:
         pass
 
 
@@ -188,7 +188,7 @@ def mock_aioresponses_sequential_payloads(
 
 def setup_dockerhub_mocking(
     aiohttp_request_mock, registry_url: str, dockerhub_responses_mock: dict[str, Any]
-):
+) -> None:
     # /v2/ endpoint
     aiohttp_request_mock.get(
         f"{registry_url}/v2/",

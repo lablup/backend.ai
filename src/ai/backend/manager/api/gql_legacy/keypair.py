@@ -200,7 +200,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_compute_sessions(
         self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
-    ):
+    ) -> list[ComputeSession]:
         ctx: GraphQueryContext = info.context
 
         if raw_status is not None:

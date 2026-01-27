@@ -95,7 +95,7 @@ class Terminal:
         finally:
             await self.sock_out.send_multipart([b"finished", b"{}"])
 
-    async def start(self):
+    async def start(self) -> None:
         if self.accept_term_input:
             raise RuntimeError("Terminal is already accepting input")
         await safe_close_task(self.term_in_task)
@@ -132,7 +132,7 @@ class Terminal:
             self.accept_term_input = True
             await asyncio.sleep(0)
 
-    async def restart(self):
+    async def restart(self) -> None:
         try:
             async with self.start_lock:
                 if not self.accept_term_input:
@@ -144,7 +144,7 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error during restart of terminal")
 
-    async def term_in(self, term_writer):
+    async def term_in(self, term_writer) -> None:
         try:
             while True:
                 data = await self.sock_term_in.recv_multipart()
@@ -161,7 +161,7 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error at term_in()")
 
-    async def term_out(self, term_reader):
+    async def term_out(self, term_reader) -> None:
         try:
             while not term_reader.at_eof():
                 try:
@@ -184,7 +184,7 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error at term_out()")
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         self.term_in_task.cancel()
         self.term_out_task.cancel()
         await self.term_in_task

@@ -412,7 +412,7 @@ async def read_from_etcd(
     return config
 
 
-def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any):
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             table[k] = {}
@@ -420,14 +420,16 @@ def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], val
     table[key_path[-1]] = value
 
 
-def override_with_env(table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str):
+def override_with_env(
+    table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str
+) -> None:
     val = os.environ.get(env_key, None)
     if val is None:
         return
     override_key(table, key_path, val)
 
 
-def check(table: Any, iv: t.Trafaret):
+def check(table: Any, iv: t.Trafaret) -> Any:
     try:
         config = iv.check(table)
     except t.DataError as e:

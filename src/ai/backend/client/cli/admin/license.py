@@ -17,7 +17,7 @@ def license() -> None:
 
 
 @license.command()
-def show():
+def show() -> None:
     """
     Show the license information (enterprise editions only).
     """

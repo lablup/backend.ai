@@ -13,7 +13,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
-from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, RescanImagesResult
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
 from ai.backend.manager.data.user.types import UserData
@@ -370,7 +370,7 @@ class SessionRepository:
         image_canonical: str,
         registry_project: str,
         reporter=None,
-    ):
+    ) -> RescanImagesResult:
         return await rescan_images(
             self._db,
             image_canonical,
@@ -389,7 +389,7 @@ class SessionRepository:
         query_domain_name: str,
         group_name: Optional[str],
         query_on_behalf_of: Optional[AccessKey] = None,
-    ):
+    ) -> tuple[uuid.UUID, uuid.UUID, dict]:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
@@ -496,7 +496,7 @@ class SessionRepository:
         root_session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         allow_stale: bool = False,
-    ):
+    ) -> list[uuid.UUID]:
         """
         Public method for finding dependent sessions.
         Maintained for backward compatibility.
@@ -515,7 +515,7 @@ class SessionRepository:
         self,
         session_name_or_id: uuid.UUID | str,
         access_key: AccessKey,
-    ):
+    ) -> dict[str, list | str]:
         async with self._db.begin_readonly_session() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,

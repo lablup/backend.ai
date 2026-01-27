@@ -88,7 +88,7 @@ class Canvas:
         self.bgcolor = bgcolor
         self.fgcolor = fgcolor
 
-    def update(self):
+    def update(self) -> None:
         builtins._sorna_emit(
             MediaRecord(
                 "application/x-sorna-drawing",
@@ -97,39 +97,39 @@ class Canvas:
         )
         self._cmd_history = []
 
-    def show(self):  # alias
+    def show(self) -> None:  # alias
         self.update()
 
-    def create_turtle(self):
+    def create_turtle(self) -> Turtle:
         return Turtle(self)
 
-    def stop_animation(self):
+    def stop_animation(self) -> None:
         self._cmd_history.append((self._id, "stop-anim"))
 
-    def resume_animation(self):
+    def resume_animation(self) -> None:
         self._cmd_history.append((self._id, "resume-anim"))
 
-    def begin_group(self):
+    def begin_group(self) -> None:
         self._cmd_history.append((self._id, "begin-group"))
 
-    def end_group(self):
+    def end_group(self) -> None:
         self._cmd_history.append((self._id, "end-group"))
 
-    def begin_fill(self, c):
+    def begin_fill(self, c) -> None:
         self._cmd_history.append((self._id, "begin-fill", c.to_hex()))
 
-    def end_fill(self):
+    def end_fill(self) -> None:
         self._cmd_history.append((self._id, "end-fill"))
 
-    def background_color(self, c):
+    def background_color(self, c) -> None:
         self.bgcolor = c
         self._cmd_history.append((self._id, "bgcolor", c.to_hex()))
 
-    def stroke_color(self, c):
+    def stroke_color(self, c) -> None:
         self.fgcolor = c
         self._cmd_history.append((self._id, "fgcolor", c.to_hex()))
 
-    def line(self, x0, y0, x1, y1, color=None):
+    def line(self, x0, y0, x1, y1, color=None) -> DrawingObject:
         if color is None:
             color = self.fgcolor
         args = (
@@ -145,7 +145,7 @@ class Canvas:
         self._next_objid += 1
         return obj
 
-    def circle(self, x, y, radius, border=None, fill=None, angle=0):
+    def circle(self, x, y, radius, border=None, fill=None, angle=0) -> DrawingObject:
         if border is None:
             border = self.fgcolor
         if fill is None:
@@ -164,7 +164,7 @@ class Canvas:
         self._next_objid += 1
         return obj
 
-    def rectangle(self, left, top, width, height, border=None, fill=None, angle=0):
+    def rectangle(self, left, top, width, height, border=None, fill=None, angle=0) -> DrawingObject:
         if border is None:
             border = self.fgcolor
         if fill is None:
@@ -184,7 +184,7 @@ class Canvas:
         self._next_objid += 1
         return obj
 
-    def triangle(self, left, top, width, height, border=None, fill=None, angle=0):
+    def triangle(self, left, top, width, height, border=None, fill=None, angle=0) -> DrawingObject:
         if border is None:
             border = self.fgcolor
         if fill is None:

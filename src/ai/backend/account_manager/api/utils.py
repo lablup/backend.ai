@@ -36,7 +36,7 @@ def set_handler_attr(func, key, value) -> None:
     func._backend_attrs = attrs
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request, key, default=None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial

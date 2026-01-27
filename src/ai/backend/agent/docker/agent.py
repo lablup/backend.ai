@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 )
 
 
-async def get_extra_volumes(docker, lang):
+async def get_extra_volumes(docker, lang) -> list[MountInfo]:
     avail_volumes = (await docker.volumes.list())["Volumes"]
     if not avail_volumes:
         return []
@@ -761,7 +761,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         current_loop().run_in_executor(None, _write_config)  # ???
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -1523,7 +1523,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             blocklist=self.local_config.agent.block_network_plugins,
         )
 
-    async def shutdown(self, stop_signal: signal.Signals):
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
@@ -1730,7 +1730,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 removed_images=removed_images,
             )
 
-    async def handle_agent_socket(self):
+    async def handle_agent_socket(self) -> None:
         """
         A simple request-reply socket handler for in-container processes.
         For ease of implementation in low-level languages such as C,
@@ -2147,7 +2147,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     raise
 
     @preserve_termination_log
-    async def monitor_docker_events(self):
+    async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
         ) -> None:

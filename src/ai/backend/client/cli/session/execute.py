@@ -57,7 +57,7 @@ async def exec_loop(
     opts=None,
     vprint_done=print_done,
     is_multi=False,
-):
+) -> None:
     """
     Fully streamed asynchronous version of the execute loop.
     """
@@ -115,7 +115,7 @@ async def exec_loop(
 
 def exec_loop_sync(
     stdout, stderr, compute_session, mode, code, *, opts=None, vprint_done=print_done
-):
+) -> None:
     """
     Old synchronous polling version of the execute loop.
     """
@@ -166,7 +166,7 @@ def exec_loop_sync(
             code = ""
 
 
-async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done):
+async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done) -> None:
     # async with compute_session.stream_pty() as stream: ...
     raise NotImplementedError
 
@@ -175,7 +175,7 @@ def _noop(*args, **kwargs) -> None:
     pass
 
 
-def format_stats(stats):
+def format_stats(stats) -> None:
     formatted = []
     version = stats.pop("version", 1)
     stats.pop("status")
@@ -432,7 +432,7 @@ def run(
     network,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
-):
+) -> None:
     """
     Run the given code snippet or files in a session.
     Depending on the session ID you give (default is random),

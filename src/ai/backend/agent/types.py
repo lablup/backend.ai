@@ -190,7 +190,7 @@ class ContainerLifecycleEvent:
             f"reason:{self.reason!r})"
         )
 
-    def set_done_future_result(self, result: Any):
+    def set_done_future_result(self, result: Any) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_result(result)
@@ -198,7 +198,7 @@ class ContainerLifecycleEvent:
                 # The future is already done, ignore the error
                 pass
 
-    def set_done_future_exception(self, exception: Exception):
+    def set_done_future_exception(self, exception: Exception) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_exception(exception)

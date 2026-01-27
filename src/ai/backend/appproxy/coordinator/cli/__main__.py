@@ -168,7 +168,7 @@ def generate_openapi_spec(output: Path) -> None:
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
     """
     Run the database shell.
 
@@ -241,22 +241,22 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> click.Group:
     """Command set for dependency verification and validation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
-def health():
+def health() -> click.Group:
     """Command set for health checking."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dbschema:cli")
-def schema():
+def schema() -> click.Group:
     """Command set for managing the database schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.config:cli")
-def config():
+def config() -> click.Group:
     """Configuration management commands."""
 
 

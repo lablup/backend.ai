@@ -10,7 +10,7 @@ from .pretty import print_error, print_info, print_warn
 
 
 @click.group()
-def dotfile():
+def dotfile() -> None:
     """Provides dotfile operations."""
 
 
@@ -47,7 +47,7 @@ def dotfile():
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def create(path, permission, dotfile_path, owner_access_key, domain, group):
+def create(path, permission, dotfile_path, owner_access_key, domain, group) -> None:
     """
     Store dotfile to Backend.AI Manager.
     Dotfiles will be automatically loaded when creating kernels.
@@ -102,7 +102,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def get(path, owner_access_key, domain, group):
+def get(path, owner_access_key, domain, group) -> None:
     """
     Print dotfile content.
     """
@@ -139,7 +139,7 @@ def get(path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def list(owner_access_key, domain, group):
+def list(owner_access_key, domain, group) -> None:
     """
     List available user/domain/group dotfiles.
     """
@@ -203,7 +203,7 @@ def list(owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def update(path, permission, dotfile_path, owner_access_key, domain, group):
+def update(path, permission, dotfile_path, owner_access_key, domain, group) -> None:
     """
     Update dotfile stored in Backend.AI Manager.
     """
@@ -252,7 +252,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def delete(path, force, owner_access_key, domain, group):
+def delete(path, force, owner_access_key, domain, group) -> None:
     """
     Delete dotfile from Backend.AI Manager.
     """

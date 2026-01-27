@@ -132,7 +132,7 @@ vfolder.command()(_list_cmd())
 
 
 @vfolder.command()
-def list_hosts():
+def list_hosts() -> None:
     """
     List all mounted hosts from virtual folder root.
     (superadmin privilege required)
@@ -151,7 +151,7 @@ def list_hosts():
 
 @vfolder.command()
 @click.argument("vfolder_host")
-def perf_metric(vfolder_host):
+def perf_metric(vfolder_host) -> None:
     """
     Show the performance statistics of a vfolder host.
     (superadmin privilege required)
@@ -182,7 +182,7 @@ def perf_metric(vfolder_host):
 @click.option(
     "-a", "--agent-id", type=str, default=None, help="Target agent to fetch fstab contents."
 )
-def get_fstab_contents(agent_id):
+def get_fstab_contents(agent_id) -> None:
     """
     Get contents of fstab file from a node.
     (superadmin privilege required)
@@ -201,7 +201,7 @@ def get_fstab_contents(agent_id):
 
 
 @vfolder.command()
-def list_mounts():
+def list_mounts() -> None:
     """
     List all mounted hosts in virtual folder root.
     (superadmin privilege required)
@@ -229,7 +229,7 @@ def list_mounts():
 @click.argument("name", type=str)
 @click.option("-o", "--options", type=str, default=None, help="Mount options.")
 @click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
-def mount_host(fs_location, name, options, edit_fstab):
+def mount_host(fs_location, name, options, edit_fstab) -> None:
     """
     Mount a host in virtual folder root.
     (superadmin privilege required)
@@ -259,7 +259,7 @@ def mount_host(fs_location, name, options, edit_fstab):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
-def umount_host(name, edit_fstab):
+def umount_host(name, edit_fstab) -> None:
     """
     Unmount a host from virtual folder root.
     (superadmin privilege required)
@@ -286,7 +286,7 @@ def umount_host(name, edit_fstab):
 
 
 @vfolder.command
-def list_shared_vfolders():
+def list_shared_vfolders() -> None:
     """
     List all shared vfolder.
     (superadmin privilege required)
@@ -319,7 +319,7 @@ def list_shared_vfolders():
 
 @vfolder.command
 @click.argument("vfolder_id", type=str)
-def shared_vfolder_info(vfolder_id):
+def shared_vfolder_info(vfolder_id) -> None:
     """Show the vfolder permission information of the given virtual folder.
 
     \b
@@ -358,7 +358,7 @@ def shared_vfolder_info(vfolder_id):
 @click.option(
     "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
 )
-def update_shared_vf_permission(vfolder_id, user_id, permission):
+def update_shared_vf_permission(vfolder_id, user_id, permission) -> None:
     """
     Update permission for shared vfolders.
 
@@ -382,7 +382,7 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
 @vfolder.command()
 @click.argument("vfolder_id", type=str)
 @click.argument("user_id", type=str)
-def remove_shared_vf_permission(vfolder_id, user_id):
+def remove_shared_vf_permission(vfolder_id, user_id) -> None:
     """
     Remove permission for shared vfolders.
 
@@ -405,7 +405,7 @@ def remove_shared_vf_permission(vfolder_id, user_id):
 @vfolder.command()
 @click.argument("vfolder_id", type=str)
 @click.argument("user_email", type=str)
-def change_vfolder_ownership(vfolder_id, user_email):
+def change_vfolder_ownership(vfolder_id, user_email) -> None:
     """
     Change the ownership of vfolder
 
