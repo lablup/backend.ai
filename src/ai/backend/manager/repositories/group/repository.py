@@ -47,6 +47,7 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
@@ -64,10 +65,10 @@ from ai.backend.manager.repositories.base.updater import Updater, execute_update
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.purgers import (
     create_group_endpoint_purger,
-    create_group_endpoint_session_purger,
     create_group_kernel_purger,
     create_group_purger,
     create_group_session_purger,
+    create_session_purger_by_ids,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
@@ -526,12 +527,24 @@ class GroupRepository:
         if len(active_endpoints) > 0:
             raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
 
-        # Delete sessions that are associated with endpoints first
-        # (must be done before endpoint deletion as the subquery depends on RoutingRow)
-        await execute_batch_purger(session, create_group_endpoint_session_purger(group_id))
+        # Collect session IDs first (must be done before endpoint/routing deletion
+        # as the query depends on RoutingRow)
+        endpoint_ids = [ep.id for ep in endpoints]
+        session_id_query = sa.select(RoutingRow.session).where(
+            sa.and_(
+                RoutingRow.endpoint.in_(endpoint_ids),
+                RoutingRow.session.is_not(None),
+            )
+        )
+        session_ids_result = await session.execute(session_id_query)
+        session_ids = [row[0] for row in session_ids_result.all()]
 
-        # Delete endpoints (routings are CASCADE deleted automatically)
+        # Delete endpoints first (routings are CASCADE deleted automatically)
         await execute_batch_purger(session, create_group_endpoint_purger(group_id))
+
+        # Delete sessions using the collected IDs
+        if session_ids:
+            await execute_batch_purger(session, create_session_purger_by_ids(session_ids))
 
     @group_repository_resilience.apply()
     async def purge_group(self, group_id: uuid.UUID) -> bool:

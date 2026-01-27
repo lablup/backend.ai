@@ -39,10 +39,10 @@ from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.group.purgers import (
     create_group_endpoint_purger,
-    create_group_endpoint_session_purger,
     create_group_kernel_purger,
     create_group_purger,
     create_group_session_purger,
+    create_session_purger_by_ids,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -476,14 +476,14 @@ class TestGroupPurgersIntegration:
     ) -> None:
         """Test purging sessions connected to group endpoints via routings.
 
-        The endpoint_session_purger finds sessions via routing.session references.
-        To satisfy FK constraints (routing.session -> sessions with RESTRICT),
-        we first set routing.session to NULL, then delete the sessions.
+        The correct deletion order is:
+        1. Collect session IDs (before routings are deleted)
+        2. Delete endpoints (CASCADE deletes routings)
+        3. Delete sessions by collected IDs (now safe because routings are gone)
         """
         group_id = sample_group.id
-        endpoint_sessions, routings = sample_endpoint_sessions_with_routings
+        endpoint_sessions, _ = sample_endpoint_sessions_with_routings
         session_ids = [sess.id for sess in endpoint_sessions]
-        routing_ids = [r.id for r in routings]
 
         # Verify endpoint sessions exist
         async with db_with_cleanup.begin_session() as session:
@@ -494,22 +494,17 @@ class TestGroupPurgersIntegration:
             )
             assert count == len(endpoint_sessions)
 
-        # Verify the purger's subquery correctly identifies the sessions
+        # Delete endpoints first (CASCADE deletes routings)
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_endpoint_session_purger(group_id)
-            subquery = purger.spec.build_subquery()
-            found_sessions = (await session.scalars(subquery)).all()
-            assert len(found_sessions) == len(endpoint_sessions)
+            purger = create_group_endpoint_purger(group_id)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(sample_endpoints)
 
-        # Set routing.session to NULL to satisfy FK constraints before session deletion
+        # Purge endpoint sessions using collected session IDs
         async with db_with_cleanup.begin_session() as session:
-            await session.execute(
-                sa.update(RoutingRow).where(RoutingRow.id.in_(routing_ids)).values(session=None)
-            )
-
-        # Purge endpoint sessions using direct session IDs (subquery won't work after NULLing)
-        async with db_with_cleanup.begin_session() as session:
-            await session.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
+            purger = create_session_purger_by_ids(session_ids)
+            result = await execute_batch_purger(session, purger)
+            assert result.deleted_count == len(endpoint_sessions)
 
         # Verify endpoint sessions are deleted
         async with db_with_cleanup.begin_session() as session:
