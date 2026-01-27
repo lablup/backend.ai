@@ -575,11 +575,11 @@ class Metric:
         if self.current_hook is not None:
             self.current = self.current_hook(self)
 
-    def to_serializable_dict(self) -> MetricValue:
+    def to_serializable_dict(self) -> dict[str, Any]:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "__type": self.type.name,  # type: ignore
+            "__type": self.type.name,
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
                 str(remove_exponent(self.capacity.quantize(q)))
@@ -597,11 +597,14 @@ class Metric:
             ),
             "unit_hint": self.unit_hint,
             **{
-                f"stats.{k}": v  # type: ignore
+                f"stats.{k}": v
                 for k, v in self.stats.to_serializable_dict().items()
                 if k in self.stats_filter
             },
         }
+
+    def to_metric_value(self) -> MetricValue:
+        return MetricValue.model_validate(self.to_serializable_dict())
 
 
 @attrs.define(auto_attribs=True, slots=True)

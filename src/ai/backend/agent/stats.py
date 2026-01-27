@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
     cast,
 )
@@ -309,7 +310,7 @@ class Metric:
         if self.current_hook is not None:
             self.current = self.current_hook(self)
 
-    def to_serializable_dict(self) -> MetricValue:
+    def to_serializable_dict(self) -> dict[str, Any]:
         q_pct = Decimal("0.00")
         return {
             "current": _to_serializable_value(self.current),
@@ -325,11 +326,14 @@ class Metric:
             ),
             "unit_hint": self.unit_hint,
             **{
-                f"stats.{k}": v  # type: ignore
+                f"stats.{k}": v
                 for k, v in self.stats.to_serializable_dict().items()
                 if k in self.stats_filter
             },
         }
+
+    def to_metric_value(self) -> MetricValue:
+        return MetricValue.model_validate(self.to_serializable_dict())
 
 
 class StatContext:
@@ -510,7 +514,7 @@ class StatContext:
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
         agent_id = self.agent.id
-        device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
+        device_metrics: dict[MetricKey, dict[DeviceId, dict[str, Any]]] = {}
         flattened_metrics: list[FlattenedDeviceMetric] = []
         for metric_key, per_device in self.device_metrics.items():
             if metric_key not in device_metrics:
@@ -528,7 +532,7 @@ class StatContext:
                     (CURRENT_METRIC_KEY, metric_value["current"]),
                     (PCT_METRIC_KEY, metric_value["pct"]),
                 ]
-                if (capacity := metric_value["capacity"]) is not None:
+                if (capacity := metric_value.get("capacity")) is not None:
                     value_pairs.append((CAPACITY_METRIC_KEY, capacity))
                 flattened_metrics.append(
                     FlattenedDeviceMetric(
@@ -540,7 +544,7 @@ class StatContext:
                 )
 
         # push to the Redis server
-        node_metrics: dict[MetricKey, MetricValue] = {}
+        node_metrics: dict[MetricKey, dict[str, Any]] = {}
         for key, obj in self.node_metrics.items():
             try:
                 node_metrics[key] = obj.to_serializable_dict()
@@ -724,7 +728,7 @@ class StatContext:
         for kernel_id in updated_kernel_ids:
             session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
             metrics = self.kernel_metrics[kernel_id]
-            serializable_metrics: dict[MetricKey, MetricValue] = {}
+            metric_values: dict[MetricKey, dict[str, Any]] = {}
             for key, obj in metrics.items():
                 try:
                     metric_value = obj.to_serializable_dict()
@@ -733,12 +737,12 @@ class StatContext:
                         "Failed to serialize metric (Metric key: {}, {})", key, str(obj.stats)
                     )
                     continue
-                serializable_metrics[key] = metric_value
+                metric_values[key] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
                     (PCT_METRIC_KEY, metric_value["pct"]),
                 ]
-                if (capacity := metric_value["capacity"]) is not None:
+                if (capacity := metric_value.get("capacity")) is not None:
                     value_pairs.append((CAPACITY_METRIC_KEY, capacity))
                 kernel_updates.append(
                     FlattenedKernelMetric(
@@ -752,9 +756,9 @@ class StatContext:
                     )
                 )
             if self.agent.local_config.debug.log_stats:
-                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+                log.debug("kernel_updates: {0}: {1}", kernel_id, metric_values)
 
-            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
+            kernel_serialized_updates.append((kernel_id, msgpack.packb(metric_values)))
 
         self._stage_observer.observe_stage(
             stage="before_report_to_redis",

@@ -8,6 +8,7 @@ from ai.backend.common.types import (
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
+    MetricValue,
     ResourceSlot,
     SlotName,
     SlotTypes,
@@ -369,3 +370,94 @@ def test_resource_slot_calc_with_infinity():
     r5 = r1 + r4
     assert r5["a"] == Decimal("Infinity")
     assert r5["b"] == 5
+
+
+class TestMetricValue:
+    def test_legacy_dict_validation(self) -> None:
+        legacy = {
+            "current": "100.000",
+            "capacity": "1000.000",
+            "pct": "10.00",
+            "unit_hint": "bytes",
+            "stats.min": "50.000",
+            "stats.max": "200.000",
+            "stats.sum": "500.000",
+            "stats.avg": "100.000",
+            "stats.diff": "50.000",
+            "stats.rate": "10.000",
+        }
+        mv = MetricValue.model_validate(legacy)
+        assert mv.current == "100.000"
+        assert mv.capacity == "1000.000"
+        assert mv.pct == "10.00"
+        assert mv.unit_hint == "bytes"
+        assert mv.stats_min == "50.000"
+        assert mv.stats_max == "200.000"
+        assert mv.stats_sum == "500.000"
+        assert mv.stats_avg == "100.000"
+        assert mv.stats_diff == "50.000"
+        assert mv.stats_rate == "10.000"
+
+    def test_serialization_preserves_alias(self) -> None:
+        mv = MetricValue(
+            current="100",
+            pct="10.00",
+            unit_hint="bytes",
+            stats_min="50",
+            stats_max="200",
+        )
+        data = mv.model_dump(by_alias=True, exclude_none=True)
+        assert "stats.min" in data
+        assert "stats.max" in data
+        assert "stats_min" not in data
+        assert "stats_max" not in data
+        assert data["stats.min"] == "50"
+        assert data["stats.max"] == "200"
+
+    def test_partial_stats_fields(self) -> None:
+        partial = {
+            "current": "100",
+            "pct": "10.00",
+            "unit_hint": "bytes",
+            "stats.max": "200",
+        }
+        mv = MetricValue.model_validate(partial)
+        assert mv.stats_max == "200"
+        assert mv.stats_min is None
+        assert mv.stats_sum is None
+        assert mv.stats_avg is None
+
+    def test_appproxy_type_field(self) -> None:
+        with_type = {
+            "current": "100",
+            "pct": "10.00",
+            "unit_hint": "bytes",
+            "__type": "GAUGE",
+        }
+        mv = MetricValue.model_validate(with_type)
+        assert mv.type_ == "GAUGE"
+
+        data = mv.model_dump(by_alias=True, exclude_none=True)
+        assert "__type" in data
+        assert data["__type"] == "GAUGE"
+        assert "type_" not in data
+
+    def test_round_trip_serialization(self) -> None:
+        original = {
+            "current": "100.000",
+            "capacity": "1000.000",
+            "pct": "10.00",
+            "unit_hint": "bytes",
+            "stats.min": "50.000",
+            "stats.max": "200.000",
+        }
+        mv = MetricValue.model_validate(original)
+        serialized = mv.model_dump(by_alias=True, exclude_none=True)
+        mv2 = MetricValue.model_validate(serialized)
+
+        assert mv.current == mv2.current
+        assert mv.capacity == mv2.capacity
+        assert mv.pct == mv2.pct
+        assert mv.unit_hint == mv2.unit_hint
+        assert mv.stats_min == mv2.stats_min
+        assert mv.stats_max == mv2.stats_max

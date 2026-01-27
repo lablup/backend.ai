@@ -34,7 +34,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import AccessKey, MetricKey, MetricValue, ValkeyTarget
+from ai.backend.common.types import AccessKey, MetricKey, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1385,10 +1385,8 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def store_inference_metrics(
         self,
-        app_metrics_updates: dict[UUID, dict[MetricKey, MetricValue | Mapping[str, Any]]],
-        replica_metrics_updates: dict[
-            tuple[UUID, UUID], dict[MetricKey, MetricValue | Mapping[str, Any]]
-        ],
+        app_metrics_updates: dict[UUID, dict[MetricKey, Mapping[str, Any]]],
+        replica_metrics_updates: dict[tuple[UUID, UUID], dict[MetricKey, Mapping[str, Any]]],
         cache_lifespan: int = 120,
     ) -> None:
         """

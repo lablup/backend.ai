@@ -44,6 +44,7 @@ import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -558,22 +559,62 @@ class MovingStatValue(TypedDict):
     version: Optional[int]  # for legacy client compatibility
 
 
-MetricValue = TypedDict(
-    "MetricValue",
-    {
-        "current": str,
-        "capacity": Optional[str],
-        "pct": str,
-        "unit_hint": str,
-        "stats.min": str,
-        "stats.max": str,
-        "stats.sum": str,
-        "stats.avg": str,
-        "stats.diff": str,
-        "stats.rate": str,
-        "stats.version": Optional[int],
-    },
-)
+class MetricValue(BaseModel):
+    """Metric value with optional statistics fields.
+
+    The stats_* fields use aliases to serialize to "stats.min", "stats.max", etc.
+    for backward compatibility with existing consumers.
+    """
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+    current: str
+    capacity: str | None = None
+    pct: str
+    unit_hint: str
+    stats_min: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.min", "stats_min"),
+        serialization_alias="stats.min",
+    )
+    stats_max: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.max", "stats_max"),
+        serialization_alias="stats.max",
+    )
+    stats_sum: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.sum", "stats_sum"),
+        serialization_alias="stats.sum",
+    )
+    stats_avg: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.avg", "stats_avg"),
+        serialization_alias="stats.avg",
+    )
+    stats_diff: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.diff", "stats_diff"),
+        serialization_alias="stats.diff",
+    )
+    stats_rate: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.rate", "stats_rate"),
+        serialization_alias="stats.rate",
+    )
+    stats_version: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("stats.version", "stats_version"),
+        serialization_alias="stats.version",
+    )
+    # Used by appproxy for metric type identification
+    type_: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("__type", "type_"),
+        serialization_alias="__type",
+    )
 
 
 class IntrinsicSlotNames(enum.Enum):

@@ -9,8 +9,6 @@ from typing import Any, Optional
 
 import humanize
 
-from ai.backend.common.types import MetricValue
-
 from .types import AbstractOutputFormatter, FieldSpec
 
 
@@ -199,7 +197,7 @@ class AgentStatFormatter(OutputFormatter):
             return ""
 
         percent_formatter = lambda metric, _: "{} %".format(metric["pct"])
-        value_formatters: Mapping[str, Callable[[MetricValue, bool], str]] = {
+        value_formatters: Mapping[str, Callable[[Mapping[str, Any], bool], str]] = {
             "bytes": lambda metric, binary: "{} / {}".format(
                 humanize.naturalsize(int(metric["current"]), binary=binary, gnu=binary),
                 (
@@ -219,7 +217,7 @@ class AgentStatFormatter(OutputFormatter):
             "%": percent_formatter,
         }
 
-        def format_value(metric: MetricValue, binary: bool) -> str:
+        def format_value(metric: Mapping[str, Any], binary: bool) -> str:
             unit_hint = metric["unit_hint"]
             formatter = value_formatters.get(
                 unit_hint,
