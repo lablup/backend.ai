@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeVar
@@ -10,8 +9,7 @@ from typing import TypeVar
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.data.permission.id import ScopeId as ScopeData
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -28,7 +26,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class RBACEntityCreator(Generic[TRow]):
+class RBACEntityCreator[TRow: Base]:
     """Creator for a single scope-scoped entity.
 
     Attributes:
@@ -39,13 +37,9 @@ class RBACEntityCreator(Generic[TRow]):
     """
 
     spec: CreatorSpec[TRow]
-    # scope_type: ScopeType
-    # scope_id: str
+    scope_type: ScopeType
+    scope_id: str
     entity_type: EntityType
-
-    @abstractmethod
-    def scope_data(self) -> ScopeData:
-        pass
 
 
 @dataclass
@@ -95,11 +89,10 @@ async def execute_rbac_entity_creator[TRow: Base](
     # 3. Extract RBAC info and insert association
     instance_state = inspect(row)
     pk_value = instance_state.identity[0]
-    scope_data = creator.scope_data()
     db_sess.add(
         AssociationScopesEntitiesRow(
-            scope_type=scope_data.scope_type,
-            scope_id=scope_data.scope_id,
+            scope_type=creator.scope_type,
+            scope_id=creator.scope_id,
             entity_type=creator.entity_type,
             entity_id=str(pk_value),
         ),
@@ -124,11 +117,10 @@ class RBACBulkEntityCreator[TRow: Base]:
         entity_type: The entity type for all entities.
     """
 
-    # specs: Sequence[CreatorSpec[TRow]]
-    # scope_type: ScopeType
-    # scope_id: str
-    # entity_type: EntityType
-    entity_creators: Sequence[RBACEntityCreator[TRow]]
+    specs: Sequence[CreatorSpec[TRow]]
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
 
 
 @dataclass
@@ -156,14 +148,11 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     Returns:
         RBACBulkEntityCreatorResult containing all created rows.
     """
-    if not creator.entity_creators:
+    if not creator.specs:
         return RBACBulkEntityCreatorResult(rows=[])
 
     # 1. Build and add all rows
-    # rows = [creator.spec.build_row() for creator in creator.entity_creators]
-    rows = []
-    for entity_creator in creator.entity_creators:
-        rows.append(entity_creator.spec.build_row())
+    rows = [spec.build_row() for spec in creator.specs]
     db_sess.add_all(rows)
 
     mapper = inspect(type(rows[0]))
@@ -176,17 +165,15 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     # 2. Flush to get DB-generated IDs and insert associations
     await db_sess.flush()
 
-    associations = []
-    for entity_creator, row in zip(creator.entity_creators, rows, strict=False):
-        scope_data = entity_creator.scope_data()
-        associations.append(
-            AssociationScopesEntitiesRow(
-                scope_type=scope_data.scope_type,
-                scope_id=scope_data.scope_id,
-                entity_type=entity_creator.entity_type,
-                entity_id=str(inspect(row).identity[0]),
-            )
+    associations = [
+        AssociationScopesEntitiesRow(
+            scope_type=creator.scope_type,
+            scope_id=creator.scope_id,
+            entity_type=creator.entity_type,
+            entity_id=str(inspect(row).identity[0]),
         )
+        for row in rows
+    ]
     db_sess.add_all(associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
