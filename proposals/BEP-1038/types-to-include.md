@@ -97,15 +97,6 @@ class ImageV2GQL(Node):
     # Registry
     registry_id: UUID  # For direct query without loading full registry node
     registry: str      # TODO: Replace with ContainerRegistryNode connection
-
-    @classmethod
-    def from_row(
-        cls,
-        row: ImageRow,
-        *,
-        permissions: list[ImagePermission] | None = None,
-    ) -> Self:
-        ...
 ```
 
 ### ImageEdgeGQL

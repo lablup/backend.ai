@@ -87,7 +87,6 @@ ImageV2GQL
 ### PR Scope
 
 - [ ] Implement all types listed in "Types to Include"
-- [ ] Implement `from_row()` factory method for `ImageV2GQL`
 - [ ] Implement connection resolver with pagination
 
 ### Future PRs
