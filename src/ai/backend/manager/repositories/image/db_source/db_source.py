@@ -39,10 +39,7 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.batch_querier import (
-    BatchQuerier,
-    execute_batch_querier,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
