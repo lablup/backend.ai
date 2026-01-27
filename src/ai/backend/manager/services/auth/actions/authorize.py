@@ -3,7 +3,7 @@ from typing import Optional, override
 
 from aiohttp import web
 
-from ai.backend.common.dto.manager.auth.field import AuthTokenType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.services.auth.actions.base import AuthAction
