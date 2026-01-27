@@ -426,14 +426,17 @@ class VfolderRepository:
             VFolderInvalidParameter: If the vfolder status is not purgable.
         """
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
-        vfolder_data = await self.get_by_id(vfolder_uuid)
-        if vfolder_data is None:
-            raise VFolderNotFound(extra_data=str(vfolder_uuid))
-        if vfolder_data.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
-            raise VFolderInvalidParameter(f"Cannot purge vfolder with status {vfolder_data.status}")
         async with self._db.begin_session() as session:
+            # Fetch vfolder first to validate status before purging.
+            vfolder_row = await self._get_vfolder_by_id(session, vfolder_uuid)
+            if vfolder_row is None:
+                raise VFolderNotFound(extra_data=str(vfolder_uuid))
+            if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
+                raise VFolderInvalidParameter(
+                    f"Cannot purge vfolder with status {vfolder_row.status}"
+                )
             await execute_purger(session, purger)
-            return vfolder_data
+            return vfolder_row.to_data()
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:
