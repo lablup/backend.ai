@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from ai.backend.client.output.fields import vfolder_fields
@@ -27,7 +29,7 @@ class Model(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls):
+    async def list(cls) -> None:
         """ """
 
     @api_function
@@ -84,7 +86,7 @@ class Model(BaseFunction):
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,
-    ):
+    ) -> dict[str, Any]:
         rqst = Request("POST", "/folders")
         rqst.set_json({
             "name": name,

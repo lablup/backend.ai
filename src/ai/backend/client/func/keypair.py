@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
 
@@ -118,7 +120,7 @@ class KeyPair(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, access_key: str):
+    async def delete(cls, access_key: str) -> dict:
         """
         Deletes an existing keypair with given ACCESSKEY.
         """

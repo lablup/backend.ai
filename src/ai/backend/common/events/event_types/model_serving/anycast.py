@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Optional, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -23,7 +25,7 @@ class RouteCreationEvent(AbstractAnycastEvent):
         return (str(self.route_id),)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(uuid.UUID(value[0]))
 
     @classmethod
@@ -62,7 +64,7 @@ class EndpointRouteListUpdatedEvent(AbstractAnycastEvent):
         return (str(self.endpoint_id),)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(uuid.UUID(value[0]))
 
     @classmethod

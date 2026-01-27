@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import ssl
 import time
@@ -29,7 +31,7 @@ class WekaQuota:
     used_bytes: Optional[int]
 
     @classmethod
-    def from_json(cls, quota_id: str, data: Any):
+    def from_json(cls, quota_id: str, data: Any) -> WekaQuota:
         return WekaQuota(
             quota_id,
             data["inode_id"],

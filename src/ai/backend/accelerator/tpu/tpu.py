@@ -1,16 +1,24 @@
+from __future__ import annotations
+
 import json
 import os
 from asyncio import subprocess
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, TypedDict
 
 import aiohttp
+
+
+class TPUDeviceProps(TypedDict):
+    hw_location: str
+    memory_size: int
+    model_name: str
 
 
 class libtpu:
     zone: ClassVar[Optional[str]] = None
 
     @classmethod
-    async def _run_ctpu(cls, cmd):
+    async def _run_ctpu(cls, cmd) -> str:
         if not cls.zone:
             try:
                 proc = await subprocess.create_subprocess_exec(
@@ -71,8 +79,7 @@ class libtpu:
         return devices_info[dev_idx].strip()
 
     @classmethod
-    async def get_device_props(cls, dev_name: str):
-        props = {}
+    async def get_device_props(cls, dev_name: str) -> TPUDeviceProps:
         cmd = ["compute", "tpus", "describe", dev_name, "--format", "json"]
         ret = await cls._run_ctpu(cmd)
 
@@ -91,7 +98,8 @@ class libtpu:
             int(cores) * 16 * 1024 * 1024 if tpu_version == "v3" else int(cores) * 8 * 1024 * 1024
         )
 
-        props["hw_location"] = tpu_info["name"].split("/")[-1]
-        props["memory_size"] = memory_size
-        props["model_name"] = f"Google Cloud TPU {tpu_version} ({cores} cores)"
-        return props
+        return TPUDeviceProps(
+            hw_location=tpu_info["name"].split("/")[-1],
+            memory_size=memory_size,
+            model_name=f"Google Cloud TPU {tpu_version} ({cores} cores)",
+        )

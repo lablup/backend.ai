@@ -3,7 +3,7 @@ from collections.abc import Callable
 from http import HTTPStatus
 from typing import Any
 from unittest import mock
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from aioresponses import CallbackResult
 
@@ -59,7 +59,7 @@ class MockableZMQAsyncSock:
     # which does not have such side effects.
 
     @classmethod
-    def create_mock(cls):
+    def create_mock(cls) -> Mock:
         return mock.Mock(cls())
 
     def bind(self, addr):

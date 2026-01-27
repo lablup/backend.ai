@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Optional, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -53,7 +55,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -96,7 +98,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -129,7 +131,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             value[0],
             VolumeMountableNodeType(value[1]),

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
@@ -535,18 +537,18 @@ class LibraryBase(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def load_library(cls) -> ctypes.CDLL:
+    def load_library(cls) -> ctypes.CDLL | None:
         pass
 
     @classmethod
-    def _ensure_lib(cls):
+    def _ensure_lib(cls) -> None:
         if cls._lib is None:
             cls._lib = cls.load_library()
         if cls._lib is None:
             raise ImportError(f"Could not load the {cls.name} library!")
 
     @classmethod
-    def invoke(cls, func_name, *args, check_rc=True):
+    def invoke(cls, func_name, *args, check_rc=True) -> int:
         try:
             cls._ensure_lib()
         except ImportError:
@@ -564,7 +566,7 @@ class libcudart(LibraryBase):
     _version = (0, 0)
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         match system_type:
             case "Windows":
@@ -611,7 +613,7 @@ class libcudart(LibraryBase):
         return count.value
 
     @classmethod
-    def get_device_props(cls, device_idx: int):
+    def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
         props_struct: cudaDeviceProp_t
         if cls.get_version() >= (13, 0):
             props_struct = cudaDeviceProp_v13()
@@ -640,7 +642,7 @@ class libcudart(LibraryBase):
         return props
 
     @classmethod
-    def reset(cls):
+    def reset(cls) -> None:
         """
         Releases the underlying CUDA driver context and resources occupied by it.
         """
@@ -688,7 +690,7 @@ class libnvml(LibraryBase):
     _initialized = False
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         if system_type == "Windows":
             return _load_library("libnvidia-ml.dll")
@@ -701,13 +703,13 @@ class libnvml(LibraryBase):
         return None
 
     @classmethod
-    def ensure_init(cls):
+    def ensure_init(cls) -> None:
         if not cls._initialized:
             cls.invoke("nvmlInit", NVML_INIT_FLAG_NO_GPUS)
             cls._initialized = True
 
     @classmethod
-    def shutdown(cls):
+    def shutdown(cls) -> None:
         if cls._initialized:
             cls.invoke("nvmlShutdown")
 
