@@ -16,6 +16,7 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
     ImageDataWithDetails,
+    ImageListResult,
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
@@ -25,6 +26,7 @@ from ai.backend.manager.models.image import (
     ImageRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.batch_querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
@@ -277,3 +279,11 @@ class ImageRepository:
         Deletes an image and all its aliases.
         """
         return await self._db_source.remove_image_and_aliases(image_id)
+
+    @image_repository_resilience.apply()
+    async def search_images(self, querier: BatchQuerier) -> ImageListResult:
+        """
+        Search images using a batch querier with conditions, pagination, and ordering.
+        Returns ImageListResult with items and pagination info.
+        """
+        return await self._db_source.search_images(querier)

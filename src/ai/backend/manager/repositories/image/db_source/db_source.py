@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from typing import Optional, cast
@@ -16,6 +18,7 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
     ImageDataWithDetails,
+    ImageListResult,
     ImageStatus,
     RescanImagesResult,
 )
@@ -36,6 +39,10 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.batch_querier import (
+    BatchQuerier,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -321,3 +328,19 @@ class ImageDBSource:
             return data
         except DBAPIError as e:
             raise PurgeImageActionByIdObjectDBError(str(e)) from e
+
+    async def search_images(self, querier: BatchQuerier) -> ImageListResult:
+        """
+        Search images using a batch querier with conditions, pagination, and ordering.
+        Returns ImageListResult with items and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageRow.to_detailed_dataclass() for row in result.rows]
+            return ImageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

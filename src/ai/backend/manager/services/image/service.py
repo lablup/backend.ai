@@ -80,6 +80,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.search_images import (
+    SearchImagesAction,
+    SearchImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
@@ -343,3 +347,15 @@ class ImageService:
             action.image_canonical, action.architecture
         )
         return ClearImageCustomResourceLimitActionResult(image_data=image_data)
+
+    async def search_images(self, action: SearchImagesAction) -> SearchImagesActionResult:
+        """
+        Search images using a batch querier with conditions, pagination, and ordering.
+        """
+        result = await self._image_repository.search_images(action.querier)
+        return SearchImagesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

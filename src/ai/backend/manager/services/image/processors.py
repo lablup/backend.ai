@@ -65,6 +65,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.search_images import (
+    SearchImagesAction,
+    SearchImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
@@ -107,6 +111,7 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
+    search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
         self.get_image_installed_agents = ActionProcessor(
@@ -137,6 +142,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.clear_image_custom_resource_limit = ActionProcessor(
             service.clear_image_custom_resource_limit, action_monitors
         )
+        self.search_images = ActionProcessor(service.search_images, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
