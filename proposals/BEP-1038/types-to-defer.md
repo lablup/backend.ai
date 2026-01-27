@@ -26,12 +26,12 @@ The `ContainerRegistryNode` will include:
 
 ```python
 # Current implementation
-@strawberry.type(name="ImageNode")
+@strawberry.type(name="ImageV2")
 class ImageV2GQL(Node):
     registry: str  # Keep as string for now
 
 # Future implementation (after ContainerRegistryNode PR)
-@strawberry.type(name="ImageNode")
+@strawberry.type(name="ImageV2")
 class ImageV2GQL(Node):
     @strawberry.field
     async def registry(self, info: strawberry.Info) -> ContainerRegistryNode | None:
