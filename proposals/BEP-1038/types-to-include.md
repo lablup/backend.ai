@@ -96,7 +96,7 @@ class ImageV2GQL(Node):
 
     # Registry
     registry_id: UUID  # For direct query without loading full registry node
-    registry: str      # TODO: Replace with ContainerRegistryNode connection
+    # registry: ContainerRegistryNode connection to be added later
 ```
 
 ### ImageEdgeGQL
