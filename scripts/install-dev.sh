@@ -507,8 +507,11 @@ install_system_pkg() {
 }
 
 install_node() {
-  # Set NVM_DIR first
-  export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+  # Set NVM_DIR first, but respect any pre-existing value
+  if [ -z "${NVM_DIR-}" ]; then
+    NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+  fi
+  export NVM_DIR
 
   # Check if NVM is already installed by checking the directory and nvm.sh
   if [ ! -d "$NVM_DIR" ] || [ ! -s "$NVM_DIR/nvm.sh" ]; then
