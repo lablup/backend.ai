@@ -798,7 +798,9 @@ class AgentSummary(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
-        query = sa.select(AgentRow)
+        # Build query to get paginated agent IDs without JOIN
+        # to avoid pagination issues caused by row multiplication from kernel JOIN
+        query = sa.select(AgentRow.id)
 
         if raw_status is not None:
             query = query.where(AgentRow.status == AgentStatus[raw_status])
@@ -814,31 +816,21 @@ class AgentSummary(graphene.ObjectType):
                 AgentRow.scaling_group.asc(),
                 AgentRow.id.asc(),
             )
-        query = (
-            query.select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
-            .options(contains_eager(AgentRow.kernels))
-            .limit(limit)
-            .offset(offset)
-        )
+
+        query = query.limit(limit).offset(offset)
+
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
         )
+
         agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            result = await db_session.scalars(query)
-            rows = result.unique().all()
-            for row in rows:
-                agent_ids.append(AgentId(row.id))
+            result = await db_session.execute(query)
+            for row in result:
+                agent_ids.append(AgentId(row[0]))
+
+        if not agent_ids:
+            return []
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
