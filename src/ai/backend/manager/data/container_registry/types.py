@@ -1,8 +1,25 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 from ai.backend.common.container_registry import ContainerRegistryType
+
+
+@dataclass
+class HarborProjectInfo:
+    url: str
+    project: str
+    ssl_verify: bool
+
+
+class HarborAuthArgs(TypedDict):
+    username: str
+    password: str
+
+
+class HarborProjectQuotaInfo(TypedDict):
+    previous_quota: int
+    quota_id: int
 
 
 @dataclass
