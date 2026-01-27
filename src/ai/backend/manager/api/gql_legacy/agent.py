@@ -798,8 +798,6 @@ class AgentSummary(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
-        # Build query to get paginated agent IDs without JOIN
-        # to avoid pagination issues caused by row multiplication from kernel JOIN
         query = sa.select(AgentRow.id)
 
         if raw_status is not None:
