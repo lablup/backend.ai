@@ -81,6 +81,8 @@ from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
+from ai.backend.manager.services.project_config.processors import ProjectConfigProcessors
+from ai.backend.manager.services.project_config.service import ProjectConfigService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -155,6 +157,7 @@ class Services:
     export: ExportService
     fair_share: FairShareService
     group: GroupService
+    project_config: ProjectConfigService
     user: UserService
     image: ImageService
     container_registry: ContainerRegistryService
@@ -215,6 +218,9 @@ class Services:
             args.config_provider,
             args.valkey_stat_client,
             repositories.group,
+        )
+        project_config_service = ProjectConfigService(
+            repositories.project_config.repository,
         )
         user_service = UserService(
             args.storage_manager,
@@ -374,6 +380,7 @@ class Services:
             export=export_service,
             fair_share=fair_share_service,
             group=group_service,
+            project_config=project_config_service,
             user=user_service,
             image=image_service,
             container_registry=container_registry_service,
@@ -419,6 +426,7 @@ class Processors(AbstractProcessorPackage):
     export: ExportProcessors
     fair_share: FairShareProcessors
     group: GroupProcessors
+    project_config: ProjectConfigProcessors
     user: UserProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
@@ -458,6 +466,9 @@ class Processors(AbstractProcessorPackage):
         export_processors = ExportProcessors(services.export, action_monitors)
         fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
+        project_config_processors = ProjectConfigProcessors(
+            services.project_config, action_monitors
+        )
         user_processors = UserProcessors(services.user, action_monitors)
         image_processors = ImageProcessors(services.image, action_monitors)
         container_registry_processors = ContainerRegistryProcessors(
@@ -527,6 +538,7 @@ class Processors(AbstractProcessorPackage):
             export=export_processors,
             fair_share=fair_share_processors,
             group=group_processors,
+            project_config=project_config_processors,
             user=user_processors,
             image=image_processors,
             container_registry=container_registry_processors,
@@ -567,6 +579,7 @@ class Processors(AbstractProcessorPackage):
             *self.export.supported_actions(),
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
+            *self.project_config.supported_actions(),
             *self.user.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
