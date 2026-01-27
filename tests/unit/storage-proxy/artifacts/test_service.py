@@ -9,7 +9,8 @@ from aiohttp import ClientError, ClientResponseError
 from aioresponses import aioresponses
 from huggingface_hub.hf_api import RepoFile
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -19,7 +20,7 @@ from ai.backend.common.data.storage.registries.types import (
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
-from ai.backend.storage.client.huggingface import HuggingFaceClient
+from ai.backend.storage.client.huggingface import HuggingFaceClient, HuggingFaceScanner
 from ai.backend.storage.client.manager import ManagerHTTPClientPool
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
@@ -27,7 +28,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
@@ -39,7 +40,6 @@ from ai.backend.storage.errors import (
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
-    HuggingFaceScanner,
 )
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirDownloadStep,
@@ -47,7 +47,6 @@ from ai.backend.storage.services.artifacts.reservoir import (
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool

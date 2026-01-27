@@ -7,12 +7,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.health_checker.types import CID_POSTGRES
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.manager.config.bootstrap import DatabaseConfig
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
-from ai.backend.testutils.bootstrap import (
-    HostPortPairModel,
-)
 
 
 @pytest.fixture

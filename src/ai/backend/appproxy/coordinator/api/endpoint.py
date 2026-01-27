@@ -20,6 +20,7 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     ProxyProtocol,
     PydanticResponse,
+    SessionConfig,
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import (
@@ -33,7 +34,7 @@ from ai.backend.appproxy.coordinator.models.worker import add_circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
 
-from .types import SessionConfig, StubResponseModel
+from .types import StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:

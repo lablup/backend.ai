@@ -279,6 +279,7 @@ preview = true
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 ignore_missing_imports = true
 follow_untyped_imports = false
+implicit_reexport = false
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true

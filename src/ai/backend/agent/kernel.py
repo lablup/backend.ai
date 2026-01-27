@@ -73,6 +73,8 @@ from .exception import (
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
+__all__ = ["KernelOwnershipData"]
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # msg types visible to the API client.

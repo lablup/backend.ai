@@ -88,7 +88,7 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api.manager import ManagerStatus
+    from ai.backend.manager.api import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -97,7 +97,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
 
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -175,7 +179,6 @@ from .group import (
     GroupNode,
     GroupPermissionField,
     ModifyGroup,
-    ProjectType,
     PurgeGroup,
 )
 from .image import (
@@ -258,7 +261,6 @@ from .session import (
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
-    SessionStatus,
     TotalResourceSlot,
 )
 from .storage import StorageVolume, StorageVolumeList
@@ -271,8 +273,6 @@ from .user import (
     UserConnection,
     UserList,
     UserNode,
-    UserRole,
-    UserStatus,
 )
 from .vfolder import (
     ModelCard,
@@ -1862,7 +1862,7 @@ class Query(graphene.ObjectType):
         is_active: Optional[bool] = None,
         status: Optional[UserStatus] = None,
     ) -> Sequence[User]:
-        from .user import UserRole
+        from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1901,7 +1901,7 @@ class Query(graphene.ObjectType):
         is_active: Optional[bool] = None,
         status: Optional[UserStatus] = None,
     ) -> UserList:
-        from .user import UserRole
+        from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]

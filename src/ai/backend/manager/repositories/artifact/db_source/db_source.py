@@ -54,8 +54,8 @@ from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
     GenericQueryBuilder,
-    PaginationOptions,
 )
+from ai.backend.manager.types import PaginationOptions
 
 
 class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):

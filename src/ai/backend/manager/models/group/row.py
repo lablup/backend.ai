@@ -18,6 +18,7 @@ from typing import (
 
 import sqlalchemy as sa
 import trafaret as t
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
@@ -29,7 +30,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack

@@ -10,8 +10,8 @@ from ai.backend.appproxy.coordinator.dependencies.infrastructure.redis import (
     RedisProvider,
 )
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestRedisProvider:

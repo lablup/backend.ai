@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Optional
 
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
 from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
@@ -10,8 +11,8 @@ from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFold
 from .enums import (
     OperationType,
     RoleSource,
+    ScopeType,
 )
-from .types import ScopeId, ScopeType
 
 VFOLDER_ENTITY = EntityType.VFOLDER
 

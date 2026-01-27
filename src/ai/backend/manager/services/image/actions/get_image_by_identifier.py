@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import (
     ImageIdentifier,
     ImageStatus,
     ImageWithAgentInstallStatus,
 )
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 

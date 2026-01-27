@@ -57,8 +57,9 @@ from ai.backend.agent.resources import scan_gpu_alloc_map
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
@@ -119,7 +120,6 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
-from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 

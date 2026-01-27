@@ -55,6 +55,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingKernelData,
     TerminatingSessionData,
@@ -68,10 +69,7 @@ from ai.backend.manager.sokovan.data import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
-    ScheduleResult,
-)
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 # =============================================================================
 # Internal Helper Functions (not fixtures)

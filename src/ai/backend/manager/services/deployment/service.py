@@ -5,8 +5,11 @@ from datetime import UTC, datetime
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
     ModelDeploymentStatus,
+    ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import (
@@ -14,11 +17,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    ActivenessStatus,
     ClusterConfigData,
     DeploymentInfo,
     ExtraVFolderMountData,
-    LivenessStatus,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
@@ -26,7 +27,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReadinessStatus,
     ReplicaStateData,
     ResourceConfigData,
     RouteInfo,

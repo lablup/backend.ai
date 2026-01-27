@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -27,7 +28,6 @@ from .base import (
     batch_result,
     batch_result_in_scalar_stream,
 )
-from .user import UserRole
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext

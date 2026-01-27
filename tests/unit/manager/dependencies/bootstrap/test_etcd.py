@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.manager.config.unified import EtcdConfig
-from ai.backend.manager.dependencies.bootstrap.config import BootstrapConfig
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.dependencies.bootstrap.etcd import EtcdDependency
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestEtcdDependency:

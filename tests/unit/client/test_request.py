@@ -3,6 +3,7 @@ import io
 import json
 from http import HTTPStatus
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
@@ -12,7 +13,6 @@ from ai.backend.client.config import API_VERSION, get_config
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import AttachedFile, Request, Response
 from ai.backend.client.session import AsyncSession, Session
-from ai.backend.testutils.mock import AsyncMock
 
 
 @pytest.fixture(scope="module", autouse=True)

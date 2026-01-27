@@ -14,7 +14,7 @@ from ai.backend.appproxy.coordinator.config import (
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.database import (
     DatabaseProvider,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class TestDatabaseProvider:

@@ -18,7 +18,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.manager.api.manager import ManagerStatus
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.resource import (
     admin_month_stats,
     check_presets,

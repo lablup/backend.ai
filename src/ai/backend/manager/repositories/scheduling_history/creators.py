@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from typing import Optional, override
 from uuid import UUID
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,

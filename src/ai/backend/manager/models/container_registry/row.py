@@ -10,9 +10,9 @@ from urllib.parse import urlparse
 
 import sqlalchemy as sa
 import yarl
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry

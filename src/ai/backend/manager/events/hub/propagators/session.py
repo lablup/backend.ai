@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Optional
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.kernel.broadcast import (
     BaseKernelEvent,
     KernelCancelledBroadcastEvent,
@@ -31,6 +30,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.hub import WILDCARD, EventPropagator
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.kernel import kernels

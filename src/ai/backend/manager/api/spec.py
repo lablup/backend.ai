@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -12,7 +13,7 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
 
 from .auth import auth_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 
 if TYPE_CHECKING:
     from .context import RootContext

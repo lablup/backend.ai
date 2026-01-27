@@ -1,11 +1,12 @@
 from http import HTTPStatus
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.session import Session
-from ai.backend.testutils.mock import AsyncContextMock, AsyncMock
+from ai.backend.testutils.mock import AsyncContextMock
 
 
 @pytest.fixture(scope="module", autouse=True)

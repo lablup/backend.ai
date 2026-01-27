@@ -13,6 +13,7 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
@@ -51,7 +52,7 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,

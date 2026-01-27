@@ -2,12 +2,13 @@ import secrets
 import uuid
 from http import HTTPStatus
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.client.versioning import get_naming
-from ai.backend.testutils.mock import AsyncContextMock, AsyncMock
+from ai.backend.testutils.mock import AsyncContextMock
 
 simulated_api_versions = [
     (4, "20190615"),

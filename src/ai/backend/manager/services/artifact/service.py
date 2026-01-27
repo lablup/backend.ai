@@ -6,6 +6,7 @@ from typing import Optional
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -19,7 +20,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
-    ArtifactRegistryType,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,

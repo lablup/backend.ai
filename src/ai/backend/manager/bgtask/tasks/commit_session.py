@@ -11,6 +11,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
@@ -21,7 +22,6 @@ from ai.backend.common.docker import (
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
-    BgtaskStatus,
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain

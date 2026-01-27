@@ -225,42 +225,42 @@ def test_host_port_pair() -> None:
     iv = tx.HostPortPair()
 
     p = iv.check(("127.0.0.1", 80))
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check("127.0.0.1:80")
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check({"host": "127.0.0.1", "port": 80})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check({"host": "127.0.0.1", "port": "80"})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check(("mydomain.com", 443))
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check("mydomain.com:443")
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check({"host": "mydomain.com", "port": 443})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check({"host": "mydomain.com", "port": "443"})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 

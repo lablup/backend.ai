@@ -28,13 +28,14 @@ from ai.backend.manager.data.domain.types import (
     UserInfo,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
-    ClientContext,
     ScopeType,
     SystemScope,
 )
+from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import get_scaling_groups
 from ai.backend.manager.models.user import UserRole

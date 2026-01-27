@@ -45,7 +45,8 @@ from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.types import Sentinel
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config.bootstrap import BootstrapConfig, DatabaseConfig
+    from ai.backend.manager.config.bootstrap import BootstrapConfig
+    from ai.backend.manager.config.unified import DatabaseConfig
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

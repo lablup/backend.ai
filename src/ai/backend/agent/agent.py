@@ -77,6 +77,7 @@ from ai.backend.agent.metrics.metric import (
     SyncContainerLifecycleObserver,
 )
 from ai.backend.common import msgpack
+from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
@@ -110,9 +111,6 @@ from ai.backend.common.docker import (
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import (
-    AbstractAnycastEvent,
-    AbstractBroadcastEvent,
-    AbstractEvent,
     EventDispatcher,
     EventProducer,
 )
@@ -163,6 +161,11 @@ from ai.backend.common.events.event_types.volume.broadcast import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.events.types import (
+    AbstractAnycastEvent,
+    AbstractBroadcastEvent,
+    AbstractEvent,
+)
 from ai.backend.common.exception import ConfigurationError, VolumeMountFailed
 from ai.backend.common.json import (
     dump_json,
@@ -193,6 +196,7 @@ from ai.backend.common.types import (
     ClusterSSHPortMapping,
     CommitStatus,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     HardwareMetadata,
@@ -221,9 +225,7 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.common.utils import (
-    cancel_tasks,
     chown,
-    current_loop,
     mount,
     umount,
 )
@@ -272,7 +274,6 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
-    ContainerStatus,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -2133,7 +2134,7 @@ class AbstractAgent[
         """
         from datetime import datetime
 
-        from ai.backend.common.bgtask.bgtask import ProgressReporter
+        from ai.backend.common.bgtask.reporter import ProgressReporter
         from ai.backend.common.events.event_types.image.anycast import (
             ImagePullFailedEvent,
             ImagePullFinishedEvent,

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, override
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -13,7 +14,6 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 

@@ -22,13 +22,15 @@ from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
-    ContainerMeasurement,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
-from ai.backend.agent.stats import ProcessMeasurement
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (

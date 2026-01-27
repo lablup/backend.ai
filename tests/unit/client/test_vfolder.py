@@ -2,6 +2,7 @@ from collections.abc import Iterator, Mapping
 from http import HTTPStatus
 from typing import Optional
 from unittest import mock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -10,7 +11,6 @@ from yarl import URL
 
 from ai.backend.client.config import API_VERSION, APIConfig
 from ai.backend.client.session import Session
-from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(

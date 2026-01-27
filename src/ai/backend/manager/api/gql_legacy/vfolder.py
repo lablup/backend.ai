@@ -27,6 +27,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import VFolderNotFound
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -35,7 +36,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -44,8 +44,9 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,

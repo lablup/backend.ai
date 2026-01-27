@@ -6,8 +6,8 @@ import traceback
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Optional, override
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId

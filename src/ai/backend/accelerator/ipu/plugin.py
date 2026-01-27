@@ -20,7 +20,6 @@ from ai.backend.agent.resources import (
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
-    StatContext,
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
@@ -28,6 +27,7 @@ from ai.backend.agent.stats import (
     MetricTypes,
     NodeMeasurement,
     ProcessMeasurement,
+    StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common import config

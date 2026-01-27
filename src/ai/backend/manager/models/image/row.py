@@ -88,7 +88,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask.bgtask import ProgressReporter
+    from ai.backend.common.bgtask.reporter import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

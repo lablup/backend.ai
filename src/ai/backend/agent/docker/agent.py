@@ -105,6 +105,7 @@ from ai.backend.agent.utils import (
     host_pid_to_container_pid,
     update_nested_dict,
 )
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
@@ -119,6 +120,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import (
     dump_json,
     load_json,
@@ -148,10 +150,6 @@ from ai.backend.common.types import (
     SessionId,
     SlotName,
     current_resource_slots,
-)
-from ai.backend.common.utils import (
-    AsyncFileWriter,
-    current_loop,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty

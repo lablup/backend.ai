@@ -6,8 +6,8 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
+from ai.backend.appproxy.common.config import HostPortPair
 from ai.backend.appproxy.common.utils import (
-    HostPortPair,
     config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
