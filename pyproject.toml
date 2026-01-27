@@ -303,6 +303,7 @@ exclude = [
 venvPath = "dist/export/python/virtualenvs/python-default"
 venv = "3.13.7"
 typeCheckingMode = "standard"
+reportMatchNotExhaustive = "error"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
