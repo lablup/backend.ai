@@ -35,13 +35,13 @@ __all__ = (
 # ========== ORM Models ==========
 
 
-def _get_notification_channel_rules_join_condition():
+def _get_notification_channel_rules_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.notification import NotificationRuleRow
 
     return NotificationChannelRow.id == foreign(NotificationRuleRow.channel_id)
 
 
-def _get_notification_channel_creator_join_condition():
+def _get_notification_channel_creator_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(NotificationChannelRow.created_by) == UserRow.uuid
@@ -123,13 +123,13 @@ class NotificationChannelRow(Base):
         )
 
 
-def _get_notification_rule_channel_join_condition():
+def _get_notification_rule_channel_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.notification import NotificationChannelRow
 
     return foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id
 
 
-def _get_notification_rule_creator_join_condition():
+def _get_notification_rule_creator_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(NotificationRuleRow.created_by) == UserRow.uuid

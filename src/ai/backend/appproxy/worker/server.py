@@ -452,7 +452,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
 
-    async def _heartbeat(interval: float):
+    async def _heartbeat(interval: float) -> None:
         try:
             async for attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -677,7 +677,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -807,7 +807,7 @@ async def server_main(
     root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
 
     @asynccontextmanager
-    async def aiomonitor_ctx() -> AsyncGenerator[None]:
+    async def aiomonitor_ctx() -> AsyncGenerator[None, None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -836,7 +836,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None]:
+    async def webapp_ctx() -> AsyncGenerator[None, None]:
         ssl_ctx = None
         if local_config.proxy_worker.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @admin.group()
-def quota_scope():
+def quota_scope() -> None:
     """Quota scope administration commands."""
 
 

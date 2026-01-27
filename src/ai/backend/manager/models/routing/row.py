@@ -38,7 +38,7 @@ __all__ = ("RouteStatus", "RoutingRow")
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-def _get_deployment_revision_join_condition():
+def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return RoutingRow.revision == DeploymentRevisionRow.id

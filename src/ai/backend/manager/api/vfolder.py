@@ -2816,7 +2816,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options):
+def create_app(default_cors_options) -> tuple[web.Application, list]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

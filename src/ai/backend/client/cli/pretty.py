@@ -7,7 +7,7 @@ import json
 import sys
 import textwrap
 import traceback
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from types import TracebackType
 from typing import Optional, Self
 
@@ -56,7 +56,7 @@ def italic(text: str) -> str:
     return "\x1b[3m" + text + "\x1b[23m"
 
 
-def format_pretty(msg, status=PrintStatus.NONE, colored=True):
+def format_pretty(msg: str, status: PrintStatus = PrintStatus.NONE, colored: bool = True) -> str:
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
@@ -79,7 +79,7 @@ format_fail = functools.partial(format_pretty, status=PrintStatus.FAILED)
 format_warn = functools.partial(format_pretty, status=PrintStatus.WARNING)
 
 
-def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
+def print_pretty(msg, *, status=PrintStatus.NONE, file=None) -> None:
     if file is None:
         file = sys.stderr
     if status == PrintStatus.NONE:
@@ -123,7 +123,7 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
     return "".join(pieces)[1:]  # strip first dot
 
 
-def format_error(exc: Exception):
+def format_error(exc: Exception) -> Iterator[str]:
     if isinstance(exc, BackendAPIError):
         yield f"{exc.__class__.__name__}: {exc.status} {exc.reason}\n"
         yield f"{exc.data['title']}"
@@ -182,7 +182,7 @@ def format_error(exc: Exception):
         yield ("*** Traceback ***\n" + "".join(traceback.format_tb(exc.__traceback__)).strip())
 
 
-def print_error(exc: Exception, *, file=None):
+def print_error(exc: Exception, *, file=None) -> None:
     if file is None:
         file = sys.stderr
     indicator = style("\u2718", fg="bright_red", reset=False)
@@ -196,7 +196,7 @@ def print_error(exc: Exception, *, file=None):
     file.flush()
 
 
-def show_warning(message, category, filename, lineno, file=None, line=None):
+def show_warning(message, category, filename, lineno, file=None, line=None) -> None:
     echo(
         "{}: {}".format(
             style(str(category.__name__), fg="yellow", bold=True),

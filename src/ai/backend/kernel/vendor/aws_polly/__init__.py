@@ -30,7 +30,7 @@ class Runner(BaseRunner):
             "AWS_DEFAULT_REGION", "ap-northeast-2"
         )
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         self.input_queue = janus.Queue()
         self.output_queue = janus.Queue()
 
@@ -59,13 +59,13 @@ class Runner(BaseRunner):
             self.outsock.send_multipart(msg)
         return 0
 
-    async def complete(self, data):
+    async def complete(self, data) -> None:
         self.outsock.send_multipart([
             b"completion",
             [],
         ])
 
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         if self.inproc_runner is None:
             log.error("No user code is running!")
             return
@@ -83,10 +83,10 @@ class Runner(BaseRunner):
             ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.c_long(0))
             log.error("Interrupt broke the interpreter state -- recommended to reset the session.")
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info) -> tuple[None, dict]:
         return None, {}
 
-    def ensure_inproc_runner(self):
+    def ensure_inproc_runner(self) -> None:
         if self.inproc_runner is None:
             self.inproc_runner = PollyInprocRunner(
                 self.input_queue.sync_q,

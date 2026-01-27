@@ -11,7 +11,7 @@ import shutil
 import signal
 import struct
 import sys
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 )
 
 
-async def get_extra_volumes(docker, lang):
+async def get_extra_volumes(docker, lang) -> list[VolumeInfo]:
     avail_volumes = (await docker.volumes.list())["Volumes"]
     if not avail_volumes:
         return []
@@ -265,14 +265,14 @@ async def _clean_scratch(
         pass
 
 
-def _DockerError_reduce(self):
+def _DockerError_reduce(self) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, *self.args),
     )
 
 
-def _DockerContainerError_reduce(self):
+def _DockerContainerError_reduce(self) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
@@ -351,7 +351,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         self.network_plugin_ctx = network_plugin_ctx
 
-    def _kernel_resource_spec_read(self, filename):
+    def _kernel_resource_spec_read(self, filename: Path | str) -> KernelResourceSpec:
         with open(filename) as f:
             return KernelResourceSpec.read_from_file(f)
 
@@ -436,7 +436,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         else:
             await loop.run_in_executor(None, partial(self.scratch_dir.mkdir, exist_ok=True))
 
-        def _create_scratch_dirs():
+        def _create_scratch_dirs() -> None:
             self.config_dir.mkdir(parents=True, exist_ok=True)
             self.config_dir.chmod(0o755)
             self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -449,7 +449,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # we need to touch them first to avoid their "ghost" files are created
             # as root in the host-side filesystem, which prevents deletion of scratch
             # directories when the agent is running as non-root.
-            def _clone_dotfiles():
+            def _clone_dotfiles() -> None:
                 jupyter_custom_css_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
                 )
@@ -585,9 +585,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # extra mounts
         async with closing_async(Docker()) as docker:
             extra_mount_list = await get_extra_volumes(docker, self.image_ref.short)
-        mounts.extend(
-            Mount(MountTypes.VOLUME, v.name, v.container_path, v.mode) for v in extra_mount_list
-        )
+        for v in extra_mount_list:
+            permission = MountPermission.READ_ONLY if v.mode == "ro" else MountPermission.READ_WRITE
+            mounts.append(
+                Mount(MountTypes.VOLUME, Path(v.name), Path(v.container_path), permission)
+            )
 
         # debug mounts
         if self.local_config.debug.coredump.enabled:
@@ -725,7 +727,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if sshkey is None:
             return
 
-        def _write_config():
+        def _write_config() -> None:
             try:
                 priv_key_path = self.config_dir / "ssh" / "id_cluster"
                 pub_key_path = self.config_dir / "ssh" / "id_cluster.pub"
@@ -761,7 +763,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         current_loop().run_in_executor(None, _write_config)  # ???
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -827,7 +829,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # Create bootstrap.sh into workdir if needed
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
-                def _write_user_bootstrap_script():
+                def _write_user_bootstrap_script() -> None:
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
@@ -890,7 +892,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
                 ssh_dir = self.work_dir / ".ssh"
 
-                def _populate_ssh_config():
+                def _populate_ssh_config() -> None:
                     ssh_dir.mkdir(parents=True, exist_ok=True)
                     ssh_dir.chmod(0o700)
                     (ssh_dir / "authorized_keys").write_bytes(pubkey)
@@ -1523,7 +1525,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             blocklist=self.local_config.agent.block_network_plugins,
         )
 
-    async def shutdown(self, stop_signal: signal.Signals):
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
@@ -1589,12 +1591,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
 
-                async def _fetch_container_info(container):
-                    kernel_id = "(unknown)"
+                async def _fetch_container_info(container: DockerContainer) -> None:
+                    kernel_id_str: str = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
                             return
+                        kernel_id_str = str(kernel_id)
                         if container["State"]["Status"] in status_filter:
                             owner_id = AgentId(
                                 container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
@@ -1618,7 +1621,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         log.exception(
                             "error while fetching container information (cid:{}, k:{})",
                             container._id,
-                            kernel_id,
+                            kernel_id_str,
                         )
 
                 fetch_tasks.append(_fetch_container_info(container))
@@ -1729,7 +1732,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 removed_images=removed_images,
             )
 
-    async def handle_agent_socket(self):
+    async def handle_agent_socket(self) -> None:
         """
         A simple request-reply socket handler for in-container processes.
         For ease of implementation in low-level languages such as C,
@@ -2032,13 +2035,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if container_id is not None:
                 container = docker.containers.container(container_id)
 
-                async def log_iter():
+                async def log_iter() -> AsyncGenerator[bytes, None]:
                     it = container.log(
                         stdout=True,
                         stderr=True,
                         follow=True,
                     )
-                    async with aiotools.aclosing(it):
+                    async with aiotools.aclosing(it):  # type: ignore[type-var]
                         async for line in it:
                             yield line.encode("utf-8")
 
@@ -2146,7 +2149,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     raise
 
     @preserve_termination_log
-    async def monitor_docker_events(self):
+    async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
         ) -> None:

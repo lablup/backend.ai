@@ -319,7 +319,7 @@ class Request:
             self.headers["Content-Type"] = self.content_type
         force_anonymous = kwargs.pop("anonymous", False)
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,
@@ -367,7 +367,7 @@ class Request:
         # websocket is always a "binary" stream.
         self.content_type = "application/octet-stream"
 
-        def _ws_ctx_builder():
+        def _ws_ctx_builder() -> _WSRequestContextManager:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
@@ -405,7 +405,7 @@ class Request:
         self.headers["Date"] = self.date.isoformat()
         self.content_type = "application/octet-stream"
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,

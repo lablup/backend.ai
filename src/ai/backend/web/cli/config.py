@@ -4,6 +4,8 @@ Configuration management CLI commands for Backend.AI Web Server.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+from __future__ import annotations
+
 import logging
 import pathlib
 

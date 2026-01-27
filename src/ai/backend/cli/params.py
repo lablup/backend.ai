@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import (
     Any,
@@ -162,7 +162,7 @@ class JSONParamType(click.ParamType):
             self.fail(f"cannot parse {value!r} as JSON", param, ctx)
 
 
-def drange(start: Decimal, stop: Decimal, num: int):
+def drange(start: Decimal, stop: Decimal, num: int) -> Iterator[Decimal]:
     """
     A simplified version of numpy.linspace with default options
     """
@@ -226,15 +226,17 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
         super().__init__()
         self.type_ = type_ if type_ is not None else str
 
-    def convert(self, arg, param, ctx):
+    def convert(self, arg, param, ctx) -> int | list[Any]:
         try:
             match arg:
                 case int():
                     return arg
                 case str():
-                    return [self.type_(elem) for elem in arg.split(",")]
+                    return [self.type_(elem) for elem in arg.split(",")]  # type: ignore[call-arg]
+                case _:
+                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)  # type: ignore[call-arg]
         except ValueError as e:
-            self.fail(repr(e), param, ctx)
+            self.fail(repr(e), param, ctx)  # type: ignore[call-arg]
 
 
 class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.ParamType):

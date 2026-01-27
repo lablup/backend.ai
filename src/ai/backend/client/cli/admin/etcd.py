@@ -22,7 +22,7 @@ def etcd() -> None:
 @click.option(
     "-p", "--prefix", is_flag=True, default=False, help="Get all keys prefixed with the given key."
 )
-def get(key, prefix):
+def get(key: str, prefix: bool) -> None:
     """
     Get a ETCD value(s).
 
@@ -43,7 +43,7 @@ def get(key, prefix):
 @etcd.command()
 @click.argument("key", type=str, metavar="KEY")
 @click.argument("value", type=str, metavar="VALUE")
-def set(key, value):
+def set(key: str, value: str) -> None:
     """
     Set new key and value on ETCD.
 
@@ -78,7 +78,7 @@ def set(key, value):
     default=False,
     help="Delete all keys prefixed with the given key.",
 )
-def delete(key, prefix):
+def delete(key: str, prefix: bool) -> None:
     """
     Delete key(s) from ETCD.
 

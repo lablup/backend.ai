@@ -227,7 +227,7 @@ async def check_and_upgrade(
     outfile: str,
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
-):
+) -> None:
     etcd = make_etcd(local_config)
     raw_redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 
@@ -16,7 +18,7 @@ class BraceStyleAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra=None) -> None:
         super().__init__(logger, extra)
 
-    def log(self, level, msg, *args, **kwargs):
+    def log(self, level, msg, *args, **kwargs) -> None:
         if self.isEnabledFor(level):
-            msg, kwargs = self.process(msg, kwargs)
-            self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
+            msg, processed_kwargs = self.process(msg, kwargs)
+            self.logger._log(level, BraceMessage(msg, args), (), **processed_kwargs)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import multiprocessing
@@ -79,12 +81,12 @@ pruned_disk_types = frozenset([
 ])
 
 
-def netstat_ns_work(ns_path: Path):
+def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
     with nsenter(ns_path):
         return psutil.net_io_counters(pernic=True)
 
 
-async def netstat_ns(ns_path: Path):
+async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     # Linux namespace is per-thread state. Therefore we need to ensure
     # IO is executed in the same thread where we switched the namespace.
@@ -242,9 +244,9 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        async def sysfs_impl(container_id):
+        async def sysfs_impl(container_id: str) -> Optional[float]:
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
-            version = ctx.agent.docker_info["CgroupVersion"]
+            version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
             try:
                 match version:
                     case "1":
@@ -267,7 +269,7 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
-        async def api_impl(container_id):
+        async def api_impl(container_id: str) -> Optional[float]:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:
@@ -530,10 +532,10 @@ class MemoryPlugin(AbstractComputePlugin):
         net_rx_bytes = _nstat.bytes_recv
         net_tx_bytes = _nstat.bytes_sent
 
-        def get_disk_stat():
+        def get_disk_stat() -> tuple[Decimal, Decimal, dict[DeviceId, Measurement]]:
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
-            per_disk_stat = {}
+            per_disk_stat: dict[DeviceId, Measurement] = {}
             for disk_info in psutil.disk_partitions():
                 # Skip additional filesystem types not filtered by psutil, like squashfs.
                 if disk_info.fstype in pruned_disk_types:
@@ -547,7 +549,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 dstat = os.statvfs(disk_info.mountpoint)
                 disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                 disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
-                per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                per_disk_stat[DeviceId(disk_info.device)] = Measurement(disk_usage, disk_capacity)
                 total_disk_usage += disk_usage
                 total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
@@ -614,7 +616,9 @@ class MemoryPlugin(AbstractComputePlugin):
             #         total_size += path.stat().st_size
             # return total_size
 
-        async def sysfs_impl(container_id: str):
+        async def sysfs_impl(
+            container_id: str,
+        ) -> Optional[tuple[int, int, int, int, int, int, int]]:
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
@@ -714,7 +718,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
-        async def api_impl(container_id: str):
+        async def api_impl(container_id: str) -> Optional[tuple[int, int, int, int, int, int, int]]:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:

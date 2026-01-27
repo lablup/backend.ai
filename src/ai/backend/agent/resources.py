@@ -23,6 +23,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
+    Self,
     TextIO,
     cast,
 )
@@ -202,7 +203,7 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> KernelResourceSpec:
+    def read_from_string(cls, text: str) -> Self:
         kvpairs = {}
         for line in text.split("\n"):
             if "=" not in line:
@@ -250,12 +251,12 @@ class KernelResourceSpec:
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> KernelResourceSpec:
+    def read_from_file(cls, file: TextIOWrapper) -> Self:
         text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> KernelResourceSpec:
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> Self:
         text = "\n".join(await file.readlines())  # type: ignore
         return cls.read_from_string(text)
 
@@ -826,7 +827,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
-        def accel_lt_intrinsic(item):
+        def accel_lt_intrinsic(item) -> int:
             # push back "intrinsic" plugins (if exists)
             if item[0] in ("cpu", "mem"):
                 return 0
@@ -851,7 +852,7 @@ class Mount:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
-    def from_str(cls, s):
+    def from_str(cls, s) -> Self:
         source, target, perm = s.split(":")
         source = Path(source)
         type = MountTypes.BIND

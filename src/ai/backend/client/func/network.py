@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from ai.backend.client.output.fields import network_fields
@@ -112,7 +112,7 @@ class Network(BaseFunction):
         return await api_session.get().Admin._query(q, {"id": str(self.network_id)})
 
     @api_function
-    async def update(self, name: str) -> None:
+    async def update(self, name: str) -> dict[str, Any]:
         """
         Updates network name.
         """
@@ -131,7 +131,7 @@ class Network(BaseFunction):
         return data["modify_network"]
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         """
         Deletes network.
         Delete only works for networks that are not attached to active session.

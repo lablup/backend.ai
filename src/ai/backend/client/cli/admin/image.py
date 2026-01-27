@@ -121,7 +121,7 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
 @click.argument("alias", type=str)
 @click.argument("target", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
-def alias(alias, target, arch):
+def alias(alias: str, target: str, arch: str | None) -> None:
     """Add an image alias."""
     from ai.backend.client.session import Session
 
@@ -139,7 +139,7 @@ def alias(alias, target, arch):
 
 @image.command()
 @click.argument("alias", type=str)
-def dealias(alias):
+def dealias(alias: str) -> None:
     """Remove an image alias."""
     from ai.backend.client.session import Session
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ctypes
 import logging
 import platform
@@ -159,10 +161,10 @@ class rsmiVersionProp(ctypes.Structure):
     ]
 
 
-def _load_library(name):
+def _load_library(name: str) -> ctypes.CDLL | None:
     try:
         if platform.system() == "Windows":
-            return ctypes.windll.LoadLibrary(name)
+            return ctypes.windll.LoadLibrary(name)  # type: ignore[attr-defined]
         return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
@@ -176,18 +178,18 @@ class LibraryBase(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def load_library(cls) -> ctypes.CDLL:
+    def load_library(cls) -> ctypes.CDLL | None:
         pass
 
     @classmethod
-    def _ensure_lib(cls):
+    def _ensure_lib(cls) -> None:
         if cls._lib is None:
             cls._lib = cls.load_library()
         if cls._lib is None:
             raise ImportError(f"Could not load the {cls.name} library!")
 
     @classmethod
-    def invoke(cls, func_name, *args, check_rc=True):
+    def invoke(cls, func_name: str, *args: Any, check_rc: bool = True) -> int:
         try:
             cls._ensure_lib()
         except ImportError:
@@ -206,7 +208,7 @@ class libhip(LibraryBase):
     _driver_version = (0, 0)
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         if system_type == "Linux":
             for candidate in [
@@ -245,7 +247,7 @@ class libhip(LibraryBase):
         return count.value
 
     @classmethod
-    def get_device_props(cls, device_idx: int):
+    def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
         props_struct = hipDeviceProp()
         cls.invoke("hipGetDeviceProperties", ctypes.byref(props_struct), device_idx)
         props: MutableMapping[str, Any] = {
@@ -272,7 +274,7 @@ class librocm_smi(LibraryBase):
     _version = (0, 0, 0)
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         if system_type == "Linux":
             for candidate in ["librocm_smi64.so", "/opt/rocm/lib/librocm_smi64.so"]:
@@ -291,13 +293,13 @@ class librocm_smi(LibraryBase):
         return cls._version
 
     @classmethod
-    def init(cls):
+    def init(cls) -> None:
         return_code = cls.invoke("rsmi_init", 0)
         if return_code != 0:
             raise RuntimeError(f"Error while initializing ROCm-SMI: {return_code}")
 
     @classmethod
-    def shutdown(cls):
+    def shutdown(cls) -> None:
         return_code = cls.invoke("rsmi_shut_down")
         if return_code != 0:
             raise RuntimeError(f"Error while shutting down ROCm-SMI: {return_code}")

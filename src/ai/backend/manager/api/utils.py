@@ -13,7 +13,7 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Hashable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Generator, Hashable, Mapping, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -57,8 +57,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
 
-def method_placeholder(orig_method):
-    async def _handler(request):
+def method_placeholder(orig_method) -> Callable[[web.Request], Awaitable[web.Response]]:
+    async def _handler(request) -> web.Response:
         raise web.HTTPMethodNotAllowed(request.method, [orig_method])
 
     return _handler
@@ -175,7 +175,9 @@ def check_api_params(
     [Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]],
     Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]],
 ]:
-    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]):
+    def wrap(
+        handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]],
+    ) -> Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]]:
         @functools.wraps(handler)
         async def wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
             orig_params: Any
@@ -398,7 +400,7 @@ numbers.Number.register(_Infinity)
 Infinity = _Infinity()
 
 
-def prettify_traceback(exc):
+def prettify_traceback(exc) -> str:
     # Make a compact stack trace string
     with io.StringIO() as buf:
         while exc is not None:
@@ -413,10 +415,10 @@ def prettify_traceback(exc):
         return f"Traceback:\n{buf.getvalue()}"
 
 
-def catch_unexpected(log, reraise_cancellation: bool = True, raven=None):
-    def _wrap(func):
+def catch_unexpected(log, reraise_cancellation: bool = True, raven=None) -> Callable:
+    def _wrap(func) -> Callable:
         @functools.wraps(func)
-        async def _wrapped(*args, **kwargs):
+        async def _wrapped(*args, **kwargs) -> Any:
             try:
                 return await func(*args, **kwargs)
             except asyncio.CancelledError:
@@ -433,7 +435,7 @@ def catch_unexpected(log, reraise_cancellation: bool = True, raven=None):
     return _wrap
 
 
-def set_handler_attr(func, key, value):
+def set_handler_attr(func, key, value) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
@@ -441,7 +443,7 @@ def set_handler_attr(func, key, value):
     func._backend_attrs = attrs
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request, key, default=None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -463,7 +465,7 @@ def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamRes
     return deprecated_stub_impl
 
 
-def chunked(iterable, n):
+def chunked(iterable, n) -> Generator[tuple, None, None]:
     it = iter(iterable)
     while True:
         chunk = tuple(itertools.islice(it, n))
@@ -483,7 +485,7 @@ async def call_non_bursty(
     *,
     max_bursts: int = 64,
     max_idle: int | float = 100.0,
-):
+) -> Any:
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
     cast,
 )
@@ -78,67 +79,67 @@ INACTIVE_USER_STATUSES = (
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition():
+def _get_session_row_join_condition() -> Any:
     from ai.backend.manager.models.session import SessionRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-def _get_kernel_row_join_condition():
+def _get_kernel_row_join_condition() -> Any:
     from ai.backend.manager.models.kernel import KernelRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_created_endpoints_join_condition():
+def _get_created_endpoints_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
-def _get_owned_endpoints_join_condition():
+def _get_owned_endpoints_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
 
 
-def _get_vfolder_rows_join_condition():
+def _get_vfolder_rows_join_condition() -> Any:
     from ai.backend.manager.models.vfolder import VFolderRow
 
     return UserRow.uuid == foreign(VFolderRow.user)
 
 
-def _get_role_assignments_join_condition():
+def _get_role_assignments_join_condition() -> Any:
     from ai.backend.manager.models.rbac_models import UserRoleRow
 
     return UserRow.uuid == foreign(UserRoleRow.user_id)
 
 
-def _get_domain_join_condition():
+def _get_domain_join_condition() -> Any:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(UserRow.domain_name)
 
 
-def _get_groups_join_condition():
+def _get_groups_join_condition() -> Any:
     from ai.backend.manager.models.group import AssocGroupUserRow
 
     return foreign(AssocGroupUserRow.user_id) == UserRow.uuid
 
 
-def _get_resource_policy_join_condition():
+def _get_resource_policy_join_condition() -> Any:
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 
     return UserResourcePolicyRow.name == foreign(UserRow.resource_policy)
 
 
-def _get_keypairs_join_condition():
+def _get_keypairs_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return foreign(KeyPairRow.user) == UserRow.uuid
 
 
-def _get_main_keypair_join_condition():
+def _get_main_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)

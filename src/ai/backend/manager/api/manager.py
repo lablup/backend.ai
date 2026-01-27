@@ -7,7 +7,7 @@ import json
 import logging
 import socket
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Optional, cast
 
@@ -17,10 +17,11 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from aiotools import aclosing
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
+from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive, QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
@@ -56,8 +57,10 @@ class SchedulerOps(enum.Enum):
     EXCLUDE_AGENTS = "exclude-agents"
 
 
-def server_status_required(allowed_status: frozenset[ManagerStatus]):
-    def decorator(handler):
+def server_status_required(
+    allowed_status: frozenset[ManagerStatus],
+) -> Callable[[Handler], Handler]:
+    def decorator(handler) -> Handler:
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
@@ -98,6 +101,8 @@ async def detect_status_update(root_ctx: RootContext) -> None:
             root_ctx.config_provider.legacy_etcd_config_loader.watch_manager_status()
         ) as agen:
             async for ev in agen:
+                if isinstance(ev, QueueSentinel):
+                    continue
                 if ev.event == "put":
                     root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status.cache_clear()
                     updated_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()

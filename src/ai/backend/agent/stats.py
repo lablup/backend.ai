@@ -4,6 +4,8 @@ A module to collect various performance metrics of Docker containers.
 Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
 
+from __future__ import annotations
+
 import asyncio
 import enum
 import logging
@@ -66,7 +68,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def check_cgroup_available():
+def check_cgroup_available() -> bool:
     """
     Check if the host OS provides cgroups.
     """
@@ -78,7 +80,7 @@ class StatModes(enum.StrEnum):
     DOCKER = "docker"
 
     @staticmethod
-    def get_preferred_mode():
+    def get_preferred_mode() -> StatModes:
         """
         Returns the most preferred statistics collector type for the host OS.
         """
@@ -128,7 +130,7 @@ class Measurement:
     value: Decimal
     capacity: Optional[Decimal] = None
 
-    def apply_scale_factor(self, scale_factor: Decimal) -> "Measurement":
+    def apply_scale_factor(self, scale_factor: Decimal) -> Measurement:
         return Measurement(
             value=self.value * scale_factor,
             capacity=self.capacity * scale_factor if self.capacity is not None else None,
@@ -148,7 +150,7 @@ class NodeMeasurement:
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -162,7 +164,7 @@ class ContainerMeasurement:
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -176,7 +178,7 @@ class ProcessMeasurement:
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -223,7 +225,7 @@ class MovingStatistics:
             point = (initial_value, time.perf_counter())
             self._last.append(point)
 
-    def update(self, value: Decimal):
+    def update(self, value: Decimal) -> None:
         self._sum += value
         self._min = min(self._min, value)
         self._max = max(self._max, value)
@@ -299,9 +301,9 @@ class Metric:
     stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
 
-    def update(self, value: Measurement):
+    def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
         self.stats.update(value.value)
@@ -333,7 +335,7 @@ class Metric:
 
 
 class StatContext:
-    agent: "AbstractAgent"
+    agent: AbstractAgent
     mode: StatModes
     node_metrics: dict[MetricKey, Metric]
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
@@ -343,7 +345,7 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
+        self, agent: AbstractAgent, mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
@@ -444,7 +446,9 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            async def gather_node_measures_with_slots(instance: "AbstractComputePlugin"):
+            async def gather_node_measures_with_slots(
+                instance: AbstractComputePlugin,
+            ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
                 result = await instance.gather_node_measures(self)
                 return [slot_name for slot_name, _ in instance.slot_types], result
 

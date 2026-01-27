@@ -6,11 +6,11 @@ import secrets
 import subprocess
 import sys
 from collections import OrderedDict, defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, Literal, Optional
+from typing import IO, Literal, Optional, cast
 from uuid import UUID
 
 import click
@@ -58,11 +58,11 @@ list_expr: click.ParamType = CommaSeparatedListType()
 
 
 @main.group()
-def session():
+def session() -> None:
     """Set of compute session operations"""
 
 
-def _create_cmd(docs: Optional[str] = None):
+def _create_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("image")
     @click.option(
         "-o",
@@ -314,7 +314,7 @@ main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
-def _create_from_template_cmd(docs: Optional[str] = None):
+def _create_from_template_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("template_id")
     @click_start_option()
     @click.option(
@@ -601,7 +601,7 @@ main.command(aliases=["start-from-template"])(
 session.command()(_create_from_template_cmd())
 
 
-def _destroy_cmd(docs: Optional[str] = None):
+def _destroy_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_names", metavar="SESSID", nargs=-1)
     @click.option(
         "-f",
@@ -622,7 +622,7 @@ def _destroy_cmd(docs: Optional[str] = None):
     @click.option(
         "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
     )
-    def destroy(session_names, forced, owner, stats, recursive):
+    def destroy(session_names, forced, owner, stats, recursive) -> None:
         """
         Terminate and destroy the given session.
 
@@ -677,7 +677,7 @@ main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destro
 session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
-def _restart_cmd(docs: Optional[str] = None):
+def _restart_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     @click.option(
         "-o",
@@ -686,7 +686,7 @@ def _restart_cmd(docs: Optional[str] = None):
         metavar="ACCESS_KEY",
         help="Specify the owner of the target session explicitly.",
     )
-    def restart(session_refs, owner):
+    def restart(session_refs, owner) -> None:
         """
         Restart the compute session.
 
@@ -732,7 +732,7 @@ session.command()(_restart_cmd())
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", type=click.Path(exists=True), nargs=-1)
-def upload(session_id, files):
+def upload(session_id, files) -> None:
     """
     Upload the files to a compute session's home directory.
     If the target directory is in a storage folder mount, the operation is
@@ -764,7 +764,7 @@ def upload(session_id, files):
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", nargs=-1)
 @click.option("--dest", type=Path, default=".", help="Destination path to store downloaded file(s)")
-def download(session_id, files, dest):
+def download(session_id, files, dest) -> None:
     """
     Download files from a compute session's home directory.
     If the source path is in a storage folder mount, the operation is
@@ -795,7 +795,7 @@ def download(session_id, files, dest):
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("path", metavar="PATH", nargs=1, default="/home/work")
-def ls(session_id, path):
+def ls(session_id, path) -> None:
     """
     List files in a path of a running compute session.
 
@@ -1004,7 +1004,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
-    async def export_tracker(bgtask_id):
+    async def export_tracker(bgtask_id) -> None:
         async with AsyncSession() as session:
             completion_msg_func = lambda: print_done("Session export process completed.")
             try:
@@ -1065,7 +1065,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: Optional[str] = None):
+def _ssh_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -1126,7 +1126,7 @@ session.command(
 )(_ssh_cmd())
 
 
-def _scp_cmd(docs: Optional[str] = None):
+def _scp_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
     @click.argument("dst", type=str, metavar="DST")
@@ -1218,7 +1218,7 @@ session.command(
 )(_scp_cmd())
 
 
-def _events_cmd(docs: Optional[str] = None):
+def _events_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
@@ -1263,14 +1263,14 @@ def _events_cmd(docs: Optional[str] = None):
         - Any other event name waits for that specific event (exit code 0)
         """
 
-        def print_event(ev):
+        def print_event(ev) -> None:
             click.echo(
                 click.style(ev.event, fg="cyan", bold=True)
                 + " "
                 + json.dumps(json.loads(ev.data), indent=None)  # as single-line
             )
 
-        async def _run_events():
+        async def _run_events() -> None:
             async with AsyncSession() as session:
                 compute_session = session.ComputeSession(session_id_or_name, owner_access_key)
 
@@ -1344,7 +1344,7 @@ def _fetch_session_names() -> tuple[str]:
     return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
-def _watch_cmd(docs: Optional[str] = None):
+def _watch_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME", nargs=-1)
     @click.option(
         "-o",
@@ -1374,7 +1374,7 @@ def _watch_cmd(docs: Optional[str] = None):
     )
     def watch(
         session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str
-    ):
+    ) -> None:
         """
         Monitor the lifecycle events of a compute session
         and display in human-friendly interface.
@@ -1412,7 +1412,7 @@ def _watch_cmd(docs: Optional[str] = None):
 
         async def handle_console_output(
             session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
-        ):
+        ) -> None:
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     match ev.event:
@@ -1433,7 +1433,7 @@ def _watch_cmd(docs: Optional[str] = None):
 
         async def handle_json_output(
             session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
-        ):
+        ) -> None:
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     event = json.loads(ev.data)
@@ -1451,7 +1451,7 @@ def _watch_cmd(docs: Optional[str] = None):
                         ):
                             break
 
-        async def _run_events():
+        async def _run_events() -> None:
             async with AsyncSession() as session:
                 try:
                     session_id = UUID(session_name_or_id)
@@ -1460,11 +1460,17 @@ def _watch_cmd(docs: Optional[str] = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
 
                 if output == "console":
-                    await handle_console_output(session=compute_session, scope=scope)
+                    await handle_console_output(
+                        session=compute_session,
+                        scope=cast(Literal["*", "session", "kernel"], scope),
+                    )
                 elif output == "json":
-                    await handle_json_output(session=compute_session, scope=scope)
+                    await handle_json_output(
+                        session=compute_session,
+                        scope=cast(Literal["*", "session", "kernel"], scope),
+                    )
 
-        async def _run_events_with_timeout(max_wait: int):
+        async def _run_events_with_timeout(max_wait: int) -> None:
             try:
                 async with timeout(max_wait):
                     await _run_events()
@@ -1490,7 +1496,7 @@ def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
     session_info_dict = {}
     visited = {}
 
-    def construct_topological_sorter(session: OrderedDict):
+    def construct_topological_sorter(session: OrderedDict) -> None:
         visited[session["session_id"]] = True
         session_info_dict[session["session_id"]] = session
         ts.add(
@@ -1574,7 +1580,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:  # type
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
 @click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
-def show_dependency_graph(session_id: UUID | str, table: bool):
+def show_dependency_graph(session_id: UUID | str, table: bool) -> None:
     """
     Shows the dependency graph of a compute session.
     \b

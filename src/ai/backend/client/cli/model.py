@@ -22,7 +22,7 @@ from .types import CLIContext
 
 
 @click.group()
-def model():
+def model() -> None:
     """Set of model operations"""
 
 
@@ -32,7 +32,7 @@ def model():
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, filter_, order, offset, limit):
+def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
     """
     List the models.
     """
@@ -58,7 +58,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @model.command()
 @pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def info(ctx: CLIContext, model_name):
+def info(ctx: CLIContext, model_name) -> None:
     """
     Display the detail of a model with its backing storage vfolder.
 
@@ -141,7 +141,7 @@ def info(ctx: CLIContext, model_name):
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(ctx: CLIContext, name, host, group, host_path, permission, quota, cloneable):
+def create(ctx: CLIContext, name, host, group, host_path, permission, quota, cloneable) -> None:
     """
     Create a new model with the given configuration.
 
@@ -180,7 +180,7 @@ def create(ctx: CLIContext, name, host, group, host_path, permission, quota, clo
 @model.command()
 @pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def rm(ctx: CLIContext, model_name):
+def rm(ctx: CLIContext, model_name) -> None:
     """
     Remove the given model.
 
@@ -242,7 +242,7 @@ def upload(
     base_dir,
     chunk_size,
     override_storage_proxy,
-):
+) -> None:
     """
     Upload a file to the model as the given version.
     The files with the same names will be overwirtten.
@@ -320,7 +320,7 @@ def download(
     chunk_size,
     override_storage_proxy,
     max_retries,
-):
+) -> None:
     """
     Download a file from the model storage.
     The files with the same names will be overwirtten.

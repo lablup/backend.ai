@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class RelativeCreatedFormatter(logging.Formatter):
-    def format(self, record):
+    def format(self, record) -> str:
         record.relative_seconds = record.relativeCreated / 1000
         return super().format(record)
 

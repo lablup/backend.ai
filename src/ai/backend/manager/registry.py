@@ -297,7 +297,7 @@ class AgentRegistry:
             result = await db_sess.execute(query)
             return [AgentId(row) for row in result.scalars().all()]
 
-    async def update_instance(self, inst_id, updated_fields):
+    async def update_instance(self, inst_id, updated_fields) -> None:
         async def _update() -> None:
             async with self.db.begin() as conn:
                 query = sa.update(agents).values(**updated_fields).where(agents.c.id == inst_id)
@@ -1060,7 +1060,7 @@ class AgentRegistry:
             "public_key": public_key.decode("utf-8"),
         }
 
-    async def get_user_occupancy(self, user_id, *, db_sess=None):
+    async def get_user_occupancy(self, user_id, *, db_sess=None) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
@@ -1081,7 +1081,7 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_keypair_occupancy(self, access_key, *, db_sess=None):
+    async def get_keypair_occupancy(self, access_key, *, db_sess=None) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
@@ -1107,7 +1107,7 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_domain_occupancy(self, domain_name, *, db_sess=None):
+    async def get_domain_occupancy(self, domain_name, *, db_sess=None) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
@@ -1135,7 +1135,7 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, db_sess=None):
+    async def get_group_occupancy(self, group_id, *, db_sess=None) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
@@ -2138,7 +2138,7 @@ class AgentRegistry:
                 continue
             per_kernel_updates[kernel_id] = kern_stat
 
-        async def _update():
+        async def _update() -> None:
             async with self.db.begin() as conn:
                 update_query = (
                     sa.update(kernels)

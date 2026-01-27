@@ -519,7 +519,7 @@ def _build_session_fetch_query(
     do_ordering: bool = False,
     max_matches: Optional[int] = None,
     eager_loading_op: Optional[Sequence] = None,
-):
+) -> sa.sql.Select:
     cond = base_cond
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
@@ -656,13 +656,13 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition():
+def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
@@ -1715,7 +1715,7 @@ class SessionLifecycleManager:
             session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
             transited = session_row.determine_and_set_status(status_changed_at=now)
 
-            def _calculate_session_occupied_slots(session_row: SessionRow):
+            def _calculate_session_occupied_slots(session_row: SessionRow) -> None:
                 session_occupying_slots = ResourceSlot()
                 for row in session_row.kernels:
                     kernel_row = cast(KernelRow, row)

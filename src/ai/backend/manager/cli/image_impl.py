@@ -23,7 +23,7 @@ from .context import CLIContext, redis_ctx
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def list_images(cli_ctx: CLIContext, short, installed_only):
+async def list_images(cli_ctx: CLIContext, short, installed_only) -> None:
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -75,7 +75,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
+async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -96,7 +96,7 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def forget_image(cli_ctx, canonical_or_alias, architecture):
+async def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
     async with (
         connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
@@ -118,7 +118,7 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
 
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
-):
+) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -150,7 +150,7 @@ async def set_image_resource_limit(
     slot_type,
     range_value,
     architecture,
-):
+) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -164,7 +164,7 @@ async def set_image_resource_limit(
                     ImageAlias(canonical_or_alias),
                 ],
             )
-            await image_row.set_resource_limit(slot_type, range_value)
+            image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception as e:
@@ -188,7 +188,7 @@ async def rescan_images(
             log.exception(f"Unknown error occurred. Error: {e}")
 
 
-async def alias(cli_ctx: CLIContext, alias, target, architecture):
+async def alias(cli_ctx: CLIContext, alias, target, architecture) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -208,7 +208,7 @@ async def alias(cli_ctx: CLIContext, alias, target, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def dealias(cli_ctx: CLIContext, alias):
+async def dealias(cli_ctx: CLIContext, alias) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,

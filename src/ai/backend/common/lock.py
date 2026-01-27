@@ -139,7 +139,7 @@ class FileLock(AbstractDistributedLock):
         self.release()
         return None
 
-    async def _watchdog_timer(self, ttl: float):
+    async def _watchdog_timer(self, ttl: float) -> None:
         await asyncio.sleep(ttl)
         if self._locked:
             if self._file is None:

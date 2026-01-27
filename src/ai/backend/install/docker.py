@@ -6,7 +6,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-def parse_version(expr):
+def parse_version(expr) -> tuple:
     result = []
     for part in expr.split("."):
         try:
@@ -54,7 +54,7 @@ def simple_hash(data: bytes) -> str:
     return base64.b64encode(h.digest()[:12], altchars=b"._").decode()
 
 
-async def detect_snap_docker():
+async def detect_snap_docker() -> Optional[str]:
     if not Path("/run/snapd.socket").is_socket():
         return None
     async with request_unix(

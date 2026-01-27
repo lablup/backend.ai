@@ -36,7 +36,7 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
             self.ssl_ctx.check_hostname = False
             self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    def makeSocket(self, timeout: float = 1):
+    def makeSocket(self, timeout: float = 1) -> ssl.SSLSocket:
         """Create a TLS wrapped socket"""
         plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

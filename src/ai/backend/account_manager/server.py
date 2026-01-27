@@ -161,7 +161,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -234,7 +234,9 @@ def build_root_app(
             database_ctx,
         ]
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(
+        cctx: CleanupContext, app: web.Application
+    ) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         cctx_instance = cctx(app["_root.context"])
         app["_cctx_instances"].append(cctx_instance)

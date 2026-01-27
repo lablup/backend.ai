@@ -209,14 +209,14 @@ class IdleCheckerHost:
         # NewUserGracePeriodChecker will be initialized in start() method
         self._grace_period_checker = NewUserGracePeriodChecker(self._valkey_live)
 
-    def add_checker(self, checker: BaseIdleChecker):
+    def add_checker(self, checker: BaseIdleChecker) -> None:
         if self._frozen:
             raise RuntimeError(
                 "Cannot add a new idle checker after the idle checker host is frozen."
             )
         self._checkers.append(checker)
 
-    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker):
+    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker) -> None:
         if self._frozen:
             raise RuntimeError(
                 "Cannot add a new event dispatch idle checker after the idle checker host is frozen."

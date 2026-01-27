@@ -479,7 +479,7 @@ class UserGroup(graphene.ObjectType):
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserGroup]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[Self]:
         if row is None:
             return None
         return cls(
@@ -488,7 +488,9 @@ class UserGroup(graphene.ObjectType):
         )
 
     @classmethod
-    async def batch_load_by_user_id(cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]):
+    async def batch_load_by_user_id(
+        cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
+    ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
             j = agus.join(groups, agus.c.group_id == groups.c.id)
             query = (

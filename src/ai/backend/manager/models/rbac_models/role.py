@@ -34,19 +34,19 @@ if TYPE_CHECKING:
     from .user_role import UserRoleRow
 
 
-def _get_mapped_user_role_rows_join_condition():
+def _get_mapped_user_role_rows_join_condition() -> sa.ColumnElement[bool]:
     from .user_role import UserRoleRow
 
     return RoleRow.id == foreign(UserRoleRow.role_id)
 
 
-def _get_object_permission_rows_join_condition():
+def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
     from .permission.object_permission import ObjectPermissionRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-def _get_permission_group_rows_join_condition():
+def _get_permission_group_rows_join_condition() -> sa.ColumnElement[bool]:
     from .permission.permission_group import PermissionGroupRow
 
     return RoleRow.id == foreign(PermissionGroupRow.role_id)

@@ -8,14 +8,14 @@ import random
 import sys
 
 
-def pbkdf2_hex(data, salt, iterations, keylen, hashfunc="sha1"):
+def pbkdf2_hex(data, salt, iterations, keylen, hashfunc="sha1") -> str:
     dk = hashlib.pbkdf2_hmac(
         hashfunc, bytes(data, "utf-8"), bytes(salt, "utf-8"), iterations, dklen=keylen
     )
     return binascii.hexlify(dk).decode("utf-8")
 
 
-def load_dictionary(dictionary_file=None):
+def load_dictionary(dictionary_file=None) -> list:
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
@@ -23,7 +23,7 @@ def load_dictionary(dictionary_file=None):
         return json.load(f)
 
 
-def default_hasher(data):
+def default_hasher(data) -> str:
     return pbkdf2_hex(data, "", iterations=50000, keylen=32, hashfunc="sha256")
 
 
@@ -35,7 +35,7 @@ def hash_phrase(
     use_numbers=True,
     separator="",
     capitalize=True,
-):
+) -> str:
     if dictionary is None:
         dictionary = load_dictionary()
 

@@ -112,7 +112,7 @@ class BigInt(Scalar):
     """
 
     @staticmethod
-    def coerce_bigint(value):
+    def coerce_bigint(value: int | str) -> int | float:
         num = int(value)
         if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
             raise ValueError("Cannot serialize integer out of the safe range.")
@@ -125,7 +125,7 @@ class BigInt(Scalar):
     parse_value = coerce_bigint
 
     @staticmethod
-    def parse_literal(node):
+    def parse_literal(node: graphql.language.ast.IntValueNode) -> int | float | None:
         if isinstance(node, graphql.language.ast.IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
@@ -523,8 +523,8 @@ async def batch_multiresult_in_scalar_stream(
     return [*objs_per_key.values()]
 
 
-def privileged_query(required_role: UserRole):
-    def wrap(func):
+def privileged_query(required_role: UserRole) -> Callable:
+    def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(
             root: Any,
@@ -548,7 +548,7 @@ def scoped_query(
     *,
     autofill_user: bool = False,
     user_key: str = "access_key",
-):
+) -> Callable:
     """
     Prepends checks for domain/group/user access rights depending
     on the client's user and keypair information.
@@ -560,7 +560,7 @@ def scoped_query(
         in the keyword arguments.
     """
 
-    def wrap(resolve_func):
+    def wrap(resolve_func) -> Callable:
         @functools.wraps(resolve_func)
         async def wrapped(
             root: Any,
@@ -622,8 +622,8 @@ def scoped_query(
     return wrap
 
 
-def privileged_mutation(required_role, target_func=None):
-    def wrap(func):
+def privileged_mutation(required_role, target_func=None) -> Callable:
+    def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users

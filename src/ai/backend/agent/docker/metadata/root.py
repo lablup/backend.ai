@@ -10,7 +10,7 @@ from .plugin import MetadataPlugin, MetadataPluginRoute, NewMetadataPluginRespon
 
 
 class ContainerMetadataPlugin(MetadataPlugin):
-    async def init(self, context):
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:

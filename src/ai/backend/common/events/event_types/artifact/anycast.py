@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Optional, Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -51,7 +53,7 @@ class ModelVerifyingEvent(BaseArtifactEvent):
         return (self.model_id, self.revision, self.registry_type, self.registry_name)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             model_id=value[0],
             revision=value[1],
@@ -99,7 +101,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         verification_result = None
         if value[6] is not None:
             verification_result = VerificationStepResult.model_validate(value[6])
@@ -143,7 +145,7 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             model=ModelMetadataInfo(
                 model_id=value[0],

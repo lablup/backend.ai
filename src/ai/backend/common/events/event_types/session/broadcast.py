@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from typing import Optional, Self, override
@@ -69,7 +71,7 @@ class SessionCreationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -118,7 +120,7 @@ class SessionTerminationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -158,7 +160,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],

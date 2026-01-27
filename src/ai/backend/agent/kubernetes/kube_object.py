@@ -59,7 +59,7 @@ class ConfigMap(AbstractAPIObject):
         self.name = name
         self.labels = {"backend.ai/kernel-id": kernel_id}
 
-    def put(self, key: str, value: str):
+    def put(self, key: str, value: str) -> None:
         self.items[key] = value
 
     def to_dict(self) -> dict:
@@ -116,7 +116,7 @@ class NFSPersistentVolume(AbstractAPIObject):
         self.labels: dict[str, str] = {}
         self.options: list[str] = []
 
-    def label(self, k, v):
+    def label(self, k, v) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:
@@ -149,7 +149,7 @@ class HostPathPersistentVolume(AbstractAPIObject):
         self.labels: dict[str, str] = {}
         self.options: list[str] = []
 
-    def label(self, k, v):
+    def label(self, k, v) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:
@@ -180,7 +180,7 @@ class PersistentVolumeClaim(AbstractAPIObject):
         self.capacity = capacity
         self.labels: dict[str, str] = {}
 
-    def label(self, k, v):
+    def label(self, k, v) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:

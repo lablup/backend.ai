@@ -877,7 +877,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -1020,7 +1020,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
-    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None]:
+    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None, None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -1048,7 +1048,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None]:
+    async def webapp_ctx() -> AsyncGenerator[None, None]:
         ssl_ctx = None
         if local_config.proxy_coordinator.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

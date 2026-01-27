@@ -193,7 +193,7 @@ class ModelServingEventHandler:
                 ],
             }
 
-            async def _update():
+            async def _update() -> None:
                 async with self._db.begin_session() as db_sess:
                     query = (
                         sa.update(RoutingRow)

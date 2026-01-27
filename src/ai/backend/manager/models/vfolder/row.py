@@ -140,11 +140,11 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     return UserRow.uuid == foreign(VFolderRow.user)
 
 
-def _get_group_row_join_condition():
+def _get_group_row_join_condition() -> sa.sql.elements.ColumnElement:
     return GroupRow.id == foreign(VFolderRow.group)
 
 
@@ -592,7 +592,7 @@ async def query_accessible_vfolders(
         # users.c.email,
     ]
 
-    async def _append_entries(_query, _is_owner=True):
+    async def _append_entries(_query, _is_owner=True) -> None:
         if extra_vf_conds is not None:
             _query = _query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:

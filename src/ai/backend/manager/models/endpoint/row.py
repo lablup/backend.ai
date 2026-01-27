@@ -121,19 +121,19 @@ type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-def _get_endpoint_tokens_join_condition():
+def _get_endpoint_tokens_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-def _get_endpoint_revisions_join_condition():
+def _get_endpoint_revisions_join_condition() -> Any:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
-def _get_endpoint_auto_scaling_policy_join_condition():
+def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_auto_scaling_policy import (
         DeploymentAutoScalingPolicyRow,
     )
@@ -141,31 +141,31 @@ def _get_endpoint_auto_scaling_policy_join_condition():
     return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
 
 
-def _get_endpoint_deployment_policy_join_condition():
+def _get_endpoint_deployment_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
-def _get_image_row_join_condition():
+def _get_image_row_join_condition() -> Any:
     from ai.backend.manager.models.image import ImageRow
 
     return foreign(EndpointRow.image) == ImageRow.id
 
 
-def _get_created_user_row_join_condition():
+def _get_created_user_row_join_condition() -> Any:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
-def _get_session_owner_row_join_condition():
+def _get_session_owner_row_join_condition() -> Any:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
 
 
-def _get_endpoint_token_endpoint_row_join_condition():
+def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 

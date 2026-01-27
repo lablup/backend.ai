@@ -457,7 +457,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         raise NotImplementedError
 
     @abstractmethod
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -491,7 +491,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
-    ):
+    ) -> Mount:
         """
         Return mount object to mount target krunner file/folder/volume.
         """
@@ -585,7 +585,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             type,
             src,
             dst,
-        ):
+        ) -> None:
             resource_spec.mounts.append(
                 self.get_runner_mount(
                     type,
@@ -1239,7 +1239,7 @@ class AbstractAgent[
             COMMIT_STATUS_EXPIRE,
         )
 
-    async def heartbeat(self, interval: float):
+    async def heartbeat(self, interval: float) -> None:
         """
         Send my status information and available kernel images to the manager(s).
         """
@@ -1342,7 +1342,7 @@ class AbstractAgent[
             chunk_buffer.close()
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
-    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]):
+    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         try:
@@ -1354,7 +1354,7 @@ class AbstractAgent[
             raise
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
-    async def collect_container_stat(self, interval: float):
+    async def collect_container_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         try:
@@ -1373,7 +1373,7 @@ class AbstractAgent[
             raise
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
-    async def collect_process_stat(self, interval: float):
+    async def collect_process_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         try:
@@ -2016,7 +2016,7 @@ class AbstractAgent[
                     hwinfo[device_name] = result
         return hwinfo
 
-    async def _cleanup_reported_kernels(self, interval: float):
+    async def _cleanup_reported_kernels(self, interval: float) -> None:
         # dest_path == abuse_report_path
         dest_path = self.local_config.agent.abuse_report_path
         if dest_path is None:
@@ -3538,7 +3538,7 @@ class AbstractAgent[
         ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         updating_kernel_config: KernelCreationConfig,
-    ):
+    ) -> dict[str, Any]:
         kernel_id = ownership_data.kernel_id
         session_id = ownership_data.session_id
         tracker = self.restarting_kernels.get(kernel_id)
@@ -3668,16 +3668,16 @@ class AbstractAgent[
     ) -> CodeCompletionResp:
         return await self.kernel_registry[kernel_id].get_completions(text, opts)
 
-    async def get_logs(self, kernel_id: KernelId):
+    async def get_logs(self, kernel_id: KernelId) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].get_logs()
 
-    async def interrupt_kernel(self, kernel_id: KernelId):
+    async def interrupt_kernel(self, kernel_id: KernelId) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
-    async def start_service(self, kernel_id: KernelId, service: str, opts: dict):
+    async def start_service(self, kernel_id: KernelId, service: str, opts: dict) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].start_service(service, opts)
 
-    async def shutdown_service(self, kernel_id: KernelId, service: str):
+    async def shutdown_service(self, kernel_id: KernelId, service: str) -> None:
         try:
             kernel_obj = self.kernel_registry[kernel_id]
             if kernel_obj is not None:
@@ -3694,7 +3694,7 @@ class AbstractAgent[
         canonical: str | None = None,
         filename: str | None = None,
         extra_labels: dict[str, str] | None = None,
-    ):
+    ) -> None:
         if extra_labels is None:
             extra_labels = {}
         return await self.kernel_registry[kernel_id].commit(
@@ -3704,19 +3704,19 @@ class AbstractAgent[
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
-    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes):
+    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes) -> None:
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 
-    async def download_file(self, kernel_id: KernelId, filepath: str):
+    async def download_file(self, kernel_id: KernelId, filepath: str) -> bytes:
         return await self.kernel_registry[kernel_id].download_file(filepath)
 
-    async def download_single(self, kernel_id: KernelId, filepath: str):
+    async def download_single(self, kernel_id: KernelId, filepath: str) -> bytes:
         return await self.kernel_registry[kernel_id].download_single(filepath)
 
-    async def list_files(self, kernel_id: KernelId, path: str):
+    async def list_files(self, kernel_id: KernelId, path: str) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].list_files(path)
 
-    async def ping_kernel(self, kernel_id: KernelId):
+    async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:

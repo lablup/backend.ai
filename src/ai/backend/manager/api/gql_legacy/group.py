@@ -331,7 +331,7 @@ class GroupPermissionField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(node: Any, _variables: dict | None = None) -> ProjectPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ProjectPermission(node.value)
         return None
@@ -559,7 +559,7 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
-        def value_or_none(value):
+        def value_or_none(value) -> Any:
             return value if value is not Undefined else None
 
         type_val = None if self.type is Undefined else ProjectType[self.type]

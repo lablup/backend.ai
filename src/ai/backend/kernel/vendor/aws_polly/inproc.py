@@ -25,7 +25,7 @@ class PollyInprocRunner(threading.Thread):
         )
         self.polly = self.session.client("polly")
 
-    def run(self):
+    def run(self) -> None:
         while True:
             code_text = self.input_queue.get()
             request = json.loads(code_text)

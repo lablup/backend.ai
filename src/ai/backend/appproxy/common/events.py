@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Optional, Self, override
 
 from pydantic import TypeAdapter
 
@@ -23,7 +25,7 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             target_worker_authority=value[0],
             circuits=[Circuit(**r) for r in json.loads(value[1])],
@@ -57,7 +59,7 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             target_worker_authority=value[0],
             circuit=Circuit(**json.loads(value[1])),
@@ -95,7 +97,7 @@ class GenericWorkerEvent(AbstractAnycastEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(value[0], value[1])
 
     @classmethod
@@ -152,7 +154,7 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls()
 
     @classmethod
@@ -179,7 +181,7 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls()
 
     @classmethod
@@ -206,7 +208,7 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls()
 
     @classmethod

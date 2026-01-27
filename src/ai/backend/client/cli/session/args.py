@@ -165,7 +165,7 @@ START_OPTION = [
 
 
 def decorator_group(*decs) -> Callable[[Any], Any]:
-    def d(f):
+    def d(f: Any) -> Any:
         for decorator in decs[::-1]:
             f = decorator(f)
         return f

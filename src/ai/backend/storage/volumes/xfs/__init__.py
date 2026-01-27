@@ -45,8 +45,8 @@ class XfsProjectRegistry:
     async def init(self, backend: BaseVolume) -> None:
         self.backend = backend
 
-    async def read_project_info(self):
-        def _read_projid_file():
+    async def read_project_info(self) -> None:
+        def _read_projid_file() -> str:
             return self.file_projid.read_text()
 
         # TODO: how to handle if /etc/proj* files are deleted by external reason?
@@ -79,7 +79,7 @@ class XfsProjectRegistry:
         temp_name_projects = ""
         temp_name_projid = ""
 
-        def _create_temp_files():
+        def _create_temp_files() -> None:
             nonlocal temp_name_projects, temp_name_projid
             _tmp_projects = NamedTemporaryFile(delete=False)
             _tmp_projid = NamedTemporaryFile(delete=False)
@@ -103,7 +103,7 @@ class XfsProjectRegistry:
                 _tmp_projects.close()
                 _tmp_projid.close()
 
-        def _delete_temp_files():
+        def _delete_temp_files() -> None:
             try:
                 os.unlink(temp_name_projects)
             except FileNotFoundError:

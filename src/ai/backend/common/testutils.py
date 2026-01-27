@@ -1,3 +1,4 @@
+from typing import Any
 from unittest import mock
 
 try:
@@ -8,20 +9,20 @@ except ImportError:
     from asynctest import CoroutineMock as AsyncMock  # type: ignore
 
 
-def mock_corofunc(return_value):
+def mock_corofunc(return_value) -> mock.Mock:
     """
     Return mock coroutine function.
 
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs):
+    async def _mock_corofunc(*args, **kargs) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs):
+async def mock_awaitable(**kwargs) -> AsyncMock:
     """
     Mock awaitable.
 

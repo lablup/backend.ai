@@ -98,7 +98,7 @@ class GQLLoggingMiddleware:
 
 
 class CustomIntrospectionRule(ValidationRule):
-    def enter_field(self, node: FieldNode, *_args):
+    def enter_field(self, node: FieldNode, *_args) -> None:
         field_name = node.name.value
         if field_name.startswith("__"):
             # Allow __typename field for GraphQL Federation, @connection directive

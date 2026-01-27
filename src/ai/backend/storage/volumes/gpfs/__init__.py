@@ -22,6 +22,7 @@ from ai.backend.storage.watcher import WatcherClient
 
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
+from .types import GPFSSystemHealthState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -194,7 +195,7 @@ class GPFSVolume(BaseVolume):
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
         invalid_status = ["FAILED", "DEGRADED", "ERROR"]
-        health_status = "HEALTHY"
+        health_status: str | GPFSSystemHealthState = "HEALTHY"
 
         for node in nodes:
             if health_status == "ERROR":

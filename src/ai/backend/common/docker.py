@@ -386,7 +386,7 @@ class PlatformTagSet(Mapping):
     def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
-    def has(self, key: str, version: Optional[str] = None):
+    def has(self, key: str, version: Optional[str] = None) -> bool:
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)
@@ -589,7 +589,7 @@ class ImageRef:
             image = default_repository + "/" + image
         return image, tag
 
-    def _update_tag_set(self):
+    def _update_tag_set(self) -> None:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 

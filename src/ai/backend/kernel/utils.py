@@ -4,7 +4,7 @@ import os
 import site
 import traceback
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 __all__ = (
     "current_loop",
@@ -22,12 +22,14 @@ else:
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
 
-def find_executable(*paths):
+def find_executable(*paths) -> Path | None:
     """
     Find the first executable regular file in the given list of paths.
     """
     for path in paths:
-        if isinstance(path, (str, bytes)):
+        if isinstance(path, bytes):
+            path = Path(path.decode("utf-8"))
+        elif isinstance(path, str):
             path = Path(path)
         if not path.exists():
             continue
@@ -58,13 +60,13 @@ class TracebackSourceFilter(logging.Filter):
         return True
 
 
-async def safe_close_task(task):
+async def safe_close_task(task) -> None:
     if task is not None and not task.done():
         task.cancel()
         await task
 
 
-async def wait_local_port_open(port):
+async def wait_local_port_open(port) -> None:
     while True:
         try:
             async with asyncio.timeout(10.0):
@@ -96,7 +98,7 @@ def scan_proc_stats() -> dict[int, dict]:
     return pid_set
 
 
-def parse_proc_stat(pid):
+def parse_proc_stat(pid) -> dict[str, Any]:
     data = Path(f"/proc/{pid}/stat").read_bytes()
     name_begin = data.find(b"(")
     name_end = data.rfind(b")")

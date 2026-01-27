@@ -64,7 +64,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put(key, val, scope=scope, scope_prefix_map=scope_prefix_map)
 
@@ -76,7 +76,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put_prefix(key, dict_obj, scope=scope, scope_prefix_map=scope_prefix_map)
 
@@ -87,7 +87,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put_dict(
             flattened_dict_obj, scope=scope, scope_prefix_map=scope_prefix_map
@@ -145,7 +145,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete(key, scope=scope, scope_prefix_map=scope_prefix_map)
 
@@ -156,7 +156,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete_multi(keys, scope=scope, scope_prefix_map=scope_prefix_map)
 
@@ -167,7 +167,7 @@ class AgentEtcdClientView(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete_prefix(key_prefix, scope=scope, scope_prefix_map=scope_prefix_map)
 

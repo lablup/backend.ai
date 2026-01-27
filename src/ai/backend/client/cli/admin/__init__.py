@@ -2,7 +2,7 @@ from ai.backend.cli.main import main
 
 
 @main.group()
-def admin():
+def admin() -> None:
     """
     Administrative command set
     """

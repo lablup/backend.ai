@@ -52,7 +52,7 @@ class VASTQuotaModel(BaseQuotaModel):
     async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VASTQuotaID | None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _read():
+        def _read() -> VASTQuotaID | None:
             try:
                 with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
                     return VASTQuotaID(f.read())
@@ -66,7 +66,7 @@ class VASTQuotaModel(BaseQuotaModel):
     ) -> None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _write():
+        def _write() -> None:
             qs_path.mkdir(parents=True, exist_ok=True)
             with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "w") as f:
                 f.write(str(vast_quota_id))

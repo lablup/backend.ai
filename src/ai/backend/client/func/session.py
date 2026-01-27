@@ -638,7 +638,9 @@ class ComputeSession(BaseFunction):
         return data["modify_compute_session"]
 
     @api_function
-    async def destroy(self, *, forced: bool = False, recursive: bool = False):
+    async def destroy(
+        self, *, forced: bool = False, recursive: bool = False
+    ) -> Optional[dict[str, Any]]:
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -664,7 +666,7 @@ class ComputeSession(BaseFunction):
         return None
 
     @api_function
-    async def restart(self):
+    async def restart(self) -> None:
         """
         Restarts the compute session.
         The server force-destroys the current running container(s), but keeps their
@@ -683,7 +685,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_name):
+    async def rename(self, new_name) -> None:
         """
         Renames Session ID of running compute session.
         """
@@ -700,7 +702,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def commit(self):
+    async def commit(self) -> dict[str, Any]:
         """
         Commit a running session to a tar file in the agent host.
         """
@@ -717,7 +719,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def export_to_image(self, new_image_name: str):
+    async def export_to_image(self, new_image_name: str) -> dict[str, Any]:
         """
         Commits running session to new image and then uploads to designated container registry.
         Requires Backend.AI server set up for per-user image commit feature (24.03).
@@ -735,7 +737,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """
         Tries to interrupt the current ongoing code execution.
         This may fail without any explicit errors depending on the code being
@@ -792,7 +794,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_info(self):
+    async def get_info(self) -> dict[str, Any]:
         """
         Retrieves a brief information about the compute session.
         """
@@ -852,7 +854,7 @@ class ComputeSession(BaseFunction):
         return result
 
     @api_function
-    async def get_logs(self, kernel_id: Optional[UUID] = None):
+    async def get_logs(self, kernel_id: Optional[UUID] = None) -> dict[str, Any]:
         """
         Retrieves the console log of the compute session container.
         """
@@ -871,7 +873,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_dependency_graph(self):
+    async def get_dependency_graph(self) -> dict[str, Any]:
         """
         Retrieves the root node of dependency graph of the compute session.
         """
@@ -892,7 +894,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_status_history(self):
+    async def get_status_history(self) -> dict[str, Any]:
         """
         Retrieves the status transition history of the compute session.
         """
@@ -915,7 +917,7 @@ class ComputeSession(BaseFunction):
         code: Optional[str] = None,
         mode: str = "query",
         opts: Optional[dict] = None,
-    ):
+    ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
         build/clean/execute commands to the compute session.
@@ -1000,7 +1002,7 @@ class ComputeSession(BaseFunction):
         files: Sequence[str | Path],
         basedir: Optional[str | Path] = None,
         show_progress: bool = False,
-    ):
+    ) -> Any:
         """
         Uploads the given list of files to the compute session.
         You may refer them in the batch-mode execution or from the code
@@ -1064,7 +1066,7 @@ class ComputeSession(BaseFunction):
         files: Sequence[str | Path],
         dest: str | Path = ".",
         show_progress: bool = False,
-    ):
+    ) -> dict[str, Any]:
         """
         Downloads the given list of files from the compute session.
 
@@ -1129,7 +1131,7 @@ class ComputeSession(BaseFunction):
         return {"file_names": file_names}
 
     @api_function
-    async def list_files(self, path: str | Path = "."):
+    async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         """
         Gets the list of files in the given path inside the compute session
         container.
@@ -1304,7 +1306,7 @@ class ComputeSession(BaseFunction):
             params=params,
         )
 
-        async def send_code(ws):
+        async def send_code(ws: WebSocketResponse) -> None:
             await ws.send_json({
                 "code": code,
                 "mode": mode,
@@ -1475,35 +1477,35 @@ class InferenceSession(BaseFunction):
         return identity_params
 
     @api_function
-    async def destroy(self, *, forced: bool = False):
+    async def destroy(self, *, forced: bool = False) -> None:
         """
         Destroys the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def restart(self):
+    async def restart(self) -> None:
         """
         Restarts the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_id) -> None:
         """
         Renames Session ID or running inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def commit(self):
+    async def commit(self) -> None:
         """
         Commit a running session to a tar file in the agent host.
         """
         raise NotImplementedError
 
     @api_function
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """
         Tries to interrupt the current ongoing code execution.
         This may fail without any explicit errors depending on the code being
@@ -1521,21 +1523,21 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def get_info(self):
+    async def get_info(self) -> None:
         """
         Retrieves a brief information about the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def get_logs(self):
+    async def get_logs(self) -> None:
         """
         Retrieves the console log of the inference session container.
         """
         raise NotImplementedError
 
     @api_function
-    async def get_status_history(self):
+    async def get_status_history(self) -> None:
         """
         Retrieves the status transition history of the inference session.
         """
@@ -1547,7 +1549,7 @@ class InferenceSession(BaseFunction):
         files: Sequence[str | Path],
         basedir: Optional[str | Path] = None,
         show_progress: bool = False,
-    ):
+    ) -> None:
         """
         Uploads the given list of files to the inference session.
         """
@@ -1559,14 +1561,14 @@ class InferenceSession(BaseFunction):
         files: Sequence[str | Path],
         dest: str | Path = ".",
         show_progress: bool = False,
-    ):
+    ) -> None:
         """
         Downloads the given list of files from the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def list_files(self, path: str | Path = "."):
+    async def list_files(self, path: str | Path = ".") -> None:
         """
         Gets the list of files in the given path inside the inference session
         container.
@@ -1574,11 +1576,11 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def stream_app_info(self):
+    async def stream_app_info(self) -> None:
         raise NotImplementedError
 
     @api_function
-    async def get_abusing_report(self):
+    async def get_abusing_report(self) -> None:
         """
         Retrieves abusing reports of session's sibling kernels.
         """
@@ -1593,8 +1595,8 @@ class StreamPty(WebSocketResponse):
 
     __slots__ = ("ws",)
 
-    async def resize(self, rows, cols):
-        await self.ws.send_str(
+    async def resize(self, rows: int, cols: int) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "resize",
                 "rows": rows,
@@ -1602,8 +1604,8 @@ class StreamPty(WebSocketResponse):
             })
         )
 
-    async def restart(self):
-        await self.ws.send_str(
+    async def restart(self) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "restart",
             })

@@ -116,7 +116,7 @@ class ConnectionConstructor(Protocol):
 
 
 class AsyncNodeField(NodeField):
-    def wrap_resolve(self, parent_resolver):
+    def wrap_resolve(self, parent_resolver) -> functools.partial:
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 
@@ -136,11 +136,11 @@ class AsyncNode(Node):
         name = "Node"
 
     @classmethod
-    def Field(cls, *args, **kwargs):
+    def Field(cls, *args: Any, **kwargs: Any) -> AsyncNodeField:
         return AsyncNodeField(cls, *args, **kwargs)
 
     @classmethod
-    async def node_resolver(cls, only_type, root, info, id):
+    async def node_resolver(cls, only_type: type, root: Any, info: Any, id: str) -> Any | None:
         return await cls.get_node_from_global_id(info, id, only_type=only_type)
 
     @staticmethod
@@ -187,8 +187,13 @@ class Connection(graphene.ObjectType):
 
     @classmethod
     def __init_subclass_with_meta__(
-        cls, node=None, name=None, strict_types=False, _meta=None, **options
-    ):
+        cls,
+        node: Any = None,
+        name: str | None = None,
+        strict_types: bool = False,
+        _meta: ConnectionOptions | None = None,
+        **options: Any,
+    ) -> None:
         if not _meta:
             _meta = ConnectionOptions(cls)
         if not node:
@@ -278,7 +283,7 @@ class AsyncListConnectionField(IterableConnectionField):
     """
 
     @property
-    def type(self):
+    def type(self) -> Any:
         type_ = super(IterableConnectionField, self).type
         connection_type = type_
         if isinstance(type_, graphene.NonNull):

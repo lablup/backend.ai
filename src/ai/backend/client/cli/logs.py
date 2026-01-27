@@ -12,7 +12,7 @@ from .pretty import print_error
 
 @main.command()
 @click.argument("task_id", metavar="TASKID")
-def task_logs(task_id):
+def task_logs(task_id) -> None:
     """
     Shows the output logs of a batch task.
 
@@ -20,7 +20,7 @@ def task_logs(task_id):
     TASKID: An UUID of a task (or kernel).
     """
 
-    async def _task_logs():
+    async def _task_logs() -> None:
         async with AsyncSession() as session:
             async for chunk in session.ComputeSession.get_task_logs(task_id):
                 print(chunk.decode("utf8", errors="replace"), end="")

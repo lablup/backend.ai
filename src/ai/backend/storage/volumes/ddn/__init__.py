@@ -46,7 +46,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return
 
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
-        def _read():
+        def _read() -> int | None:
             try:
                 with open(pid_file_path) as f:
                     return int(f.read())
@@ -56,7 +56,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return await asyncio.get_running_loop().run_in_executor(None, _read)
 
     async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
-        def _write():
+        def _write() -> None:
             with open(pid_file_path, "w") as f:
                 f.write(str(pid))
 

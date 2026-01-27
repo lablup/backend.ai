@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any, Optional
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
@@ -124,7 +126,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def rescan_images(cls, registry: str, project: Optional[str] = None):
+    async def rescan_images(cls, registry: str, project: Optional[str] = None) -> dict[str, Any]:
         q = _d("""
             mutation($registry: String, $project: String) {
                 rescan_images(registry:$registry, project: $project) {
@@ -143,7 +145,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def forget_image_by_id(cls, image_id: str):
+    async def forget_image_by_id(cls, image_id: str) -> dict[str, Any]:
         q = _d("""
             mutation($image_id: String!) {
                 forget_image_by_id(image_id: $image_id) {
@@ -164,7 +166,7 @@ class Image(BaseFunction):
         image_id: str,
         remove_from_registry: bool = False,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ):
+    ) -> dict[str, Any]:
         q = _d("""
             mutation($image_id: String!, $options: PurgeImageOptions) {
                 purge_image_by_id(image_id: $image_id, options: $options) {
@@ -186,7 +188,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def untag_image_from_registry(cls, image_id: str):
+    async def untag_image_from_registry(cls, image_id: str) -> dict[str, Any]:
         """
         Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
         """
@@ -205,7 +207,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def forget_image(cls, reference: str, architecture: str):
+    async def forget_image(cls, reference: str, architecture: str) -> dict[str, Any]:
         q = _d("""
             mutation($reference: String!, $architecture: String!) {
                 forget_image(reference: $reference, architecture: $architecture) {

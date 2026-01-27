@@ -10,7 +10,7 @@ from .pretty import print_error
 
 
 @click.group()
-def server_logs():
+def server_logs() -> None:
     """Provides operations related to server logs."""
 
 
@@ -22,7 +22,7 @@ def server_logs():
     "-l", "--page-size", type=int, default=20, help="Number of logs to fetch (from latest log)"
 )
 @click.option("-n", "--page-number", type=int, default=1, help="Page number to fetch.")
-def list(mark_read, page_size, page_number):
+def list(mark_read, page_size, page_number) -> None:
     """Fetch server (error) logs."""
     with Session() as session:
         try:

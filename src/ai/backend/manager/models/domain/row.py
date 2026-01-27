@@ -82,7 +82,7 @@ def row_to_data(row: DomainRow | Row) -> DomainData:
     )
 
 
-def _get_network_join_condition():
+def _get_network_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.network import NetworkRow
 
     return DomainRow.name == foreign(NetworkRow.domain_name)

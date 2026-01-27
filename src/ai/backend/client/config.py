@@ -298,12 +298,12 @@ class APIConfig:
         """All configured endpoint URLs."""
         return self._endpoints
 
-    def rotate_endpoints(self):
+    def rotate_endpoints(self) -> None:
         if len(self._endpoints) > 1:
             item = self._endpoints.pop(0)
             self._endpoints.append(item)
 
-    def load_balance_endpoints(self):
+    def load_balance_endpoints(self) -> None:
         pass
 
     @property

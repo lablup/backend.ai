@@ -34,7 +34,7 @@ shutdown_enabled = False
 
 
 @web.middleware
-async def auth_middleware(request, handler):
+async def auth_middleware(request, handler) -> web.StreamResponse:
     token = request.headers.get("X-BackendAI-Watcher-Token", None)
     if token == request.app["token"]:
         try:
@@ -236,7 +236,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     return web.Response(text=out)
 
 
-async def init_app(app):
+async def init_app(app) -> None:
     r = app.router.add_route
     r("GET", "/", handle_status)
     if app["config"]["watcher"]["soft-reset-available"]:
@@ -252,11 +252,11 @@ async def init_app(app):
     r("DELETE", "/mounts", handle_umount)
 
 
-async def shutdown_app(app):
+async def shutdown_app(app) -> None:
     pass
 
 
-async def prepare_hook(request, response):
+async def prepare_hook(request, response) -> None:
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 

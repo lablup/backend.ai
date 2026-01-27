@@ -49,7 +49,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition():
+def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.session import SessionRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)

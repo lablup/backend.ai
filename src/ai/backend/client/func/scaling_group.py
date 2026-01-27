@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Optional
@@ -57,7 +59,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_available(cls, group: str):
+    async def list_available(cls, group: str) -> Sequence[dict]:
         """
         List available scaling groups for the current user,
         considering the user, the user's domain, and the designated user group.
@@ -219,7 +221,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, name: str):
+    async def delete(cls, name: str) -> dict:
         """
         Deletes an existing scaling group.
         """
@@ -236,7 +238,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def associate_domain(cls, scaling_group: str, domain: str):
+    async def associate_domain(cls, scaling_group: str, domain: str) -> dict:
         """
         Associate scaling_group with domain.
 
@@ -257,7 +259,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def dissociate_domain(cls, scaling_group: str, domain: str):
+    async def dissociate_domain(cls, scaling_group: str, domain: str) -> dict:
         """
         Dissociate scaling_group from domain.
 
@@ -278,7 +280,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def dissociate_all_domain(cls, domain: str):
+    async def dissociate_all_domain(cls, domain: str) -> dict:
         """
         Dissociate all scaling_groups from domain.
 
@@ -297,7 +299,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def associate_group(cls, scaling_group: str, group_id: str):
+    async def associate_group(cls, scaling_group: str, group_id: str) -> dict:
         """
         Associate scaling_group with group.
 
@@ -318,7 +320,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def dissociate_group(cls, scaling_group: str, group_id: str):
+    async def dissociate_group(cls, scaling_group: str, group_id: str) -> dict:
         """
         Dissociate scaling_group from group.
 
@@ -339,7 +341,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def dissociate_all_group(cls, group_id: str):
+    async def dissociate_all_group(cls, group_id: str) -> dict:
         """
         Dissociate all scaling_groups from group.
 

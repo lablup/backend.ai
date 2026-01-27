@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import ssl
 import time
@@ -29,7 +31,7 @@ class WekaQuota:
     used_bytes: Optional[int]
 
     @classmethod
-    def from_json(cls, quota_id: str, data: Any):
+    def from_json(cls, quota_id: str, data: Any) -> WekaQuota:
         return WekaQuota(
             quota_id,
             data["inode_id"],
@@ -39,7 +41,7 @@ class WekaQuota:
             data["used_bytes"],
         )
 
-    def to_json(self):
+    def to_json(self) -> dict[str, int | str | None]:
         return {
             "quota_id": self.quota_id,
             "inode_id": self.inode_id,
@@ -68,7 +70,8 @@ class WekaFs:
     ssd_budget: int
     total_budget: int
 
-    def from_json(data: Any):
+    @classmethod
+    def from_json(cls, data: Any) -> WekaFs:
         return WekaFs(
             data["id"],
             data["name"],
@@ -88,8 +91,8 @@ class WekaFs:
         )
 
 
-def error_handler(inner):
-    async def outer(*args, **kwargs):
+def error_handler(inner) -> Any:
+    async def outer(*args, **kwargs) -> Any:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging.config
@@ -342,10 +344,10 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
-    async def _get_login_history():
+    async def _get_login_history() -> dict[str, float | int]:
         login_history_bytes = await valkey_client.get_login_history(creds["username"])
         if not login_history_bytes:
-            login_history = {
+            login_history: dict[str, float | int] = {
                 "last_login_attempt": 0,
                 "login_fail_count": 0,
             }
@@ -357,7 +359,7 @@ async def login_handler(request: web.Request) -> web.Response:
             login_history["login_fail_count"] = 0
         return login_history
 
-    async def _set_login_history(last_login_attempt, login_fail_count):
+    async def _set_login_history(last_login_attempt: float, login_fail_count: float | int) -> None:
         """
         Set login history per email (not in browser session).
         """
@@ -873,7 +875,7 @@ async def webapp_ctx(
         raise ValueError("Unrecognized service.mode", config.service.mode)
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
 
-    async def on_prepare(request, response):
+    async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
         # Remove "Server" header for a security reason.
         response.headers.popall("Server", None)
 

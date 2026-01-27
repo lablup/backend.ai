@@ -349,13 +349,13 @@ async def handle_kernel_exception(
 
 
 # Defined for avoiding circular import
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition():
+def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.image import ImageRow
 
     return sa.and_(
@@ -708,7 +708,7 @@ class KernelRow(Base):
     ) -> KernelRow:
         from ai.backend.manager.models.agent import AgentStatus
 
-        async def _query():
+        async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:
                 query = (
                     sa.select(KernelRow)
@@ -726,7 +726,7 @@ class KernelRow(Base):
                         k
                         for k in result
                         if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row.status == AgentStatus.ALIVE)
+                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
                     ]
                 if not cand:
                     raise SessionNotFound

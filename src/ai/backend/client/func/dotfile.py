@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Optional
+from typing import Any, Optional
 
 from ai.backend.client.request import Request
 
@@ -103,7 +103,7 @@ class Dotfile(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update(self, data: str, permission: str):
+    async def update(self, data: str, permission: str) -> dict[str, Any]:
         body = {
             "data": data,
             "path": self.path,
@@ -128,7 +128,7 @@ class Dotfile(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         params = {"path": self.path}
         if self.group:
             params["group"] = self.group

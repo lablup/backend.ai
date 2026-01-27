@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Optional, Self, override
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -19,7 +21,7 @@ class ModelServiceStatusEventArgs(AbstractEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             session_id=SessionId(uuid.UUID(value[0])),
             new_status=ModelServiceStatus(value[1]),

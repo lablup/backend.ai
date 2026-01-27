@@ -293,7 +293,7 @@ class ProxyRunnerContext:
     metavar='"ENVNAME=envvalue"',
     help="Add additional environment variable when starting service.",
 )
-def app(session_name, app, bind, arg, env):
+def app(session_name, app, bind, arg, env) -> None:
     """
     Run a local proxy to a service provided by Backend.AI compute sessions.
 
@@ -331,7 +331,7 @@ def app(session_name, app, bind, arg, env):
 @click.argument("session_name", type=str, metavar="SESSION_ID", nargs=1)
 @click.argument("app_name", type=str, metavar="APP", nargs=-1)
 @click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
-def apps(session_name, app_name, list_names):
+def apps(session_name, app_name, list_names) -> None:
     """
     List available additional arguments and environment variables when starting service.
 
@@ -341,7 +341,7 @@ def apps(session_name, app_name, list_names):
          If none provided, this will print all available services.
     """
 
-    async def print_arguments():
+    async def print_arguments() -> None:
         apps = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)

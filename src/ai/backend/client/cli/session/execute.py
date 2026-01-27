@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import collections
 import getpass
@@ -55,7 +57,7 @@ async def exec_loop(
     opts=None,
     vprint_done=print_done,
     is_multi=False,
-):
+) -> None:
     """
     Fully streamed asynchronous version of the execute loop.
     """
@@ -113,7 +115,7 @@ async def exec_loop(
 
 def exec_loop_sync(
     stdout, stderr, compute_session, mode, code, *, opts=None, vprint_done=print_done
-):
+) -> None:
     """
     Old synchronous polling version of the execute loop.
     """
@@ -164,16 +166,16 @@ def exec_loop_sync(
             code = ""
 
 
-async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done):
+async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done) -> None:
     # async with compute_session.stream_pty() as stream: ...
     raise NotImplementedError
 
 
-def _noop(*args, **kwargs):
+def _noop(*args, **kwargs) -> None:
     pass
 
 
-def format_stats(stats):
+def format_stats(stats) -> str:
     formatted = []
     version = stats.pop("version", 1)
     stats.pop("status")
@@ -430,7 +432,7 @@ def run(
     network,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
-):
+) -> None:
     """
     Run the given code snippet or files in a session.
     Depending on the session ID you give (default is random),
@@ -526,7 +528,7 @@ def run(
                 pretty_env = " ".join(f"{item[0]}={item[1]}" for item in case[0])
                 print(f"env = {pretty_env!r}, build = {case[1]!r}, exec = {case[2]!r}")
 
-    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd):
+    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd) -> None:
         try:
             compute_session = session.ComputeSession.get_or_create(
                 image,
@@ -625,7 +627,9 @@ def run(
                     else:
                         print(f"[{idx}] Statistics is not available.")
 
-    async def _run(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False):
+    async def _run(
+        session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False
+    ) -> None:
         try:
             if network:
                 try:
@@ -715,7 +719,7 @@ def run(
 
         try:
 
-            def indexed_vprint_done(msg):
+            def indexed_vprint_done(msg) -> None:
                 vprint_done(f"[{idx}] " + msg)
 
             if files:
@@ -793,7 +797,7 @@ def run(
                     stdout.close()
                     stderr.close()
 
-    async def _run_cases():
+    async def _run_cases() -> None:
         loop = current_loop()
         if name is None:
             name_prefix = f"pysdk-{secrets.token_hex(5)}"

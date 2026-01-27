@@ -41,7 +41,7 @@ from .types import CLIContext
 
 
 @click.group()
-def notification():
+def notification() -> None:
     """Set of notification operations (channels and rules)"""
 
 
@@ -49,7 +49,7 @@ def notification():
 
 
 @notification.group()
-def channel():
+def channel() -> None:
     """Manage notification channels"""
 
 
@@ -370,7 +370,7 @@ def validate_channel_cmd(
 
 
 @notification.group()
-def rule():
+def rule() -> None:
     """Manage notification rules"""
 
 

@@ -39,7 +39,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _danger_words = ["password", "passwd", "secret"]
 
 
-def set_handler_attr(func, key, value):
+def set_handler_attr(func, key, value) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
@@ -47,7 +47,7 @@ def set_handler_attr(func, key, value):
     func._backend_attrs = attrs
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request, key, default=None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -95,7 +95,7 @@ async def call_non_bursty(
     *,
     max_bursts: int = 64,
     max_idle: int | float = 100.0,
-):
+) -> Any:
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
@@ -307,7 +307,7 @@ class BackendAIAccessLogger(AccessLogger):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def log(self, request, response, time):
+    def log(self, request, response, time) -> None:
         if request.get("do_not_print_access_log"):
             return
 

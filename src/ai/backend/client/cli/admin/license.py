@@ -17,14 +17,14 @@ def license() -> None:
 
 
 @license.command()
-def show():
+def show() -> None:
     """
     Show the license information (enterprise editions only).
     """
     from ai.backend.client.request import Request
     from ai.backend.client.session import AsyncSession
 
-    async def _show_license():
+    async def _show_license() -> None:
         async with AsyncSession():
             rqst = Request("GET", "/license")
             async with rqst.fetch() as resp:

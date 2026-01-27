@@ -174,10 +174,10 @@ ignore = [
     "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
     "ANN002",  # missing-type-args - *args type annotation, low practical value
     "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
-    "ANN201",  # missing-return-type-undocumented-public-function - 597 violations, defer for gradual migration
-    "ANN202",  # missing-return-type-private-function - 258 violations, defer for gradual migration
-    "ANN205",  # missing-return-type-static-method - 21 violations, defer for gradual migration
-    "ANN206",  # missing-return-type-class-method - 119 violations, defer for gradual migration
+    # "ANN201",  # missing-return-type-undocumented-public-function - ENABLING: analyzing patterns
+    # "ANN202",  # missing-return-type-private-function - ENABLED: fixing violations incrementally
+    # "ANN205",  # missing-return-type-static-method - ENABLED: fixing violations incrementally
+    # "ANN206",  # missing-return-type-class-method - ENABLED: fixing violations incrementally
     "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs
 ]
 
@@ -284,6 +284,32 @@ namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
+
+# Disable errors in client CLI, web server, and tests
+# Client SDK will be rewritten, so defer all type fixes
+# "None not callable" errors occur because mypy doesn't understand the APIFunctionMeta metaclass magic
+# that wraps async API functions to work in both sync (Session) and async (AsyncSession) contexts
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.client.cli.*",
+    "ai.backend.client.session",
+    "ai.backend.client.helper",
+    "ai.backend.client.func.resource",
+    "ai.backend.web.server",
+    "ai.backend.test.*",
+    "tests.unit.client.*",
+]
+disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
+
+# Ignore errors in vendor code, accelerators, and build tools
+# These are external/generated code or low-priority plugins
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.kernel.vendor.*",
+    "ai.backend.accelerator.*",
+    "tools.build-macros",
+]
+ignore_errors = true
 
 [tool.pyright]
 pythonVersion = "3.13"

@@ -34,7 +34,7 @@ OrderSpecItem = tuple[
 ]
 
 
-def get_col_from_table(table, column_name: str):
+def get_col_from_table(table, column_name: str) -> sa.Column:
     try:
         return table.c[column_name]
     except AttributeError:

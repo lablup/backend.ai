@@ -489,7 +489,7 @@ class DelimiterSeparatedList(list[TItem]):
             except ValidationError as e:
                 raise ValueError(str(e)) from e
 
-        def _serialize(val: Sequence[Any]):
+        def _serialize(val: Sequence[Any]) -> str:
             return cls.delimiter.join(str(x) for x in val)
 
         return core_schema.with_info_plain_validator_function(

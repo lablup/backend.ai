@@ -15,7 +15,7 @@ pure_python_mods = (
 )
 
 
-def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None):
+def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None) -> None:
     global exclude_source_files
     if exclude_source_files:
         if isinstance(zinfo_or_arcname, str):
@@ -37,12 +37,12 @@ class bdist_wheel(_bdist_wheel):
         ("exclude-source-files", None, "remove all .py files from the generated wheel"),
     )
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         super().initialize_options()
         self.python_tag = None
         self.exclude_source_files = False
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         global exclude_source_files
         if self.python_tag is None:
             if self.exclude_source_files:

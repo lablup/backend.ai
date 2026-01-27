@@ -112,8 +112,8 @@ class TestRecalculateUsage:
         mock_root_ctx.processors.agent.recalculate_usage.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
         # Verify response body is empty dict
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == {}
 
     @pytest.mark.asyncio
@@ -148,8 +148,8 @@ class TestAdminMonthStats:
         mock_root_ctx.processors.user.admin_month_stats.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected stats
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_stats
 
     @pytest.mark.asyncio
@@ -185,8 +185,8 @@ class TestGetContainerRegistries:
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected registries
         json_response = cast(web.Response, response)
-        assert json_response.body is not None
-        response_body = json.loads(cast(bytes, json_response.body))
+        assert json_response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, json_response._body))  # type: ignore[attr-defined]
         assert response_body == expected_registries
 
     @pytest.mark.asyncio
@@ -224,8 +224,8 @@ class TestListPresets:
         assert response.status == HTTPStatus.OK
         # Verify response body contains presets wrapped in dict
         json_response = cast(web.Response, response)
-        assert json_response.body is not None
-        response_body = json.loads(cast(bytes, json_response.body))
+        assert json_response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, json_response._body))  # type: ignore[attr-defined]
         assert response_body == {"presets": expected_presets}
 
     @pytest.mark.asyncio
@@ -287,8 +287,8 @@ class TestUserMonthStats:
         action = call_args[0][0]
         assert action.user_id == user_uuid
         # Verify response body contains expected stats
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_stats
 
     @pytest.mark.asyncio
@@ -340,8 +340,8 @@ class TestGetWatcherStatus:
         assert action.agent_id == "agent-001"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected data
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_data
 
     @pytest.mark.asyncio
@@ -393,8 +393,8 @@ class TestWatcherAgentStart:
         assert action.agent_id == "agent-001"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected data
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_data
 
     @pytest.mark.asyncio
@@ -446,8 +446,8 @@ class TestWatcherAgentStop:
         assert action.agent_id == "agent-001"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected data
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_data
 
     @pytest.mark.asyncio
@@ -499,8 +499,8 @@ class TestWatcherAgentRestart:
         assert action.agent_id == "agent-001"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected data
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_data
 
     @pytest.mark.asyncio
@@ -555,8 +555,8 @@ class TestUsagePerMonth:
         assert action.month == "202401"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected result
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_result
 
     @pytest.mark.asyncio
@@ -616,8 +616,8 @@ class TestUsagePerPeriod:
         assert action.end_date == "20240131"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected result
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body == expected_result
 
     @pytest.mark.asyncio
@@ -729,8 +729,8 @@ class TestCheckPresets:
         assert action.scaling_group == "sg-test"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected structure
-        assert response.body is not None
-        response_body = json.loads(cast(bytes, response.body))
+        assert response._body is not None  # type: ignore[attr-defined]
+        response_body = json.loads(cast(bytes, response._body))  # type: ignore[attr-defined]
         assert response_body["presets"] == [{"name": "small"}]
         assert response_body["keypair_limits"] == mock_slot.to_json()
         assert response_body["keypair_using"] == mock_slot.to_json()

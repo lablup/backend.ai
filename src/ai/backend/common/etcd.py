@@ -25,6 +25,7 @@ from collections.abc import (
 )
 from types import TracebackType
 from typing import (
+    Any,
     Optional,
     ParamSpec,
     Self,
@@ -81,8 +82,8 @@ class ConfigScopes(enum.Enum):
 quote = functools.partial(_quote, safe="")
 
 
-def make_dict_from_pairs(key_prefix, pairs, path_sep="/"):
-    result = {}
+def make_dict_from_pairs(key_prefix, pairs, path_sep="/") -> dict[str, Any]:
+    result: dict[str, Any] = {}
     len_prefix = len(key_prefix)
     if isinstance(pairs, dict):
         iterator = pairs.items()
@@ -108,7 +109,7 @@ def make_dict_from_pairs(key_prefix, pairs, path_sep="/"):
     return result
 
 
-def _slash(v: str):
+def _slash(v: str) -> str:
     return v.rstrip("/") + "/" if len(v) > 0 else ""
 
 
@@ -134,7 +135,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -145,7 +146,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -155,7 +156,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -197,7 +198,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -207,7 +208,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -217,7 +218,7 @@ class AbstractKVStore(ABC):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         pass
 
     @abstractmethod
@@ -373,7 +374,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         """
         Put a single key-value pair to the etcd.
 
@@ -397,7 +398,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         """
         Put a nested dict object under the given key prefix.
         All keys in the dict object are automatically quoted to avoid conflicts with the path separator.
@@ -442,7 +443,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         """
         Put a flattened key-value pairs into the etcd.
         Since the given dict must be a flattened one, its keys must be quoted as needed by the caller.
@@ -633,7 +634,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
         async with self.etcd.connect() as communicator:
@@ -645,7 +646,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         async with self.etcd.connect() as communicator:
             actions = []
@@ -663,7 +664,7 @@ class AsyncEtcd(AbstractKVStore):
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ):
+    ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
         async with self.etcd.connect() as communicator:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import asyncio
 import fcntl
@@ -10,12 +12,16 @@ import struct
 import sys
 import termios
 import traceback
+from typing import TYPE_CHECKING
 
 import zmq
 import zmq.asyncio
 
 from .logging import BraceStyleAdapter
 from .utils import safe_close_task
+
+if TYPE_CHECKING:
+    from asyncio import Task
 
 log = BraceStyleAdapter(logging.getLogger())
 
@@ -30,8 +36,8 @@ class Terminal:
         self.zctx = sock_out.context
 
         self.ev_term = ev_term
-        self.pid = None
-        self.fd = None
+        self.pid: int | None = None
+        self.fd: int | None = None
 
         self.shell_cmd = shell_cmd
         self.auto_restart = auto_restart
@@ -40,10 +46,10 @@ class Terminal:
         self.sock_out = sock_out
 
         # For terminal I/O
-        self.sock_term_in = None
-        self.sock_term_out = None
-        self.term_in_task = None
-        self.term_out_task = None
+        self.sock_term_in: zmq.asyncio.Socket | None = None
+        self.sock_term_out: zmq.asyncio.Socket | None = None
+        self.term_in_task: Task[None] | None = None
+        self.term_out_task: Task[None] | None = None
         self.start_lock = asyncio.Lock()
         self.accept_term_input = False
 
@@ -95,7 +101,7 @@ class Terminal:
         finally:
             await self.sock_out.send_multipart([b"finished", b"{}"])
 
-    async def start(self):
+    async def start(self) -> None:
         if self.accept_term_input:
             raise RuntimeError("Terminal is already accepting input")
         await safe_close_task(self.term_in_task)
@@ -125,27 +131,35 @@ class Terminal:
             term_writer_transport, term_writer_protocol = await loop.connect_write_pipe(
                 _reader_factory, os.fdopen(self.fd, "wb")
             )
-            term_writer = asyncio.StreamWriter(term_writer_transport, term_writer_protocol, None)
+            term_writer = asyncio.StreamWriter(
+                term_writer_transport, term_writer_protocol, None, loop
+            )
 
             self.term_in_task = asyncio.create_task(self.term_in(term_writer))
             self.term_out_task = asyncio.create_task(self.term_out(term_reader))
             self.accept_term_input = True
             await asyncio.sleep(0)
 
-    async def restart(self):
+    async def restart(self) -> None:
         try:
             async with self.start_lock:
                 if not self.accept_term_input:
                     return
                 self.accept_term_input = False
+                if self.sock_term_out is None:
+                    raise RuntimeError("Terminal output socket is not initialized")
+                if self.pid is None:
+                    raise RuntimeError("Terminal process ID is not set")
                 await self.sock_term_out.send_multipart([b"Restarting...\r\n"])
                 os.waitpid(self.pid, 0)
                 await self.start()
         except Exception:
             log.exception("Unexpected error during restart of terminal")
 
-    async def term_in(self, term_writer):
+    async def term_in(self, term_writer) -> None:
         try:
+            if self.sock_term_in is None:
+                raise RuntimeError("Terminal input socket is not initialized")
             while True:
                 data = await self.sock_term_in.recv_multipart()
                 if not data:
@@ -161,8 +175,10 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error at term_in()")
 
-    async def term_out(self, term_reader):
+    async def term_out(self, term_reader) -> None:
         try:
+            if self.sock_term_out is None:
+                raise RuntimeError("Terminal output socket is not initialized")
             while not term_reader.at_eof():
                 try:
                     data = await term_reader.read(4096)
@@ -184,7 +200,17 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error at term_out()")
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
+        if self.term_in_task is None:
+            raise RuntimeError("Terminal input task is not initialized")
+        if self.term_out_task is None:
+            raise RuntimeError("Terminal output task is not initialized")
+        if self.sock_term_in is None:
+            raise RuntimeError("Terminal input socket is not initialized")
+        if self.sock_term_out is None:
+            raise RuntimeError("Terminal output socket is not initialized")
+        if self.pid is None:
+            raise RuntimeError("Terminal process ID is not set")
         self.term_in_task.cancel()
         self.term_out_task.cancel()
         await self.term_in_task

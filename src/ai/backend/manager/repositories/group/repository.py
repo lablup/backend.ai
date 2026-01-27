@@ -44,6 +44,7 @@ from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.resource_policy import project_resource_policies
@@ -404,7 +405,7 @@ class GroupRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Optional[Sequence[UUID]] = None,
-    ):
+    ) -> list[KernelRow]:
         """Fetch resource usage data for projects."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 

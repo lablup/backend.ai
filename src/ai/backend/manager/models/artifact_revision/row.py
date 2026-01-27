@@ -32,13 +32,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ArtifactRevisionRow",)
 
 
-def _get_artifact_join_cond():
+def _get_artifact_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact import ArtifactRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
-def _get_association_artifacts_storages_join_cond():
+def _get_association_artifacts_storages_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )

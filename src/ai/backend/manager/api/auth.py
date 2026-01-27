@@ -301,7 +301,7 @@ _whois_timezone_info: Final = {
 whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
-def _extract_auth_params(request):
+def _extract_auth_params(request) -> tuple[str, str, str] | None:
     """
     HTTP Authorization header must be formatted as:
     "Authorization: BackendAI signMethod=HMAC-SHA256,
@@ -400,7 +400,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature") from e
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]):
+def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     allowed_client_ip = user.get("allowed_client_ip", None)
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list

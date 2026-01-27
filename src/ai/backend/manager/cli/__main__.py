@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 
@@ -10,11 +10,14 @@ from ai.backend.common.cli import LazyGroup
 
 from .context import CLIContext
 
+if TYPE_CHECKING:
+    from ai.backend.logging import BraceStyleAdapter
+
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger():
+def _get_logger() -> BraceStyleAdapter:
     import logging
 
     from ai.backend.logging import BraceStyleAdapter
@@ -96,7 +99,7 @@ def main(
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
     """
     Run the database shell.
 
@@ -270,7 +273,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     expiration_date = today - duration.check_and_return(retention)
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
 
-    async def _clear_redis_history():
+    async def _clear_redis_history() -> None:
         try:
             async with connect_database(bootstrap_config.db) as db:
                 async with db.begin_readonly() as conn:
@@ -282,7 +285,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                         )
                     )
                     result = await conn.execute(query)
-                    target_kernels = [str(x["id"]) for x in result.all()]
+                    target_kernels = [str(x.id) for x in result.all()]
 
             delete_count = 0
             async with redis_ctx(cli_ctx) as redis_conn_set:
@@ -309,7 +312,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
 
-    async def _clear_terminated_sessions():
+    async def _clear_terminated_sessions() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
@@ -338,7 +341,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             expiration_date,
         )
 
-    async def _clear_old_error_logs():
+    async def _clear_old_error_logs() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
@@ -360,63 +363,63 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
-def schema():
+def schema() -> None:
     """Command set for managing the database schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.etcd:cli")
-def etcd():
+def etcd() -> None:
     """Command set for putting/getting data to/from etcd."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.fixture:cli")
-def fixture():
+def fixture() -> None:
     """Command set for managing fixtures."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
-def api():
+def api() -> None:
     """Command set for API schema inspection and manipulation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
-def gql():
+def gql() -> None:
     """Command set for GraphQL schema."""
     # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")
-def image():
+def image() -> None:
     """Command set for managing images."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
-def redis():
+def redis() -> None:
     """Command set for Redis related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.agent:cli")
-def agent():
+def agent() -> None:
     """Command set for agent related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.scheduler:cli")
-def scheduler():
+def scheduler() -> None:
     """Command set for scheduler related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.config:cli")
-def config():
+def config() -> None:
     """Command set for configuration management."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> None:
     """Command set for dependency verification and validation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.health:cli")
-def health():
+def health() -> None:
     """Command set for health checking."""
 
 

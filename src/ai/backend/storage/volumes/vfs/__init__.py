@@ -601,7 +601,7 @@ class BaseVolume(AbstractVolume):
         vfpath = self.mangle_vfpath(vfid)
         session_id = secrets.token_hex(16)
 
-        def _create_target():
+        def _create_target() -> None:
             upload_base_path = vfpath / ".upload"
             upload_base_path.mkdir(exist_ok=True)
             upload_target_path = upload_base_path / session_id

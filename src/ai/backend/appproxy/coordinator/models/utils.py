@@ -403,7 +403,7 @@ async def reenter_txn_session(
             yield sess
 
 
-def _populate_column(column: sa.Column):
+def _populate_column(column: sa.Column) -> sa.Column:
     column_attrs = dict(column.__dict__)
     name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})

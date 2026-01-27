@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
@@ -105,7 +105,7 @@ DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 # helper functions
-def zero_if_none(val):
+def zero_if_none(val) -> int:
     return 0 if val is None else val
 
 
@@ -156,8 +156,8 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
         return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self):
-        return self._enum_class
+    def python_type(self) -> type[T_Enum]:
+        return self._enum_cls
 
 
 class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
@@ -262,7 +262,7 @@ class CurvePublicKeyColumn(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect) -> TypeEngine:
         return dialect.type_descriptor(sa.String(40))
 
     def process_bind_param(
@@ -290,7 +290,7 @@ class QuotaScopeIDType(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect) -> TypeEngine:
         return dialect.type_descriptor(sa.String(64))
 
     def process_bind_param(
@@ -353,7 +353,7 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect: Dialect):
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
@@ -399,10 +399,10 @@ class StructuredJSONObjectColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, dialect) -> Optional[dict]:
         return self._schema.to_json(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, dialect) -> Optional[JSONSerializableMixin]:
         return self._schema.from_json(value)
 
     def copy(self, **kw) -> Self:
@@ -422,13 +422,13 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op, value):
+    def coerce_compared_value(self, op, value) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, dialect) -> list[dict]:
         return [self._schema.to_json(item) for item in value]
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, dialect) -> list[JSONSerializableMixin]:
         if value is None:
             return []
         return [self._schema.from_json(item) for item in value]
@@ -487,7 +487,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op, value):
+    def coerce_compared_value(self, op, value) -> JSONB:
         return JSONB()
 
     def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> list:
@@ -534,7 +534,7 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value, dialect) -> Optional[str]:
         if value is None:
             return value
         try:
@@ -543,7 +543,7 @@ class IPColumn(TypeDecorator):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value, dialect) -> Optional[ReadableCIDR]:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -645,12 +645,12 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect) -> TypeEngine:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Any | None, dialect):
+    def process_bind_param(self, value: Any | None, dialect) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -702,7 +702,7 @@ class SlugType(TypeDecorator):
             allow_unicode=allow_unicode,
         )
 
-    def coerce_compared_value(self, op, value):
+    def coerce_compared_value(self, op, value) -> Unicode:
         return Unicode()
 
     def process_bind_param(self, value: Any | None, dialect) -> str | None:
@@ -730,29 +730,29 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-def IDColumn(name="id"):
+def IDColumn(name="id") -> sa.Column:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def EndpointIDColumn(name="id"):
+def EndpointIDColumn(name="id") -> sa.Column:
     return sa.Column(
         name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def SessionIDColumn(name="id"):
+def SessionIDColumn(name="id") -> sa.Column:
     return sa.Column(
         name, SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def KernelIDColumn(name="id"):
+def KernelIDColumn(name="id") -> sa.Column:
     return sa.Column(
         name, KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def ForeignKeyIDColumn(name, fk_field, nullable=True):
+def ForeignKeyIDColumn(name, fk_field, nullable=True) -> sa.Column:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
