@@ -477,7 +477,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         raise NotImplementedError
 
     @abstractmethod
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(self, filename: str) -> Path:
         """
         Return matching krunner path object for given filename.
         """
@@ -502,7 +502,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> KernelObjectType:
         raise NotImplementedError
@@ -512,8 +512,8 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts,
-        preopen_ports,
+        resource_opts: Optional[Mapping[str, Any]],
+        preopen_ports: list[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
@@ -582,9 +582,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         environ: MutableMapping[str, str],
     ) -> None:
         def _mount(
-            type,
-            src,
-            dst,
+            type: MountTypes,
+            src: str | Path,
+            dst: str | Path,
         ) -> None:
             resource_spec.mounts.append(
                 self.get_runner_mount(
@@ -3687,7 +3687,7 @@ class AbstractAgent[
 
     async def commit(
         self,
-        reporter,
+        reporter: Any,
         kernel_id: KernelId,
         subdir: str,
         *,
@@ -3719,7 +3719,7 @@ class AbstractAgent[
     async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self.kernel_registry[kernel_id].ping()
 
-    async def save_last_registry(self, force=False) -> None:
+    async def save_last_registry(self, force: bool = False) -> None:
         await self._write_kernel_registry_to_recovery(
             self.kernel_registry,
             KernelRegistrySaveMetadata(force),

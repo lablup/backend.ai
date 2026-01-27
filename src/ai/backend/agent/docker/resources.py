@@ -83,7 +83,9 @@ async def scan_available_resources(
     return slots
 
 
-async def get_resource_spec_from_container(container_info) -> Optional[KernelResourceSpec]:
+async def get_resource_spec_from_container(
+    container_info: Mapping[str, Any],
+) -> Optional[KernelResourceSpec]:
     for mount in container_info["HostConfig"]["Mounts"]:
         if mount["Target"] == "/home/config":
             async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:

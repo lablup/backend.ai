@@ -489,7 +489,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             resource_spec.mounts.append(mount)
 
     @override
-    async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
+    async def apply_accelerator_allocation(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> None:
         # update_nested_dict(
         #     self.computer_docker_args,
         #     await computer.generate_docker_args(self.docker, device_alloc))
@@ -550,7 +554,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: Any,
         cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
         loop = current_loop()
@@ -687,8 +691,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts,
-        preopen_ports,
+        resource_opts: Any,
+        preopen_ports: Any,
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         image_labels = self.kernel_config["image"]["labels"]
@@ -908,14 +912,17 @@ class KubernetesAgent(
         if len(pv.items) == 0:
             # PV does not exists; create one
             if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
+                scratch_nfs_address = self.local_config.container.scratch_nfs_address
+                if scratch_nfs_address is None:
+                    raise K8sError("scratch_nfs_address must be set when using K8S_NFS")
                 new_pv: NFSPersistentVolume | HostPathPersistentVolume = NFSPersistentVolume(
-                    self.local_config.container.scratch_nfs_address,
+                    scratch_nfs_address,
                     "backend-ai-static-pv",
                     capacity,
                 )
                 new_pv.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config.container.scratch_nfs_address,
+                    scratch_nfs_address,
                 )
                 scratch_nfs_options = self.local_config.container.scratch_nfs_options
                 if scratch_nfs_options is not None:
@@ -949,9 +956,12 @@ class KubernetesAgent(
                 capacity,
             )
             if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
+                scratch_nfs_address = self.local_config.container.scratch_nfs_address
+                if scratch_nfs_address is None:
+                    raise K8sError("scratch_nfs_address must be set when using K8S_NFS")
                 new_pvc.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config.container.scratch_nfs_address,
+                    scratch_nfs_address,
                 )
             else:
                 new_pvc.label("backend.ai/backend-ai-scratch-volume", "hostPath")

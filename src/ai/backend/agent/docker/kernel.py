@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 import textwrap
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path, PurePosixPath
 from typing import Any, Final, Optional, cast, override
 
@@ -34,7 +34,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -82,7 +82,7 @@ class DockerKernel(AbstractKernel):
     def __getstate__(self) -> Mapping[str, Any]:
         return super().__getstate__()
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
@@ -186,8 +186,8 @@ class DockerKernel(AbstractKernel):
     @override
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
@@ -452,15 +452,15 @@ class DockerCodeRunner(AbstractCodeRunner):
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: int = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,

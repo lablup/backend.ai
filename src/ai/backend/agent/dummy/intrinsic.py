@@ -11,6 +11,7 @@ from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
+    DeviceAllocation,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
@@ -134,9 +135,9 @@ class CPUPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
-        cores = [*map(int, device_alloc["cpu"].keys())]
+        cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
@@ -286,7 +287,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
         return {}
 

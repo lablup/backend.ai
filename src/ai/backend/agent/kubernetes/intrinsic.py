@@ -187,7 +187,7 @@ class CPUPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
         # This function might be needed later to apply fine-grained tuning for
         # K8s resource allocation
@@ -346,7 +346,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
         # This function might be needed later to apply fine-grained tuning for
         # K8s resource allocation

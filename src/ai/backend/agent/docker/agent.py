@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 )
 
 
-async def get_extra_volumes(docker, lang) -> list[VolumeInfo]:
+async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
     avail_volumes = (await docker.volumes.list())["Volumes"]
     if not avail_volumes:
         return []
@@ -644,7 +644,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return mounts
 
     @override
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path(
             pkg_resources.resource_filename(
                 "ai.backend.runner",
@@ -1014,8 +1014,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts,
-        preopen_ports,
+        resource_opts: Optional[Mapping[str, Any]],
+        preopen_ports: list[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         loop = current_loop()

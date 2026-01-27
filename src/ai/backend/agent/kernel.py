@@ -130,7 +130,7 @@ def _dump_json_bytes(obj: Any) -> bytes:
 class RunEvent(Exception):
     data: Any
 
-    def __init__(self, data=None) -> None:
+    def __init__(self, data: Any = None) -> None:
         super().__init__()
         self.data = data
 
@@ -258,7 +258,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         del props["clean_event"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
@@ -291,7 +291,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     # - restoration from running containers is done by computer's classmethod
     #   "restore_from_container"
 
-    def release_slots(self, computer_ctxs) -> None:
+    def release_slots(self, computer_ctxs: Mapping[str, Any]) -> None:
         """
         Release the resource slots occupied by the kernel
         to the allocation maps.
@@ -321,7 +321,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts) -> CodeCompletionResp:
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
@@ -333,26 +333,26 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts) -> dict[str, Any]:
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service) -> dict[str, Any]:
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def shutdown_service(self, service) -> None:
+    async def shutdown_service(self, service: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
@@ -758,7 +758,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["event_producer"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         global _zctx
         self.__dict__.update(props)
         if _zctx is None:
@@ -845,7 +845,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except Exception:
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
-    async def feed_batch(self, opts) -> None:
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
@@ -899,7 +899,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
+    async def feed_and_get_completion(
+        self, code_text: str, opts: Mapping[str, Any]
+    ) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -916,7 +918,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return CodeCompletionResult.failure()
 
-    async def feed_start_model_service(self, model_info) -> dict[str, Any]:
+    async def feed_start_model_service(self, model_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
@@ -938,7 +940,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_start_service(self, service_info) -> dict[str, Any]:
+    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
@@ -1050,7 +1052,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         else:
             raise AssertionError("Unrecognized API version")
 
-    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+    async def get_next_result(self, api_ver: int = 2, flush_timeout: float = 2.0) -> NextResult:
         # Context: per API request
         has_continuation = ClientFeatures.CONTINUATION in self.client_features
         records = []

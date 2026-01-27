@@ -403,9 +403,9 @@ class CPUPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        cores = [*map(int, device_alloc["cpu"].keys())]
+        cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
@@ -933,9 +933,9 @@ class MemoryPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        memory = sum(device_alloc["mem"].values())
+        memory = sum(device_alloc[SlotName("mem")].values())
         return {
             "HostConfig": {
                 "MemorySwap": int(memory),  # prevent using swap!
@@ -1046,7 +1046,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         return {ContainerNetworkCapability.GLOBAL}
 
     async def join_network(
-        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs: Any
     ) -> dict[str, Any]:
         if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
             return {
@@ -1068,7 +1068,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         pass
 
     async def prepare_port_forward(
-        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> None:
         host_ports = [p[0] for p in ports]
         scratch_dir = (
@@ -1091,7 +1091,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         )
 
     async def expose_ports(
-        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> ContainerNetworkInfo:
         host_ports = [p[0] for p in ports]
 

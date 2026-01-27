@@ -437,7 +437,7 @@ class AgentRPCServer(aobject):
     async def status_snapshot_request_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        def _ensure_serializable(o) -> Any:
+        def _ensure_serializable(o: Any) -> Any:
             match o:
                 case dict() | defaultdict() | OrderedDict():
                     return {_ensure_serializable(k): _ensure_serializable(v) for k, v in o.items()}
