@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import click
 
@@ -9,11 +9,14 @@ from ai.backend.common.cli import LazyGroup
 
 from .context import CLIContext
 
+if TYPE_CHECKING:
+    from ai.backend.logging import BraceStyleAdapter
+
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger():
+def _get_logger() -> BraceStyleAdapter:
     import logging
 
     from ai.backend.logging import BraceStyleAdapter
@@ -109,7 +112,7 @@ async def _generate() -> dict[str, Any]:
     subapps: list[web.Application] = []
     for subapp in global_subapp_pkgs:
         pkg = importlib.import_module("ai.backend.appproxy.coordinator.api" + subapp)
-        app, _ = pkg.create_app(cors_options)
+        app, _ = pkg.create_app(cors_options)  # type: ignore
         subapps.append(app)
     return generate_openapi("Proxy Coordinator", subapps, verbose=True)
 

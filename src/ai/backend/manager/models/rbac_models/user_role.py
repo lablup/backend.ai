@@ -29,13 +29,13 @@ if TYPE_CHECKING:
     from .role import RoleRow
 
 
-def _get_role_row_join_condition():
+def _get_role_row_join_condition() -> sa.ColumnElement[bool]:
     from .role import RoleRow
 
     return RoleRow.id == foreign(UserRoleRow.role_id)
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(UserRoleRow.user_id)

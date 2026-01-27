@@ -70,7 +70,7 @@ class WekaFs:
     ssd_budget: int
     total_budget: int
 
-    def from_json(data: Any):
+    def from_json(data: Any) -> WekaFs:
         return WekaFs(
             data["id"],
             data["name"],
@@ -91,7 +91,7 @@ class WekaFs:
 
 
 def error_handler(inner):
-    async def outer(*args, **kwargs):
+    async def outer(*args, **kwargs) -> Any:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:

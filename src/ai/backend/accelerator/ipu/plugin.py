@@ -96,7 +96,7 @@ class IPUPlugin(AbstractComputePlugin):
         self.ipu_config = _config_iv.check(raw_cfg)
         log.info("Read IPU device configs from {}", cfg_src_path)
 
-        def _read_json():
+        def _read_json() -> dict[str, Any]:
             with open(self.ipu_config["ipuof-config-path"]) as fr:
                 return json.loads(fr.read())
 
@@ -356,7 +356,7 @@ class IPUPlugin(AbstractComputePlugin):
             source_path / "ipuof.conf.d" / Path(self.ipu_config["ipuof-config-path"]).name
         )
 
-        def _write():
+        def _write() -> None:
             generated_ipuof_config_path.parent.mkdir(parents=True)
             with open(generated_ipuof_config_path, "w") as fw:
                 fw.write(json.dumps(generated_ipuof_config))

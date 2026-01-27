@@ -1,5 +1,6 @@
 import functools
 import re
+from collections.abc import Callable
 from decimal import Decimal
 from enum import Enum
 from importlib import import_module
@@ -9,9 +10,9 @@ from typing import Any, Optional
 import click
 
 
-def wrap_method(method):
+def wrap_method(method) -> Callable:
     @functools.wraps(method)
-    def wrapped(self, *args, **kwargs):
+    def wrapped(self, *args, **kwargs) -> Any:
         return method(self._impl, *args, **kwargs)
 
     return wrapped
@@ -41,7 +42,7 @@ class LazyClickMixin:
                 setattr(self, key, wrap_method(val).__get__(self, self.__class__))
 
     @property
-    def _impl(self):
+    def _impl(self) -> click.Command | click.Group:
         if self._loaded_impl:
             return self._loaded_impl
         # Load when first invoked.

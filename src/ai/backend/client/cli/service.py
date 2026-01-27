@@ -548,7 +548,7 @@ def try_start(
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
-    async def try_start_tracker(bgtask_id):
+    async def try_start_tracker(bgtask_id: str) -> None:
         async with AsyncSession() as session:
             completion_msg_func = lambda: print_done("Model service validation started.")
             try:

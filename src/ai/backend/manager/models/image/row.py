@@ -304,13 +304,13 @@ type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
-def _get_image_endpoint_join_condition():
+def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return ImageRow.id == foreign(EndpointRow.image)
 
 
-def _get_container_registry_join_condition():
+def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
@@ -817,7 +817,7 @@ class ImageRow(Base):
 
         return min_slot
 
-    def _parse_row(self):
+    def _parse_row(self) -> dict[str, Any]:
         res_limits = []
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
@@ -832,11 +832,11 @@ class ImageRow(Base):
                 "max": max_value,
             })
 
-        accels = self.accelerators
-        if accels is None:
-            accels = []
+        accels_str = self.accelerators
+        if accels_str is None:
+            accels: list[str] = []
         else:
-            accels = accels.split(",")
+            accels = accels_str.split(",")
 
         return {
             "canonical_ref": self.name,
@@ -1433,7 +1433,7 @@ class ImagePermissionContextBuilder(
     ) -> ImagePermissionContext:
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def global_registry_condition(project_ids: list[Any]):
+        def global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(
@@ -1450,7 +1450,7 @@ class ImagePermissionContextBuilder(
         )
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def non_global_registry_condition(project_ids: list[Any]):
+        def non_global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
                 AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )

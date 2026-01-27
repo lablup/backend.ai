@@ -1304,7 +1304,7 @@ class ComputeSession(BaseFunction):
             params=params,
         )
 
-        async def send_code(ws):
+        async def send_code(ws: WebSocketResponse) -> None:
             await ws.send_json({
                 "code": code,
                 "mode": mode,
@@ -1593,8 +1593,8 @@ class StreamPty(WebSocketResponse):
 
     __slots__ = ("ws",)
 
-    async def resize(self, rows, cols):
-        await self.ws.send_str(
+    async def resize(self, rows: int, cols: int) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "resize",
                 "rows": rows,
@@ -1602,8 +1602,8 @@ class StreamPty(WebSocketResponse):
             })
         )
 
-    async def restart(self):
-        await self.ws.send_str(
+    async def restart(self) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "restart",
             })

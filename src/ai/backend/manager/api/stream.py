@@ -136,7 +136,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     defer(lambda: app_ctx.stream_stdin_socks[stream_key].discard(socks[0]))
     stream_sync = asyncio.Event()
 
-    async def stream_stdin():
+    async def stream_stdin() -> None:
         nonlocal socks
         try:
             async for msg in ws:
@@ -154,7 +154,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                             socks[0] = stdin_sock
                             socks[1] = stdout_sock
                             app_ctx.stream_stdin_socks[stream_key].add(socks[0])
-                            socks[0].write([raw_data])
+                            await socks[0].send_multipart([raw_data])
                             log.debug("stream_stdin({0}): zmq stream reset", stream_key)
                             stream_sync.set()
                             continue
@@ -224,7 +224,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             if not socks[0].closed:
                 socks[0].close()
 
-    async def stream_stdout():
+    async def stream_stdout() -> None:
         nonlocal socks
         log.debug("stream_stdout({0}): started", stream_key)
         try:

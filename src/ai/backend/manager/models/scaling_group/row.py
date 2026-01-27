@@ -258,7 +258,7 @@ class ScalingGroupForKeypairsRow(Base):
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
-def _get_resource_preset_join_condition():
+def _get_resource_preset_join_condition() -> Any:
     from ai.backend.manager.models.resource_preset import ResourcePresetRow
 
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)

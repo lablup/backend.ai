@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 async def read_sysfs(path, attr):
-    def _blocking():
+    def _blocking() -> str:
         return (path / attr).read_text().strip()
 
     return await asyncio.get_running_loop().run_in_executor(None, _blocking)

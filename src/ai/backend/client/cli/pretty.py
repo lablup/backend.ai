@@ -7,7 +7,7 @@ import json
 import sys
 import textwrap
 import traceback
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from types import TracebackType
 from typing import Optional, Self
 
@@ -56,7 +56,7 @@ def italic(text: str) -> str:
     return "\x1b[3m" + text + "\x1b[23m"
 
 
-def format_pretty(msg, status=PrintStatus.NONE, colored=True):
+def format_pretty(msg: str, status: PrintStatus = PrintStatus.NONE, colored: bool = True) -> str:
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
@@ -123,7 +123,7 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
     return "".join(pieces)[1:]  # strip first dot
 
 
-def format_error(exc: Exception):
+def format_error(exc: Exception) -> Iterator[str]:
     if isinstance(exc, BackendAPIError):
         yield f"{exc.__class__.__name__}: {exc.status} {exc.reason}\n"
         yield f"{exc.data['title']}"

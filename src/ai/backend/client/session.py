@@ -99,14 +99,14 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
                 orig_lost = proto.connection_lost
                 orig_eof_received = proto.eof_received
 
-                def connection_lost(exc):
+                def connection_lost(exc) -> None:
                     orig_lost(exc)
                     nonlocal transports
                     transports -= 1
                     if transports == 0:
                         all_is_lost.set()
 
-                def eof_received():
+                def eof_received() -> None:
                     try:
                         orig_eof_received()
                     except AttributeError:
@@ -186,7 +186,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    async def agen_wrapper(self, agen):
+    async def agen_wrapper(self, agen) -> None:
         self.agen_shutdown = False
         try:
             async for item in agen:
@@ -220,7 +220,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    def interrupt_generator(self):
+    def interrupt_generator(self) -> None:
         self.agen_shutdown = True
         self.stream_block.set()
         self.stream_queue.put(sentinel)
@@ -467,7 +467,7 @@ class Session(BaseSession):
         api_session.reset(self._context_token)
 
     @property
-    def worker_thread(self):
+    def worker_thread(self) -> _SyncWorkerThread:
         """
         The thread that internally executes the asynchronous implementations
         of the given API functions.
@@ -569,7 +569,7 @@ class AsyncSession(BaseSession):
 
 # TODO: Remove this after refactoring session management with contextvars
 @actxmgr
-async def set_api_context(session):
+async def set_api_context(session) -> AsyncIterator[None]:
     token = api_session.set(session)
     try:
         yield

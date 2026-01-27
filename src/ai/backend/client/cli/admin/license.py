@@ -24,7 +24,7 @@ def show():
     from ai.backend.client.request import Request
     from ai.backend.client.session import AsyncSession
 
-    async def _show_license():
+    async def _show_license() -> None:
         async with AsyncSession():
             rqst = Request("GET", "/license")
             async with rqst.fetch() as resp:

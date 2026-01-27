@@ -17,12 +17,12 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     continuing the shell/batch script.
     """
 
-    def main(self, *args, **kwargs):
+    def main(self, *args, **kwargs) -> None:  # type: ignore[override]
         try:
             _interrupted = False
             kwargs.pop("standalone_mode", None)
             kwargs.pop("prog_name", None)
-            super().main(
+            super().main(  # type: ignore[call-overload]
                 *args,
                 standalone_mode=False,
                 prog_name="backend.ai",
@@ -84,7 +84,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f):
+        def _decorator(f) -> click.Command:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -103,7 +103,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f):
+        def _decorator(f) -> click.Group:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases

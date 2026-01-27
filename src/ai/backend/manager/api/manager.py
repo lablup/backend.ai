@@ -17,6 +17,7 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from aiotools import aclosing
 
 from ai.backend.common import validators as tx
@@ -57,7 +58,7 @@ class SchedulerOps(enum.Enum):
 
 
 def server_status_required(allowed_status: frozenset[ManagerStatus]):
-    def decorator(handler):
+    def decorator(handler) -> Handler:
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]

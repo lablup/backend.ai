@@ -802,8 +802,8 @@ class BinarySize(int):
             return cls(int(expr))
         return cls._parse_str(expr)
 
-    def _preformat(self):
-        scale = self
+    def _preformat(self) -> int:
+        scale: int = int(self)
         suffix_idx = 0
         while scale >= 1024:
             scale //= 1024

@@ -2138,7 +2138,7 @@ class AgentRegistry:
                 continue
             per_kernel_updates[kernel_id] = kern_stat
 
-        async def _update():
+        async def _update() -> None:
             async with self.db.begin() as conn:
                 update_query = (
                     sa.update(kernels)

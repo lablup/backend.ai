@@ -16,9 +16,9 @@ from ai.backend.account_manager.exceptions import AuthorizationFailed, InvalidAP
 from ai.backend.logging import BraceStyleAdapter
 
 
-def auth_required(handler):
+def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -28,7 +28,7 @@ def auth_required(handler):
     return wrapped
 
 
-def set_handler_attr(func, key, value):
+def set_handler_attr(func, key, value) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}

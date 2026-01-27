@@ -10,5 +10,5 @@ __all__: tuple[str, ...] = (
 __version__ = (Path(__file__).parent / "VERSION").read_text().strip()
 
 
-def get_user_agent():
+def get_user_agent() -> str:
     return f"Backend.AI Client for Python {__version__}"

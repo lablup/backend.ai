@@ -559,7 +559,7 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
-        def value_or_none(value):
+        def value_or_none(value) -> Any:
             return value if value is not Undefined else None
 
         type_val = None if self.type is Undefined else ProjectType[self.type]

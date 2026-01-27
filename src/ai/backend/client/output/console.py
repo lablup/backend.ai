@@ -99,7 +99,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 raise ValueError("Scalar output requires exactly one field")
         if sys.stdout.isatty():
 
-            def infinite_fetch():
+            def infinite_fetch() -> Iterator[_Item]:
                 current_offset = 0
                 page_size = get_preferred_page_size()
                 while True:

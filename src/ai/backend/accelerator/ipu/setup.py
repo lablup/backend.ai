@@ -15,7 +15,7 @@ pure_python_mods = (
 )
 
 
-def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None):
+def _filtered_writestr(self, zinfo_or_arcname, bytes, compress_type=None) -> None:
     global exclude_source_files
     if exclude_source_files:
         if isinstance(zinfo_or_arcname, str):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import hashlib
@@ -173,7 +175,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         if self.restarting:
             await kube_config.load_kube_config()
 
-            def _kernel_resource_spec_read():
+            def _kernel_resource_spec_read() -> KernelResourceSpec:
                 with open((self.config_dir / "resource.txt").resolve()) as f:
                     return KernelResourceSpec.read_from_file(f)
 
@@ -221,7 +223,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             raise K8sError("PVC not Bound")
         self.static_pvc_name = pvc.metadata.name
 
-        def _create_scratch_dirs():
+        def _create_scratch_dirs() -> None:
             self.work_dir.resolve().mkdir(parents=True, exist_ok=True)
             self.work_dir.chmod(0o755)
             self.config_dir.resolve().mkdir(parents=True, exist_ok=True)
@@ -236,7 +238,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             # we need to touch them first to avoid their "ghost" files are created
             # as root in the host-side filesystem, which prevents deletion of scratch
             # directories when the agent is running as non-root.
-            def _clone_dotfiles():
+            def _clone_dotfiles() -> None:
                 jupyter_custom_css_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
                 )
@@ -557,7 +559,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         else:
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
-                def _write_user_bootstrap_script():
+                def _write_user_bootstrap_script() -> None:
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if KernelFeatures.UID_MATCH in self.kernel_features:
                         uid = self.local_config.container.kernel_uid
@@ -567,7 +569,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
-            def _write_config(file_name: str, content: str):
+            def _write_config(file_name: str, content: str) -> None:
                 file_path = self.config_dir / file_name
                 file_path.write_text(content)
                 if KernelFeatures.UID_MATCH in self.kernel_features:
@@ -732,7 +734,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         async def rollup(
             functions: list[tuple[Optional[functools.partial], Optional[functools.partial]]],
-        ):
+        ) -> None:
             rollback_functions: list[Optional[functools.partial]] = []
 
             for rollup_function, future_rollback_function in functions:
@@ -1026,7 +1028,7 @@ class KubernetesAgent(
         for deployment in (await core_api.list_namespaced_pod("backend-ai")).items:
             # Additional check to filter out real worker pods only?
 
-            async def _fetch_container_info(pod: Any):
+            async def _fetch_container_info(pod: Any) -> None:
                 kernel_id: KernelId | str | None = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
@@ -1138,8 +1140,8 @@ class KubernetesAgent(
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
 
-        async def force_cleanup(reason="self-terminated"):
-            await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)
+        async def force_cleanup(reason: str = "self-terminated") -> None:
+            await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)  # type: ignore[attr-defined]
 
         try:
             kernel = self.kernel_registry[kernel_id]

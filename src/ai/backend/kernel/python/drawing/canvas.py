@@ -15,41 +15,41 @@ class DrawingObject:
         self._id = id_
         self._type = args[0]
 
-    def set_x(self, x):
+    def set_x(self, x) -> None:
         if self._type in ("rect", "circle", "triangle"):
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "x", x))
 
-    def set_y(self, y):
+    def set_y(self, y) -> None:
         if self._type in ("rect", "circle", "triangle"):
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "y", y))
 
-    def set_x1(self, x):
+    def set_x1(self, x) -> None:
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "x1", x))
 
-    def set_y1(self, y):
+    def set_y1(self, y) -> None:
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "y1", y))
 
-    def set_x2(self, x):
+    def set_x2(self, x) -> None:
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "x2", x))
 
-    def set_y2(self, y):
+    def set_y2(self, y) -> None:
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "y2", y))
 
-    def set_radius(self, r):
+    def set_radius(self, r) -> None:
         if self._type == "circle":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "radius", r))
 
-    def rotate(self, a):
+    def rotate(self, a) -> None:
         self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "rotate", a))
 
-    def set_angle(self, a):
+    def set_angle(self, a) -> None:
         self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "angle", a))
 
-    def stroke(self, color):
+    def stroke(self, color) -> None:
         color = color.to_hex()
         if self._type == "line":
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "color", color))
@@ -62,7 +62,7 @@ class DrawingObject:
                 color,
             ))
 
-    def fill(self, color):
+    def fill(self, color) -> None:
         color = color.to_hex()
         if self._type == "circle" or self._type in ("rect", "triangle"):
             self._canvas._cmd_history.append((self._canvas._id, "update", self._id, "fill", color))

@@ -84,19 +84,19 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_networks_join_condition():
+def _get_networks_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.network import NetworkRow
 
     return GroupRow.id == foreign(NetworkRow.project)
 
 
-def _get_vfolder_rows_join_condition():
+def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.vfolder import VFolderRow
 
     return GroupRow.id == foreign(VFolderRow.group)
 
 
-def _get_association_container_registries_groups_join_condition():
+def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 

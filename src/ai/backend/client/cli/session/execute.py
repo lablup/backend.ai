@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import collections
 import getpass
@@ -169,7 +171,7 @@ async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=
     raise NotImplementedError
 
 
-def _noop(*args, **kwargs):
+def _noop(*args, **kwargs) -> None:
     pass
 
 
@@ -526,7 +528,7 @@ def run(
                 pretty_env = " ".join(f"{item[0]}={item[1]}" for item in case[0])
                 print(f"env = {pretty_env!r}, build = {case[1]!r}, exec = {case[2]!r}")
 
-    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd):
+    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd) -> None:
         try:
             compute_session = session.ComputeSession.get_or_create(
                 image,
@@ -625,7 +627,9 @@ def run(
                     else:
                         print(f"[{idx}] Statistics is not available.")
 
-    async def _run(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False):
+    async def _run(
+        session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False
+    ) -> None:
         try:
             if network:
                 try:
@@ -715,7 +719,7 @@ def run(
 
         try:
 
-            def indexed_vprint_done(msg):
+            def indexed_vprint_done(msg) -> None:
                 vprint_done(f"[{idx}] " + msg)
 
             if files:
@@ -793,7 +797,7 @@ def run(
                     stdout.close()
                     stderr.close()
 
-    async def _run_cases():
+    async def _run_cases() -> None:
         loop = current_loop()
         if name is None:
             name_prefix = f"pysdk-{secrets.token_hex(5)}"

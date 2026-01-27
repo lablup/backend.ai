@@ -76,7 +76,7 @@ class ServiceConfigNode(graphene.ObjectType):
     async def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
         ctx: GraphQueryContext = info.context
 
-        def _fallback(x):
+        def _fallback(x) -> str:
             return str(x)
 
         unified_config = ctx.config_provider.config.model_dump(

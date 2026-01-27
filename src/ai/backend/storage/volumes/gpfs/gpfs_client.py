@@ -5,7 +5,7 @@ import urllib.parse
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -46,9 +46,13 @@ type ResponseHandler = Callable[
     [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]
 ]
 
+_T = TypeVar("_T")
 
-def error_handler(inner):
-    async def outer(*args, **kwargs):
+
+def error_handler[T](
+    inner: Callable[..., Coroutine[Any, Any, T]],
+) -> Callable[..., Coroutine[Any, Any, T]]:
+    async def outer(*args, **kwargs) -> T:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:

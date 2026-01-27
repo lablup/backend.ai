@@ -21,19 +21,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
 
 
-def _get_association_artifact_join_cond():
+def _get_association_artifact_join_cond() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 
     return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
-def _get_association_object_storage_join_cond():
+def _get_association_object_storage_join_cond() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
 
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-def _get_association_vfs_storage_join_cond():
+def _get_association_vfs_storage_join_cond() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)

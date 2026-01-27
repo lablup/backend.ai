@@ -559,7 +559,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(_on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["ctx"] = root_app["ctx"]

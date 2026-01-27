@@ -13,14 +13,14 @@ else:
     current_loop = asyncio.get_event_loop  # type: ignore
 
 
-all_tasks: Callable[[], Collection[asyncio.Task]]
+all_tasks: Callable[[Optional[asyncio.AbstractEventLoop]], Collection[asyncio.Task]]
 if hasattr(asyncio, "all_tasks"):
     all_tasks = asyncio.all_tasks  # type: ignore
 else:
     all_tasks = asyncio.Task.all_tasks  # type: ignore
 
 
-def _cancel_all_tasks(loop):
+def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
     to_cancel = all_tasks(loop)
     if not to_cancel:
         return
@@ -38,7 +38,10 @@ def _cancel_all_tasks(loop):
             })
 
 
-def _asyncio_run(coro, *, debug=False):
+_T = TypeVar("_T")
+
+
+def _asyncio_run[T](coro: Awaitable[T], *, debug: bool = False) -> T:
     loop = asyncio.new_event_loop()
     try:
         asyncio.set_event_loop(loop)
@@ -54,8 +57,6 @@ def _asyncio_run(coro, *, debug=False):
             loop.close()
 
 
-_T = TypeVar("_T")
-
 run: Callable[[Awaitable[_T], Optional[bool]], _T]
 if hasattr(asyncio, "run"):
     asyncio_run = asyncio.run  # type: ignore
@@ -64,8 +65,12 @@ else:
 
 
 def asyncio_run_forever(
-    setup_coro, shutdown_coro, *, stop_signals: set[signal.Signals] | None = None, debug=False
-):
+    setup_coro: Awaitable[None],
+    shutdown_coro: Awaitable[None],
+    *,
+    stop_signals: set[signal.Signals] | None = None,
+    debug: bool = False,
+) -> None:
     """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.
@@ -75,7 +80,7 @@ def asyncio_run_forever(
     if stop_signals is None:
         stop_signals = {signal.SIGINT}
 
-    async def wait_for_stop():
+    async def wait_for_stop() -> None:
         loop = current_loop()
         future = loop.create_future()
         for stop_sig in stop_signals:

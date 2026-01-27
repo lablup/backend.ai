@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 
@@ -10,11 +10,14 @@ from ai.backend.common.cli import LazyGroup
 
 from .context import CLIContext
 
+if TYPE_CHECKING:
+    from ai.backend.logging import BraceStyleAdapter
+
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger():
+def _get_logger() -> BraceStyleAdapter:
     import logging
 
     from ai.backend.logging import BraceStyleAdapter
@@ -96,7 +99,7 @@ def main(
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
     """
     Run the database shell.
 
@@ -270,7 +273,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     expiration_date = today - duration.check_and_return(retention)
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
 
-    async def _clear_redis_history():
+    async def _clear_redis_history() -> None:
         try:
             async with connect_database(bootstrap_config.db) as db:
                 async with db.begin_readonly() as conn:
@@ -282,7 +285,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                         )
                     )
                     result = await conn.execute(query)
-                    target_kernels = [str(x["id"]) for x in result.all()]
+                    target_kernels = [str(x.id) for x in result.all()]
 
             delete_count = 0
             async with redis_ctx(cli_ctx) as redis_conn_set:
@@ -309,7 +312,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
 
-    async def _clear_terminated_sessions():
+    async def _clear_terminated_sessions() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
@@ -338,7 +341,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             expiration_date,
         )
 
-    async def _clear_old_error_logs():
+    async def _clear_old_error_logs() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")

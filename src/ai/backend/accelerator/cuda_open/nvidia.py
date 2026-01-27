@@ -520,10 +520,10 @@ type cudaDeviceProp_t = (
 )
 
 
-def _load_library(name):
+def _load_library(name: str) -> ctypes.CDLL | None:
     try:
         if platform.system() == "Windows":
-            return ctypes.windll.LoadLibrary(name)
+            return ctypes.windll.LoadLibrary(name)  # type: ignore[attr-defined]
         return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass

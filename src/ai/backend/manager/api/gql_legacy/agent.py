@@ -289,10 +289,10 @@ class AgentNode(graphene.ObjectType):
                 cnt_query = cnt_query.where(cond)
             else:
 
-                async def all_permissions(row):
+                async def all_permissions(row) -> frozenset[AgentPermission]:
                     return ADMIN_PERMISSIONS
 
-                permission_getter = all_permissions
+                permission_getter = all_permissions  # type: ignore[assignment]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)

@@ -58,7 +58,7 @@ _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
 
 def method_placeholder(orig_method):
-    async def _handler(request):
+    async def _handler(request) -> web.Response:
         raise web.HTTPMethodNotAllowed(request.method, [orig_method])
 
     return _handler
@@ -175,7 +175,9 @@ def check_api_params(
     [Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]],
     Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]],
 ]:
-    def wrap(handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]]):
+    def wrap(
+        handler: Callable[Concatenate[web.Request, Any, P], Awaitable[TAnyResponse]],
+    ) -> Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]]:
         @functools.wraps(handler)
         async def wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> TAnyResponse:
             orig_params: Any
@@ -414,9 +416,9 @@ def prettify_traceback(exc):
 
 
 def catch_unexpected(log, reraise_cancellation: bool = True, raven=None):
-    def _wrap(func):
+    def _wrap(func) -> Callable:
         @functools.wraps(func)
-        async def _wrapped(*args, **kwargs):
+        async def _wrapped(*args, **kwargs) -> Any:
             try:
                 return await func(*args, **kwargs)
             except asyncio.CancelledError:

@@ -68,7 +68,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def check_cgroup_available():
+def check_cgroup_available() -> bool:
     """
     Check if the host OS provides cgroups.
     """
@@ -225,7 +225,7 @@ class MovingStatistics:
             point = (initial_value, time.perf_counter())
             self._last.append(point)
 
-    def update(self, value: Decimal):
+    def update(self, value: Decimal) -> None:
         self._sum += value
         self._min = min(self._min, value)
         self._max = max(self._max, value)
@@ -303,7 +303,7 @@ class Metric:
     capacity: Optional[Decimal] = None
     current_hook: Optional[Callable[[Metric], Decimal]] = None
 
-    def update(self, value: Measurement):
+    def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
         self.stats.update(value.value)
@@ -446,7 +446,9 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            async def gather_node_measures_with_slots(instance: AbstractComputePlugin):
+            async def gather_node_measures_with_slots(
+                instance: AbstractComputePlugin,
+            ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
                 result = await instance.gather_node_measures(self)
                 return [slot_name for slot_name, _ in instance.slot_types], result
 

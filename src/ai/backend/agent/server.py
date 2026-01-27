@@ -146,7 +146,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 def collect_error(meth: Callable) -> Callable:
     @functools.wraps(meth)
-    async def _inner(self: AgentRPCServer, *args, **kwargs):
+    async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
@@ -378,7 +378,7 @@ class AgentRPCServer(aobject):
             self.status_snapshot_request_handler, debug_socket_path.as_posix()
         )
 
-        async def _debug_server_task():
+        async def _debug_server_task() -> None:
             try:
                 async with server:
                     await server.serve_forever()

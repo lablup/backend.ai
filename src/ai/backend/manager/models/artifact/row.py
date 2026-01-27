@@ -30,7 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ArtifactRow",)
 
 
-def _get_artifact_revision_join_cond():
+def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id

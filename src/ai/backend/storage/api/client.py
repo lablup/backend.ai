@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
-from collections.abc import Mapping, MutableMapping
+from collections.abc import AsyncGenerator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -224,17 +224,17 @@ async def download_directory_as_archive(
     Serve a directory as a zip archive on the fly.
     """
 
-    def _iter2aiter(iter):
+    def _iter2aiter(iter) -> AsyncGenerator[Any, None]:
         """Iterable to async iterable"""
 
-        def _consume(loop, iter, q):
+        def _consume(loop: asyncio.AbstractEventLoop, iter, q: janus.SyncQueue[Any]) -> None:
             for item in iter:
                 q.put(item)
             q.put(SENTINEL)
 
-        async def _aiter():
+        async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
-            q = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
+            q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
                 fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:

@@ -585,7 +585,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             type,
             src,
             dst,
-        ):
+        ) -> None:
             resource_spec.mounts.append(
                 self.get_runner_mount(
                     type,
@@ -2016,7 +2016,7 @@ class AbstractAgent[
                     hwinfo[device_name] = result
         return hwinfo
 
-    async def _cleanup_reported_kernels(self, interval: float):
+    async def _cleanup_reported_kernels(self, interval: float) -> None:
         # dest_path == abuse_report_path
         dest_path = self.local_config.agent.abuse_report_path
         if dest_path is None:

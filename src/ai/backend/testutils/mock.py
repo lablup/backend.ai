@@ -8,14 +8,14 @@ from unittest.mock import AsyncMock, Mock
 from aioresponses import CallbackResult
 
 
-def mock_corofunc(return_value):
+def mock_corofunc(return_value) -> Mock:
     """
     Return mock coroutine function.
 
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs):
+    async def _mock_corofunc(*args, **kargs) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)

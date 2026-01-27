@@ -34,13 +34,13 @@ class NetworkType(enum.StrEnum):
     HOST = "host"
 
 
-def _get_project_join_condition():
+def _get_project_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.group import GroupRow
 
     return GroupRow.id == foreign(NetworkRow.project)
 
 
-def _get_domain_join_condition():
+def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(NetworkRow.domain_name)

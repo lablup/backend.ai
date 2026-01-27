@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-def parse_version(expr):
+def parse_version(expr) -> tuple:
     result = []
     for part in expr.split("."):
         try:

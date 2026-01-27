@@ -4,7 +4,7 @@ import os
 import site
 import traceback
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 __all__ = (
     "current_loop",
@@ -96,7 +96,7 @@ def scan_proc_stats() -> dict[int, dict]:
     return pid_set
 
 
-def parse_proc_stat(pid):
+def parse_proc_stat(pid) -> dict[str, Any]:
     data = Path(f"/proc/{pid}/stat").read_bytes()
     name_begin = data.find(b"(")
     name_end = data.rfind(b")")

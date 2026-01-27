@@ -2,7 +2,10 @@
 A compatibility module for backported codes from Python 3.6+ standard library.
 """
 
+from __future__ import annotations
+
 import asyncio
+from typing import Any
 
 __all__ = (
     "all_tasks",
@@ -24,7 +27,7 @@ else:
     all_tasks = asyncio.Task.all_tasks  # type: ignore
 
 
-def _cancel_all_tasks(loop):
+def _cancel_all_tasks(loop) -> None:
     to_cancel = all_tasks(loop)
     if not to_cancel:
         return
@@ -42,7 +45,7 @@ def _cancel_all_tasks(loop):
             })
 
 
-def _asyncio_run(coro, *, debug=False):
+def _asyncio_run(coro, *, debug=False) -> Any:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.set_debug(debug)
@@ -65,7 +68,7 @@ else:
     asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
-def asyncio_run_forever(server_context, *, debug=False):
+def asyncio_run_forever(server_context, *, debug=False) -> Any:
     """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.
@@ -77,7 +80,7 @@ def asyncio_run_forever(server_context, *, debug=False):
 
     forever = loop.create_future()
 
-    async def _run_forever():
+    async def _run_forever() -> None:
         async with server_context:
             try:
                 await forever

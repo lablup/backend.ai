@@ -6,7 +6,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Optional
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import zmq
@@ -41,14 +41,14 @@ class PeerInvoker(Peer):
             if f := self._cached_funcs.get(name, None):
                 return f
 
-            async def _wrapped(*args, **kwargs):
+            async def _wrapped(*args, **kwargs) -> Any:
                 request_body = {
                     "args": args,
                     "kwargs": kwargs,
                 }
-                self.peer.last_used = time.monotonic()
+                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
                 ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                self.peer.last_used = time.monotonic()
+                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
                 return ret
 
             self._cached_funcs[name] = _wrapped
@@ -96,7 +96,7 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row | None:
+        async def _fetch_agent() -> Optional[Row]:
             async with self.db.begin_readonly() as conn:
                 query = (
                     sa.select(agents.c.addr, agents.c.public_key)

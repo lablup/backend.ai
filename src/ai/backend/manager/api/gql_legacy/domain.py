@@ -170,7 +170,9 @@ class DomainNode(graphene.ObjectType):
             created_at=obj.created_at,
             modified_at=obj.modified_at,
             total_resource_slots=obj.total_resource_slots,
-            allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
+            allowed_vfolder_hosts=(
+                obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
+            ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
@@ -190,7 +192,9 @@ class DomainNode(graphene.ObjectType):
             created_at=obj.created_at,
             modified_at=obj.modified_at,
             total_resource_slots=obj.total_resource_slots,
-            allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
+            allowed_vfolder_hosts=(
+                obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
+            ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
@@ -373,7 +377,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
     def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
-        def value_or_none(value):
+        def value_or_none(value) -> Any:
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
@@ -638,7 +642,7 @@ class DomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
-        def value_or_none(value):
+        def value_or_none(value) -> Any:
             return value if value is not Undefined else None
 
         return CreateDomainAction(

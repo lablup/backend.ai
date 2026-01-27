@@ -339,13 +339,13 @@ def apps(session_name, app_name, list_names):
          If none provided, this will print all available services.
     """
 
-    async def print_arguments():
+    async def print_arguments() -> None:
         apps = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x["name"] in app_name))
+                apps = list(filter(lambda x: x["name"] in app_name, apps))
         if list_names:
             print_info(
                 "This session provides the following app services: {}".format(

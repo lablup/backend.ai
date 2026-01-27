@@ -827,7 +827,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
-        def accel_lt_intrinsic(item):
+        def accel_lt_intrinsic(item) -> int:
             # push back "intrinsic" plugins (if exists)
             if item[0] in ("cpu", "mem"):
                 return 0

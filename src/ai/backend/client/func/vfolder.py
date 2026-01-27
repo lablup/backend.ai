@@ -319,7 +319,7 @@ class VFolderByName(BaseFunction):
             self.name = new_name
             return await resp.text()
 
-    def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]):
+    def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]) -> None:
         with open(file_path, mode) as f:
             while True:
                 chunk = q.get()

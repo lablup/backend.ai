@@ -341,7 +341,7 @@ def apps(session_name, app_name, list_names):
          If none provided, this will print all available services.
     """
 
-    async def print_arguments():
+    async def print_arguments() -> None:
         apps = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)

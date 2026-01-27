@@ -5,7 +5,7 @@ from typing import Any, Optional, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
-from sqlalchemy.sql.elements import BooleanClauseList
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -104,7 +104,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         order_clauses: list[tuple[sa.Column, bool]],
         cursor_uuid: uuid.UUID,
         pagination_order: Optional[ConnectionPaginationOrder],
-    ) -> list[BooleanClauseList]:
+    ) -> list[ColumnElement[bool]]:
         """
         Build lexicographic cursor conditions for multiple ordering fields.
         Generic implementation that works with any model.
@@ -121,7 +121,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         # Cache subqueries to avoid duplication
         subquery_cache = {}
 
-        def get_cursor_value_subquery(column):
+        def get_cursor_value_subquery(column) -> sa.ScalarSelect:
             """Get or create cached subquery for cursor value"""
             if column not in subquery_cache:
                 id_column = self.model_class.id

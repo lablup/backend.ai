@@ -255,7 +255,7 @@ class KubernetesKernel(AbstractKernel):
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
-        def _write_to_disk():
+        def _write_to_disk() -> None:
             host_abspath.parent.mkdir(parents=True, exist_ok=True)
             host_abspath.write_bytes(filedata)
 

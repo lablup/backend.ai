@@ -1329,7 +1329,7 @@ async def _find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-):
+) -> dict[str, list | str]:
     sessions = await SessionRow.match_sessions(
         db_session,
         session_name_or_id,

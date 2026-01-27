@@ -524,7 +524,7 @@ async def batch_multiresult_in_scalar_stream(
 
 
 def privileged_query(required_role: UserRole):
-    def wrap(func):
+    def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(
             root: Any,
@@ -560,7 +560,7 @@ def scoped_query(
         in the keyword arguments.
     """
 
-    def wrap(resolve_func):
+    def wrap(resolve_func) -> Callable:
         @functools.wraps(resolve_func)
         async def wrapped(
             root: Any,
@@ -623,7 +623,7 @@ def scoped_query(
 
 
 def privileged_mutation(required_role, target_func=None):
-    def wrap(func):
+    def wrap(func) -> Callable:
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users

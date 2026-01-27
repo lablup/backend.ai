@@ -172,7 +172,7 @@ get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
 
-def _define_functions():
+def _define_functions() -> None:
     global _defined
     global get_instance_id
     global get_instance_ip
@@ -306,7 +306,6 @@ def _define_functions():
                 return f"google/{region}"
 
         case _:
-            _metadata_prefix = None
 
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"

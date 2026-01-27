@@ -50,7 +50,7 @@ def cli() -> None:
 def put(cli_ctx: CLIContext, key, value, scope) -> None:
     """Put a single key-value pair into the etcd."""
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 await etcd.put(key, value, scope=scope)
@@ -77,7 +77,7 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     under the given KEY prefix.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 value = json.load(file)
@@ -108,11 +108,11 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
     Move a subtree to another key prefix.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 subtree = await etcd.get_prefix(src_prefix, scope=scope)
-                await etcd.put_prefix(dst_prefix, subtree, scope=scope)
+                await etcd.put_prefix(dst_prefix, subtree, scope=scope)  # type: ignore[arg-type]
                 await etcd.delete_prefix(src_prefix, scope=scope)
             except Exception:
                 log.exception("An error occurred.")
@@ -140,7 +140,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
     Get the value of a key in the configured etcd namespace.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 if prefix:
@@ -171,7 +171,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
 def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
     """Delete the key in the configured etcd namespace."""
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 if prefix:
@@ -182,7 +182,7 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
                     await etcd.delete_prefix(key, scope=scope)
                     log.info(f"All keys starting with '{key}' successfully deleted.")
                 else:
-                    data = await etcd.get(key, scope=scope)
+                    data = await etcd.get(key, scope=scope)  # type: ignore[assignment]
                     if data is None:
                         log.info(f"No key found to delete: {key}")
                         return
@@ -328,7 +328,7 @@ def set_storage_sftp_scaling_group(
     To enter multiple scaling groups concatenate names with comma(,).
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:
@@ -361,7 +361,7 @@ def remove_storage_sftp_scaling_group(
     Removes storage proxy node config's SFTP desginated scaling groups.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:
