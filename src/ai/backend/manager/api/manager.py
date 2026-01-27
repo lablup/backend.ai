@@ -21,7 +21,7 @@ from aiohttp.typedefs import Handler
 from aiotools import aclosing
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
+from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive, QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
@@ -101,6 +101,8 @@ async def detect_status_update(root_ctx: RootContext) -> None:
             root_ctx.config_provider.legacy_etcd_config_loader.watch_manager_status()
         ) as agen:
             async for ev in agen:
+                if isinstance(ev, QueueSentinel):
+                    continue
                 if ev.event == "put":
                     root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status.cache_clear()
                     updated_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()

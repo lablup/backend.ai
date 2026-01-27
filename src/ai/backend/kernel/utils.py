@@ -27,7 +27,9 @@ def find_executable(*paths) -> Path | None:
     Find the first executable regular file in the given list of paths.
     """
     for path in paths:
-        if isinstance(path, (str, bytes)):
+        if isinstance(path, bytes):
+            path = Path(path.decode("utf-8"))
+        elif isinstance(path, str):
             path = Path(path)
         if not path.exists():
             continue

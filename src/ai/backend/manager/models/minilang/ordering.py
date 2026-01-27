@@ -56,7 +56,7 @@ class QueryOrderTransformer(Transformer):
                         matched_col = get_col_from_table(self._sa_table, column)
                     case JSONFieldItem(_col, _key):
                         _column = get_col_from_table(self._sa_table, _col)
-                        matched_col = _column.op("->>")(_key)
+                        matched_col = _column.op("->>")(_key)  # type: ignore[assignment]
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
                 col = func(matched_col) if func is not None else matched_col

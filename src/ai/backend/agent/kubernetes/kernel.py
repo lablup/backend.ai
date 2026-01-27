@@ -19,12 +19,13 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
-from ai.backend.agent.types import AgentEventData, CommitStatus, KernelOwnershipData
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import CommitStatus
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -164,7 +165,7 @@ class KubernetesKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self) -> dict[str, Any]:
+    async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()

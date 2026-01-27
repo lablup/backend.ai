@@ -149,7 +149,7 @@ async def prepare_sshd_service(service_info) -> tuple[list[str], dict]:
             cmdargs.extend(["-p", f"0.0.0.0:{port}"])
     else:
         cmdargs.extend(["-p", f"0.0.0.0:{port_config}"])
-    env = {}
+    env: dict[str, str] = {}
     return cmdargs, env
 
 

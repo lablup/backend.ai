@@ -163,7 +163,7 @@ class QueryFilterTransformer(Transformer):
                     case JSONFieldItem(col_name, obj_key):
                         # For json columns, we additionally indicate the object key
                         # to retrieve the value used in the expression.
-                        col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)
+                        col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)  # type: ignore[assignment]
                         expr = build_expr(op, col, val)
                     case EnumFieldItem(col_name, enum_cls):
                         col = get_col_from_table(self._sa_table, col_name)

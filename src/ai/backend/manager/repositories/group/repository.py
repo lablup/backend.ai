@@ -42,9 +42,9 @@ from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.resource_policy import project_resource_policies

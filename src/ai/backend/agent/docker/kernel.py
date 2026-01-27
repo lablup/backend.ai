@@ -110,7 +110,7 @@ class DockerKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self) -> dict[str, Any]:
+    async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()

@@ -317,7 +317,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_status(self) -> dict[str, Any]:
+    async def check_status(self) -> dict[str, Any] | None:
         raise NotImplementedError
 
     @abstractmethod

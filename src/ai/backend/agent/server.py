@@ -1144,7 +1144,7 @@ class AgentRPCServer(aobject):
         kernel_id: str,
         filepath: str,
         agent_id: AgentId | None = None,
-    ) -> dict[str, Any]:
+    ) -> bytes:
         log.info("rpc::download_file(k:{0}, fn:{1})", kernel_id, filepath)
         agent = self.runtime.get_agent(agent_id)
         return await agent.download_file(KernelId(UUID(kernel_id)), filepath)
@@ -1156,7 +1156,7 @@ class AgentRPCServer(aobject):
         kernel_id: str,
         filepath: str,
         agent_id: AgentId | None = None,
-    ) -> dict[str, Any]:
+    ) -> bytes:
         log.info("rpc::download_single(k:{0}, fn:{1})", kernel_id, filepath)
         agent = self.runtime.get_agent(agent_id)
         return await agent.download_single(KernelId(UUID(kernel_id)), filepath)

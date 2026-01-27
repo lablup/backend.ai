@@ -41,7 +41,7 @@ class WekaQuota:
             data["used_bytes"],
         )
 
-    def to_json(self) -> dict[str, int | str]:
+    def to_json(self) -> dict[str, int | str | None]:
         return {
             "quota_id": self.quota_id,
             "inode_id": self.inode_id,

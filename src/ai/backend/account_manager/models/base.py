@@ -60,7 +60,9 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: UUID_SubType | uuid.UUID | None, dialect) -> str | None:
+    def process_bind_param(
+        self, value: UUID_SubType | uuid.UUID | None, dialect
+    ) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.

@@ -132,7 +132,7 @@ class AliasGroupMixin(click.Group):
             if cmd.hidden:
                 continue
             if subcommand in self._commands:
-                aliases = ",".join(sorted(self._commands[subcommand]))
+                aliases = ",".join(sorted(self._commands[subcommand]))  # type: ignore[call-overload]
                 subcommand = f"{subcommand} ({aliases})"
             commands.append((subcommand, cmd))
 

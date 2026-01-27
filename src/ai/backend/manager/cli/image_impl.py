@@ -164,7 +164,7 @@ async def set_image_resource_limit(
                     ImageAlias(canonical_or_alias),
                 ],
             )
-            await image_row.set_resource_limit(slot_type, range_value)
+            image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception as e:

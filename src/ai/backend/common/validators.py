@@ -123,12 +123,12 @@ class AliasedKey(t.Key):
 class MultiKey(t.Key):
     def get_data(self, data, default) -> list[Any]:
         if isinstance(data, (multidict.MultiDict, multidict.MultiDictProxy)):
-            return data.getall(self.name, default)
+            return data.getall(self.name, default)  # type: ignore[attr-defined]
         # fallback for plain dicts
-        raw_value = data.get(self.name, default)
+        raw_value = data.get(self.name, default)  # type: ignore[attr-defined]
         if isinstance(raw_value, (list, tuple)):
             # if plain dict already contains list of values, just return it.
-            return raw_value
+            return list(raw_value)
         # otherwise, wrap the value in a list.
         return [raw_value]
 

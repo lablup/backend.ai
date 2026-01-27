@@ -102,7 +102,7 @@ class Canvas:
         self.fgcolor = fgcolor
 
     def update(self) -> None:
-        builtins._sorna_emit(
+        builtins._sorna_emit(  # type: ignore[attr-defined]
             MediaRecord(
                 "application/x-sorna-drawing",
                 encode_commands(self._cmd_history),

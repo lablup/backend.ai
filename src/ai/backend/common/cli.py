@@ -66,7 +66,7 @@ class EnumChoice(click.Choice):
     def convert(self, value: Any, param, ctx) -> str:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
-            return next(e for e in self.enum if e == value)
+            return next(e for e in self.enum if e == value).value
         value = super().convert(value, param, ctx)
         return next(k for k in self.enum.__members__.keys() if k == value)
 

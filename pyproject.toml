@@ -311,47 +311,6 @@ module = [
 ]
 ignore_errors = true
 
-# Defer type fixes for remaining modules (to be fixed incrementally)
-# These have various type issues that require deeper investigation
-[[tool.mypy.overrides]]
-module = [
-    "ai.backend.agent.fs",
-    "ai.backend.agent.server",
-    "ai.backend.agent.docker.kernel",
-    "ai.backend.agent.kubernetes.kernel",
-    "ai.backend.kernel.python",
-    "ai.backend.kernel.python.drawing.canvas",
-    "ai.backend.kernel.utils",
-    "ai.backend.kernel.intrinsic",
-    "ai.backend.web.logging",
-    "ai.backend.manager.api.manager",
-    "ai.backend.manager.cli.image_impl",
-    "ai.backend.manager.models.minilang.ordering",
-    "ai.backend.manager.models.minilang.queryfilter",
-    "ai.backend.storage.volumes.weka.weka_client",
-    "ai.backend.account_manager.models.base",
-    "ai.backend.common.cli",
-    "ai.backend.common.validators",
-    "ai.backend.helpers.package",
-    "ai.backend.cli.params",
-    "ai.backend.cli.extensions",
-]
-disable_error_code = [
-    "assignment",
-    "arg-type",
-    "return-value",
-    "attr-defined",
-    "operator",
-    "call-arg",
-    "call-overload",
-    "var-annotated",
-    "union-attr",
-    "func-returns-value",
-    "override",
-    "dict-item",
-    "str-format",
-]
-
 [tool.pyright]
 pythonVersion = "3.13"
 extraPaths = ["src"]

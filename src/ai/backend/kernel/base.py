@@ -18,12 +18,16 @@ from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     Optional,
     TypeVar,
     cast,
 )
+
+if TYPE_CHECKING:
+    from janus import _AsyncQueueProxy
 
 import janus
 import msgpack
@@ -156,7 +160,7 @@ class BaseRunner(metaclass=ABCMeta):
     _build_success: Optional[bool]
 
     # Set by subclasses.
-    user_input_queue: Optional[asyncio.Queue[str]]
+    user_input_queue: asyncio.Queue[str] | _AsyncQueueProxy[str] | None
 
     _main_task: asyncio.Task
     _run_task: asyncio.Task
@@ -723,7 +727,13 @@ class BaseRunner(metaclass=ABCMeta):
         ])
 
     @abstractmethod
-    async def start_service(self, service_info) -> tuple[None, dict]:
+    async def start_service(
+        self, service_info
+    ) -> (
+        tuple[list[str] | None, dict[str, str]]
+        | tuple[list[str] | None, dict[str, str], str]
+        | None
+    ):
         """Start an application service daemon."""
         return None, {}
 
@@ -891,7 +901,8 @@ class BaseRunner(metaclass=ABCMeta):
                         if start_info is None:
                             cmdargs, env = None, {}
                         elif len(start_info) == 3:
-                            cmdargs, env, _cwd = start_info
+                            cmdargs, env, cwd_str = start_info
+                            _cwd = Path(cwd_str)
                         elif len(start_info) == 2:
                             cmdargs, env = start_info
                     if cmdargs is None:
