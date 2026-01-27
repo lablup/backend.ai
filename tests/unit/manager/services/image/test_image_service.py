@@ -21,8 +21,12 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
+    ImageDataWithDetails,
     ImageLabelsData,
+    ImageListResult,
     ImageResourcesData,
+    KVPair,
+    ResourceLimit,
 )
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
@@ -31,6 +35,7 @@ from ai.backend.manager.errors.image import (
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
@@ -49,6 +54,7 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesKeyData,
 )
+from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -836,3 +842,126 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await processors.clear_image_custom_resource_limit.wait_for_complete(action)
+
+
+class TestSearchImages(ImageServiceBaseFixtures):
+    """Tests for ImageService.search_images"""
+
+    @pytest.fixture
+    def image_data_with_details(
+        self, image_id: uuid.UUID, container_registry_id: uuid.UUID
+    ) -> ImageDataWithDetails:
+        """Sample ImageDataWithDetails for testing."""
+        from decimal import Decimal
+
+        return ImageDataWithDetails(
+            id=ImageID(image_id),
+            name=ImageCanonical("registry.example.com/test_project/python:3.9-ubuntu20.04"),
+            namespace="test_project",
+            base_image_name="python",
+            project="test_project",
+            humanized_name="Python 3.9",
+            tag="3.9-ubuntu20.04",
+            tags=[KVPair(key="version", value="3.9")],
+            version="3.9",
+            registry="registry.example.com",
+            registry_id=container_registry_id,
+            type=ImageType.COMPUTE,
+            architecture="x86_64",
+            is_local=False,
+            status=ImageStatus.ALIVE,
+            resource_limits=[ResourceLimit(key="cpu", min=Decimal("1"), max=Decimal("4"))],
+            supported_accelerators=["cuda"],
+            digest="sha256:abcdef",
+            labels=[KVPair(key="maintainer", value="test@example.com")],
+            aliases=["python39"],
+            size_bytes=12345678,
+            hash=None,
+        )
+
+    async def test_search_images_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data_with_details: ImageDataWithDetails,
+    ) -> None:
+        """Search images should return matching results."""
+        mock_image_repository.search_images = AsyncMock(
+            return_value=ImageListResult(
+                items=[image_data_with_details],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchImagesAction(querier=querier)
+
+        result = await processors.search_images.wait_for_complete(action)
+
+        assert result.data == [image_data_with_details]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_image_repository.search_images.assert_called_once_with(querier)
+
+    async def test_search_images_empty_result(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+    ) -> None:
+        """Search images should return empty list when no results found."""
+        mock_image_repository.search_images = AsyncMock(
+            return_value=ImageListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchImagesAction(querier=querier)
+
+        result = await processors.search_images.wait_for_complete(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_search_images_with_pagination(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data_with_details: ImageDataWithDetails,
+    ) -> None:
+        """Search images should handle pagination correctly."""
+        mock_image_repository.search_images = AsyncMock(
+            return_value=ImageListResult(
+                items=[image_data_with_details],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchImagesAction(querier=querier)
+
+        result = await processors.search_images.wait_for_complete(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
