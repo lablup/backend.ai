@@ -414,7 +414,7 @@ class ImageDBSource:
                 await session.delete(image_row)
             return data
         except DBAPIError as e:
-            raise PurgeImageActionByIdObjectDBError(str(e)) from e
+            raise PurgeImageActionByIdObjectDBError(str(e))
 
     async def search_images(self, querier: BatchQuerier) -> ImageListResult:
         """
@@ -422,9 +422,9 @@ class ImageDBSource:
         Returns ImageListResult with items and pagination info.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ImageRow)
+            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ImageRow.to_dataclass() for row in result.rows]
+            items = [row.ImageRow.to_detailed_dataclass() for row in result.rows]
             return ImageListResult(
                 items=items,
                 total_count=result.total_count,
