@@ -131,8 +131,8 @@ class RootContext:
         else:
             try:
                 volume_config = self.local_config.volume[name]
-            except KeyError:
-                raise InvalidVolumeError(name)
+            except KeyError as e:
+                raise InvalidVolumeError(name) from e
             volume_cls: type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),

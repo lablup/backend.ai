@@ -371,8 +371,9 @@ def vfolder_check_exists[**P](
             )
             try:
                 result = await conn.execute(query)
-            except sa.exc.DataError:
-                raise InvalidAPIParameters
+            except sa.exc.DataError as e:
+                raise InvalidAPIParameters from e
+
             row = result.first()
             if row is None:
                 raise VFolderNotFound()
@@ -458,9 +459,10 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             )
         )
     except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
     except BackendAIError as e:
-        raise InternalServerError(str(e))
+        raise InternalServerError(str(e)) from e
+
     resp = {
         "id": result.id.hex,
         "name": result.name,
@@ -1770,7 +1772,8 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
             )
         )
     except VFolderInvalidParameter as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
+
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1881,9 +1884,11 @@ async def delete_from_trash_bin(
             )
         )
     except VFolderInvalidParameter as e:
-        raise InvalidAPIParameters(str(e))
-    except TooManyVFoldersFound:
-        raise InternalServerError("Too many vfolders found")
+        raise InvalidAPIParameters(str(e)) from e
+
+    except TooManyVFoldersFound as e:
+        raise InternalServerError("Too many vfolders found") from e
+
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -2310,21 +2315,22 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
                     )
         except asyncio.CancelledError:
             raise
-        except TimeoutError:
+        except TimeoutError as e:
             log.error(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
-        except Exception:
+            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
+        except Exception as e:
             log.exception(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
                 "unexpected error while reading from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise InternalServerError
+            raise InternalServerError from e
+
     else:
         resp = {
             "content": (
@@ -2714,8 +2720,9 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         )
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
+
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")

@@ -177,8 +177,8 @@ class UUIDFloatMap(Scalar):
         for k, v in value.items():
             try:
                 key_str = str(uuid.UUID(k))
-            except ValueError:
-                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID")
+            except ValueError as e:
+                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID") from e
 
             if not isinstance(v, float):
                 raise GraphQLError(f"UUIDFloatMap cannot represent value {v} as a float")
@@ -195,10 +195,10 @@ class UUIDFloatMap(Scalar):
             if isinstance(field.value, (FloatValueNode, IntValueNode)):
                 try:
                     validated[key] = float(field.value.value)
-                except Exception:
+                except Exception as e:
                     raise GraphQLError(
                         f"UUIDFloatMap cannot represent value for key {key} as a float"
-                    )
+                    ) from e
             else:
                 raise GraphQLError(
                     f"UUIDFloatMap cannot represent non-numeric value for key {key}: {print_ast(field.value)}"
@@ -213,8 +213,8 @@ class UUIDFloatMap(Scalar):
         for k, v in value.items():
             try:
                 key_str = str(uuid.UUID(k))
-            except ValueError:
-                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID")
+            except ValueError as e:
+                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID") from e
             if not isinstance(v, float):
                 raise GraphQLError(f"UUIDFloatMap cannot represent value {v} as a float")
             validated[key_str] = v
@@ -233,8 +233,8 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
 
     try:
         return UUID(raw_id)
-    except ValueError:
-        raise ObjectNotFound(object_name)
+    except ValueError as e:
+        raise ObjectNotFound(object_name) from e
 
 
 # DataLoader-related types and classes

@@ -106,7 +106,7 @@ Generated using BackendAIConfigMeta annotations.
         generator.generate_to_file(StorageProxyUnifiedConfig, output, header=header_comment.strip())
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        raise click.ClickException(f"Failed to generate sample configuration: {e}")
+        raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 
 
 if __name__ == "__main__":

@@ -443,10 +443,10 @@ async def exception_middleware(
     # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}") from ex
         if len(ex.args) == 1:
-            raise InvalidAPIParameters(ex.args[0])
-        raise InvalidAPIParameters()
+            raise InvalidAPIParameters(ex.args[0]) from ex
+        raise InvalidAPIParameters() from ex
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -479,13 +479,13 @@ async def exception_middleware(
                 "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
             )
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
-        raise GenericBadRequest
+            ) from ex
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -498,7 +498,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        raise InternalServerError()
+        raise InternalServerError() from e
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp

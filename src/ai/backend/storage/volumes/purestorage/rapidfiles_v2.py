@@ -44,7 +44,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 os.fsencode(dst_path),
             ])
         except CalledProcessError as e:
-            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}')
+            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}') from e
 
     def scan_tree(
         self,

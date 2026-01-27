@@ -815,8 +815,8 @@ def _validate_priority_input(priority: int) -> None:
 def _validate_name_input(name: str) -> None:
     try:
         tx.SessionName().check(name)
-    except t.DataError:
-        raise ValueError(f"Not allowed session name (n:{name})")
+    except t.DataError as e:
+        raise ValueError(f"Not allowed session name (n:{name})") from e
 
 
 class ModifyComputeSession(graphene.relay.ClientIDMutation):

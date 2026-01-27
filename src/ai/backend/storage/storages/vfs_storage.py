@@ -194,8 +194,8 @@ class VFSStorage(AbstractStorage):
         # Ensure the resolved path is within base_path
         try:
             full_path.relative_to(self._base_path)
-        except ValueError:
-            raise InvalidPathError(f"Path traversal not allowed: {filepath}")
+        except ValueError as e:
+            raise InvalidPathError(f"Path traversal not allowed: {filepath}") from e
 
         return full_path
 

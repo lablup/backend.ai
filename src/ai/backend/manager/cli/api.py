@@ -106,15 +106,15 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
         click.echo("✅ Supergraph generation completed successfully!")
     except FileNotFoundError as e:
         click.echo(f"❌ Error: {e}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
     except subprocess.CalledProcessError as e:
         click.echo(f"❌ Rover command failed: {e}", err=True)
         if hasattr(e, "stderr") and e.stderr:
             click.echo(f"Error details: {e.stderr}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
     except Exception as e:
         click.echo(f"❌ Unexpected error: {e}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
 
 
 @cli.command()

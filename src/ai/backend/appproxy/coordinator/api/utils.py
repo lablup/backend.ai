@@ -35,8 +35,8 @@ def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Ha
                                 root_ctx.local_config.secrets.api_secret,
                                 algorithms=["HS256"],
                             )
-                        except jwt.PyJWTError:
-                            raise AuthorizationFailed("Unauthorized access")
+                        except jwt.PyJWTError as e:
+                            raise AuthorizationFailed("Unauthorized access") from e
                     case _:
                         raise AuthorizationFailed(f"Unsupported authorization method {method}")
             else:

@@ -51,10 +51,10 @@ def error_handler(inner):
     async def outer(*args, **kwargs):
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise GPFSInvalidBodyError
-        except web.HTTPNotFound:
-            raise GPFSNotFoundError
+        except web.HTTPBadRequest as e:
+            raise GPFSInvalidBodyError from e
+        except web.HTTPNotFound as e:
+            raise GPFSNotFoundError from e
 
     return outer
 
@@ -66,14 +66,17 @@ async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.Cli
         case 4:
             pass
         case 5:
+            msg_detail = ""
+            exc_to_chain = None
             try:
                 data = await response.json()
                 msg_detail = str(data)
-            except json.decoder.JSONDecodeError:
+            except json.decoder.JSONDecodeError as e:
                 msg_detail = "Unable to decode response body."
+                exc_to_chain = e
             raise ExternalStorageServiceError(
                 f"GPFS API server error. (status code: {response.status}, detail: {msg_detail})"
-            )
+            ) from exc_to_chain
     return response
 
 
@@ -132,8 +135,8 @@ class GPFSAPIClient:
                     "/scalemgmt/v2" + path, headers=self._req_header, json=body, ssl=self.ssl
                 )
             return await response_handler(response)
-        except web.HTTPUnauthorized:
-            raise GPFSUnauthorizedError
+        except web.HTTPUnauthorized as e:
+            raise GPFSUnauthorizedError from e
 
     async def _wait_for_job_done(self, jobs: list[GPFSJob]) -> None:
         for job_to_wait in jobs:

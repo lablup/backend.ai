@@ -109,8 +109,8 @@ class FileLock(AbstractDistributedLock):
                         )
                     if self._debug:
                         log.debug("file lock acquired: {}", self._path)
-        except RetryError:
-            raise TimeoutError(f"failed to lock file: {self._path}")
+        except RetryError as e:
+            raise TimeoutError(f"failed to lock file: {self._path}") from e
 
     def release(self) -> None:
         if self._file is None:
@@ -257,7 +257,7 @@ class RedisLock(AbstractDistributedLock):
         try:
             await self._lock.__aenter__()
         except LockError as e:
-            raise TimeoutError(str(e))
+            raise TimeoutError(str(e)) from e
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 

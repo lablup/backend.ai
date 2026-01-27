@@ -162,7 +162,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             file_path.resolve().relative_to(vfpath)
             if not file_path.exists():
                 raise FileNotFoundError
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError) as e:
             raise web.HTTPNotFound(
                 body=dump_json_str(
                     {
@@ -171,7 +171,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     },
                 ),
                 content_type="application/problem+json",
-            )
+            ) from e
         if not file_path.is_file():
             if params["archive"]:
                 # Download directory as an archive when archive param is set.
@@ -355,10 +355,10 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             try:
                 client_offset = int(upload_offset_header)
-            except ValueError:
+            except ValueError as e:
                 raise InvalidAPIParameters(
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
-                )
+                ) from e
 
             actual_offset = int(headers["Upload-Offset"])
             if client_offset != actual_offset:

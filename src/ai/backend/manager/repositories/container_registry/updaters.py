@@ -51,10 +51,10 @@ async def handle_allowed_groups_update(
         try:
             insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
             await session.execute(insert_query)
-        except sa.exc.IntegrityError:
+        except sa.exc.IntegrityError as e:
             raise ContainerRegistryGroupsAlreadyAssociated(
                 f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
-            )
+            ) from e
 
     if allowed_group_updates.remove:
         delete_query = (

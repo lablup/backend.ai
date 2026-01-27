@@ -52,8 +52,8 @@ def get_service_id(session: Session, name_or_id: str) -> UUID:
         services = session.Service.list(name=name_or_id)
         try:
             return UUID(services[0]["id"])
-        except (KeyError, IndexError):
-            raise RuntimeError(f"Service {name_or_id!r} not found")
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Service {name_or_id!r} not found") from e
     else:
         # When we can fetch the detail directly, it's a valid UUID.
         return UUID(name_or_id)

@@ -31,9 +31,9 @@ async def verify_user_access_scopes(db: ExtendedAsyncSAEngine, owner_uuid: uuid.
             )
             return
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
         except RuntimeError as e:
-            raise GenericForbidden(str(e))
+            raise GenericForbidden(str(e)) from e
 
 
 def validate_endpoint_access(

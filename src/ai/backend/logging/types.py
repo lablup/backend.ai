@@ -110,12 +110,12 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_value)
+            except ArithmeticError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             try:
                 multiplier = self.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_value)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             return int(dec_expr * multiplier)
 
 

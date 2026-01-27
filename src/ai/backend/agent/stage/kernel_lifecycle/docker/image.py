@@ -61,7 +61,7 @@ class ImagePullSpecProvisioner(Provisioner[ImagePullCheckSpec, ImagePullSpec]):
                     case AutoPullBehavior.DIGEST | AutoPullBehavior.TAG:
                         return True
                     case AutoPullBehavior.NONE:
-                        raise ImageNotAvailable(spec.image_ref)
+                        raise ImageNotAvailable(spec.image_ref) from e
             else:
                 raise
         return False

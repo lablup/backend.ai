@@ -1776,7 +1776,7 @@ class Query(graphene.ObjectType):
                 allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `load_filters` should be one of ({allowed_filter_values})"
-                )
+                ) from e
             image_load_types.update([ImageLoadFilter(f) for f in _filters])
             if (
                 client_role == UserRole.SUPERADMIN
@@ -3324,7 +3324,7 @@ class GQLExceptionMiddleware:
                 extensions={
                     "code": str(e.error_code()),
                 },
-            )
+            ) from e
         except Exception as e:
             log.exception("GraphQL unexpected error: {}", e)
             raise GraphQLError(
@@ -3332,7 +3332,7 @@ class GQLExceptionMiddleware:
                 extensions={
                     "code": str(ErrorCode.default()),
                 },
-            )
+            ) from e
         return res
 
 

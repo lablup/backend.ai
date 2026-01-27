@@ -209,8 +209,8 @@ class VASTAPIClient:
     def _parse_token(self, data: Mapping[str, Any]) -> None:
         try:
             self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
-        except KeyError:
-            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})")
+        except KeyError as e:
+            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})") from e
 
     async def _refresh(self) -> None:
         if self._auth_token is None:

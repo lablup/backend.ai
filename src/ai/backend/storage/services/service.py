@@ -69,7 +69,7 @@ class VolumeService:
                     "msg": "An internal error has occurred.",
                 }),
                 content_type="application/json",
-            )
+            ) from e
 
     async def _delete_vfolder(
         self,
@@ -146,8 +146,10 @@ class VolumeService:
                     await volume.quota_model.create_quota_scope(
                         quota_scope_id=quota_scope_id, options=options, extra_args=None
                     )
-            except QuotaScopeAlreadyExists:
-                raise web.HTTPConflict(reason="Volume already exists with given quota scope.")
+            except QuotaScopeAlreadyExists as e:
+                raise web.HTTPConflict(
+                    reason="Volume already exists with given quota scope."
+                ) from e
 
     async def get_quota_scope(self, quota_scope_key: QuotaScopeKey) -> QuotaScopeMeta:
         await log_manager_api_entry_new(log, "get_quota_scope", quota_scope_key)
@@ -182,8 +184,8 @@ class VolumeService:
                             quota_scope_id=quota_scope_id,
                             config=options,
                         )
-                    except InvalidQuotaConfig:
-                        raise web.HTTPBadRequest(reason="Invalid quota config option")
+                    except InvalidQuotaConfig as e:
+                        raise web.HTTPBadRequest(reason="Invalid quota config option") from e
 
     async def delete_quota_scope(self, quota_scope_key: QuotaScopeKey) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
@@ -209,10 +211,10 @@ class VolumeService:
                 await volume.quota_model.create_quota_scope(quota_scope_id)
                 try:
                     await volume.create_vfolder(vfolder_id)
-                except QuotaScopeNotFoundError:
+                except QuotaScopeNotFoundError as e:
                     raise ExternalStorageServiceError(
                         "Failed to create vfolder due to quota scope not found"
-                    )
+                    ) from e
 
     async def clone_vfolder(self, vfolder_key: VFolderKey, dst_vfolder_id: VFolderID) -> None:
         await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)
@@ -227,10 +229,10 @@ class VolumeService:
                 mount_path = await volume.get_vfolder_mount(vfolder_id, subpath)
                 usage = await volume.get_usage(vfolder_id)
                 fs_usage = await volume.get_fs_usage()
-            except VFolderNotFoundError:
-                raise web.HTTPGone(reason="VFolder not found")
-            except InvalidSubpathError:
-                raise web.HTTPBadRequest(reason="Invalid vfolder subpath")
+            except VFolderNotFoundError as e:
+                raise web.HTTPGone(reason="VFolder not found") from e
+            except InvalidSubpathError as e:
+                raise web.HTTPBadRequest(reason="Invalid vfolder subpath") from e
 
             return VFolderMeta(
                 mount_path=mount_path,
@@ -246,11 +248,11 @@ class VolumeService:
         try:
             async with self._volume_pool.get_volume(vfolder_key.volume_id) as volume:
                 await volume.get_vfolder_mount(vfolder_id, ".")
-        except VFolderNotFoundError:
+        except VFolderNotFoundError as e:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None:
                 ongoing_task.cancel()
-            raise web.HTTPGone(reason="VFolder not found")
+            raise web.HTTPGone(reason="VFolder not found") from e
         else:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None and ongoing_task.done():

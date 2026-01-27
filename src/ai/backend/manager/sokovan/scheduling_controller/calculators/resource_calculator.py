@@ -239,11 +239,11 @@ class ResourceCalculator:
 
         try:
             requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
-        except ValueError:
+        except ValueError as e:
             log.exception("request_slots & image_slots calculation error")
             raise InvalidAPIParameters(
                 "Your resource request has resource type(s) not supported by the image."
-            )
+            ) from e
 
         # Fill intrinsic resources with image minimums if not specified
         for k, v in requested_slots.items():
@@ -302,10 +302,11 @@ class ResourceCalculator:
 
         try:
             shmem = BinarySize.from_str(raw_shmem)
-        except ValueError:
+        except ValueError as e:
             log.warning(
                 f"Failed to convert raw `shmem({raw_shmem})` "
-                f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
+                f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE}).",
+                exc_info=e,
             )
             shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
 

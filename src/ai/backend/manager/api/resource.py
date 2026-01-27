@@ -100,7 +100,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         # scaling_group = request.query.get('scaling_group')
         # assert scaling_group is not None, 'scaling_group parameter is missing.'
     except (json.decoder.JSONDecodeError, AssertionError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     log.info(
         "CHECK_PRESETS (ak:{}, g:{}, sg:{})",

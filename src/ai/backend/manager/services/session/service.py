@@ -280,8 +280,8 @@ class SessionService:
         try:
             await self._agent_registry.increment_session_usage(session)
             resp = await self._agent_registry.get_completions(session, code, opts=options)
-        except AssertionError:
-            raise InvalidAPIParameters
+        except AssertionError as e:
+            raise InvalidAPIParameters from e
         return CompleteActionResult(
             session_data=session.to_dataclass(),
             result=resp,
@@ -403,7 +403,7 @@ class SessionService:
                 query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
             )
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
 
         try:
             resp = await self._agent_registry.create_cluster(
@@ -425,16 +425,16 @@ class SessionService:
                 sudo_session_enabled=sudo_session_enabled,
             )
             return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
-        except TooManySessionsMatched:
-            raise SessionAlreadyExists
+        except TooManySessionsMatched as e:
+            raise SessionAlreadyExists from e
         except BackendAIError:
             raise
-        except UnknownImageReference:
-            raise UnknownImageReferenceError("Unknown image reference!")
+        except UnknownImageReference as e:
+            raise UnknownImageReferenceError("Unknown image reference!") from e
         except Exception as e:
             await self._error_monitor.capture_exception()
             log.exception("GET_OR_CREATE: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
     async def create_from_params(
         self, action: CreateFromParamsAction
@@ -518,14 +518,14 @@ class SessionService:
             return CreateFromParamsActionResult(
                 session_id=uuid.UUID(resp["sessionId"]), result=resp
             )
-        except UnknownImageReference:
-            raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except UnknownImageReference as e:
+            raise UnknownImageReferenceError(f"Unknown image reference: {image}") from e
         except BackendAIError:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
     async def create_from_template(
         self, action: CreateFromTemplateAction
@@ -610,10 +610,10 @@ class SessionService:
             params = overwritten_param_check.check(param_from_template)
         except RuntimeError as e1:
             log.exception(e1)
-            raise InvalidAPIParameters("Error while validating template")
+            raise InvalidAPIParameters("Error while validating template") from e1
         except t.DataError as e2:
             log.debug("Error: {0}", str(e2))
-            raise InvalidAPIParameters("Error while validating template")
+            raise InvalidAPIParameters("Error while validating template") from e2
         params["config"] = config_from_template
 
         log.debug("Updated param: {0}", params)
@@ -715,14 +715,14 @@ class SessionService:
                 sudo_session_enabled=sudo_session_enabled,
             )
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
-        except UnknownImageReference:
-            raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except UnknownImageReference as e:
+            raise UnknownImageReferenceError(f"Unknown image reference: {image}") from e
         except BackendAIError:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
@@ -774,8 +774,8 @@ class SessionService:
             )
             await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.download_single(session, owner_access_key, file)
-        except (ValueError, FileNotFoundError):
-            raise InvalidAPIParameters("The file is not found.")
+        except (ValueError, FileNotFoundError) as e:
+            raise InvalidAPIParameters("The file is not found.") from e
         except asyncio.CancelledError:
             raise
         except BackendAIError:
@@ -783,7 +783,7 @@ class SessionService:
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
             log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
         return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
 
@@ -813,12 +813,12 @@ class SessionService:
             raise
         except BackendAIError:
             raise
-        except (ValueError, FileNotFoundError):
-            raise InvalidAPIParameters("The file is not found.")
+        except (ValueError, FileNotFoundError) as e:
+            raise InvalidAPIParameters("The file is not found.") from e
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
             log.exception("DOWNLOAD_FILE: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
             headers = multidict.MultiDict({"Content-Encoding": "identity"})
@@ -919,7 +919,7 @@ class SessionService:
                 resp["result"] = result
         except AssertionError as e:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
-            raise InvalidAPIParameters(extra_msg=e.args[0])
+            raise InvalidAPIParameters(extra_msg=e.args[0]) from e
         except BackendAIError:
             raise
 
@@ -1173,7 +1173,7 @@ class SessionService:
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
             log.exception("LIST_FILES: unexpected error!", e)
-            raise InternalServerError
+            raise InternalServerError from e
 
         return ListFilesActionResult(result=result, session_data=session.to_dataclass())
 
@@ -1210,7 +1210,7 @@ class SessionService:
                 raise InvalidAPIParameters("Can't change name of not running session")
         except ValueError as e:
             if "already exists" in str(e):
-                raise InvalidAPIParameters(str(e))
+                raise InvalidAPIParameters(str(e)) from e
             raise
 
         return RenameSessionActionResult(session_data=compute_session.to_dataclass())
@@ -1292,10 +1292,10 @@ class SessionService:
                     # using one of the primary/secondary ports of the app
                     try:
                         hport_idx = sport["container_ports"].index(port)
-                    except ValueError:
+                    except ValueError as e:
                         raise InvalidAPIParameters(
                             f"Service {service} does not open the port number {port}."
-                        )
+                        ) from e
                     host_port = sport["host_ports"][hport_idx]
                 else:
                     # using the default (primary) port of the app

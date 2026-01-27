@@ -411,8 +411,8 @@ class VFolderRow(Base):
     def __getitem__(self, item: str) -> Any:
         try:
             return getattr(self, item)
-        except AttributeError:
-            raise KeyError(item)
+        except AttributeError as e:
+            raise KeyError(item) from e
 
     @property
     def vfid(self) -> VFolderID:

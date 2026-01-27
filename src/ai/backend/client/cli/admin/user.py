@@ -309,7 +309,7 @@ def add(
                         # Either domain_name or group_ref may be invalid.
                         raise ValueError(
                             f"Cannot find the group {group_ref!r} in the domain {domain_name!r}"
-                        )
+                        ) from None
                     group_ids.append(data[0]["id"])
             data = session.User.create(
                 domain_name,

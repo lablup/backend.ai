@@ -96,13 +96,13 @@ class KubernetesKernel(AbstractKernel):
             try:
                 await runner.feed_and_get_status()
                 break
-            except zmq.error.ZMQError as e:
+            except zmq.error.ZMQError:
                 if retries < 4:
                     retries += 1
                     log.debug("Socket not responding, retrying #{}", retries)
                     await asyncio.sleep(retries**2)
                 else:
-                    raise e
+                    raise
 
         return runner
 
@@ -264,7 +264,7 @@ class KubernetesKernel(AbstractKernel):
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
-            )
+            ) from e
 
     @override
     async def download_file(self, container_path: os.PathLike | str) -> bytes:

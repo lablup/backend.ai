@@ -233,8 +233,8 @@ class DellEMCOneFSVolume(BaseVolume):
     async def get_drive_stats(self) -> Mapping[str, Any]:
         try:
             return await self.api_client.get_drive_stats()
-        except (IndexError, KeyError):
-            raise DellNoMetricError
+        except (IndexError, KeyError) as e:
+            raise DellNoMetricError from e
 
     async def get_protocol_stats(self) -> Mapping[str, Any]:
         try:
@@ -253,8 +253,8 @@ class DellEMCOneFSVolume(BaseVolume):
     async def get_system_stats(self) -> Mapping[str, Any]:
         try:
             return await self.api_client.get_system_stats()
-        except (IndexError, KeyError):
-            raise DellNoMetricError
+        except (IndexError, KeyError) as e:
+            raise DellNoMetricError from e
 
     async def get_workload_stats(self) -> Mapping[str, Any]:
         try:

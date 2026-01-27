@@ -74,8 +74,8 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
-    except NotImplementedError:
+        ) from e
+    except NotImplementedError as e:
         raise web.HTTPBadRequest(
             text=dump_json_str(
                 {
@@ -84,7 +84,7 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
+        ) from e
 
 
 async def log_manager_api_entry(

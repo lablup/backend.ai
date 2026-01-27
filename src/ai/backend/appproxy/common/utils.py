@@ -229,10 +229,10 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
@@ -345,4 +345,4 @@ async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
         return await redis_helper.execute(connection, lambda r: r.ping())
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
-        raise e
+        raise e from e

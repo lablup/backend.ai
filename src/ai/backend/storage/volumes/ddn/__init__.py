@@ -85,7 +85,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 path,
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs setquota -p {pid}' command failed: {e.stderr}"
+            ) from e
 
     async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
         await self._set_quota_by_project(pid, path, QuotaConfig(0))
@@ -172,7 +174,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 str(qspath),
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs project -p {project_id}' command failed: {e.stderr}"
+            ) from e
 
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)

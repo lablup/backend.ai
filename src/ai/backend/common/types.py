@@ -248,8 +248,10 @@ class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
         try:
             # Assume that the enum values are lowercases.
             return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+        except (KeyError, ValueError) as e:
+            raise self._failure(
+                f"value is not a valid member of {self.enum_cls.__name__}", value=value
+            ) from e
 
 
 T1 = TypeVar("T1")
@@ -696,8 +698,8 @@ class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     def _to_ip_network(val: str) -> Address:
         try:
             return cast(Address, ip_network(val))
-        except ValueError:
-            raise InvalidIpAddressValue
+        except ValueError as e:
+            raise InvalidIpAddressValue from e
 
     @property
     def address(self) -> Address | None:
@@ -765,12 +767,12 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except (ArithmeticError, IndexError):
-                raise ValueError("Unconvertible value", orig_expr, ending)
+            except (ArithmeticError, IndexError) as e:
+                raise ValueError("Unconvertible value", orig_expr, ending) from e
             try:
                 multiplier = cls.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_expr)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_expr) from e
             return cls(dec_expr * multiplier)
 
     @classmethod
@@ -1038,8 +1040,8 @@ class ResourceSlot(UserDict[str, Decimal]):
         except (
             ArithmeticError,
             ValueError,  # catch wrapped errors from BinarySize.from_str()
-        ):
-            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
+        ) as e:
+            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}") from e
         return value
 
     @classmethod
@@ -1075,7 +1077,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
         return cls(data)
 
     @classmethod
@@ -1107,7 +1109,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             extra_guide = ""
             if e.args[0] == "shmem":
                 extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
@@ -1118,7 +1120,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
@@ -1324,8 +1326,8 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
-            except ValueError:
-                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            except ValueError as e:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})") from e
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 

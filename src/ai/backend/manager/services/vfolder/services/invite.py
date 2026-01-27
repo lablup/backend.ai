@@ -187,7 +187,7 @@ class VFolderInviteService:
             raise
         except Exception as e:
             if not isinstance(e, (VFolderInvitationNotFound, VFolderNotFound, Forbidden)):
-                raise InternalServerError(f"unexpected error: {e}")
+                raise InternalServerError(f"unexpected error: {e}") from e
             raise
         return RejectInvitationActionResult(action.invitation_id)
 

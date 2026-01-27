@@ -174,9 +174,9 @@ class Service(BaseFunction):
                     vfolder_id = UUID(mount)
                     if vfolder_id not in vfolder_id_to_name:
                         raise BackendClientError(f"VFolder (id: {vfolder_id}) not found")
-                except ValueError:
+                except ValueError as e:
                     if mount not in vfolder_name_to_id:
-                        raise BackendClientError(f"VFolder (name: {mount}) not found")
+                        raise BackendClientError(f"VFolder (name: {mount}) not found") from e
                     vfolder_id = vfolder_name_to_id[mount]
                 extra_mount_body[str(vfolder_id)] = {
                     "mount_destination": extra_mount_map.get(mount),

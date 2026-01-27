@@ -687,8 +687,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case mode if mode:
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
-                except KeyError:
-                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                except KeyError as e:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!") from e
 
                 container_config = await plugin.join_network(
                     self.kernel_config, cluster_info, **cluster_info["network_config"]
@@ -1065,8 +1065,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
             try:
                 plugin = self.network_plugin_ctx.plugins[mode]
-            except KeyError:
-                raise RuntimeError(f"Network plugin {mode} not loaded!")
+            except KeyError as e:
+                raise RuntimeError(f"Network plugin {mode} not loaded!") from e
             if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
                 await plugin.prepare_port_forward(
                     kernel_obj,
@@ -1220,12 +1220,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ) as writer:
                     await writer.write(f"CID={cid}\n")
 
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
                         message="Container creation was cancelled",
-                    )
+                    ) from e
                 raise
             except Exception as e:
                 # Oops, we have to restore the allocated resources!
@@ -1234,23 +1234,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
                         message=f"Unexpected error during container creation: {e!r}",
-                    )
+                    ) from e
                 raise
 
             try:
                 await container.start()
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
                 await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
                     message="Container start was cancelled",
-                )
+                ) from e
             except Exception as e:
                 await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
                     message=f"Unexpected error during container start: {e!r}",
-                )
+                ) from e
 
             if self.internal_data.get("sudo_session_enabled", False):
                 exec = await container.exec(
@@ -1284,8 +1284,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
-                except KeyError:
-                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                except KeyError as e:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!") from e
                 if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
                     container_network_info = await plugin.expose_ports(
                         kernel_obj,
@@ -1924,7 +1924,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 if auto_pull == AutoPullBehavior.DIGEST or auto_pull == AutoPullBehavior.TAG:
                     return True
                 if auto_pull == AutoPullBehavior.NONE:
-                    raise ImageNotAvailable(image_ref)
+                    raise ImageNotAvailable(image_ref) from e
             else:
                 raise
         return False
@@ -2109,10 +2109,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if kernel.network_driver != "bridge":
                         try:
                             plugin = self.network_plugin_ctx.plugins[kernel.network_driver]
-                        except KeyError:
+                        except KeyError as e:
                             raise RuntimeError(
                                 f"Network plugin {kernel.network_driver} not loaded!"
-                            )
+                            ) from e
                         await plugin.leave_network(kernel)
 
     @override

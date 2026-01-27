@@ -197,7 +197,7 @@ def handle_fs_errors(
                 },
             ),
             content_type="application/json",
-        )
+        ) from e
 
 
 @ctxmgr
@@ -210,7 +210,7 @@ def handle_external_errors() -> Iterator[None]:
                 "msg": str(e),
             }),
             content_type="application/json",
-        )
+        ) from e
 
 
 async def get_volumes(request: web.Request) -> web.Response:
@@ -432,7 +432,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 if not params["vfid"].quota_scope_id:
                     raise InvalidAPIParameters(
                         "quota_scope_id is required for auto quota scope creation"
-                    )
+                    ) from None
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):
@@ -444,10 +444,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 )
                 try:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
-                except QuotaScopeNotFoundError:
+                except QuotaScopeNotFoundError as e:
                     raise ExternalStorageServiceError(
                         "Failed to create vfolder due to quota scope not found."
-                    )
+                    ) from e
             return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -550,7 +550,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                     params["vfid"],
                     params["subpath"],
                 )
-            except VFolderNotFoundError:
+            except VFolderNotFoundError as e:
                 raise web.HTTPBadRequest(
                     text=dump_json_str(
                         {
@@ -559,7 +559,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from e
             except InvalidSubpathError as e:
                 raise web.HTTPBadRequest(
                     text=dump_json_str(
@@ -570,7 +570,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from e
             return web.json_response(
                 {
                     "path": str(mount_path),

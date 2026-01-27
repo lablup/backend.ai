@@ -83,9 +83,9 @@ async def get_access_key_scopes(
             )
             return request["keypair"]["access_key"], owner_access_key
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
         except RuntimeError as e:
-            raise GenericForbidden(str(e))
+            raise GenericForbidden(str(e)) from e
 
 
 async def get_user_uuid_scopes(
@@ -107,9 +107,9 @@ async def get_user_uuid_scopes(
             )
             return request["user"]["uuid"], owner_uuid
         except ValueError as e:
-            raise InvalidAPIParameters(str(e))
+            raise InvalidAPIParameters(str(e)) from e
         except RuntimeError as e:
-            raise GenericForbidden(str(e))
+            raise GenericForbidden(str(e)) from e
 
 
 async def get_user_scopes(
@@ -196,10 +196,10 @@ def check_api_params(
                 if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except t.DataError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict()) from e
             return await handler(request, checked_params, *args, **kwargs)
 
         set_handler_attr(wrapped, "request_scheme", checker)
@@ -320,8 +320,8 @@ def pydantic_params_api_handler[
                 if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except ValidationError as ex:
                 first_error = ex.errors()[0]
                 # Format the first validation error as the message
@@ -337,7 +337,7 @@ def pydantic_params_api_handler[
                 ]
                 msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
                 # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json()))
+                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json())) from ex
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

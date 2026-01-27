@@ -405,10 +405,10 @@ class VFolderByName(BaseFunction):
                                                             chunk = await raw_resp.content.read(
                                                                 chunk_size
                                                             )
-                                                        except TimeoutError:
-                                                            raise TryAgain
-                                            except RetryError:
-                                                raise ResponseFailed
+                                                        except TimeoutError as e:
+                                                            raise TryAgain from e
+                                            except RetryError as e:
+                                                raise ResponseFailed from e
                                             range_start += len(chunk)
                                             pbar.update(len(chunk))
                                             if not chunk:
@@ -423,10 +423,12 @@ class VFolderByName(BaseFunction):
                         ResponseFailed,
                         aiohttp.ClientPayloadError,
                         aiohttp.ClientConnectorError,
-                    ):
-                        raise TryAgain
-        except RetryError:
-            raise RuntimeError(f"Downloading {file_path.name} failed after {max_retries} retries")
+                    ) as e:
+                        raise TryAgain from e
+        except RetryError as e:
+            raise RuntimeError(
+                f"Downloading {file_path.name} failed after {max_retries} retries"
+            ) from e
 
     @api_function
     async def download(

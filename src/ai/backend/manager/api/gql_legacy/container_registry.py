@@ -275,7 +275,7 @@ class ContainerRegistryScopeField(graphene.Scalar):
             try:
                 return ContainerRegistryScope.parse(value)
             except Exception as e:
-                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}") from e
         raise ValueError("Invalid ContainerRegistryScope")
 
     @staticmethod
@@ -284,7 +284,7 @@ class ContainerRegistryScopeField(graphene.Scalar):
             try:
                 return ContainerRegistryScope.parse(node.value)
             except Exception as e:
-                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}") from e
         return None
 
 

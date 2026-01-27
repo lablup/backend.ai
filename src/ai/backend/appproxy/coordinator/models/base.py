@@ -179,7 +179,7 @@ class StructuredJSONColumn(TypeDecorator):
             raise ValueError(
                 "The given value does not conform with the structured json column format.",
                 e.json(),
-            )
+            ) from e
         return value
 
     def process_result_value(self, value, dialect):
@@ -281,8 +281,8 @@ class IPColumn(TypeDecorator):
             return value
         try:
             cidr = ReadableCIDR(value).address
-        except InvalidIpAddressValue:
-            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        except InvalidIpAddressValue as e:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
     def process_result_value(self, value, dialect):

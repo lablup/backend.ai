@@ -326,8 +326,8 @@ def _extract_auth_params(request):
     try:
         access_key, signature = params["credential"].split(":", 1)
         return params["signMethod"], access_key, signature
-    except (KeyError, ValueError):
-        raise InvalidAuthParameters("Missing or malformed authorization parameters")
+    except (KeyError, ValueError) as e:
+        raise InvalidAuthParameters("Missing or malformed authorization parameters") from e
 
 
 def check_date(request: web.Request) -> bool:
@@ -396,8 +396,8 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         ).digest()
         sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
-    except ValueError:
-        raise AuthorizationFailed("Invalid signature")
+    except ValueError as e:
+        raise AuthorizationFailed("Invalid signature") from e
 
 
 def validate_ip(request: web.Request, user: Mapping[str, Any]):
@@ -412,8 +412,8 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
         raise AuthorizationFailed("Not allowed IP address")
     try:
         client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr, is_network=False)
-    except InvalidIpAddressValue:
-        raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value")
+    except InvalidIpAddressValue as e:
+        raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value") from e
     if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
         return
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")

@@ -88,8 +88,8 @@ class _TimeDurationPydanticAnnotation:
                         return datetime.timedelta(seconds=t)
                     case _:
                         raise ValueError("value is not a known time duration")
-        except ValueError:
-            raise ValueError(f"invalid numeric literal: {value[:-1]}")
+        except ValueError as e:
+            raise ValueError(f"invalid numeric literal: {value[:-1]}") from e
 
     @classmethod
     def time_duration_serializer(cls, value: TVariousDelta) -> float | str:
@@ -257,8 +257,8 @@ class HostPortPair(BaseModel):
         elif isinstance(value, Mapping):
             try:
                 host, port = value["host"], value["port"]
-            except KeyError:
-                raise ValueError('value as map must contain "host" and "port" keys')
+            except KeyError as e:
+                raise ValueError('value as map must contain "host" and "port" keys') from e
 
         else:
             raise TypeError("unrecognized value type")
@@ -274,8 +274,8 @@ class HostPortPair(BaseModel):
 
         try:
             port = int(port)
-        except (TypeError, ValueError):
-            raise ValueError("port number must be an integer")
+        except (TypeError, ValueError) as e:
+            raise ValueError("port number must be an integer") from e
         if not (1 <= port <= 65535):
             raise ValueError("port number must be between 1 and 65535")
 
@@ -377,8 +377,8 @@ class UserID(int):
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_uid
-                except KeyError:
-                    raise ValueError(f"no such user {value} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such user {value} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -428,8 +428,8 @@ class GroupID(int):
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_gid
-                except KeyError:
-                    raise ValueError(f"no such group {value!r} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such group {value!r} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -487,7 +487,7 @@ class DelimiterSeparatedList(list[TItem]):
             try:
                 return cls([item_adapter.validate_python(x) for x in items])
             except ValidationError as e:
-                raise ValueError(str(e))
+                raise ValueError(str(e)) from e
 
         def _serialize(val: Sequence[Any]):
             return cls.delimiter.join(str(x) for x in val)

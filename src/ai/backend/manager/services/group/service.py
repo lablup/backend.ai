@@ -121,8 +121,8 @@ class GroupService:
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
             end_date = start_date + relativedelta(months=+1)
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         result = await self._group_repository.get_container_stats_for_period(
             start_date, end_date, action.group_ids
         )
@@ -140,8 +140,8 @@ class GroupService:
             end_date = end_date + timedelta(days=1)  # include sessions in end_date
             if end_date - start_date > timedelta(days=100):
                 raise InvalidAPIParameters("Cannot query more than 100 days")
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         if end_date <= start_date:
             raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
         log.info(

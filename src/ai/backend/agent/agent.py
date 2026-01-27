@@ -2625,13 +2625,13 @@ class AbstractAgent[
                             timeout=image_pull_timeout,
                         )
 
-                    except TimeoutError:
+                    except TimeoutError as e:
                         log.exception(
                             f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                         )
                         raise ImagePullTimeoutError(
                             f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
-                        )
+                        ) from e
                 else:
                     log.info(
                         "create_kernel(kernel:{}, session:{}) pulling not required: {}",
@@ -3019,7 +3019,7 @@ class AbstractAgent[
                         )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
-                        )
+                        ) from e
                     except Exception as e:
                         log.warning(
                             "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
@@ -3033,7 +3033,7 @@ class AbstractAgent[
                         )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
-                        )
+                        ) from e
                     try:
                         pretty_container_id: str = container_data["container_id"][:12]
                     except KeyError:
@@ -3112,7 +3112,7 @@ class AbstractAgent[
                             pretty_container_id,
                             service_ports,
                         )
-                    except TimeoutError:
+                    except TimeoutError as e:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3122,8 +3122,8 @@ class AbstractAgent[
                         )
                         raise ContainerStartupTimeoutError(
                             f"Timeout during container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
-                        )
-                    except asyncio.CancelledError:
+                        ) from e
+                    except asyncio.CancelledError as e:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3133,8 +3133,8 @@ class AbstractAgent[
                         )
                         raise ContainerStartupCancelledError(
                             f"Cancelled waiting of container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
-                        )
-                    except RetryError:
+                        ) from e
+                    except RetryError as e:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3147,7 +3147,7 @@ class AbstractAgent[
                             f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         log.exception(err_msg)
-                        raise ContainerStartupFailedError(err_msg)
+                        raise ContainerStartupFailedError(err_msg) from e
                     except BaseException as e:
                         log.exception(
                             "unexpected error while waiting container startup (k: {}, e: {})",
@@ -3239,9 +3239,9 @@ class AbstractAgent[
                     # The startup command for the batch-type sessions will be executed by the manager
                     # upon firing of the "session_started" event.
                     return kernel_creation_info
-                except Exception as e:
+                except Exception:
                     await self.reconstruct_resource_usage()
-                    raise e
+                    raise
 
     async def start_and_monitor_model_service_health(
         self,

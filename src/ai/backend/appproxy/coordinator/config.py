@@ -742,6 +742,6 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return server_config

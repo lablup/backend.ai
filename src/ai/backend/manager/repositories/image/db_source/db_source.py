@@ -146,8 +146,8 @@ class ImageDBSource:
                     ],
                     filter_by_statuses=status_filter,
                 )
-        except UnknownImageReference:
-            raise ImageNotFound
+        except UnknownImageReference as e:
+            raise ImageNotFound from e
         return image_row.to_detailed_dataclass()
 
     async def query_image_details_by_id(
@@ -161,8 +161,8 @@ class ImageDBSource:
                 row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
                 )
-            except UnknownImageReference:
-                raise ImageNotFound()
+            except UnknownImageReference as e:
+                raise ImageNotFound() from e
             return row.to_detailed_dataclass()
 
     async def query_all_images(
@@ -228,10 +228,10 @@ class ImageDBSource:
                 row_id = image_row.id
                 alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
             return row_id, alias_data
-        except ValueError:
-            raise AliasImageActionValueError
+        except ValueError as e:
+            raise AliasImageActionValueError from e
         except DBAPIError as e:
-            raise AliasImageActionDBError(str(e))
+            raise AliasImageActionDBError(str(e)) from e
 
     async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
@@ -291,8 +291,8 @@ class ImageDBSource:
                 if result is None:
                     raise ImageNotFound(f"Image not found (id:{updater.pk_value})")
                 return result.row.to_dataclass()
-        except (ValueError, DBAPIError):
-            raise ModifyImageActionValueError
+        except (ValueError, DBAPIError) as e:
+            raise ModifyImageActionValueError from e
 
     async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str
@@ -320,4 +320,4 @@ class ImageDBSource:
                 await session.delete(image_row)
             return data
         except DBAPIError as e:
-            raise PurgeImageActionByIdObjectDBError(str(e))
+            raise PurgeImageActionByIdObjectDBError(str(e)) from e

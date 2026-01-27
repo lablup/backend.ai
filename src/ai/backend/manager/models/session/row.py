@@ -1544,8 +1544,8 @@ class SessionRow(Base):
         )
         try:
             return session_list
-        except IndexError:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
 
     @classmethod
     async def get_session_by_id(
@@ -1571,8 +1571,8 @@ class SessionRow(Base):
         )
         try:
             return sessions[0]
-        except IndexError:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
     @classmethod
     async def get_sgroup_managed_sessions(

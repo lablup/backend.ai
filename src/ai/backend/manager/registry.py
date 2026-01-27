@@ -350,12 +350,12 @@ class AgentRegistry:
                     row = result.first()
 
                     if row is None:
-                        raise SessionNotFound(f"Session {session_id} not found")
+                        raise SessionNotFound(f"Session {session_id} not found") from e
 
                     if row.status == SessionStatus.RUNNING:
                         return
                     if row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
-                        raise SessionNotFound("Session terminated during scheduling")
+                        raise SessionNotFound("Session terminated during scheduling") from e
 
     async def create_session(
         self,
@@ -427,7 +427,7 @@ class AgentRegistry:
             try:
                 ResourceSlot.from_user_input(_resources, available_resource_slots)
             except ValueError as e:
-                raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
+                raise InvalidAPIParameters(f"Invalid resource allocation: {e}") from e
 
         # Resolve the image reference.
         try:
@@ -450,8 +450,8 @@ class AgentRegistry:
                     allowed_registries = await conn.scalar(query)
                     if allowed_registries is None or image_ref.registry not in allowed_registries:
                         raise AliasResolutionFailed
-        except AliasResolutionFailed:
-            raise ImageNotFound("unknown alias or disallowed registry")
+        except AliasResolutionFailed as e:
+            raise ImageNotFound("unknown alias or disallowed registry") from e
 
         # Check existing (access_key, session_name) instance
         try:
@@ -499,6 +499,7 @@ class AgentRegistry:
 
         if session_type == SessionTypes.BATCH and not startup_command:
             raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
+
         if session_type != SessionTypes.BATCH:
             if starts_at_timestamp:
                 raise InvalidAPIParameters(
@@ -789,8 +790,8 @@ class AgentRegistry:
                     ):
                         raise AliasResolutionFailed
                     kernel_config["image_ref"] = requested_image_ref
-            except AliasResolutionFailed:
-                raise ImageNotFound("unknown alias or disallowed registry")
+            except AliasResolutionFailed as e:
+                raise ImageNotFound("unknown alias or disallowed registry") from e
 
             for i in range(node["replicas"]):
                 kernel_config["cluster_idx"] = i + 1
@@ -1758,6 +1759,11 @@ class AgentRegistry:
                             if last_stat is not None:
                                 last_stat["version"] = 2
                         except TimeoutError:
+                            log.debug(
+                                "Timeout while fetching last statistics for kernel {}",
+                                kernel.id,
+                                exc_info=True,
+                            )
                             pass
                         if kernel.cluster_role == DEFAULT_ROLE:
                             main_stat = {
@@ -1917,7 +1923,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kernel()")
+                log.exception("unexpected-error in _restart_kernel() for kernel {}", kernel.id)
 
         restart_coros = []
         for kernel in kernel_list:
@@ -2442,11 +2448,12 @@ class AgentRegistry:
                         if override_kwargs:
                             _info = _info.model_copy(update=override_kwargs)
                         break
-            except Exception:
+            except Exception as e:
                 log.debug(
                     "Failed to read health check override from model definition for endpoint {}, "
-                    "using default health check settings",
+                    "using default health check settings if any. Error: {}",
                     endpoint.id,
+                    str(e),
                     exc_info=True,
                 )
         return _info

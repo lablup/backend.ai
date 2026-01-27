@@ -163,8 +163,6 @@ ignore = [
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
-    # B904 - raise-without-from-inside-except: 361 violations, no auto-fix, defer for gradual migration
-    "B904",
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # UP (pyupgrade) - defer large-scale changes for gradual adoption
     "UP043",  # unnecessary-default-type-args - defer for review (256 violations)

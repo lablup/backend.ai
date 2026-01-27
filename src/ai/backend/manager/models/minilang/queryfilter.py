@@ -95,8 +95,8 @@ class QueryFilterTransformer(Transformer):
         if self._fieldspec:
             try:
                 func = self._fieldspec[col_name][1]
-            except KeyError:
-                raise ValueError("Unknown/unsupported field name", col_name)
+            except KeyError as e:
+                raise ValueError("Unknown/unsupported field name", col_name) from e
             return func(value) if func is not None else value
         return value
 
@@ -174,8 +174,8 @@ class QueryFilterTransformer(Transformer):
                         except ValueError:
                             try:
                                 enum_val = enum_cls[val]
-                            except KeyError:
-                                raise ValueError(f"Invalid enum value: {val}")
+                            except KeyError as e:
+                                raise ValueError(f"Invalid enum value: {val}") from e
                         expr = build_expr(op, col, enum_val)
                     case ORMFieldItem(column):
                         expr = build_expr(op, column, val)
@@ -185,8 +185,8 @@ class QueryFilterTransformer(Transformer):
             else:
                 col = get_col_from_table(self._sa_table, col_name)
                 expr = build_expr(op, col, val)
-        except KeyError:
-            raise ValueError("Unknown/unsupported field name", col_name)
+        except KeyError as e:
+            raise ValueError("Unknown/unsupported field name", col_name) from e
         return expr
 
     def unary_expr(self, *args):
@@ -227,7 +227,7 @@ class QueryFilterParser:
             ast = self._parser.parse(filter_expr)
             where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
         except LarkError as e:
-            raise ValueError(f"Query filter parsing error: {e}")
+            raise ValueError(f"Query filter parsing error: {e}") from e
         return where_clause
 
     def append_filter(

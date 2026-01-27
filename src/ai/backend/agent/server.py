@@ -1610,7 +1610,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     # Override the read config with environment variables (for legacy).
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
@@ -1649,14 +1649,14 @@ def main(
             file=sys.stderr,
         )
         print(e, file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     except Exception as e:
         print(
             "ConfigurationError: Parsing agent local config failed for an unknown reason:",
             file=sys.stderr,
         )
         print(str(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     if not is_invoked_subcommand:
         server_config.agent_common.pid_file.write_text(str(os.getpid()))

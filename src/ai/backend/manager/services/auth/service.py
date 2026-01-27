@@ -98,11 +98,11 @@ class AuthService:
                 # TODO: per-group role is not yet implemented.
                 await self._auth_repository.get_group_membership(action.group_id, action.user_id)
                 group_role = "user"
-            except GroupMembershipNotFoundError:
+            except GroupMembershipNotFoundError as e:
                 raise ObjectNotFound(
                     extra_msg="No such project or you are not the member of it.",
                     object_name="project (user group)",
-                )
+                ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
@@ -261,8 +261,8 @@ class AuthService:
                 group_name=group_name,
                 domain_name=action.domain_name,
             )
-        except UserCreationError:
-            raise InternalServerError("Error creating user account")
+        except UserCreationError as e:
+            raise InternalServerError("Error creating user account") from e
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -316,9 +316,9 @@ class AuthService:
                 email,
                 action.old_password,
             )
-        except AuthorizationFailed:
+        except AuthorizationFailed as e:
             log.info(log_fmt + ": old password mismatch", *log_args)
-            raise AuthorizationFailed("Old password mismatch")
+            raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.

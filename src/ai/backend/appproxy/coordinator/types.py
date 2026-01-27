@@ -148,10 +148,10 @@ class CircuitManager:
         try:
             async with asyncio.timeout(15.0):
                 await worker_ready_evt.wait()
-        except TimeoutError:
+        except TimeoutError as e:
             raise ServiceUnavailable(
                 "E10001: Proxy worker not responding", extra_data={"worker": authority}
-            )
+            ) from e
 
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
