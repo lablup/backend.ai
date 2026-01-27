@@ -103,11 +103,13 @@ class DummyKernel(AbstractKernel):
     async def interrupt_kernel(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["interrupt-kernel"]
         await asyncio.sleep(delay)
+        return {}
 
     @override
     async def start_service(self, service, opts) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["start-service"]
         await asyncio.sleep(delay)
+        return {}
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:

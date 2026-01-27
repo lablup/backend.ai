@@ -882,7 +882,7 @@ class AgentRPCServer(aobject):
     ) -> dict[str, Any]:
         log.info("rpc::interrupt_kernel(k:{0})", kernel_id)
         agent = self.runtime.get_agent(agent_id)
-        await agent.interrupt_kernel(KernelId(UUID(kernel_id)))
+        return await agent.interrupt_kernel(KernelId(UUID(kernel_id)))
 
     @rpc_function_v2
     @collect_error

@@ -233,6 +233,8 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
                     return arg
                 case str():
                     return [self.type_(elem) for elem in arg.split(",")]
+                case _:
+                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)
         except ValueError as e:
             self.fail(repr(e), param, ctx)
 

@@ -241,23 +241,27 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dependencies:cli")
-def dependencies() -> click.Group:
+def dependencies() -> click.Group:  # type: ignore[empty-body]
     """Command set for dependency verification and validation."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
-def health() -> click.Group:
+def health() -> click.Group:  # type: ignore[empty-body]
     """Command set for health checking."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dbschema:cli")
-def schema() -> click.Group:
+def schema() -> click.Group:  # type: ignore[empty-body]
     """Command set for managing the database schema."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.config:cli")
-def config() -> click.Group:
+def config() -> click.Group:  # type: ignore[empty-body]
     """Configuration management commands."""
+    ...
 
 
 if __name__ == "__main__":
