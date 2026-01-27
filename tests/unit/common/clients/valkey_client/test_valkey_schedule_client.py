@@ -5,6 +5,7 @@ Tests the client with real Redis operations for route health monitoring.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from time import time
@@ -800,8 +801,6 @@ class TestAgentLastCheck:
                 initial_last_checks[kid] = status.last_check
 
         # Wait a bit
-        import asyncio
-
         await asyncio.sleep(0.1)
 
         # Call get_kernel_presence_batch (read-only)

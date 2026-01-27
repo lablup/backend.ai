@@ -27,7 +27,11 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.repositories.resource_preset.db_source.types import (
+    PresetAllocatabilityData,
+)
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
 from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
@@ -431,13 +435,6 @@ class TestResourcePresetServiceCompatibility:
         mock_conn.scalar = AsyncMock(return_value={"cpu": "200", "mem": "200G", "gpu": "20"})
 
         # Mock scaling group query - this is now handled by repository
-        from ai.backend.common.types import ResourceSlot
-        from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-        from ai.backend.manager.repositories.resource_preset.db_source.types import (
-            PresetAllocatabilityData,
-        )
-        from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
-
         # Create mock preset data
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),

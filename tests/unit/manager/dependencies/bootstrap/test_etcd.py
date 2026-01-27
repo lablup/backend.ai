@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.manager.config.unified import EtcdConfig
 from ai.backend.manager.dependencies.bootstrap.config import BootstrapConfig
 from ai.backend.manager.dependencies.bootstrap.etcd import EtcdDependency
 from ai.backend.testutils.bootstrap import HostPortPairModel
@@ -18,9 +20,6 @@ class TestEtcdDependency:
         test_ns: str,
     ) -> BootstrapConfig:
         """Create a bootstrap config pointing to the test etcd container."""
-        from ai.backend.common.typed_validators import HostPortPair
-        from ai.backend.manager.config.unified import EtcdConfig
-
         container_id, etcd_addr = etcd_container
 
         # Create minimal etcd config for testing

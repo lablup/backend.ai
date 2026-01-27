@@ -5,6 +5,8 @@ The kernel main program.
 from __future__ import annotations
 
 import argparse
+import ctypes
+import ctypes.util
 import importlib
 import os
 import signal
@@ -18,9 +20,6 @@ from .compat import asyncio_run_forever
 def setproctitle(title: str) -> None:
     # setproctitle package doesn't work for unknown reasons
     # We don't need a portable implementation, so here is a Linux-only version
-    import ctypes
-    import ctypes.util
-
     libc_path = ctypes.util.find_library("c")
     libc = ctypes.CDLL(libc_path)
     PR_SET_NAME = 15

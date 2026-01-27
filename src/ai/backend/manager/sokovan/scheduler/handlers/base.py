@@ -10,8 +10,8 @@ from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
-from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 
 class SessionLifecycleHandler(ABC):

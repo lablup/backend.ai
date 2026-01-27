@@ -14,6 +14,7 @@ import textwrap
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
@@ -39,8 +40,9 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
@@ -295,8 +297,6 @@ def mock_etcd_ctx(
 @pytest.fixture
 def event_dispatcher_test_ctx():
     # TODO: Remove this fixture when the root context is refactored
-    from contextlib import asynccontextmanager as actxmgr
-
     @actxmgr
     async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_dispatcher = EventDispatcher(
@@ -398,8 +398,6 @@ def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
     config_dict = bootstrap_config.model_dump()
 
     # Convert back to proper types for compatibility with AsyncEtcd
-    from ai.backend.common.typed_validators import HostPortPair
-
     config_dict["etcd"]["addr"] = HostPortPair(
         host=config_dict["etcd"]["addr"]["host"], port=config_dict["etcd"]["addr"]["port"]
     )
@@ -999,8 +997,6 @@ async def registry_ctx(mocker):
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     # Create a mock scheduling controller
-    from ai.backend.common.types import SessionId
-
     mock_scheduling_controller = AsyncMock()
     mock_scheduling_controller.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
     mock_scheduling_controller.dispatch_session_events = AsyncMock()

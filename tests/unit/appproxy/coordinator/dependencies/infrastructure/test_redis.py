@@ -9,6 +9,8 @@ from ai.backend.appproxy.coordinator.dependencies.infrastructure.redis import (
     CoordinatorValkeyClients,
     RedisProvider,
 )
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
@@ -21,9 +23,6 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a coordinator config pointing to the test redis container."""
-        from ai.backend.common.config import redis_config_iv
-        from ai.backend.common.types import HostPortPair
-
         container_id, redis_addr = redis_container
 
         # Create Redis config with single endpoint for all roles

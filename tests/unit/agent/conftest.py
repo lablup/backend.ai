@@ -11,12 +11,14 @@ from unittest.mock import AsyncMock, Mock
 import aiodocker
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.types import AgentId, HostPortPair
 from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
@@ -260,10 +262,6 @@ async def agent_runtime(
     - No real backend or resource loading
     - Proper cleanup after tests
     """
-    from ai.backend.agent.agent import AbstractAgent
-    from ai.backend.agent.kernel import KernelRegistry
-    from ai.backend.common.types import AgentId
-
     # Create mock agents
     mock_agent_id = AgentId(local_config.agent.defaulted_id)
     mock_agent = AsyncMock(spec=AbstractAgent)

@@ -5,11 +5,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
-    DomainResourceLimitValidator,
-    DomainResourceQuotaExceeded,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
@@ -17,6 +13,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
+    DomainResourceLimitValidator,
+    DomainResourceQuotaExceeded,
 )
 
 

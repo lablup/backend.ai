@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -25,6 +26,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_bulk_entity_creator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.utils import insert_on_conflict_do_nothing
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -265,10 +267,6 @@ class TestRBACEntityCreatorIdempotent:
 
         async with database_connection.begin_session() as db_sess:
             # Manually try to insert duplicate association (same scope, same entity_id)
-            from ai.backend.manager.repositories.base.rbac.utils import (
-                insert_on_conflict_do_nothing,
-            )
-
             duplicate_assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
@@ -439,8 +437,6 @@ class TestRBACEntityCreatorCompositePK:
         database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Test that single entity creator rejects composite PK tables."""
-        from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
-
         async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
 
@@ -465,8 +461,6 @@ class TestRBACEntityCreatorCompositePK:
         database_connection: ExtendedAsyncSAEngine,
     ) -> None:
         """Test that bulk entity creator rejects composite PK tables."""
-        from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
-
         async with database_connection.begin() as conn:
             await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
 

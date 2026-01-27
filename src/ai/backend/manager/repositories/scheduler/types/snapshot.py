@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeyPairResourcePolicy,
     PendingSessionSnapshot,

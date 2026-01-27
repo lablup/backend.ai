@@ -73,8 +73,6 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
         project_info: HarborProjectInfo,
         rqst_args: dict[str, Any],
     ) -> HarborProjectQuotaInfo:
-        from ai.backend.manager.service.container_registry.harbor import HarborProjectQuotaInfo
-
         harbor_project_id = await self._get_harbor_project_id(sess, project_info, rqst_args)
         get_quota_id_api = (yarl.URL(project_info.url) / "api" / "v2.0" / "quotas").with_query({
             "reference": "project",

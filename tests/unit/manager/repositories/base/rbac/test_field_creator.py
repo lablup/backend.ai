@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.base.rbac.field_creator import (
     execute_rbac_bulk_field_creator,
     execute_rbac_field_creator,
 )
+from ai.backend.manager.repositories.base.rbac.utils import insert_on_conflict_do_nothing
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -255,10 +256,6 @@ class TestRBACFieldCreatorIdempotent:
 
         async with database_connection.begin_session() as db_sess:
             # Try to insert duplicate EntityFieldRow
-            from ai.backend.manager.repositories.base.rbac.utils import (
-                insert_on_conflict_do_nothing,
-            )
-
             duplicate_field = EntityFieldRow(
                 entity_type=EntityType.VFOLDER.value,
                 entity_id=parent_entity_id,

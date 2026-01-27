@@ -20,6 +20,7 @@ from ai.backend.manager.models.resource_usage import (
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -73,8 +74,6 @@ class GroupService:
         return CreateGroupActionResult(data=group_data)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        from ai.backend.manager.models.user import UserRole
-
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()

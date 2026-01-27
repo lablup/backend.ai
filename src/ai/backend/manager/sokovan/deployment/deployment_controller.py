@@ -20,6 +20,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -39,6 +40,7 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -296,9 +298,6 @@ class DeploymentController:
         Returns:
             Updated RouteInfo if found, None otherwise
         """
-        from ai.backend.manager.models.routing import RoutingRow
-        from ai.backend.manager.types import OptionalState
-
         spec = RouteUpdaterSpec(
             traffic_status=OptionalState.update(traffic_status),
         )

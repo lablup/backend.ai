@@ -35,8 +35,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AllocationBatch,
     KernelCreationInfo,
     SessionRunningData,
@@ -48,6 +47,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
+from .types.results import ScheduledSessionData
 from .types.scheduling import SchedulingData
 from .types.search import (
     SessionWithKernelsAndUserSearchResult,

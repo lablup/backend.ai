@@ -43,9 +43,10 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.dotfile import prepare_dotfiles
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
@@ -53,12 +54,17 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session import (
+    PRIVATE_SESSION_TYPES,
+    SessionDependencyRow,
+    SessionRow,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -76,6 +82,9 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_b
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
+from ai.backend.manager.repositories.scheduler.types.results import (
+    ScheduledSessionData,
+)
 from ai.backend.manager.repositories.scheduler.types.scaling_group import ScalingGroupMeta
 from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
 from ai.backend.manager.repositories.scheduler.types.search import (
@@ -106,10 +115,7 @@ from ai.backend.manager.repositories.session.creators import (
     KernelRowCreatorSpec,
     SessionRowCreatorSpec,
 )
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AgentOccupancy,
     AllocationBatch,
     ImageConfigData,
@@ -1367,8 +1373,6 @@ class ScheduleDBSource:
         """
         Fetch vfolder mounts for the session using existing DB session.
         """
-        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-
         # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
@@ -1394,8 +1398,6 @@ class ScheduleDBSource:
         """
         Fetch dotfile data for the session using existing DB session.
         """
-        from ai.backend.manager.models.dotfile import prepare_dotfiles
-
         # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
@@ -1439,8 +1441,6 @@ class ScheduleDBSource:
         """
         Prepare vfolder mounts for the session.
         """
-        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-
         async with self._begin_readonly_read_committed() as conn:
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -1463,9 +1463,6 @@ class ScheduleDBSource:
         """
         Prepare dotfile data for the session.
         """
-
-        from ai.backend.manager.models.dotfile import prepare_dotfiles
-
         async with self._begin_readonly_read_committed() as conn:
             dotfile_data = await prepare_dotfiles(
                 conn,
@@ -2835,8 +2832,6 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        from collections import defaultdict
-
         session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 
@@ -3057,9 +3052,6 @@ class ScheduleDBSource:
         :param access_key: The access key to query
         :return: KeypairConcurrencyData with both regular and sftp counts
         """
-        from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-        from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
-
         async with self._begin_readonly_session_read_committed() as db_sess:
             # Base query for active kernels
             base_query = (
@@ -3623,8 +3615,6 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        from collections import defaultdict
-
         session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 

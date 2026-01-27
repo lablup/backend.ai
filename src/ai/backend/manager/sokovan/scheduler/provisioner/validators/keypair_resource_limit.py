@@ -1,7 +1,7 @@
 """Validator for keypair resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     SessionWorkload,
     SystemSnapshot,
 )

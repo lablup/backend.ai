@@ -12,12 +12,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    EndpointRouteListUpdatedEvent,
+)
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.data import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.types import SessionRunningData, SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -138,10 +141,6 @@ class RunningTransitionHook(StatusTransitionHook):
 
     async def _execute_inference_running(self, session: SessionWithKernels) -> None:
         """Create model service route for INFERENCE sessions."""
-        from ai.backend.common.events.event_types.model_serving.anycast import (
-            EndpointRouteListUpdatedEvent,
-        )
-
         session_id = session.session_info.identity.id
         log.info(
             "Creating model service route for inference session {}",
@@ -225,10 +224,6 @@ class TerminatedTransitionHook(StatusTransitionHook):
 
     async def _execute_inference_terminated(self, session: SessionWithKernels) -> None:
         """Delete model service route for INFERENCE sessions."""
-        from ai.backend.common.events.event_types.model_serving.anycast import (
-            EndpointRouteListUpdatedEvent,
-        )
-
         session_id = session.session_info.identity.id
         log.info(
             "Deleting model service route for inference session {}",

@@ -28,7 +28,11 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.data.deployment.types import (
+    ModelRevisionData,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
@@ -80,6 +84,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentAutoScalingPolicyCreatorSpec,
     DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
+    RouteCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
@@ -88,6 +93,8 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
+    RouteStatusUpdaterSpec,
+    RouteUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -2782,9 +2789,6 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test creating a route using Creator with RouteCreatorSpec."""
-        from ai.backend.manager.data.deployment.types import RouteTrafficStatus
-        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
-
         spec = RouteCreatorSpec(
             endpoint_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
@@ -2812,14 +2816,6 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test updating route status using RouteStatusUpdaterSpec."""
-        from ai.backend.manager.data.deployment.types import (
-            RouteStatus,
-            RouteTrafficStatus,
-        )
-        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
-        from ai.backend.manager.repositories.deployment.updaters import RouteStatusUpdaterSpec
-        from ai.backend.manager.types import OptionalState
-
         # Create a route first
         spec = RouteCreatorSpec(
             endpoint_id=test_endpoint_id,
@@ -2860,14 +2856,6 @@ class TestRouteOperations:
         test_group_id: uuid.UUID,
     ) -> None:
         """Test updating route using unified RouteUpdaterSpec."""
-        from ai.backend.manager.data.deployment.types import (
-            RouteStatus,
-            RouteTrafficStatus,
-        )
-        from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
-        from ai.backend.manager.repositories.deployment.updaters import RouteUpdaterSpec
-        from ai.backend.manager.types import OptionalState
-
         # Create a route first
         spec = RouteCreatorSpec(
             endpoint_id=test_endpoint_id,
@@ -2905,10 +2893,6 @@ class TestRouteOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that update_route returns False for nonexistent route."""
-        from ai.backend.manager.data.deployment.types import RouteStatus
-        from ai.backend.manager.repositories.deployment.updaters import RouteStatusUpdaterSpec
-        from ai.backend.manager.types import OptionalState
-
         nonexistent_id = uuid.uuid4()
         updater = Updater(
             spec=RouteStatusUpdaterSpec(

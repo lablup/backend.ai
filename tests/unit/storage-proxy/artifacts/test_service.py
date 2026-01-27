@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from aiohttp import ClientError, ClientResponseError
 from aioresponses import aioresponses
+from huggingface_hub.hf_api import RepoFile
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
@@ -429,8 +430,6 @@ class TestHuggingFaceDownloadStep:
         mock_list_repo_files.return_value = ["config.json"]
 
         # Mock the RepoFile object properly
-        from huggingface_hub.hf_api import RepoFile
-
         mock_repo_file = MagicMock(spec=RepoFile)
         mock_repo_file.path = "config.json"
         mock_repo_file.size = 285
@@ -887,8 +886,6 @@ class TestReservoirDownloadStep:
             )
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
@@ -913,8 +910,6 @@ class TestReservoirDownloadStep:
             mock_list_keys.return_value = ([], {}, 0)
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(

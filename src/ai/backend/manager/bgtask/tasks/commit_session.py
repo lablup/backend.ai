@@ -12,7 +12,12 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
 )
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, KernelFeatures, LabelName
+from ai.backend.common.docker import (
+    DEFAULT_KERNEL_FEATURE,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
@@ -167,8 +172,6 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 ]
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-
-            from ai.backend.common.docker import ImageRef
 
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,

@@ -14,12 +14,12 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
+from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from ai.backend.manager.sokovan.scheduler.types import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher

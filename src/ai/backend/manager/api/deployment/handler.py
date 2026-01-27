@@ -28,7 +28,9 @@ from ai.backend.common.dto.manager.deployment import (
     ListRevisionsResponse,
     ListRoutesResponse,
     PaginationInfo,
+    RevisionFilter,
     RevisionPathParam,
+    RouteFilter,
     RoutePathParam,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
@@ -297,8 +299,6 @@ class DeploymentAPIHandler:
 
         # Build querier using adapter, adding deployment filter
         if body.parsed.filter is None:
-            from ai.backend.common.dto.manager.deployment import RevisionFilter
-
             body.parsed.filter = RevisionFilter(deployment_id=path.parsed.deployment_id)
         else:
             body.parsed.filter.deployment_id = path.parsed.deployment_id
@@ -392,8 +392,6 @@ class DeploymentAPIHandler:
 
         # Build querier using adapter, adding deployment filter
         if body.parsed.filter is None:
-            from ai.backend.common.dto.manager.deployment import RouteFilter
-
             body.parsed.filter = RouteFilter(deployment_id=path.parsed.deployment_id)
         else:
             body.parsed.filter.deployment_id = path.parsed.deployment_id

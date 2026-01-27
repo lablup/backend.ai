@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Generic, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
 from ai.backend.common.exception import (
@@ -11,8 +11,6 @@ from .base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
-    TManifest,
-    TResult,
 )
 
 
@@ -40,7 +38,10 @@ class _TaskExecutor(ABC):
         raise NotImplementedError("Subclasses must implement this method")
 
 
-class _TaskDefinition(_TaskExecutor, Generic[TManifest, TResult]):
+class _TaskDefinition[
+    TManifest: BaseBackgroundTaskManifest,
+    TResult: Optional[BaseBackgroundTaskResult],
+](_TaskExecutor):
     _handler: BaseBackgroundTaskHandler[TManifest, TResult]
     _task_name: BgtaskNameBase
 

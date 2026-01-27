@@ -24,6 +24,7 @@ import aiotools
 import click
 import jinja2
 import tomli
+import uvloop
 from aiohttp import web
 from setproctitle import setproctitle
 
@@ -1031,8 +1032,6 @@ def main(
                 log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

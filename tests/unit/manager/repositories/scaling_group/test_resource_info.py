@@ -11,11 +11,14 @@ import pytest
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -314,10 +317,6 @@ class TestResourceInfo:
         Returns:
             Tuple of (user_uuid, domain_name, group_id)
         """
-        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-        from ai.backend.manager.data.user.types import UserStatus
-        from ai.backend.manager.models.hasher.types import PasswordInfo
-
         test_user_uuid = uuid.uuid4()
         test_domain = f"test-domain-{uuid.uuid4().hex[:8]}"
         test_group_id = uuid.uuid4()

@@ -64,11 +64,13 @@ from ai.backend.manager.repositories.notification.creators import (
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
+    NotificationRuleConditions,
 )
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,
 )
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -426,8 +428,6 @@ class TestNotificationRepository:
         sample_channel_id: uuid.UUID,
     ) -> None:
         """Test updating notification channel"""
-        from ai.backend.manager.types import OptionalState
-
         new_config = WebhookSpec(
             url="https://example.com/new-webhook",
             method="GET",
@@ -631,8 +631,6 @@ class TestNotificationRepository:
         sample_rule_id: uuid.UUID,
     ) -> None:
         """Test updating notification rule"""
-        from ai.backend.manager.types import OptionalState
-
         updater_spec = NotificationRuleUpdaterSpec(
             name=OptionalState.update("Updated Rule"),
             message_template=OptionalState.update("Updated template: {{ session_id }}"),
@@ -669,7 +667,6 @@ class TestNotificationRepository:
         test_user: uuid.UUID,
     ) -> None:
         """Test listing notification rules with filters"""
-
         # Create rules directly in DB
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session.started rule (enabled)
@@ -715,8 +712,6 @@ class TestNotificationRepository:
             db_sess.add(rule2)
             db_sess.add(rule3)
             await db_sess.flush()
-
-        from ai.backend.manager.repositories.notification.options import NotificationRuleConditions
 
         # List all rules
         all_querier = BatchQuerier(

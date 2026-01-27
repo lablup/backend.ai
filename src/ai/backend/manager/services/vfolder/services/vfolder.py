@@ -22,6 +22,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCreateParams,
     VFolderData,
 )
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
@@ -266,8 +267,6 @@ class VFolderService:
             action.mount_permission = VFolderPermission.READ_ONLY
 
         # Use repository to create VFolder
-        from ai.backend.manager.data.vfolder.types import VFolderCreateParams
-
         params = VFolderCreateParams(
             id=folder_id,
             name=action.name,

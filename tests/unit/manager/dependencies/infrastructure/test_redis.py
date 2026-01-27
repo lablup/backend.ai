@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.types import HostPortPair
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import (
     ValkeyClients,
@@ -19,9 +21,6 @@ class TestValkeyDependency:
         redis_container: tuple[str, HostPortPairModel],
     ) -> ManagerUnifiedConfig:
         """Create a manager config pointing to the test redis container."""
-        from ai.backend.common.config import redis_config_iv
-        from ai.backend.common.types import HostPortPair
-
         container_id, redis_addr = redis_container
 
         # Create Redis config with single endpoint for all roles

@@ -31,6 +31,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     RouteInfo,
 )
+from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -602,8 +603,6 @@ class DeploymentService:
         Raises:
             RouteNotFound: If the route does not exist
         """
-        from ai.backend.manager.errors.service import RoutingNotFound
-
         route = await self._deployment_controller.update_route_traffic_status(
             route_id=action.route_id,
             traffic_status=action.traffic_status,

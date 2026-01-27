@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.sokovan.data import PromotionSpec
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -99,7 +100,6 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
 )
-from ai.backend.manager.sokovan.scheduler.types import PromotionSpec
 
 
 def create_default_scheduler_components(

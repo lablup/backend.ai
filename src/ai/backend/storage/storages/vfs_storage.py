@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import mimetypes
 import shutil
 import tarfile
 import tempfile
@@ -298,8 +299,6 @@ class VFSStorage(AbstractStorage):
             # Determine content type based on file extension
             content_type = "application/octet-stream"  # Default
             if target_path.suffix:
-                import mimetypes
-
                 guessed_type, _ = mimetypes.guess_type(str(target_path))
                 if guessed_type:
                     content_type = guessed_type

@@ -212,8 +212,6 @@ class APIConfig:
         read_timeout: Optional[float] = None,
         announcement_handler: Optional[Callable[[str], None]] = None,
     ) -> None:
-        from . import get_user_agent
-
         self._endpoints = (
             _clean_urls(endpoint)
             if endpoint
@@ -242,7 +240,11 @@ class APIConfig:
             )
         )
         self._version = version if version is not None else default_clean(self.DEFAULTS["version"])
-        self._user_agent = user_agent if user_agent is not None else get_user_agent()
+        if user_agent is None:
+            from ai.backend.client import get_user_agent
+
+            user_agent = get_user_agent()
+        self._user_agent = user_agent
         # Note: Running a web server with session BACKEND_ENDPOINT_TYPE is not an intended scenario;
         # The normal scenario is to run with "api" as the endpoint type.
         if self._endpoint_type == "api":

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
+import jwt as pyjwt
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -546,8 +547,6 @@ async def _authenticate_via_jwt(
     Raises:
         AuthorizationFailed: If JWT validation fails or access_key not found
     """
-    import jwt as pyjwt
-
     try:
         # 1. Decode token without verification to extract access_key
         unverified_payload = pyjwt.decode(

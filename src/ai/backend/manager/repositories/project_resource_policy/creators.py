@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 
+from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 
 
 @dataclass
@@ -20,8 +18,6 @@ class ProjectResourcePolicyCreatorSpec(CreatorSpec["ProjectResourcePolicyRow"]):
 
     @override
     def build_row(self) -> ProjectResourcePolicyRow:
-        from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-
         return ProjectResourcePolicyRow(
             name=self.name,
             max_vfolder_count=self.max_vfolder_count,

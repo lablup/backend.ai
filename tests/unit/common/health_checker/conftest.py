@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
@@ -78,8 +79,6 @@ def mock_timeout_checker() -> ServiceHealthChecker:
     checker = AsyncMock(spec=ServiceHealthChecker)
 
     async def slow_check() -> ServiceHealth:
-        import asyncio
-
         await asyncio.sleep(10)  # Will timeout
         return ServiceHealth(results={})
 

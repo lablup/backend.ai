@@ -29,6 +29,7 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.errors.fair_share import FairShareNotFoundError
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
@@ -517,8 +518,6 @@ class FairShareDBSource:
         Returns:
             domain_name if user is member of project, None otherwise.
         """
-        from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
-
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(GroupRow.domain_name)
@@ -543,8 +542,6 @@ class FairShareDBSource:
         Returns:
             domain_name if project exists, None otherwise.
         """
-        from ai.backend.manager.models.group import GroupRow
-
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
             result = await db_sess.execute(query)
@@ -559,8 +556,6 @@ class FairShareDBSource:
         Returns:
             True if domain exists, False otherwise.
         """
-        from ai.backend.manager.models.domain import DomainRow
-
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(sa.literal(1)).where(DomainRow.name == domain_name)
             result = await db_sess.execute(query)

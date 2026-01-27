@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.repositories.base import CreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 
 
 @dataclass
@@ -33,8 +31,6 @@ class KeyPairResourcePolicyCreatorSpec(CreatorSpec["KeyPairResourcePolicyRow"]):
 
     @override
     def build_row(self) -> KeyPairResourcePolicyRow:
-        from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-
         return KeyPairResourcePolicyRow(
             name=self.name,
             default_for_unspecified=self.default_for_unspecified,
