@@ -625,7 +625,6 @@ class TestVfolderRepositoryPurge:
             result = await session.execute(query)
             return result.scalar_one_or_none() is not None
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "status",
         [
@@ -667,7 +666,6 @@ class TestVfolderRepositoryPurge:
         # Verify vfolder is deleted from DB
         assert not await self._vfolder_exists(db_with_cleanup, vfolder_id)
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_not_found(
         self,
         vfolder_repository: VfolderRepository,
@@ -682,7 +680,6 @@ class TestVfolderRepositoryPurge:
         with pytest.raises(VFolderNotFound):
             await vfolder_repository.purge_vfolder(purger)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "status",
         [

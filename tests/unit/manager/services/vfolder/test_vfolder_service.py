@@ -89,7 +89,6 @@ class TestVFolderServicePurge:
             status=status,
         )
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_success(
         self,
         vfolder_service: VFolderService,
@@ -109,7 +108,6 @@ class TestVFolderServicePurge:
         assert result.vfolder_uuid == sample_vfolder_uuid
         mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_not_found_propagates(
         self,
         vfolder_service: VFolderService,
@@ -127,7 +125,6 @@ class TestVFolderServicePurge:
 
         mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_invalid_status_propagates(
         self,
         vfolder_service: VFolderService,
