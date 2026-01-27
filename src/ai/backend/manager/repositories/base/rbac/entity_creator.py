@@ -46,10 +46,6 @@ class RBACEntityCreator[TRow: Base]:
     scope_ref: ScopeId
     additional_scope_refs: Sequence[ScopeId] = field(default_factory=list)
 
-    @abstractmethod
-    def scope_data(self) -> ScopeData:
-        pass
-
 
 @dataclass
 class RBACEntityCreatorResult[TRow: Base]:
@@ -128,11 +124,10 @@ class RBACBulkEntityCreator[TRow: Base]:
         entity_type: The entity type for all entities.
     """
 
-    # specs: Sequence[CreatorSpec[TRow]]
-    # scope_type: ScopeType
-    # scope_id: str
-    # entity_type: EntityType
-    entity_creators: Sequence[RBACEntityCreator[TRow]]
+    specs: Sequence[CreatorSpec[TRow]]
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
 
 
 @dataclass
@@ -160,14 +155,11 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     Returns:
         RBACBulkEntityCreatorResult containing all created rows.
     """
-    if not creator.entity_creators:
+    if not creator.specs:
         return RBACBulkEntityCreatorResult(rows=[])
 
     # 1. Build and add all rows
-    # rows = [creator.spec.build_row() for creator in creator.entity_creators]
-    rows = []
-    for entity_creator in creator.entity_creators:
-        rows.append(entity_creator.spec.build_row())
+    rows = [spec.build_row() for spec in creator.specs]
     db_sess.add_all(rows)
 
     mapper = inspect(type(rows[0]))
@@ -180,17 +172,15 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     # 2. Flush to get DB-generated IDs and insert associations
     await db_sess.flush()
 
-    associations = []
-    for entity_creator, row in zip(creator.entity_creators, rows, strict=False):
-        scope_data = entity_creator.scope_data()
-        associations.append(
-            AssociationScopesEntitiesRow(
-                scope_type=scope_data.scope_type,
-                scope_id=scope_data.scope_id,
-                entity_type=entity_creator.entity_type,
-                entity_id=str(inspect(row).identity[0]),
-            )
+    associations = [
+        AssociationScopesEntitiesRow(
+            scope_type=creator.scope_type,
+            scope_id=creator.scope_id,
+            entity_type=creator.entity_type,
+            entity_id=str(inspect(row).identity[0]),
         )
+        for row in rows
+    ]
     db_sess.add_all(associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
