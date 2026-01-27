@@ -220,7 +220,6 @@ class TestImageRepositorySearch:
         """Test filtering images by architecture"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.architecture == "arm64",
             ],
@@ -240,7 +239,6 @@ class TestImageRepositorySearch:
         """Test filtering images by type"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.type == ImageType.COMPUTE,
             ],
@@ -303,7 +301,6 @@ class TestImageRepositorySearch:
         """Test search with no matching results"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.architecture == "nonexistent",
             ],
