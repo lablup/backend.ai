@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from typing import Optional, override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.services.project_config.actions.base import ProjectConfigAction
+
+
+@dataclass
+class CreateDotfileAction(ProjectConfigAction):
+    path: str
+    data: str
+    permission: str
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.group_id_or_name)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "create_dotfile"
+
+
+@dataclass
+class CreateDotfileActionResult(BaseActionResult):
+    group_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.group_id)
