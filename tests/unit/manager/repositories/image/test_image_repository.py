@@ -12,7 +12,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.repository import ImageRepository
@@ -33,6 +33,7 @@ class TestImageRepositorySearch:
             [
                 ContainerRegistryRow,
                 ImageRow,
+                ImageAliasRow,
             ],
         ):
             yield database_connection
