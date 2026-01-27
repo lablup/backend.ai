@@ -42,7 +42,7 @@ class ModelServiceCreator:
     config: ServiceConfig
     sudo_session_enabled: bool
     model_service_prepare_ctx: ModelServicePrepareCtx
-    tag: Optional[str] = None
+    tag: Optional[dict[str, str]] = None
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
     callback_url: Optional[AnyUrl] = None

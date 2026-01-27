@@ -22,7 +22,7 @@ class CreateClusterAction(SessionAction):
     scaling_group_name: str
     requester_access_key: AccessKey
     owner_access_key: AccessKey
-    tag: str
+    tag: dict[str, str] | None
     enqueue_only: bool
     keypair_resource_policy: Optional[dict]
     max_wait_seconds: int

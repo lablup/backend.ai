@@ -21,7 +21,7 @@ class DryRunModelServiceAction(ModelServiceAction):
     domain_name: str
     cluster_size: int
     cluster_mode: ClusterMode
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     startup_command: Optional[str]
     bootstrap_script: Optional[str]
     callback_url: Optional[AnyUrl]

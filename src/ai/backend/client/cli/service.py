@@ -6,6 +6,7 @@ from uuid import UUID
 
 import click
 
+from ai.backend.cli.params import CommaSeparatedKVListParamType
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.session.execute import (
     prepare_env_arg,
@@ -226,7 +227,12 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
     help="A user-defined script to execute on startup.",
 )
 # extra options
-@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
+@click.option(
+    "--tag",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="User-defined tag string in key=value format, comma-separated (e.g., 'project=ai,env=prod').",
+)
 @click.option(
     "--arch",
     "--architecture",
@@ -298,7 +304,7 @@ def create(
     domain: Optional[str],
     project: Optional[str],
     bootstrap_script: Optional[str],
-    tag: Optional[str],
+    tag: Optional[dict[str, str]],
     architecture: Optional[str],
     scaling_group: Optional[str],
     owner: Optional[str],
@@ -439,7 +445,12 @@ def create(
     help="A user-defined script to execute on startup.",
 )
 # extra options
-@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
+@click.option(
+    "--tag",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="User-defined tag string in key=value format, comma-separated (e.g., 'project=ai,env=prod').",
+)
 @click.option(
     "--arch",
     "--architecture",
@@ -493,7 +504,7 @@ def try_start(
     domain: Optional[str],
     project: Optional[str],
     bootstrap_script: Optional[str],
-    tag: Optional[str],
+    tag: Optional[dict[str, str]],
     architecture: Optional[str],
     scaling_group: Optional[str],
     owner: Optional[str],

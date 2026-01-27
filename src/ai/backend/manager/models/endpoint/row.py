@@ -94,6 +94,7 @@ from ai.backend.manager.models.base import (
     ResourceSlotColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
+    TagColumn,
     URLColumn,
 )
 from ai.backend.manager.models.image import ImageRow
@@ -242,7 +243,7 @@ class EndpointRow(Base):
         nullable=False,
         default=EndpointLifecycle.PENDING,
     )
-    tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
+    tag: Mapped[dict[str, str] | None] = mapped_column("tag", TagColumn(), nullable=True)
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     bootstrap_script: Mapped[str | None] = mapped_column(
         "bootstrap_script", sa.String(length=16 * 1024), nullable=True

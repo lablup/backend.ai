@@ -93,7 +93,7 @@ class SessionCreationSpec:
 
     # Optional parameters
     scaling_group: Optional[str] = None
-    session_tag: Optional[str] = None
+    session_tag: Optional[dict[str, str]] = None
     starts_at: Optional[datetime] = None
     batch_timeout: Optional[timedelta] = None
     dependency_sessions: Optional[list[SessionId]] = None
@@ -212,7 +212,7 @@ class KernelEnqueueData:
     image: str  # Canonical image name
     architecture: str
     registry: str
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     starts_at: Optional[datetime]
     status: str  # KernelStatus.PENDING
     status_history: dict[str, str]
@@ -268,7 +268,7 @@ class SessionEnqueueData:
     occupying_slots: ResourceSlot
     vfolder_mounts: list[VFolderMount]
     environ: dict[str, str]
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     starts_at: Optional[datetime]
     batch_timeout: Optional[int]  # seconds
     callback_url: Optional[yarl.URL]

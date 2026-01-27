@@ -174,7 +174,7 @@ def sample_endpoint_creator_spec(sample_user, sample_image, sample_vfolder) -> E
         model_definition_path="model.py",
         runtime_variant=RuntimeVariant.CUSTOM,
         session_owner=sample_user.uuid,
-        tag="test",
+        tag={"env": "test"},
         startup_command="python serve.py",
         bootstrap_script="pip install -r requirements.txt",
         callback_url=yarl.URL("https://callback.example.com"),

@@ -1940,7 +1940,10 @@
           "tag": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
               },
               {
                 "type": "null"

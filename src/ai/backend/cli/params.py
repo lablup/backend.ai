@@ -97,6 +97,17 @@ class ByteSizeParamCheckType(ByteSizeParamType):
 class CommaSeparatedKVListParamType(click.ParamType):
     name = "comma-seperated-KVList-check"
 
+    def __init__(
+        self,
+        max_items: int = 50,
+        max_key_length: int = 128,
+        max_value_length: int = 256,
+    ) -> None:
+        super().__init__()
+        self.max_items = max_items
+        self.max_key_length = max_key_length
+        self.max_value_length = max_value_length
+
     @override
     def convert(
         self,
@@ -112,20 +123,44 @@ class CommaSeparatedKVListParamType(click.ParamType):
                 param,
                 ctx,
             )
+
+        key_value_pairs = value.split(",")
+        if len(key_value_pairs) > self.max_items:
+            self.fail(
+                f"Too many key-value pairs (maximum {self.max_items}).",
+                param,
+                ctx,
+            )
+
         override_map = {}
-        for assignment in value.split(","):
-            try:
-                k, _, v = assignment.partition("=")
-                if k == "" or v == "":
-                    raise ValueError(f"key or value is empty. key = {k}, value = {v}")
-            except ValueError:
+        for assignment in key_value_pairs:
+            if "=" not in assignment:
                 self.fail(
-                    f"{value!r} is not a valid mapping expression",
+                    'Invalid format. Each key-value pair should be in the format "key=value".',
                     param,
                     ctx,
                 )
-            else:
-                override_map[k] = v
+
+            k, _, v = assignment.partition("=")
+
+            if not k:
+                self.fail("Empty key is not allowed.", param, ctx)
+            if not v:
+                self.fail("Empty value is not allowed.", param, ctx)
+            if len(k) > self.max_key_length:
+                self.fail(
+                    f"Key length should be less than {self.max_key_length} characters.",
+                    param,
+                    ctx,
+                )
+            if len(v) > self.max_value_length:
+                self.fail(
+                    f"Value length should be less than {self.max_value_length} characters.",
+                    param,
+                    ctx,
+                )
+
+            override_map[k] = v
         return override_map
 
 

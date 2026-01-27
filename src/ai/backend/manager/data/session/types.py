@@ -154,7 +154,7 @@ class SessionData:
     access_key: Optional[AccessKey]
     agent_ids: Optional[list[str]]
     images: Optional[list[str]]
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     vfolder_mounts: Optional[list[VFolderMountData]]
     environ: Optional[dict[str, Any]]
     bootstrap_script: Optional[str]
@@ -197,7 +197,7 @@ class SessionMetadata:
     session_type: SessionTypes
     priority: int
     created_at: Optional[datetime]
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
 
 
 @dataclass
@@ -214,7 +214,7 @@ class ResourceSpec:
 @dataclass
 class ImageSpec:
     images: Optional[list[str]]
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
 
 
 @dataclass

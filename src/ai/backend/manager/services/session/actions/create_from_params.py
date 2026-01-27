@@ -24,7 +24,7 @@ class CreateFromParamsActionParams:
     cluster_size: int
     cluster_mode: ClusterMode
     config: dict[str, Any]
-    tag: str
+    tag: dict[str, str] | None
     priority: int
     owner_access_key: AccessKey
     enqueue_only: bool

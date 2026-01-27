@@ -108,9 +108,6 @@ def _create_cmd(docs: Optional[str] = None):
         help="A user-defined script to execute on startup.",
     )
     @click.option(
-        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
-    )
-    @click.option(
         "--arch",
         "--architecture",
         "architecture",
@@ -159,7 +156,7 @@ def _create_cmd(docs: Optional[str] = None):
         env: Sequence[str],  # click_start_option
         # extra options
         bootstrap_script: Optional[IO],
-        tag: Optional[str],  # click_start_option
+        tag: Optional[dict[str, str]],  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
@@ -451,7 +448,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: Optional[str],  # click_start_option
+        tag: Optional[dict[str, str]],  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,

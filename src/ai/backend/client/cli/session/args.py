@@ -3,6 +3,7 @@ from typing import Any
 
 import click
 
+from ai.backend.cli.params import CommaSeparatedKVListParamType
 from ai.backend.common.types import SessionTypes
 
 START_OPTION = [
@@ -73,9 +74,9 @@ START_OPTION = [
     # extra options
     click.option(
         "--tag",
-        type=str,
+        type=CommaSeparatedKVListParamType(),
         default=None,
-        help="User-defined tag string to annotate sessions.",
+        help="User-defined tag string in key=value format, comma-separated (e.g., 'project=ai,env=prod').",
     ),
     # resource spec
     click.option(

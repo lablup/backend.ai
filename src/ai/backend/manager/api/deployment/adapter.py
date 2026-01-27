@@ -377,7 +377,21 @@ class CreateDeploymentAdapter:
         """
         # Generate name if not provided
         name = request.metadata.name or f"deployment-{uuid4().hex[:8]}"
-        tag = ",".join(request.metadata.tags) if request.metadata.tags else None
+        # Parse tags from list of "key=value" strings to dict
+        tag = None
+        if request.metadata.tags:
+            tag = {}
+            for tag_str in request.metadata.tags:
+                if "=" not in tag_str:
+                    raise ValueError(
+                        f"Invalid tag format: '{tag_str}'. Expected 'key=value' format."
+                    )
+                k, v = tag_str.split("=", 1)
+                if not k or not v:
+                    raise ValueError(
+                        f"Invalid tag format: '{tag_str}'. Key and value cannot be empty."
+                    )
+                tag[k] = v
 
         # Build metadata
         metadata = DeploymentMetadata(

@@ -64,7 +64,7 @@ class EndpointData:
     created_user_email: Optional[str]
     session_owner_id: uuid.UUID
     session_owner_email: str
-    tag: Optional[str]
+    tag: Optional[dict[str, str]]
     startup_command: Optional[str]
     bootstrap_script: Optional[str]
     callback_url: Optional[yarl.URL]

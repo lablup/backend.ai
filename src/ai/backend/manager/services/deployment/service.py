@@ -211,7 +211,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         metadata=ModelDeploymentMetadataInfo(
             name=info.metadata.name,
             status=_map_lifecycle_to_status(info.state.lifecycle),
-            tags=[info.metadata.tag] if info.metadata.tag else [],
+            tags=[f"{k}={v}" for k, v in info.metadata.tag.items()] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
             created_at=info.metadata.created_at or datetime.now(UTC),
