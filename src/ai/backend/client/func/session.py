@@ -1000,7 +1000,7 @@ class ComputeSession(BaseFunction):
         files: Sequence[str | Path],
         basedir: Optional[str | Path] = None,
         show_progress: bool = False,
-    ) -> None:
+    ) -> Any:
         """
         Uploads the given list of files to the compute session.
         You may refer them in the batch-mode execution or from the code

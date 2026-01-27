@@ -111,7 +111,7 @@ class Model(BaseFunction):
         return result
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/folders/{self.model_name}")
         rqst.set_json({"id": self.model_name})
         async with rqst.fetch():

@@ -284,11 +284,11 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
-    async def recover(self) -> None:
+    async def recover(self) -> Mapping[str, Any]:
         return await self._restore()
 
     @api_function
-    async def restore(self) -> None:
+    async def restore(self) -> Mapping[str, Any]:
         return await self._restore()
 
     @api_function
@@ -309,7 +309,7 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
-    async def rename(self, new_name) -> None:
+    async def rename(self, new_name) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename")
         rqst.set_json({
@@ -618,7 +618,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def delete_files(self, files: Sequence[str | Path], recursive: bool = False) -> None:
+    async def delete_files(self, files: Sequence[str | Path], recursive: bool = False) -> str:
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/delete-files")
         rqst.set_json({
@@ -773,7 +773,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def update_options(
         self, name: str, permission: Optional[str] = None, cloneable: Optional[bool] = None
-    ) -> None:
+    ) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/update-options")
         rqst.set_json({
