@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -161,8 +162,6 @@ class TestImageRepositorySearch:
         """Create ImageRepository instance with database"""
         # ImageRepository requires valkey_image and config_provider
         # For search tests, we only need the db_source which uses db
-        from unittest.mock import MagicMock
-
         mock_valkey = MagicMock()
         mock_config = MagicMock()
         return ImageRepository(
@@ -175,7 +174,6 @@ class TestImageRepositorySearch:
     # Tests - Search with pagination
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_images_first_page(
         self,
         image_repository: ImageRepository,
@@ -193,7 +191,6 @@ class TestImageRepositorySearch:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_search_images_second_page(
         self,
         image_repository: ImageRepository,
@@ -211,7 +208,6 @@ class TestImageRepositorySearch:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_search_images_last_page(
         self,
         image_repository: ImageRepository,
@@ -233,7 +229,6 @@ class TestImageRepositorySearch:
     # Tests - Search with filtering
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_images_filter_by_architecture(
         self,
         image_repository: ImageRepository,
@@ -253,7 +248,6 @@ class TestImageRepositorySearch:
         assert len(result.items) == 1
         assert result.items[0].architecture == "arm64"
 
-    @pytest.mark.asyncio
     async def test_search_images_filter_by_type(
         self,
         image_repository: ImageRepository,
@@ -278,7 +272,6 @@ class TestImageRepositorySearch:
     # Tests - Search with ordering
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_images_order_by_name_ascending(
         self,
         image_repository: ImageRepository,
@@ -296,7 +289,6 @@ class TestImageRepositorySearch:
         names = [str(item.name) for item in result.items]
         assert names == sorted(names)
 
-    @pytest.mark.asyncio
     async def test_search_images_order_by_name_descending(
         self,
         image_repository: ImageRepository,
@@ -318,7 +310,6 @@ class TestImageRepositorySearch:
     # Tests - Empty results
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_images_no_results(
         self,
         image_repository: ImageRepository,
