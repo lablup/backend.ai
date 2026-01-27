@@ -536,8 +536,8 @@ class GroupRepository:
                 RoutingRow.session.is_not(None),
             )
         )
-        session_ids_result = await session.execute(session_id_query)
-        session_ids = [row[0] for row in session_ids_result.all()]
+        session_ids_result = await session.scalars(session_id_query)
+        session_ids = [sid for sid in session_ids_result.all() if sid is not None]
 
         # Delete endpoints first (routings are CASCADE deleted automatically)
         await execute_batch_purger(session, create_group_endpoint_purger(group_id))
