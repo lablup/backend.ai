@@ -25,6 +25,7 @@ import aiotools
 import attrs
 import sqlalchemy as sa
 import trafaret as t
+import yarl
 from aiohttp import web
 from pydantic import (
     AliasChoices,
@@ -48,7 +49,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
@@ -154,6 +154,34 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
+
+
+# NOTE: This function duplicates AgentService._get_watcher_info.
+# Both access etcd directly for agent watcher information.
+# Consider consolidating into a shared client/repository to eliminate
+# this duplication and the direct etcd access pattern.
+async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
+    """
+    Get watcher information.
+
+    :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
+    :return token: agent watcher token ("insecure" if not set in config server)
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    token = root_ctx.config_provider.config.watcher.token
+    if token is None:
+        token = "insecure"
+    agent_ip = await root_ctx.etcd.get(f"nodes/agents/{agent_id}/ip")
+    raw_watcher_port = await root_ctx.etcd.get(
+        f"nodes/agents/{agent_id}/watcher_port",
+    )
+    watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
+    # TODO: watcher scheme is assumed to be http
+    addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
+    return {
+        "addr": addr,
+        "token": token,
+    }
 
 
 class SuccessResponseModel(LegacyBaseResponseModel):
