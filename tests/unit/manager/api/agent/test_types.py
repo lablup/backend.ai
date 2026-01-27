@@ -60,30 +60,31 @@ class TestAgentSummaryLoadSlice:
         """
         Mock DB session simulating pagination bug caused by JOIN with KernelRow.
 
-        OLD code (scalars): Returns only 1 agent due to JOIN row multiplication
-        NEW code (execute): Returns both agents correctly
+        OLD code (scalars + unique): Returns only 1 agent due to JOIN row multiplication
+        NEW code (scalars + iterate): Returns both agents correctly
         """
         mock_session = AsyncMock()
 
-        # OLD code path: scalars() -> unique().all() -> row.id
-        # Simulates bug: JOIN causes only 1 unique agent after LIMIT
+        # Both code paths use scalars(), but differ in how they process results:
+        # - OLD: scalars() -> unique().all() -> row.id (1 agent due to LIMIT on JOIN)
+        # - NEW: scalars() -> iterate directly (2 agents)
+        mock_scalars_result = MagicMock()
+
+        # For OLD code: unique().all() returns only 1 agent
         mock_unique_result = MagicMock()
         mock_unique_result.all.return_value = [
             MagicMock(id="agent-001"),
             # agent-002 missing: LIMIT 20 consumed by agent-001's kernel rows
         ]
-        mock_scalars_result = MagicMock()
         mock_scalars_result.unique.return_value = mock_unique_result
-        mock_session.scalars = AsyncMock(return_value=mock_scalars_result)
 
-        # NEW code path: execute() -> iterate rows -> row[0]
-        # Returns both agents correctly
-        mock_execute_result = MagicMock()
-        mock_execute_result.__iter__ = lambda _: iter([
-            (AgentId("agent-001"),),
-            (AgentId("agent-002"),),
+        # For NEW code: direct iteration returns both agents
+        mock_scalars_result.__iter__ = lambda _: iter([
+            "agent-001",
+            "agent-002",
         ])
-        mock_session.execute = AsyncMock(return_value=mock_execute_result)
+
+        mock_session.scalars = AsyncMock(return_value=mock_scalars_result)
 
         return mock_session
 

@@ -825,9 +825,9 @@ class AgentSummary(graphene.ObjectType):
 
         agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            result = await db_session.execute(query)
-            for row in result:
-                agent_ids.append(AgentId(row[0]))
+            result = await db_session.scalars(query)
+            for agent_id in result:
+                agent_ids.append(AgentId(agent_id))
 
         if not agent_ids:
             return []
