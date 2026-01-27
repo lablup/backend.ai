@@ -3,6 +3,8 @@ import ctypes
 import logging
 import os
 import threading
+from collections.abc import Mapping
+from typing import Any
 
 import janus
 
@@ -40,7 +42,7 @@ class Runner(BaseRunner):
     async def execute_heuristic(self) -> int:
         raise NotImplementedError
 
-    async def query(self, code_text) -> int:
+    async def query(self, code_text: str) -> int:
         self.ensure_inproc_runner()
         if self.input_queue is None:
             raise RuntimeError("Input queue is not initialized")
@@ -59,7 +61,7 @@ class Runner(BaseRunner):
             self.outsock.send_multipart(msg)
         return 0
 
-    async def complete(self, data) -> None:
+    async def complete(self, data: Any) -> None:
         self.outsock.send_multipart([
             b"completion",
             [],
@@ -83,7 +85,7 @@ class Runner(BaseRunner):
             ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.c_long(0))
             log.error("Interrupt broke the interpreter state -- recommended to reset the session.")
 
-    async def start_service(self, service_info) -> tuple[None, dict]:
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[None, dict]:
         return None, {}
 
     def ensure_inproc_runner(self) -> None:

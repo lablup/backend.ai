@@ -67,11 +67,16 @@ class HealthStatus(enum.Enum):
     UNDETERMINED = 2
 
 
-async def pipe_output(stream, outsock, target, log_fd) -> None:
+async def pipe_output(
+    stream: asyncio.StreamReader,
+    outsock: zmq.Socket,
+    target: str,
+    log_fd: int,
+) -> None:
     if target not in ("stdout", "stderr"):
         raise ValueError(f"Invalid target: {target}. Must be 'stdout' or 'stderr'")
-    target = target.encode("ascii")
     console_fd = sys.stdout.fileno() if target == "stdout" else sys.stderr.fileno()
+    target_bytes = target.encode("ascii")
     loop = current_loop()
     try:
         while True:
@@ -81,7 +86,7 @@ async def pipe_output(stream, outsock, target, log_fd) -> None:
             await asyncio.gather(
                 loop.run_in_executor(None, os.write, console_fd, data),
                 loop.run_in_executor(None, os.write, log_fd, data),
-                outsock.send_multipart([target, data]),
+                outsock.send_multipart([target_bytes, data]),
                 return_exceptions=True,
             )
     except asyncio.CancelledError:
@@ -508,7 +513,7 @@ class BaseRunner(metaclass=ABCMeta):
             }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
-    async def query(self, code_text) -> int:
+    async def query(self, code_text: str) -> int:
         """Run user's code in query mode.
 
         The default interface is jupyter kernel. To use different interface,
@@ -523,7 +528,7 @@ class BaseRunner(metaclass=ABCMeta):
         log.debug("executing in query mode...")
         exit_code = 0
 
-        async def output_hook(msg) -> None:
+        async def output_hook(msg: Mapping[str, Any]) -> None:
             nonlocal exit_code
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
@@ -577,7 +582,7 @@ class BaseRunner(metaclass=ABCMeta):
                         json.dumps({"type": dtype, "data": dval}).encode("utf8"),
                     ])
 
-        async def stdin_hook(msg) -> None:
+        async def stdin_hook(msg: Mapping[str, Any]) -> None:
             if self.kernel_client is None:
                 raise RuntimeError("Kernel client is not initialized")
             if self.user_input_queue is None:
@@ -623,7 +628,7 @@ class BaseRunner(metaclass=ABCMeta):
                 json.dumps({"suggestions": result}).encode("utf8"),
             ])
 
-    async def complete(self, completion_data) -> Sequence[str]:
+    async def complete(self, completion_data: Any) -> Sequence[str]:
         """Return the list of strings to be shown in the auto-complete list.
 
         The default interface is jupyter kernel. To use different interface,
@@ -728,7 +733,8 @@ class BaseRunner(metaclass=ABCMeta):
 
     @abstractmethod
     async def start_service(
-        self, service_info
+        self,
+        service_info: Mapping[str, Any],
     ) -> (
         tuple[list[str] | None, dict[str, str]]
         | tuple[list[str] | None, dict[str, str], str]
@@ -1028,6 +1034,8 @@ class BaseRunner(metaclass=ABCMeta):
                     **pipe_opts,
                 )
                 self.subproc = proc
+                if proc.stdout is None or proc.stderr is None:
+                    raise RuntimeError("Process stdout or stderr is None")
                 pipe_tasks = [
                     loop.create_task(
                         pipe_output(proc.stdout, self.outsock, "stdout", log_out.fileno())

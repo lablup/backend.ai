@@ -57,8 +57,8 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
 
     def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator:
         if dialect.name == "postgresql":
-            return dialect.type_descriptor(UUID())
-        return dialect.type_descriptor(CHAR(16))
+            return cast(TypeDecorator, dialect.type_descriptor(UUID()))
+        return cast(TypeDecorator, dialect.type_descriptor(CHAR(16)))
 
     def process_bind_param(
         self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect

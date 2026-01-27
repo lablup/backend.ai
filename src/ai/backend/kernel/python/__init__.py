@@ -3,8 +3,9 @@ import logging
 import os
 import shutil
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import janus
 
@@ -88,7 +89,7 @@ class Runner(BaseRunner):
         return 127
 
     async def start_service(
-        self, service_info
+        self, service_info: Mapping[str, Any]
     ) -> (
         tuple[list[str] | None, dict[str, str]]
         | tuple[list[str] | None, dict[str, str], str]
@@ -129,6 +130,7 @@ class Runner(BaseRunner):
             ], {}
         if service_info["name"] == "tensorboard":
             Path("/home/work/logs").mkdir(parents=True, exist_ok=True)
+            port_str = str(service_info["port"])
             return [
                 str(self.runtime_path),
                 "-m",
@@ -138,7 +140,7 @@ class Runner(BaseRunner):
                 "--host",
                 "0.0.0.0",
                 "--port",
-                str(service_info["port"]),
+                port_str,
                 "--debugger_port",
                 "6064",  # used by in-container TensorFlow
             ], {}
@@ -154,11 +156,12 @@ class Runner(BaseRunner):
                 "/home/work/spectravis",
             )
         if service_info["name"] == "sftp":
+            port_str = str(service_info["port"])
             return [
                 str(self.runtime_path),
                 "-m",
                 "sftpserver",
                 "--port",
-                str(service_info["port"]),
+                port_str,
             ], {}
         return None

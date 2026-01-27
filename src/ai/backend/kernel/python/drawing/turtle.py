@@ -1,30 +1,34 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 from .color import Colors
+
+if TYPE_CHECKING:
+    from .canvas import Canvas
 
 
 class Vec2D(tuple):
     """A helper class taken from Python stdlib's Turtle package."""
 
-    def __new__(cls, x, y):
+    def __new__(cls, x: float | int, y: float | int):
         return tuple.__new__(cls, (x, y))
 
-    def __add__(self, other):
+    def __add__(self, other: Vec2D):  # type: ignore[override]
         return Vec2D(self[0] + other[0], self[1] + other[1])
 
-    def __mul__(self, other):
+    def __mul__(self, other: Vec2D | float | int):  # type: ignore[override]
         if isinstance(other, Vec2D):
             return self[0] * other[0] + self[1] * other[1]
         return Vec2D(self[0] * other, self[1] * other)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: float | int):  # type: ignore[override]
         if isinstance(other, (int, float)):
             return Vec2D(self[0] * other, self[1] * other)
         return None
 
-    def __sub__(self, other):
+    def __sub__(self, other: Vec2D):  # type: ignore[override]
         return Vec2D(self[0] - other[0], self[1] - other[1])
 
     def __neg__(self):
@@ -33,7 +37,7 @@ class Vec2D(tuple):
     def __abs__(self):
         return (self[0] ** 2 + self[1] ** 2) ** 0.5
 
-    def rotate(self, angle) -> Vec2D:
+    def rotate(self, angle: float | int) -> Vec2D:
         """rotate self counterclockwise by angle"""
         perp = Vec2D(-self[1], self[0])
         angle = angle * math.pi / 180.0
@@ -48,7 +52,7 @@ class Vec2D(tuple):
 
 
 class Turtle:
-    def __init__(self, canvas) -> None:
+    def __init__(self, canvas: Canvas) -> None:
         self.canvas = canvas
         self.points = []
         self.pen = True
@@ -66,7 +70,7 @@ class Turtle:
         self.angle = 90
         self.points.append((w / 2, h / 2))
 
-    def forward(self, amt) -> None:
+    def forward(self, amt: float | int) -> None:
         x = self.points[-1][0]
         y = self.points[-1][1]
         x_diff = math.sin(math.radians(self.angle)) * amt
@@ -79,13 +83,13 @@ class Turtle:
         self.canvas.end_group()
         self.points.append((x + x_diff, y + y_diff))
 
-    def left(self, deg) -> None:
+    def left(self, deg: float | int) -> None:
         self.cursor.rotate(-deg)
-        self.angle -= deg
+        self.angle -= deg  # type: ignore[assignment]
 
-    def right(self, deg) -> None:
+    def right(self, deg: float | int) -> None:
         self.cursor.rotate(deg)
-        self.angle += deg
+        self.angle += deg  # type: ignore[assignment]
 
     def pos(self) -> Vec2D:
         base_x, base_y = self.points[0][0], self.points[0][1]
@@ -97,25 +101,25 @@ class Turtle:
     def pendown(self) -> None:
         self.pen = True
 
-    def setpos(self, x, y=None) -> None:
+    def setpos(self, x: float | int | Vec2D, y: float | int | None = None) -> None:
         base_x, base_y = self.points[0][0], self.points[0][1]
         if y is None:
-            _x = x[0]
-            _y = x[1]
+            _x = x[0]  # type: ignore[index]
+            _y = x[1]  # type: ignore[index]
             x, y = _x, _y
         self.canvas.begin_group()
         if self.pen:
             self.canvas.line(
                 self.points[-1][0],
                 self.points[-1][1],
-                x + base_x,
-                y + base_y,
+                x + base_x,  # type: ignore[operator]
+                y + base_y,  # type: ignore[operator]
                 color=Colors.from_rgba([255, 0, 0, 128]),
             )
-        self.cursor.set_x(x + base_x)
-        self.cursor.set_y(y + base_y)
+        self.cursor.set_x(x + base_x)  # type: ignore[operator]
+        self.cursor.set_y(y + base_y)  # type: ignore[operator]
         self.canvas.end_group()
-        self.points.append((x + base_x, y + base_y))
+        self.points.append((x + base_x, y + base_y))  # type: ignore[operator]
 
 
 __all__ = [

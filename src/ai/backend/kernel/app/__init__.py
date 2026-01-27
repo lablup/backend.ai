@@ -4,6 +4,8 @@ which do not provide query/batch-mode code execution.
 """
 
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from ai.backend.kernel import BaseRunner
 
@@ -30,6 +32,6 @@ class Runner(BaseRunner):
         log.warning("batch-mode execution is not supported")
         return 0
 
-    async def start_service(self, service_info) -> tuple[None, dict]:
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[None, dict]:
         # app kernels use service-definition templates.
         return None, {}

@@ -22,7 +22,7 @@ else:
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
 
-def find_executable(*paths) -> Path | None:
+def find_executable(*paths: Path | str | bytes) -> Path | None:
     """
     Find the first executable regular file in the given list of paths.
     """
@@ -60,13 +60,13 @@ class TracebackSourceFilter(logging.Filter):
         return True
 
 
-async def safe_close_task(task) -> None:
+async def safe_close_task(task: asyncio.Task[Any] | None) -> None:
     if task is not None and not task.done():
         task.cancel()
         await task
 
 
-async def wait_local_port_open(port) -> None:
+async def wait_local_port_open(port: int) -> None:
     while True:
         try:
             async with asyncio.timeout(10.0):
@@ -98,7 +98,7 @@ def scan_proc_stats() -> dict[int, dict]:
     return pid_set
 
 
-def parse_proc_stat(pid) -> dict[str, Any]:
+def parse_proc_stat(pid: int) -> dict[str, Any]:
     data = Path(f"/proc/{pid}/stat").read_bytes()
     name_begin = data.find(b"(")
     name_end = data.rfind(b")")
