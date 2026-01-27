@@ -40,11 +40,7 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.base.batch_querier import (
-    BatchQuerier,
-    execute_batch_querier,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
