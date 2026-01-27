@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from ai.backend.manager.data.image.types import ImageDataWithDetails
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.processors import ImageProcessors
@@ -28,7 +28,7 @@ async def load_images_by_ids(
         return []
 
     querier = BatchQuerier(
-        pagination=OffsetPagination(limit=len(image_ids)),
+        pagination=NoPagination(),
         conditions=[ImageConditions.by_ids(image_ids)],
     )
 
