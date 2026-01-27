@@ -20,13 +20,8 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
-<<<<<<< HEAD
-from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import EntityType
-=======
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, EntityType, ScopeType
->>>>>>> 3bd3f0b87 (resolve conflict)
 from ai.backend.common.docker import (
     ImageRef,
     LabelName,
