@@ -284,6 +284,7 @@ class MockPlugin(AbstractComputePlugin):
                 "memory_size": dev_info["memory_size"],
                 "processing_units": dev_info["subproc_count"],
                 "model_name": dev_info["model_name"],
+                "device_name": self.key,
             }
             match self.key:
                 case "cuda":
