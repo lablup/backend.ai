@@ -89,7 +89,9 @@ class ContainerRegistryTypeField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node, _variables=None):
+    def parse_literal(
+        node: graphql.language.ast.Node, _variables: dict | None = None
+    ) -> ContainerRegistryType | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ContainerRegistryType(node.value)
         return None
@@ -270,7 +272,7 @@ class ContainerRegistryScopeField(graphene.Scalar):
         raise ValueError("Invalid ContainerRegistryScope")
 
     @staticmethod
-    def parse_value(value):
+    def parse_value(value: str) -> ContainerRegistryScope:
         if isinstance(value, str):
             try:
                 return ContainerRegistryScope.parse(value)
@@ -279,7 +281,7 @@ class ContainerRegistryScopeField(graphene.Scalar):
         raise ValueError("Invalid ContainerRegistryScope")
 
     @staticmethod
-    def parse_literal(node):
+    def parse_literal(node: graphql.language.ast.Node) -> ContainerRegistryScope | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             try:
                 return ContainerRegistryScope.parse(node.value)

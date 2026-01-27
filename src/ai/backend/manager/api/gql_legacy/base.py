@@ -112,7 +112,7 @@ class BigInt(Scalar):
     """
 
     @staticmethod
-    def coerce_bigint(value):
+    def coerce_bigint(value: int | str) -> int | float:
         num = int(value)
         if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
             raise ValueError("Cannot serialize integer out of the safe range.")
@@ -125,7 +125,7 @@ class BigInt(Scalar):
     parse_value = coerce_bigint
 
     @staticmethod
-    def parse_literal(node):
+    def parse_literal(node: graphql.language.ast.IntValueNode) -> int | float | None:
         if isinstance(node, graphql.language.ast.IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):

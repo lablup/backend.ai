@@ -4,6 +4,8 @@ A module to collect various performance metrics of Docker containers.
 Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
 
+from __future__ import annotations
+
 import asyncio
 import enum
 import logging
@@ -78,7 +80,7 @@ class StatModes(enum.StrEnum):
     DOCKER = "docker"
 
     @staticmethod
-    def get_preferred_mode():
+    def get_preferred_mode() -> StatModes:
         """
         Returns the most preferred statistics collector type for the host OS.
         """
@@ -128,7 +130,7 @@ class Measurement:
     value: Decimal
     capacity: Optional[Decimal] = None
 
-    def apply_scale_factor(self, scale_factor: Decimal) -> "Measurement":
+    def apply_scale_factor(self, scale_factor: Decimal) -> Measurement:
         return Measurement(
             value=self.value * scale_factor,
             capacity=self.capacity * scale_factor if self.capacity is not None else None,
@@ -148,7 +150,7 @@ class NodeMeasurement:
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -162,7 +164,7 @@ class ContainerMeasurement:
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -176,7 +178,7 @@ class ProcessMeasurement:
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
     unit_hint: str = "count"
 
 
@@ -299,7 +301,7 @@ class Metric:
     stats_filter: frozenset[str]
     current: Decimal
     capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    current_hook: Optional[Callable[[Metric], Decimal]] = None
 
     def update(self, value: Measurement):
         if value.capacity is not None:
@@ -333,7 +335,7 @@ class Metric:
 
 
 class StatContext:
-    agent: "AbstractAgent"
+    agent: AbstractAgent
     mode: StatModes
     node_metrics: dict[MetricKey, Metric]
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
@@ -343,7 +345,7 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
+        self, agent: AbstractAgent, mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
@@ -444,7 +446,7 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            async def gather_node_measures_with_slots(instance: "AbstractComputePlugin"):
+            async def gather_node_measures_with_slots(instance: AbstractComputePlugin):
                 result = await instance.gather_node_measures(self)
                 return [slot_name for slot_name, _ in instance.slot_types], result
 

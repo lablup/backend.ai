@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import enum
 import struct
+from collections.abc import Sequence
 
 rgba = struct.Struct("BBBB")
 
@@ -12,7 +15,7 @@ class Color:
         self.alpha = alpha
 
     @staticmethod
-    def from_hex(value):
+    def from_hex(value: str) -> Color:
         value = value.replace("#", "")
         r = int(value[0:2], 16)
         g = int(value[2:4], 16)
@@ -21,11 +24,11 @@ class Color:
         return Color(r, g, b, a)
 
     @staticmethod
-    def from_rgba(value):
+    def from_rgba(value: Sequence[int]) -> Color:
         return Color(*value)
 
     @staticmethod
-    def from_bytes(value):
+    def from_bytes(value: bytes) -> Color:
         r, g, b, a = rgba.unpack(value)
         return Color(r, g, b, a)
 

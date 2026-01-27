@@ -1469,7 +1469,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> GroupNode | None:
         return await GroupNode.get_node(info, id)
 
     @staticmethod
@@ -1508,7 +1508,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> VirtualFolderNode | None:
         return await VirtualFolderNode.get_node(info, id)
 
     @staticmethod
@@ -1943,7 +1943,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> UserNode | None:
         return await UserNode.get_node(info, id)
 
     @staticmethod
@@ -3205,7 +3205,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> NetworkNode | None:
         return await NetworkNode.get_node(info, id)
 
     @staticmethod

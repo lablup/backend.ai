@@ -811,7 +811,7 @@ class BinarySize(int):
         return suffix_idx
 
     @staticmethod
-    def _quantize(val, multiplier):
+    def _quantize(val: int | Decimal, multiplier: int) -> Decimal:
         d = Decimal(val) / Decimal(multiplier)
         if d == d.to_integral():
             value = d.quantize(Decimal(1))
