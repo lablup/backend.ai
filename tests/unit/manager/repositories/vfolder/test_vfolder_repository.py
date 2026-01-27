@@ -13,8 +13,6 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize, VFolderHostPermissionMap, VFolderUsageMode
-from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -23,6 +21,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -51,6 +50,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
