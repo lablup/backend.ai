@@ -40,7 +40,11 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.batch_querier import (
+    BatchQuerier,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.base.creator import execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
@@ -419,9 +423,9 @@ class ImageDBSource:
         Returns ImageListResult with items and pagination info.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ImageRow)
+            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ImageRow.to_dataclass() for row in result.rows]
+            items = [row.ImageRow.to_detailed_dataclass() for row in result.rows]
             return ImageListResult(
                 items=items,
                 total_count=result.total_count,
