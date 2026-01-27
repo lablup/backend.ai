@@ -5,9 +5,9 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from unittest.mock import MagicMock
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -43,9 +43,9 @@ class TestImageRepositorySearch:
     async def test_registry_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> uuid.UUID:
+    ) -> UUID:
         """Create test container registry and return registry ID"""
-        registry_id = uuid.uuid4()
+        registry_id = uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
@@ -65,8 +65,8 @@ class TestImageRepositorySearch:
     async def sample_images(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        test_registry_id: UUID,
+    ) -> AsyncGenerator[list[UUID], None]:
         """Create sample images for testing"""
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE),
@@ -86,7 +86,7 @@ class TestImageRepositorySearch:
                     registry_id=test_registry_id,
                     project="test_project",
                     architecture=arch,
-                    config_digest=f"sha256:{uuid.uuid4().hex}",
+                    config_digest=f"sha256:{uuid4().hex}",
                     size_bytes=1000000,
                     type=img_type,
                     status=ImageStatus.ALIVE,
@@ -106,8 +106,8 @@ class TestImageRepositorySearch:
     async def sample_images_for_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_registry_id: uuid.UUID,
-    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        test_registry_id: UUID,
+    ) -> AsyncGenerator[list[UUID], None]:
         """Create 25 images for pagination testing"""
         image_rows: list[ImageRow] = []
 
@@ -121,7 +121,7 @@ class TestImageRepositorySearch:
                     registry_id=test_registry_id,
                     project="test_project",
                     architecture="x86_64",
-                    config_digest=f"sha256:{uuid.uuid4().hex}",
+                    config_digest=f"sha256:{uuid4().hex}",
                     size_bytes=1000000,
                     type=ImageType.COMPUTE,
                     status=ImageStatus.ALIVE,
@@ -160,7 +160,7 @@ class TestImageRepositorySearch:
     async def test_search_images_first_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[uuid.UUID],
+        sample_images_for_pagination: list[UUID],
     ) -> None:
         """Test first page of search results"""
         querier = BatchQuerier(
@@ -177,7 +177,7 @@ class TestImageRepositorySearch:
     async def test_search_images_second_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[uuid.UUID],
+        sample_images_for_pagination: list[UUID],
     ) -> None:
         """Test second page of search results"""
         querier = BatchQuerier(
@@ -194,7 +194,7 @@ class TestImageRepositorySearch:
     async def test_search_images_last_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[uuid.UUID],
+        sample_images_for_pagination: list[UUID],
     ) -> None:
         """Test last page with partial results"""
         querier = BatchQuerier(
@@ -215,11 +215,12 @@ class TestImageRepositorySearch:
     async def test_search_images_filter_by_architecture(
         self,
         image_repository: ImageRepository,
-        sample_images: list[uuid.UUID],
+        sample_images: list[UUID],
     ) -> None:
         """Test filtering images by architecture"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
+            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.architecture == "arm64",
             ],
@@ -234,11 +235,12 @@ class TestImageRepositorySearch:
     async def test_search_images_filter_by_type(
         self,
         image_repository: ImageRepository,
-        sample_images: list[uuid.UUID],
+        sample_images: list[UUID],
     ) -> None:
         """Test filtering images by type"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
+            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.type == ImageType.COMPUTE,
             ],
@@ -258,7 +260,7 @@ class TestImageRepositorySearch:
     async def test_search_images_order_by_name_ascending(
         self,
         image_repository: ImageRepository,
-        sample_images: list[uuid.UUID],
+        sample_images: list[UUID],
     ) -> None:
         """Test ordering images by name ascending"""
         querier = BatchQuerier(
@@ -275,7 +277,7 @@ class TestImageRepositorySearch:
     async def test_search_images_order_by_name_descending(
         self,
         image_repository: ImageRepository,
-        sample_images: list[uuid.UUID],
+        sample_images: list[UUID],
     ) -> None:
         """Test ordering images by name descending"""
         querier = BatchQuerier(
@@ -296,11 +298,12 @@ class TestImageRepositorySearch:
     async def test_search_images_no_results(
         self,
         image_repository: ImageRepository,
-        sample_images: list[uuid.UUID],
+        sample_images: list[UUID],
     ) -> None:
         """Test search with no matching results"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
+            # TODO: Refactor after adding Condition type
             conditions=[
                 lambda: ImageRow.architecture == "nonexistent",
             ],
