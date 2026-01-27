@@ -32,6 +32,7 @@ from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
 from .dev import (
@@ -54,7 +55,6 @@ from .types import (
     DistInfo,
     FrontendMode,
     HalfstackConfig,
-    HostPortPair,
     ImageSource,
     InstallInfo,
     InstallType,

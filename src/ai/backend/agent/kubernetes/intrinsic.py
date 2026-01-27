@@ -21,7 +21,6 @@ from ai.backend.agent.resources import (
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
-    MountInfo,
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
@@ -29,6 +28,7 @@ from ai.backend.agent.stats import (
     ProcessMeasurement,
     StatContext,
 )
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ContainerId,
@@ -40,7 +40,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

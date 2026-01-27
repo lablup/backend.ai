@@ -18,7 +18,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactVerificationFailedError,
     ArtifactVerifyStorageTypeInvalid,
@@ -29,7 +29,6 @@ from ai.backend.storage.services.artifacts.storage_transfer import StorageTransf
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportStep,
-    ImportStepContext,
     VerifyStepResult,
 )
 from ai.backend.storage.storages.vfolder_storage import VFolderStorage

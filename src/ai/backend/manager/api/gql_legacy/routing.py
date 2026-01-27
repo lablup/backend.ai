@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Optional, Self
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound

@@ -20,7 +20,7 @@ from ai.backend.agent.stats import (
     ProcessMeasurement,
     StatContext,
 )
-from ai.backend.agent.types import MountInfo
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -29,8 +29,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-
-from .agent import Container
 
 
 class CPUDevice(AbstractComputeDevice):

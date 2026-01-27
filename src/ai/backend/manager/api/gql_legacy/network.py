@@ -10,8 +10,8 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.common import (

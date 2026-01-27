@@ -4,7 +4,6 @@ import ipaddress
 import pytest
 
 from ai.backend.common.argparse import (
-    HostPortPair,
     host_port_pair,
     ipaddr,
     non_negative_int,
@@ -13,6 +12,7 @@ from ai.backend.common.argparse import (
     port_range,
     positive_int,
 )
+from ai.backend.common.types import HostPortPair
 
 localhost_ipv4 = ipaddress.ip_address("127.0.0.1")
 localhost_ipv6 = ipaddress.ip_address("::1")

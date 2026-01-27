@@ -39,7 +39,7 @@ from ai.backend.agent.errors.resources import (
     InvalidResourceConfigError,
     ResourceOverAllocatedError,
 )
-from ai.backend.agent.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (

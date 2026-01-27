@@ -10,6 +10,7 @@ import yarl
 from pydantic import HttpUrl
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -22,7 +23,6 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.data.user.types import UserRole
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus

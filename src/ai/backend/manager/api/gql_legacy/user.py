@@ -27,9 +27,14 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, groups
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import (
+    ExternalTableFilterSpec,
+    FieldSpecItem,
+    OrderSpecItem,
+    ORMFieldItem,
+)
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,

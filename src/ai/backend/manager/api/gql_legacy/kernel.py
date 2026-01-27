@@ -257,7 +257,7 @@ class ComputeContainer(graphene.ObjectType):
 
         if row is None:
             raise DataTransformationFailed("Kernel row is None")
-        from .user import UserRole
+        from ai.backend.manager.models.user import UserRole
 
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
@@ -681,7 +681,7 @@ class LegacyComputeSession(graphene.ObjectType):
 
         if row is None:
             raise DataTransformationFailed("Legacy compute session row is None")
-        from .user import UserRole
+        from ai.backend.manager.models.user import UserRole
 
         mega = 2**20
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN

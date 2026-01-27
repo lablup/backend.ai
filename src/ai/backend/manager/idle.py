@@ -48,7 +48,6 @@ from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     EventHandler,
     EventProducer,
 )
@@ -59,6 +58,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
 )
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,

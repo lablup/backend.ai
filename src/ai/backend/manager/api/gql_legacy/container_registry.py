@@ -19,8 +19,9 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
     ProjectScope,

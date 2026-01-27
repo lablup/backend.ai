@@ -6,8 +6,8 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestEtcdHealthChecker:

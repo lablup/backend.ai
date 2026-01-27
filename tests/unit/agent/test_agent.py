@@ -14,16 +14,16 @@ import tomlkit
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import (
-    AgentBackend,
     AgentConfig,
     AgentUnifiedConfig,
     ContainerConfig,
-    EtcdConfig,
     ResourceConfig,
     ScratchType,
 )
 from ai.backend.agent.dummy.agent import DummyAgent
 from ai.backend.agent.server import AgentRPCServer
+from ai.backend.agent.types import AgentBackend
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import AgentId
 

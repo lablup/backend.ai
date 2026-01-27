@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import aiofiles.os
 
@@ -11,7 +11,7 @@ from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
 from ai.backend.storage.subproc import run
-from ai.backend.storage.types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
+from ai.backend.storage.types import CapacityUsage, QuotaConfig, QuotaUsage, TreeUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_SIZE,
     CAP_QUOTA,

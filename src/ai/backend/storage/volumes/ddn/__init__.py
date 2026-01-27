@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final
+from typing import Any, Final, Optional
 
 import aiofiles
 import aiofiles.os
@@ -18,7 +18,7 @@ from ai.backend.storage.errors import (
     SubprocessStdoutNotAvailableError,
 )
 from ai.backend.storage.subproc import run
-from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 

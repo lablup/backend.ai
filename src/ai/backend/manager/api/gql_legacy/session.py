@@ -38,6 +38,7 @@ from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -95,7 +96,6 @@ from .gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .user import UserNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode

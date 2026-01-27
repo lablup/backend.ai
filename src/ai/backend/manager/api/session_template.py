@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -27,7 +27,7 @@ from ai.backend.manager.models.user import users
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:

@@ -5,7 +5,7 @@ from pathlib import Path
 import attrs
 from pydantic import BaseModel
 
-from ai.backend.common.utils import current_loop
+from ai.backend.common.asyncio import current_loop
 
 
 @attrs.define(auto_attribs=True, slots=True)

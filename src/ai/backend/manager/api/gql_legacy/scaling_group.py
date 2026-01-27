@@ -339,7 +339,8 @@ class ScalingGroup(graphene.ObjectType):
     ) -> Optional[Mapping[str, Any]]:
         if self._is_masked:
             return None
-        from .agent import AgentRow, AgentStatus
+        from ai.backend.manager.data.agent.types import AgentStatus
+        from ai.backend.manager.models.agent.row import AgentRow
 
         graph_ctx = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -400,12 +401,11 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_own_session_occupied_resource_slots(
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
+        from ai.backend.manager.models.agent.row import AgentRow
         from ai.backend.manager.models.kernel import (
             AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
             KernelRow,
         )
-
-        from .agent import AgentRow
 
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user

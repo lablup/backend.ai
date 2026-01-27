@@ -10,6 +10,7 @@ import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
@@ -60,7 +61,7 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,

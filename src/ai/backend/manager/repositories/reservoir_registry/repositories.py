@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

@@ -10,7 +10,7 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.health_checker import ComponentId
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class TestValkeyHealthChecker:

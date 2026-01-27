@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter

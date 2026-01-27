@@ -4,9 +4,9 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Optional
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventPropagator
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

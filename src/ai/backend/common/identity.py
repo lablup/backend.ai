@@ -20,7 +20,7 @@ import aiohttp
 import ifaddr
 import psutil
 
-from .utils import curl
+from .networking import curl
 
 __all__ = (
     "current_provider",

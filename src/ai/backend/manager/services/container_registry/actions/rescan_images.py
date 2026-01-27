@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData

@@ -27,7 +27,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.db_source.db_source import ArtifactDBSource
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.types import PaginationOptions
+from ai.backend.manager.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(
     policies=[

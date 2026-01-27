@@ -26,6 +26,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
     Mapped,
@@ -35,7 +36,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (

@@ -8,7 +8,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
@@ -16,8 +16,6 @@ from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
-    QuotaConfig,
-    QuotaUsage,
 )
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient

@@ -18,6 +18,7 @@ from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -36,7 +37,6 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.session import (
-    CustomizedImageVisibilityScope,
     drop_undefined,
     overwritten_param_check,
 )

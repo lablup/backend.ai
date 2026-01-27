@@ -5,15 +5,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.storage.config.loaders import make_etcd
-from ai.backend.storage.config.unified import EtcdConfig, StorageProxyUnifiedConfig
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.redis import (
     RedisProvider,
     StorageProxyValkeyClients,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestRedisProvider:

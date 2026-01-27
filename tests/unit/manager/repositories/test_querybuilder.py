@@ -15,10 +15,9 @@ from ai.backend.manager.repositories.types import (
     GenericQueryBuilder,
     ModelConverter,
     OrderingApplier,
-    PaginationOptions,
     PaginationQueryResult,
 )
-from ai.backend.manager.types import OffsetBasedPaginationOptions
+from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOptions
 
 
 class MockFilterApplier(FilterApplier):

@@ -16,6 +16,7 @@ from ruamel.yaml import YAML
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -46,7 +47,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
-    EndpointLifecycle,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,

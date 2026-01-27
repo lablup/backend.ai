@@ -41,9 +41,10 @@ from ai.backend.agent.stats import (
     StatContext,
     StatModes,
 )
-from ai.backend.agent.types import MountInfo
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.agent.utils import closing_async, read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
@@ -57,10 +58,9 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import current_loop, nmget
+from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 
-from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

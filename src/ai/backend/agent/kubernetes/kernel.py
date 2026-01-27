@@ -21,10 +21,10 @@ from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 

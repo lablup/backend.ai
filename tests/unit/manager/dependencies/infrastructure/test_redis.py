@@ -3,13 +3,13 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import (
     ValkeyClients,
     ValkeyDependency,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestValkeyDependency:

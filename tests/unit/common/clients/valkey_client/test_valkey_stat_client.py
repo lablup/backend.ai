@@ -7,8 +7,8 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestValkeyStatClient:

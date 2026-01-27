@@ -3,7 +3,7 @@ from time import monotonic
 
 import zmq
 import zmq.asyncio
-from jupyter_client import AsyncKernelClient
+from jupyter_client.asynchronous.client import AsyncKernelClient
 
 
 async def aexecute_interactive(
