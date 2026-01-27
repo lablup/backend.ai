@@ -21,10 +21,16 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
+<<<<<<< HEAD
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.permission.types import EntityType
+=======
+from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, EntityType, ScopeType
+>>>>>>> 3bd3f0b87 (resolve conflict)
 from ai.backend.common.docker import (
     ImageRef,
+    LabelName,
     arch_name_aliases,
     validate_image_labels,
 )
@@ -49,9 +55,10 @@ from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec, RBACImageCreator
+from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
@@ -205,7 +212,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    rbac_creator = RBACImageCreator(
+                    labels = update["labels"]
+                    owner_labels = labels.get(LabelName.CUSTOMIZED_OWNER)
+                    if owner_labels is not None:
+                        scope_type = ScopeType.USER
+                        _, _, scope_id = owner_labels.partition(":")
+                    else:
+                        scope_type = ScopeType.GLOBAL
+                        scope_id = GLOBAL_SCOPE_ID
+
+                    rbac_creator = RBACEntityCreator(
                         spec=ImageRowCreatorSpec(
                             name=parsed_img.canonical,
                             project=self.registry_info.project,
@@ -222,8 +238,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
                         ),
-                        # scope_type=scope_type,
-                        # scope_id=scope_id,
+                        scope_type=scope_type,
+                        scope_id=scope_id,
                         entity_type=EntityType.IMAGE,
                     )
                     result = await execute_rbac_entity_creator(session, rbac_creator)
