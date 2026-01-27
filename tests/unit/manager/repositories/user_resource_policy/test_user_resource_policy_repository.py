@@ -163,6 +163,7 @@ class TestUserResourcePolicyRepository:
                 ),
                 UserResourcePolicyData(
                     name="test-policy",
+                    created_at=None,
                     max_vfolder_count=20,
                     max_quota_scope_size=1000000,  # unchanged
                     max_session_count_per_model_session=5,  # unchanged
@@ -178,6 +179,7 @@ class TestUserResourcePolicyRepository:
                 ),
                 UserResourcePolicyData(
                     name="test-policy",
+                    created_at=None,
                     max_vfolder_count=20,
                     max_quota_scope_size=2000000,
                     max_session_count_per_model_session=5,  # unchanged
@@ -193,6 +195,7 @@ class TestUserResourcePolicyRepository:
                 ),
                 UserResourcePolicyData(
                     name="test-policy",
+                    created_at=None,
                     max_vfolder_count=25,
                     max_quota_scope_size=3000000,
                     max_session_count_per_model_session=10,
@@ -208,6 +211,7 @@ class TestUserResourcePolicyRepository:
                 ),
                 UserResourcePolicyData(
                     name="test-policy",
+                    created_at=None,
                     max_vfolder_count=15,
                     max_quota_scope_size=1000000,  # unchanged
                     max_session_count_per_model_session=8,

@@ -20,6 +20,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.auth.types import UserCredential
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -431,6 +432,29 @@ class UserRow(Base):
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
+        )
+
+    def to_credential(self) -> UserCredential:
+        """Convert UserRow to UserCredential for authentication."""
+        return UserCredential(
+            uuid=self.uuid,
+            username=self.username,
+            email=self.email,
+            need_password_change=self.need_password_change,
+            password_changed_at=self.password_changed_at,
+            full_name=self.full_name,
+            status=self.status,
+            status_info=self.status_info,
+            modified_at=self.modified_at,
+            integration_id=self.integration_id,
+            domain_name=self.domain_name,
+            role=self.role,
+            allowed_client_ip=self.allowed_client_ip,
+            totp_key=self.totp_key,
+            totp_activated=self.totp_activated,
+            resource_policy=self.resource_policy,
+            sudo_session_enabled=self.sudo_session_enabled,
+            main_access_key=self.main_access_key,
         )
 
 

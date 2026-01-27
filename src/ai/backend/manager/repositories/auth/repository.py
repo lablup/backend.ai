@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import CredentialsByAccessKey, GroupMembershipData, UserData
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -102,3 +102,8 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_current_time(self) -> datetime:
         return await self._db_source.fetch_current_time()
+
+    @auth_repository_resilience.apply()
+    async def get_credentials_by_access_key(self, access_key: str) -> CredentialsByAccessKey:
+        """Get keypair and user credentials by access_key."""
+        return await self._db_source.fetch_credentials_by_access_key(access_key)
