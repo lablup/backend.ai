@@ -121,7 +121,8 @@ def calculate_remaining_time(
 
 async def get_db_now(dbconn: SAConnection) -> datetime:
     result = await dbconn.scalar(sa.select(sa.func.now()))
-    assert result is not None
+    if result is None:
+        raise IdlePolicyNotFound("Failed to retrieve current database timestamp")
     return result
 
 

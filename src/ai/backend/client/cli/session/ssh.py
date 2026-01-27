@@ -45,7 +45,8 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    assert proxy_proc.stdout is not None
+    if proxy_proc.stdout is None:
+        raise RuntimeError("Failed to capture stdout from proxy process")
     try:
         lines: list[bytes] = []
         while True:

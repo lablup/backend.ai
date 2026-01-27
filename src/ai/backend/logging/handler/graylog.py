@@ -54,7 +54,8 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
 
 def setup_graylog_handler(config: LoggingConfig) -> logging.Handler:
     drv_config = config.graylog
-    assert drv_config is not None
+    if drv_config is None:
+        raise RuntimeError("Graylog configuration is required but not provided")
     graylog_params = {
         "host": drv_config.host,
         "port": drv_config.port,

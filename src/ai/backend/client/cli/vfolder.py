@@ -619,7 +619,8 @@ def invite(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
+            if perm not in ["rw", "ro", "wd"]:
+                raise ValueError(f"Invalid permission: {perm}. Must be one of: rw, ro, wd")
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
             if invited_ids:
@@ -708,7 +709,8 @@ def share(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], f"Invalid permission: {perm}"
+            if perm not in ["rw", "ro", "wd"]:
+                raise ValueError(f"Invalid permission: {perm}. Must be one of: rw, ro, wd")
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
             if shared_emails:

@@ -127,6 +127,7 @@ from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
 from .errors.image import ImageNotFound
 from .errors.kernel import (
+    InvalidKernelConfig,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
@@ -463,8 +464,10 @@ class AgentRegistry:
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
-                assert sess.main_kernel.image is not None
-                assert sess.main_kernel.architecture is not None
+                if sess.main_kernel.image is None:
+                    raise InvalidKernelConfig("Session main kernel has no image specified")
+                if sess.main_kernel.architecture is None:
+                    raise InvalidKernelConfig("Session main kernel has no architecture specified")
                 running_image_ref = (
                     await ImageRow.resolve(
                         db_session,
@@ -1874,8 +1877,10 @@ class AgentRegistry:
                 updated_config: dict[str, Any] = {
                     # TODO: support rescaling of sub-containers
                 }
-                assert kernel.image is not None
-                assert kernel.architecture is not None
+                if kernel.image is None:
+                    raise InvalidKernelConfig(f"Kernel {kernel.id} has no image specified")
+                if kernel.architecture is None:
+                    raise InvalidKernelConfig(f"Kernel {kernel.id} has no architecture specified")
                 async with self.db.begin_session() as db_sess:
                     image_row = await ImageRow.resolve(
                         db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]

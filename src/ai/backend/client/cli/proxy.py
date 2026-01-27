@@ -108,7 +108,8 @@ def _translate_headers(upstream_request: Request, client_request: Request) -> No
     for k, v in client_request.headers.items():
         upstream_request.headers[k] = v
     api_endpoint = upstream_request.config.endpoint
-    assert api_endpoint.host is not None
+    if api_endpoint.host is None:
+        raise RuntimeError("API endpoint host is not configured")
     if api_endpoint.is_default_port():
         upstream_request.headers["Host"] = api_endpoint.host
     else:

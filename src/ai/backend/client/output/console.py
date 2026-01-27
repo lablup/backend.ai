@@ -95,7 +95,8 @@ class ConsoleOutputHandler(BaseOutputHandler):
         is_scalar: bool = False,
     ) -> None:
         if is_scalar:
-            assert len(fields) == 1
+            if len(fields) != 1:
+                raise ValueError("Scalar output requires exactly one field")
         if sys.stdout.isatty():
 
             def infinite_fetch():

@@ -532,7 +532,8 @@ class TimeDuration(t.Trafaret):
             self._failure("value must be a number or string", value=value)
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         if len(value) == 0:
             self._failure("value must not be empty", value=value)
         try:

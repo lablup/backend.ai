@@ -33,7 +33,8 @@ def tabulate_items(
     header_height = 0
     if tablefmt in ("simple", "github"):
         header_height = 2
-    assert header_height >= 0
+    if header_height < 0:
+        raise ValueError("Header height must be non-negative")
 
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(

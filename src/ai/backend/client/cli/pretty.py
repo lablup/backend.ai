@@ -85,7 +85,8 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
-        assert "\n" not in msg, "Waiting message must be a single line."
+        if "\n" in msg:
+            raise ValueError("Waiting message must be a single line")
         indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
         indicator = style("\u2713", fg="bright_green", reset=False)

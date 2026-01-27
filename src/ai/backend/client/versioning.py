@@ -25,11 +25,13 @@ def get_naming(api_version: tuple[int, str], key: str) -> str:
 
 def get_id_or_name(api_version: tuple[int, str], obj: ComputeSession) -> str:
     if api_version[0] <= 4:
-        assert obj.name is not None
+        if obj.name is None:
+            raise ValueError("Session name is required for API version <= 4")
         return obj.name
     if obj.id:
         return str(obj.id)
-    assert obj.name is not None
+    if obj.name is None:
+        raise ValueError("Session must have either id or name")
     return obj.name
 
 

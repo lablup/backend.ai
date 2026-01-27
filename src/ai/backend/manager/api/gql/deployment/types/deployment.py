@@ -610,14 +610,16 @@ class DeploymentStrategyInputGQL:
         strategy = DeploymentStrategy(self.type.value)
         match strategy:
             case DeploymentStrategy.ROLLING:
-                assert self.rolling_update is not None
+                if self.rolling_update is None:
+                    raise InvalidAPIParameters("rolling_update config required but not provided")
                 return DeploymentPolicyConfig(
                     strategy=strategy,
                     strategy_spec=self.rolling_update.to_spec(),
                     rollback_on_failure=self.rollback_on_failure,
                 )
             case DeploymentStrategy.BLUE_GREEN:
-                assert self.blue_green is not None
+                if self.blue_green is None:
+                    raise InvalidAPIParameters("blue_green config required but not provided")
                 return DeploymentPolicyConfig(
                     strategy=strategy,
                     strategy_spec=self.blue_green.to_spec(),

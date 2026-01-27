@@ -475,7 +475,8 @@ class Session(BaseSession):
         return self._worker_thread
 
     def __enter__(self) -> Session:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         self.open()
         if self.config.announcement_handler:
             try:
@@ -548,7 +549,8 @@ class AsyncSession(BaseSession):
         return self._aclose()
 
     async def __aenter__(self) -> AsyncSession:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         await self.open()
         if self.config.announcement_handler:
             try:

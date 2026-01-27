@@ -107,10 +107,12 @@ def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
             continue
         for entry in adapter.ips:
             if entry.is_IPv4 and proto == socket.AF_INET:
-                assert isinstance(entry.ip, str)
+                if not isinstance(entry.ip, str):
+                    raise TypeError(f"Expected str for IPv4 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip)
             elif entry.is_IPv6 and proto == socket.AF_INET6:
-                assert isinstance(entry.ip, tuple)
+                if not isinstance(entry.ip, tuple):
+                    raise TypeError(f"Expected tuple for IPv6 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip[0])
             else:
                 continue

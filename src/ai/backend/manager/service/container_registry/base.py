@@ -75,10 +75,16 @@ class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepositor
                     f"Container registry info does not exist or is invalid in the group. (group: {project_id})"
                 )
 
-            # After _is_valid_group_row check, group_row and container_registry are not None
-            assert group_row is not None
+            # After _is_valid_group_row check, group_row and container_registry are guaranteed to be valid
+            if group_row is None:
+                raise ContainerRegistryNotFound(
+                    f"Group row not found after validation. (group: {project_id})"
+                )
             container_registry = group_row.container_registry
-            assert container_registry is not None
+            if container_registry is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found after validation. (group: {project_id})"
+                )
             registry_name, project = (
                 container_registry["registry"],
                 container_registry["project"],

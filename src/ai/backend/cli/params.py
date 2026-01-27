@@ -191,7 +191,8 @@ class RangeExprOptionType(click.ParamType):
         ctx: Optional[click.Context],
     ) -> Any:
         key, value = value.split("=", maxsplit=1)
-        assert self._rx_range_key.match(key), "The key must be a valid slug string."
+        if not self._rx_range_key.match(key):
+            self.fail("The key must be a valid slug string.", param, ctx)
         try:
             if value.startswith("case:"):
                 return key, value[5:].split(",")

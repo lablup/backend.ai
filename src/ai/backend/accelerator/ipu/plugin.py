@@ -173,7 +173,8 @@ class IPUPlugin(AbstractComputePlugin):
             if len(ipv4_subnet) > 1:
                 raise DockerNetworkError(f"Multiple IPv4 configs on network {network_identifier}")
             ip_network = ipaddress.ip_network(ipv4_subnet[0])
-            assert isinstance(ip_network, ipaddress.IPv4Network)
+            if not isinstance(ip_network, ipaddress.IPv4Network):
+                raise RuntimeError(f"Expected IPv4Network but got {type(ip_network).__name__}")
             self.subnet_network_map[ip_network] = network_identifier
 
     def get_docker_network(self, device: IPUDevice) -> str:

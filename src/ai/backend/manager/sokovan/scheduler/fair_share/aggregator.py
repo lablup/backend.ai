@@ -338,14 +338,20 @@ class FairShareAggregator:
                 raise ValueError(f"Kernel {kernel.id} has no starts_at for first observation")
             start_time = kernel.lifecycle.starts_at
         else:
-            assert kernel.lifecycle.last_observed_at is not None  # for type narrowing
+            if kernel.lifecycle.last_observed_at is None:
+                raise ValueError(
+                    f"Kernel {kernel.id} has no last_observed_at for non-first observation"
+                )
             start_time = kernel.lifecycle.last_observed_at
 
         # Determine end time based on kernel status
         end_time: datetime
         if is_terminated:
             # TERMINATED: use terminated_at (allows partial end slice)
-            assert kernel.lifecycle.terminated_at is not None  # for type narrowing
+            if kernel.lifecycle.terminated_at is None:
+                raise ValueError(
+                    f"Kernel {kernel.id} marked as terminated but has no terminated_at"
+                )
             end_time = kernel.lifecycle.terminated_at
         else:
             # RUNNING: floor to last complete boundary (no partial end slice)

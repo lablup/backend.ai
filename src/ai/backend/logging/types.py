@@ -18,7 +18,8 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.

@@ -32,7 +32,8 @@ class ManagerAuthHandler(AbstractClientAuthenticator):
         return self._manager_public_key
 
     async def client_identity(self) -> Identity:
-        assert self._manager_secret_key is not None
+        if self._manager_secret_key is None:
+            raise RuntimeError("Manager secret key is not initialized")
         return Identity(self.domain, self._manager_secret_key)
 
 
@@ -53,7 +54,8 @@ class AgentAuthHandler(AbstractServerAuthenticator):
         return self._agent_public_key
 
     async def server_identity(self) -> Identity:
-        assert self._agent_secret_key is not None
+        if self._agent_secret_key is None:
+            raise RuntimeError("Agent secret key is not initialized")
         return Identity(self.domain, self._agent_secret_key)
 
     async def check_client(self, creds: Credential) -> AuthResult:
