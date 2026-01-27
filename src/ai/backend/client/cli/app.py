@@ -67,11 +67,11 @@ class WSProxy:
                         if msg.type == aiohttp.WSMsgType.ERROR:
                             await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.CLOSE:
+                        if msg.type == aiohttp.WSMsgType.CLOSE:
                             if msg.data != aiohttp.WSCloseCode.OK:
                                 await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.BINARY:
+                        if msg.type == aiohttp.WSMsgType.BINARY:
                             self.writer.write(msg.data)
                             await self.writer.drain()
                 except ConnectionResetError:

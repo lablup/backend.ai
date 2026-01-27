@@ -86,10 +86,9 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
             else:
                 return None
             break
-        elif user_reply.lower() in choices:
+        if user_reply.lower() in choices:
             break
-        else:
-            print(f"Please answer in {'/'.join(choices)}.")
+        print(f"Please answer in {'/'.join(choices)}.")
     return user_reply
 
 
@@ -126,8 +125,7 @@ def ask_yn(prompt: str = "Are you sure?", default: str = "y") -> bool:
             user_reply = default
         if user_reply in ("y", "yes", "n", "no"):
             break
-        else:
-            print("Please answer in y/yes/n/no.")
+        print("Please answer in y/yes/n/no.")
     return user_reply[:1].lower() == "y"
 
 
@@ -144,6 +142,5 @@ def ask_tf(prompt: str = "Are you sure?", default: str = "true") -> bool:
             user_reply = default
         if user_reply in ("t", "true", "f", "false"):
             break
-        else:
-            print("Please answer in t/true/f/false.")
+        print("Please answer in t/true/f/false.")
     return user_reply[:1].lower() == "t"

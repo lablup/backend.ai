@@ -171,10 +171,6 @@ ignore = [
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
-    # RET (return) - stylistic rules that may reduce readability
-    "RET502",  # implicit-return-value - mixed implicit/explicit return (stylistic preference)
-    "RET507",  # superfluous-else-continue - else after continue (can improve readability)
-    "RET508",  # superfluous-else-break - else after break (can improve readability)
     # ANN (annotations) - defer for gradual migration, mypy handles type checking
     "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
     "ANN002",  # missing-type-args - *args type annotation, low practical value

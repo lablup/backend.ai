@@ -633,7 +633,7 @@ class BaseRunner(metaclass=ABCMeta):
         try:
             if self.subproc:
                 self.subproc.send_signal(signal.SIGINT)
-                return
+                return None
             return await self.interrupt()
         except Exception:
             log.exception("unexpected error")
@@ -661,8 +661,7 @@ class BaseRunner(metaclass=ABCMeta):
             if not terminated_pid_list:
                 await asyncio.sleep(0.5)
                 continue
-            else:
-                break
+            break
         else:
             log.warning("failed to get the information of oom-killed processes")
             return

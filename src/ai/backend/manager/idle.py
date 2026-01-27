@@ -337,7 +337,7 @@ class IdleCheckerHost:
                     if isinstance(check_result, BaseExceptionGroup):
                         errors.extend(check_result.exceptions)
                         continue
-                    elif isinstance(check_result, BaseException):
+                    if isinstance(check_result, BaseException):
                         # mark to be destroyed afterwards
                         errors.append(check_result)
                         continue

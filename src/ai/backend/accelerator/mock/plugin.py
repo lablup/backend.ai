@@ -648,10 +648,9 @@ class MockPlugin(AbstractComputePlugin):
                 active_device_id_list.append(device_id)
                 is_unique = True
                 break
-            else:
-                for dev_id, alloc in per_device_alloc.items():
-                    if alloc > 0:
-                        active_device_id_list.append(dev_id)
+            for dev_id, alloc in per_device_alloc.items():
+                if alloc > 0:
+                    active_device_id_list.append(dev_id)
 
         match self.key:
             case "cuda":

@@ -38,7 +38,7 @@ def exec_loop(kernel, mode, code, opts=None, user_inputs=None):
         console.extend(result["console"])
         if result["status"] == "finished":
             break
-        elif result["status"] == "waiting-input":
+        if result["status"] == "waiting-input":
             mode = "input"
             code = user_inputs.pop(0)
             opts = None

@@ -2125,8 +2125,7 @@ class AgentRegistry:
             if kern_stat is None:
                 log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
                 continue
-            else:
-                per_kernel_updates[kernel_id] = kern_stat
+            per_kernel_updates[kernel_id] = kern_stat
 
         async def _update():
             async with self.db.begin() as conn:
