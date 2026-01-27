@@ -165,7 +165,7 @@ class ImageAliasData:
 class ImageListResult:
     """Search result with total count and pagination info for images."""
 
-    items: list[ImageData]
+    items: list[ImageDataWithDetails]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
