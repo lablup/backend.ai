@@ -87,7 +87,7 @@ def test_request_attach_files(mock_request_params):
 
     mock_request_params["content"] = b"something"
     rqst = Request(**mock_request_params)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         rqst.attach_files(files)
 
     mock_request_params["content"] = b""
@@ -118,7 +118,7 @@ async def test_fetch_invalid_method(mock_request_params):
     mock_request_params["method"] = "STRANGE"
     rqst = Request(**mock_request_params)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         async with rqst.fetch():
             pass
 
@@ -213,7 +213,7 @@ async def test_invalid_requests(dummy_endpoint):
 async def test_fetch_invalid_method_async():
     async with AsyncSession():
         rqst = Request("STRANGE", "/")
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             async with rqst.fetch():
                 pass
 

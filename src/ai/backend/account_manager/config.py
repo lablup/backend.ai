@@ -83,9 +83,11 @@ class UserID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
+            if not cls.default_uid:
+                raise ValueError("value is None but default_uid not provided")
             return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
@@ -153,8 +155,11 @@ class GroupID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+            if not cls.default_gid:
+                raise ValueError("value is None but default_gid not provided")
+            return cls.default_gid
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
@@ -445,7 +450,8 @@ def generate_example_json(
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise ValueError(f"Field {name} in {schema} has no annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]

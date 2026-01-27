@@ -42,8 +42,10 @@ class Runner(BaseRunner):
 
     async def query(self, code_text) -> int:
         self.ensure_inproc_runner()
-        assert self.input_queue is not None
-        assert self.output_queue is not None
+        if self.input_queue is None:
+            raise RuntimeError("Input queue is not initialized")
+        if self.output_queue is None:
+            raise RuntimeError("Output queue is not initialized")
         await self.input_queue.async_q.put(code_text)
         # Read the generated outputs until done
         while True:

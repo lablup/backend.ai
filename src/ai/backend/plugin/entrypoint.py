@@ -105,7 +105,8 @@ def _glob(
     match_patterns: Iterable[str] | None = None,
 ) -> Iterator[Path]:
     q: collections.deque[tuple[Path, bool]] = collections.deque()
-    assert base_path.is_dir()
+    if not base_path.is_dir():
+        raise ValueError(f"{base_path} is not a directory")
     q.append((base_path, False))
     while q:
         search_path, suffix_match = q.pop()

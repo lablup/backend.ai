@@ -45,9 +45,10 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         for device_info in stats.devices:
             if device_info.name not in VALID_DEVICE_NAME:
                 continue
-            assert device_info.sid is not None, (
-                "sid value in atom-stats -j response cannot be null for ATOM Max device!"
-            )
+            if device_info.sid is None:
+                raise RuntimeError(
+                    "sid value in atom-stats -j response cannot be null for ATOM Max device!"
+                )
             devices_by_sid[DeviceId(device_info.sid)].append(
                 ATOMMaxChildDevice(
                     serial=device_info.uuid,

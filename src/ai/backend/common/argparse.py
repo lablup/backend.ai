@@ -9,8 +9,10 @@ from .types import HostPortPair
 def port_no(s: str) -> int:
     try:
         port = int(s)
-        assert port > 0
-        assert port < 65536
+        if port <= 0:
+            raise ValueError("Port must be greater than 0")
+        if port >= 65536:
+            raise ValueError("Port must be less than 65536")
     except (ValueError, AssertionError):
         msg = f"{s!r} is not a valid port number."
         raise argparse.ArgumentTypeError(msg)
@@ -41,7 +43,8 @@ def port_range(s: str) -> tuple[int, int]:
 def positive_int(s: str) -> int:
     try:
         val = int(s)
-        assert val > 0
+        if val <= 0:
+            raise ValueError("Value must be positive")
     except (ValueError, AssertionError):
         msg = f"{s!r} is not a positive integer."
         raise argparse.ArgumentTypeError(msg)
@@ -51,7 +54,8 @@ def positive_int(s: str) -> int:
 def non_negative_int(s: str) -> int:
     try:
         val = int(s)
-        assert val >= 0
+        if val < 0:
+            raise ValueError("Value must be non-negative")
     except (ValueError, AssertionError):
         msg = f"{s!r} is not a non-negative integer."
         raise argparse.ArgumentTypeError(msg)
@@ -74,8 +78,10 @@ def host_port_pair(s: str) -> tuple[ipaddress._BaseAddress, int]:
             host = host
         try:
             port = int(pieces[1])
-            assert port > 0
-            assert port < 65536
+            if port <= 0:
+                raise ValueError("Port must be greater than 0")
+            if port >= 65536:
+                raise ValueError("Port must be less than 65536")
         except (ValueError, AssertionError):
             msg = f"{pieces[1]!r} is not a valid port number."
             raise argparse.ArgumentTypeError(msg)

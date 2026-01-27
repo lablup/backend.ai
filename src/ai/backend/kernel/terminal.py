@@ -96,7 +96,8 @@ class Terminal:
             await self.sock_out.send_multipart([b"finished", b"{}"])
 
     async def start(self):
-        assert not self.accept_term_input
+        if self.accept_term_input:
+            raise RuntimeError("Terminal is already accepting input")
         await safe_close_task(self.term_in_task)
         await safe_close_task(self.term_out_task)
         pid, fd = pty.fork()

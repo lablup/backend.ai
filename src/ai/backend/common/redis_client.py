@@ -237,7 +237,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
             raise RuntimeError("Redis with sentinel not supported for this library")
 
         redis_url = self._redis_target.addr
-        assert redis_url is not None
+        if redis_url is None:
+            raise ValueError("Redis URL is not configured")
 
         host = str(redis_url[0])
         port = redis_url[1]

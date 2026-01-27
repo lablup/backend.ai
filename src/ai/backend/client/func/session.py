@@ -303,7 +303,8 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
-            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
+            if not (4 <= len(name) <= 64):
+                raise ValueError("Client session token should be 4 to 64 characters long.")
         else:
             faker = Faker()
             name = f"pysdk-{faker.user_name()}"
@@ -496,7 +497,8 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not undefined:
-            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
+            if not (4 <= len(name) <= 64):
+                raise ValueError("Client session token should be 4 to 64 characters long.")
         else:
             name = f"pysdk-{secrets.token_urlsafe(8)}"
 
@@ -579,7 +581,8 @@ class ComputeSession(BaseFunction):
                 "sessionId": str(self.id),
             }
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session must have either id or name")
             identity_params = {
                 "sessionName": self.name,
             }
@@ -942,7 +945,8 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         if mode in {"query", "continue", "input"}:
-            assert code is not None, "The code argument must be a valid string even when empty."
+            if code is None:
+                raise ValueError("The code argument must be a valid string even when empty.")
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.session_identifier}",
@@ -1098,12 +1102,18 @@ class ComputeSession(BaseFunction):
                     part = cast(aiohttp.BodyPartReader, await reader.next())
                     if part is None:
                         break
-                    assert part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower() == "identity"
-                    assert part.headers.get(hdrs.CONTENT_TRANSFER_ENCODING, "binary").lower() in (
-                        "binary",
-                        "8bit",
-                        "7bit",
-                    )
+                    content_encoding = part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower()
+                    if content_encoding != "identity":
+                        raise ValueError(
+                            f"Unexpected content encoding: {content_encoding}, expected 'identity'"
+                        )
+                    content_transfer = part.headers.get(
+                        hdrs.CONTENT_TRANSFER_ENCODING, "binary"
+                    ).lower()
+                    if content_transfer not in ("binary", "8bit", "7bit"):
+                        raise ValueError(
+                            f"Unexpected content transfer encoding: {content_transfer}"
+                        )
                     fp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
                     while True:
                         chunk = await part.read_chunk(DEFAULT_CHUNK_SIZE)
@@ -1224,7 +1234,8 @@ class ComputeSession(BaseFunction):
                 },
             )
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session name is required for API version < 6")
             params = {
                 get_naming(api_session.get().api_version, "event_name_arg"): self.name,
             }
@@ -1454,7 +1465,8 @@ class InferenceSession(BaseFunction):
                 "sessionId": str(self.id),
             }
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session must have either id or name")
             identity_params = {
                 "sessionName": self.name,
             }

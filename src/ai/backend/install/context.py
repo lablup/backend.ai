@@ -240,7 +240,8 @@ class Context(metaclass=ABCMeta):
         }
         creds: dict[str, str] | None = None
         if halfstack.etcd_user is not None:
-            assert halfstack.etcd_password is not None
+            if halfstack.etcd_password is None:
+                raise ValueError("etcd_password must be set when etcd_user is provided")
             creds = {
                 "user": halfstack.etcd_user,
                 "password": halfstack.etcd_password,
@@ -372,7 +373,8 @@ class Context(metaclass=ABCMeta):
         (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
-        assert self.install_info.halfstack_config.redis_addr
+        if not self.install_info.halfstack_config.redis_addr:
+            raise RuntimeError("redis_addr must be configured")
         self.sed_in_place_multi(
             dst_compose_path,
             [
@@ -512,7 +514,8 @@ class Context(metaclass=ABCMeta):
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
-            assert halfstack.redis_sentinel_addrs
+            if not halfstack.redis_sentinel_addrs:
+                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
             data["redis"] = {
                 "sentinel": ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -527,7 +530,8 @@ class Context(metaclass=ABCMeta):
             if halfstack.redis_password:
                 data["redis"]["password"] = halfstack.redis_password
         else:
-            assert halfstack.redis_addr
+            if not halfstack.redis_addr:
+                raise RuntimeError("redis_addr must be configured")
             data["redis"] = {
                 "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
                 "helper": {
@@ -663,7 +667,8 @@ class Context(metaclass=ABCMeta):
         fqdn_prefix = self.install_variable.fqdn_prefix
         storage_public_address = self.install_variable.storage_public_address
         public_facing_address = self.install_variable.public_facing_address
-        assert halfstack.redis_addr is not None
+        if halfstack.redis_addr is None:
+            raise RuntimeError("redis_addr must be configured")
 
         # use FQDN if provided, otherwise use public_facing_address
         if fqdn_prefix is not None:
@@ -691,7 +696,8 @@ class Context(metaclass=ABCMeta):
             helper_table["socket_connect_timeout"] = 2.0
             helper_table["reconnect_poll_timeout"] = 0.3
             if halfstack.ha_setup:
-                assert halfstack.redis_sentinel_addrs
+                if not halfstack.redis_sentinel_addrs:
+                    raise ValueError("Redis sentinel addresses must be configured for HA setup")
                 redis_table = tomlkit.table()
                 redis_table["sentinel"] = ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -701,7 +707,8 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             else:
-                assert halfstack.redis_addr
+                if not halfstack.redis_addr:
+                    raise RuntimeError("redis_addr must be configured")
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"

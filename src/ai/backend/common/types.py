@@ -216,7 +216,8 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
@@ -513,7 +514,8 @@ class ClusterMode(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: object) -> Optional[ClusterMode]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
         match value.lower():
             case "single-node" | "single_node":
@@ -707,7 +709,8 @@ class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
+        if not isinstance(other, ReadableCIDR):
+            raise TypeError("Only can compare ReadableCIDR objects.")
         return self.address == other.address
 
 
@@ -923,14 +926,16 @@ class ResourceSlot(UserDict[str, Decimal]):
             self.data[k] = Decimal(0)
 
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can add ResourceSlot to ResourceSlot.")
         self.sync_keys(other)
         return type(self)({
             k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
         })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can subtract ResourceSlot from ResourceSlot.")
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
@@ -940,19 +945,22 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in sorted(self.data.keys())]
         other_values = [other.data[k] for k in sorted(other.data.keys())]
         return self_values == other_values
 
     def __ne__(self, other: object) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         return not self.__eq__(other)
 
     def eq_contains(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_other_keys = other.keys() - self.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -960,7 +968,8 @@ class ResourceSlot(UserDict[str, Decimal]):
         return self_values == other_values and all(other[k] == 0 for k in only_other_keys)
 
     def eq_contained(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_self_keys = self.keys() - other.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -968,14 +977,16 @@ class ResourceSlot(UserDict[str, Decimal]):
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
     def __le__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
     def __lt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
@@ -984,14 +995,16 @@ class ResourceSlot(UserDict[str, Decimal]):
         )
 
     def __ge__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
     def __gt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]

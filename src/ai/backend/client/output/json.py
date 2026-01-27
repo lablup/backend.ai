@@ -89,7 +89,8 @@ class JsonOutputHandler(BaseOutputHandler):
         is_scalar: bool = False,
     ) -> None:
         if is_scalar:
-            assert len(fields) == 1
+            if len(fields) != 1:
+                raise ValueError("Scalar output requires exactly one field")
             item_list = [
                 {
                     fields[0].alt_name: fields[0].formatter.format_json(item, fields[0]),

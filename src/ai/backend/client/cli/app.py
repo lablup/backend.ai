@@ -193,7 +193,8 @@ class ProxyRunnerContext:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session is not initialized")
         p = WSProxy(
             self.api_session,
             self.session_name,
@@ -256,9 +257,11 @@ class ProxyRunnerContext:
             print_info("Shutting down....")
             self.local_server.close()
             await self.local_server.wait_closed()
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session is not initialized")
         await self.api_session.__aexit__(*exc_info)
-        assert self.api_session.closed
+        if not self.api_session.closed:
+            raise RuntimeError("API session failed to close properly")
         if self.local_server is not None:
             print_info(f'The local proxy to "{self.app_name}" has terminated.')
         self.local_server = None

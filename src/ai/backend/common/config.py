@@ -441,7 +441,8 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
     for k, v in updates.items():
         if isinstance(v, Mapping):
             orig = result.get(k, {})
-            assert isinstance(orig, Mapping)
+            if not isinstance(orig, Mapping):
+                raise TypeError(f"Cannot merge non-mapping value at key {k!r}")
             result[k] = merge(orig, v)
         else:
             result[k] = v

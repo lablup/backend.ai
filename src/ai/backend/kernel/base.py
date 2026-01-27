@@ -63,7 +63,8 @@ class HealthStatus(enum.Enum):
 
 
 async def pipe_output(stream, outsock, target, log_fd):
-    assert target in ("stdout", "stderr")
+    if target not in ("stdout", "stderr"):
+        raise ValueError(f"Invalid target: {target}. Must be 'stdout' or 'stderr'")
     target = target.encode("ascii")
     console_fd = sys.stdout.fileno() if target == "stdout" else sys.stderr.fileno()
     loop = current_loop()
@@ -322,7 +323,8 @@ class BaseRunner(metaclass=ABCMeta):
                         log.error("jupyter query mode is disabled: failed to start jupyter kernel")
                     else:
                         self.kernel_client = self.kernel_mgr.client()  # type: ignore
-                        assert self.kernel_client is not None
+                        if self.kernel_client is None:
+                            raise RuntimeError("Failed to create kernel client")
                         self.kernel_client.start_channels(
                             shell=True, iopub=True, stdin=True, hb=True
                         )
@@ -346,11 +348,13 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _shutdown_jupyter_kernel(self):
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
-            assert self.kernel_client is not None
+            if self.kernel_client is None:
+                raise RuntimeError("Kernel client is not initialized")
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
-            assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
+            if await self.kernel_mgr.is_alive():
+                raise RuntimeError("ipykernel failed to shutdown")
 
     async def _handle_exception(
         self, coro: Awaitable[TReturn], help_text: str | None = None
@@ -507,7 +511,8 @@ class BaseRunner(metaclass=ABCMeta):
             log.error("query mode is disabled: failed to start jupyter kernel")
             return 127
 
-        assert self.kernel_client is not None
+        if self.kernel_client is None:
+            raise RuntimeError("Kernel client is not initialized")
         log.debug("executing in query mode...")
         exit_code = 0
 
@@ -566,8 +571,10 @@ class BaseRunner(metaclass=ABCMeta):
                     ])
 
         async def stdin_hook(msg):
-            assert self.kernel_client is not None
-            assert self.user_input_queue is not None
+            if self.kernel_client is None:
+                raise RuntimeError("Kernel client is not initialized")
+            if self.user_input_queue is None:
+                raise RuntimeError("User input queue is not initialized")
             if msg["msg_type"] == "input_request":
                 prompt = msg["content"]["prompt"]
                 password = msg["content"]["password"]
@@ -718,7 +725,8 @@ class BaseRunner(metaclass=ABCMeta):
         return None, {}
 
     async def start_model_service(self, model_info):
-        assert self.service_parser is not None
+        if self.service_parser is None:
+            raise RuntimeError("Service parser is not initialized")
         model_service_info = model_info.get("service")
         result = {}
         started = False

@@ -83,7 +83,8 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
                 "extra": extra,
             }
             msg, context_kwargs = self.process(msg, context_kwargs)  # type: ignore
-            assert isinstance(msg, str)
+            if not isinstance(msg, str):
+                raise TypeError("msg must be a string after processing")
             user_kwargs["extra"] = context_kwargs["extra"]
             self.logger._log(level, BraceMessage(msg, args, user_kwargs), (), **context_kwargs)
 

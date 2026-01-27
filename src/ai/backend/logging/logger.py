@@ -190,7 +190,8 @@ class Logger(AbstractLogger):
         if self.is_master and self.log_endpoint:
             self.relay_handler = logging.getLogger("").handlers[0]
             self.ready_event = threading.Event()
-            assert isinstance(self.relay_handler, RelayHandler)
+            if not isinstance(self.relay_handler, RelayHandler):
+                raise RuntimeError("Expected RelayHandler as first handler")
             self.log_processor = threading.Thread(
                 target=log_processor,
                 name="Logger",
@@ -214,7 +215,8 @@ class Logger(AbstractLogger):
         # just leave it as-is.
         is_active.reset(self._is_active_token)
         if self.is_master and self.log_endpoint:
-            assert isinstance(self.relay_handler, RelayHandler)
+            if not isinstance(self.relay_handler, RelayHandler):
+                raise RuntimeError("Expected RelayHandler as relay_handler")
             self.relay_handler.emit(None)  # sentinel to stop log_processor
             self.log_processor.join()
             self.relay_handler.close()

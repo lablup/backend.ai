@@ -41,4 +41,7 @@ class ScenarioBase[TInput, TResult]:
                 await fn(self.input)
         else:
             result = await fn(self.input)
-            assert result == self.expected
+            if result != self.expected:
+                raise AssertionError(
+                    f"Expected {self.expected!r} but got {result!r} for scenario: {self.description}"
+                )

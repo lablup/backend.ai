@@ -110,11 +110,13 @@ class CoalescingState:
         loop = asyncio.get_running_loop()
         if self.fut_sync is None:
             self.fut_sync = loop.create_future()
-        assert self.fut_sync is not None
+        if self.fut_sync is None:
+            raise RuntimeError("Failed to create future for rate control")
         self.last_added = loop.time()
         self.batch_size += 1
         if self.batch_size >= opts["max_batch_size"]:
-            assert self.last_handle is not None
+            if self.last_handle is None:
+                raise RuntimeError("Timer handle is not initialized")
             self.last_handle.cancel()
             self.fut_sync.cancel()
             self.last_handle = None

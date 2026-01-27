@@ -134,7 +134,8 @@ class PackageSetup(Static):
         _log_token = current_log.set(_log)
         # prerequisites
         if self._non_interactive:
-            assert dist_info.target_path is not None
+            if dist_info.target_path is None:
+                raise ValueError("Target path must be specified in non-interactive mode")
         else:
             if dist_info.target_path.exists():
                 input_box = InputDialog(
@@ -146,7 +147,8 @@ class PackageSetup(Static):
                 )
                 _log.mount(input_box)
                 value = await input_box.wait()
-                assert value is not None
+                if value is None:
+                    raise ValueError("Target path input was cancelled")
                 dist_info.target_path = Path(value)
         ctx = PackageContext(
             dist_info, install_variable, self.app, non_interactive=self._non_interactive
@@ -222,7 +224,8 @@ class Configure(Static):
 
     @on(Button.Pressed, "#save-config")
     def save_config(self) -> None:
-        assert self.install_variable
+        if self.install_variable is None:
+            raise RuntimeError("Install variable is not initialized")
         if self.public_facing_address is not None:
             self.install_variable.public_facing_address = self.public_facing_address
         self.close()
@@ -409,7 +412,8 @@ class ModeMenu(Static):
         # if Path("INSTALL-INFO").exists():
         #     self._enabled_menus.add(InstallModes.MAINTAIN)
         self._enabled_menus.add(InstallModes.CONFIGURE)
-        assert mode is not None
+        if mode is None:
+            raise ValueError("Installation mode must be specified")
         self._mode = mode
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,

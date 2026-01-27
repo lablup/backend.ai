@@ -243,9 +243,8 @@ def get_redis_object(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
-        assert service_name is not None, (
-            "config/redis/service_name is required when using Redis Sentinel"
-        )
+        if service_name is None:
+            raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
         kwargs = {
             "password": password,
@@ -333,9 +332,8 @@ def get_redis_object_for_lock(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
-        assert service_name is not None, (
-            "config/redis/service_name is required when using Redis Sentinel"
-        )
+        if service_name is None:
+            raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
         kwargs = {
             "password": password,

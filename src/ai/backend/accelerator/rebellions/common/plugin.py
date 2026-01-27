@@ -280,7 +280,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         numa_node_indexes: set[int] = set()
         for dev in await self._list_devices():
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
-                assert dev.numa_node is not None, "NUMA node index of accelerator cannot be null!"
+                if dev.numa_node is None:
+                    raise RuntimeError("NUMA node index of accelerator cannot be null!")
                 assigned_devices.append(dev)
                 device_files.extend([Path(x) for x in await self.list_device_files(dev)])
                 numa_node_indexes.add(dev.numa_node)

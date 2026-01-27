@@ -51,7 +51,8 @@ def setup_logger_basic(log_prefix: str, debug: bool) -> None:
 
 class LogQHandler(QueueHandler):
     def enqueue(self, record: logging.LogRecord) -> None:
-        assert self.formatter is not None
+        if self.formatter is None:
+            raise RuntimeError("Formatter is not initialized")
         with closing(StringIO()) as buf:
             print(self.formatter.format(record), file=buf)
             if record.exc_info is not None:

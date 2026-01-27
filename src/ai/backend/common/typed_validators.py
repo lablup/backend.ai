@@ -46,30 +46,35 @@ class _TimeDurationPydanticAnnotation:
         cls,
         value: int | float | str,
     ) -> TVariousDelta:
-        assert isinstance(value, (int, float, str)), "value must be a number or string"
+        if not isinstance(value, (int, float, str)):
+            raise ValueError("value must be a number or string")
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert len(value) > 0, "value must not be empty"
+        if len(value) == 0:
+            raise ValueError("value must not be empty")
 
         try:
             unit = value[-1]
             if unit.isdigit():
                 t = float(value)
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 return datetime.timedelta(seconds=t)
             if value[-2:].isalpha():
                 t = int(value[:-2])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-2:]:
                     case "yr":
                         return relativedelta(years=t)
                     case "mo":
                         return relativedelta(months=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
+                        raise ValueError("value is not a known time duration")
             else:
                 t = float(value[:-1])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-1]:
                     case "w":
                         return datetime.timedelta(weeks=t)
@@ -82,9 +87,9 @@ class _TimeDurationPydanticAnnotation:
                     case "s":
                         return datetime.timedelta(seconds=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
+                        raise ValueError("value is not a known time duration")
         except ValueError:
-            raise AssertionError(f"invalid numeric literal: {value[:-1]}")
+            raise ValueError(f"invalid numeric literal: {value[:-1]}")
 
     @classmethod
     def time_duration_serializer(cls, value: TVariousDelta) -> float | str:
@@ -94,19 +99,19 @@ class _TimeDurationPydanticAnnotation:
             case relativedelta():
                 # just like the deserializer, serializing relativedelta is only supported when year or month (not both) is supplied
                 # years or months being normalized is not considered as a valid case since relativedelta does not allow fraction of years or months as an input
-                assert not (value.years and value.months), (
-                    "Serializing relativedelta with both years and months contained is not supported"
-                )
-                assert value.years or value.months, (
-                    "Serialization is supported only for months or years field"
-                )
+                if value.years and value.months:
+                    raise ValueError(
+                        "Serializing relativedelta with both years and months contained is not supported"
+                    )
+                if not (value.years or value.months):
+                    raise ValueError("Serialization is supported only for months or years field")
                 if value.years:
                     return f"{value.years}yr"
                 if value.months:
                     return f"{value.months}mo"
-                raise AssertionError("Should not reach here")
+                raise RuntimeError("Should not reach here")
             case _:
-                raise AssertionError("Not a valid type")
+                raise ValueError("Not a valid type")
 
     @classmethod
     def __get_pydantic_core_schema__(

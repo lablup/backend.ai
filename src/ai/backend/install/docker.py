@@ -86,7 +86,8 @@ async def detect_system_docker(ctx: Context) -> str:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("Failed to capture docker version output")
     stdout = ""
     try:
         async with asyncio.timeout(0.5):
@@ -111,7 +112,8 @@ async def detect_system_docker(ctx: Context) -> str:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise RuntimeError("Failed to capture chmod output")
             stdout = (await proc.stdout.read()).decode()
             if (await proc.wait()) != 0:
                 raise RuntimeError("Failed to set the docker socket permission", stdout)
@@ -195,7 +197,8 @@ async def check_docker(ctx: Context) -> None:
     proc = await asyncio.create_subprocess_exec(
         *ctx.docker_sudo, "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
     )
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("Failed to capture docker compose version output")
     stdout = await proc.stdout.read()
     exit_code = await proc.wait()
     if exit_code != 0:
