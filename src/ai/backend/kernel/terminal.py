@@ -146,8 +146,10 @@ class Terminal:
                 if not self.accept_term_input:
                     return
                 self.accept_term_input = False
-                assert self.sock_term_out is not None
-                assert self.pid is not None
+                if self.sock_term_out is None:
+                    raise RuntimeError("Terminal output socket is not initialized")
+                if self.pid is None:
+                    raise RuntimeError("Terminal process ID is not set")
                 await self.sock_term_out.send_multipart([b"Restarting...\r\n"])
                 os.waitpid(self.pid, 0)
                 await self.start()
@@ -156,7 +158,8 @@ class Terminal:
 
     async def term_in(self, term_writer) -> None:
         try:
-            assert self.sock_term_in is not None
+            if self.sock_term_in is None:
+                raise RuntimeError("Terminal input socket is not initialized")
             while True:
                 data = await self.sock_term_in.recv_multipart()
                 if not data:
@@ -174,7 +177,8 @@ class Terminal:
 
     async def term_out(self, term_reader) -> None:
         try:
-            assert self.sock_term_out is not None
+            if self.sock_term_out is None:
+                raise RuntimeError("Terminal output socket is not initialized")
             while not term_reader.at_eof():
                 try:
                     data = await term_reader.read(4096)
@@ -197,11 +201,16 @@ class Terminal:
             log.exception("Unexpected error at term_out()")
 
     async def shutdown(self) -> None:
-        assert self.term_in_task is not None
-        assert self.term_out_task is not None
-        assert self.sock_term_in is not None
-        assert self.sock_term_out is not None
-        assert self.pid is not None
+        if self.term_in_task is None:
+            raise RuntimeError("Terminal input task is not initialized")
+        if self.term_out_task is None:
+            raise RuntimeError("Terminal output task is not initialized")
+        if self.sock_term_in is None:
+            raise RuntimeError("Terminal input socket is not initialized")
+        if self.sock_term_out is None:
+            raise RuntimeError("Terminal output socket is not initialized")
+        if self.pid is None:
+            raise RuntimeError("Terminal process ID is not set")
         self.term_in_task.cancel()
         self.term_out_task.cancel()
         await self.term_in_task

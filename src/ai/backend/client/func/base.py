@@ -31,7 +31,8 @@ def _wrap_method(cls: type, orig_name: str, meth: Callable) -> Callable:
         if isinstance(_api_session, AsyncSession):
             return coro
         # At this point, _api_session must be a Session (the sync version)
-        assert isinstance(_api_session, Session)
+        if not isinstance(_api_session, Session):
+            raise RuntimeError("API session must be either AsyncSession or Session")
         if inspect.isasyncgen(coro):
             return _api_session.worker_thread.execute_generator(coro)
         return _api_session.worker_thread.execute(coro)

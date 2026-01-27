@@ -25,7 +25,8 @@ async def create_scratch_filesystem(scratch_dir, size) -> None:
     exit_code = await proc.wait()
 
     if exit_code < 0:
-        assert proc.returncode is not None
+        if proc.returncode is None:
+            raise RuntimeError("Process returncode is None")
         raise CalledProcessError(proc.returncode, cmd)
 
 
@@ -43,5 +44,6 @@ async def destroy_scratch_filesystem(scratch_dir) -> None:
     exit_code = await proc.wait()
 
     if exit_code < 0:
-        assert proc.returncode is not None
+        if proc.returncode is None:
+            raise RuntimeError("Process returncode is None")
         raise CalledProcessError(proc.returncode, cmd)

@@ -773,7 +773,8 @@ class BaseRunner(metaclass=ABCMeta):
             ])
             if started:
                 # If started is True, model_service_info is guaranteed to be non-None
-                assert model_service_info is not None
+                if model_service_info is None:
+                    raise RuntimeError("model_service_info is None despite service being started")
                 model_service_info = cast(Mapping[str, Any], model_service_info)
                 if model_service_info.get("health_check"):
                     self._health_check_task = asyncio.create_task(
