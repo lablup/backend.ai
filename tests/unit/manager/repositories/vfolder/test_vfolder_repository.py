@@ -21,7 +21,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderFilterStatusFailed, VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -710,7 +710,7 @@ class TestVfolderRepositoryPurge:
 
         purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
 
-        with pytest.raises(VFolderInvalidParameter):
+        with pytest.raises(VFolderFilterStatusFailed):
             await vfolder_repository.purge_vfolder(purger)
 
         # Verify vfolder still exists in DB (not deleted)

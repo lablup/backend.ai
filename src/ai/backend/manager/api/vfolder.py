@@ -1938,14 +1938,11 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    try:
-        await root_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
-            PurgeVFolderAction(
-                purger=Purger(row_class=VFolderRow, pk_value=folder_id),
-            )
+    await root_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
+        PurgeVFolderAction(
+            purger=Purger(row_class=VFolderRow, pk_value=folder_id),
         )
-    except VFolderInvalidParameter as e:
-        raise InvalidAPIParameters(str(e))
+    )
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 

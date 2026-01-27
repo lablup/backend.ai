@@ -30,6 +30,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DBOperationFailed, ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
+    VFolderFilterStatusFailed,
     VFolderInvalidParameter,
     VFolderNotFound,
 )
@@ -423,7 +424,7 @@ class VfolderRepository:
 
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
-            VFolderInvalidParameter: If the vfolder status is not purgable.
+            VFolderFilterStatusFailed: If the vfolder status is not purgable.
         """
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
         async with self._db.begin_session() as session:
@@ -432,9 +433,7 @@ class VfolderRepository:
             if vfolder_row is None:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
             if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
-                raise VFolderInvalidParameter(
-                    f"Cannot purge vfolder with status {vfolder_row.status}"
-                )
+                raise VFolderFilterStatusFailed
             await execute_purger(session, purger)
             return vfolder_row.to_data()
 

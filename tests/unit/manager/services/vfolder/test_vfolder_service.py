@@ -17,7 +17,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderFilterStatusFailed, VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -128,12 +128,10 @@ class TestVFolderServicePurge:
         mock_vfolder_repository: MagicMock,
         sample_action: PurgeVFolderAction,
     ) -> None:
-        """Test that VFolderInvalidParameter from repository is propagated."""
-        mock_vfolder_repository.purge_vfolder = AsyncMock(
-            side_effect=VFolderInvalidParameter("Cannot purge vfolder with status ready")
-        )
+        """Test that VFolderFilterStatusFailed from repository is propagated."""
+        mock_vfolder_repository.purge_vfolder = AsyncMock(side_effect=VFolderFilterStatusFailed)
 
-        with pytest.raises(VFolderInvalidParameter):
+        with pytest.raises(VFolderFilterStatusFailed):
             await vfolder_service.purge(sample_action)
 
         mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
