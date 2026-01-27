@@ -879,8 +879,6 @@ class TestSearchImages(ImageServiceBaseFixtures):
         self, image_id: uuid.UUID, container_registry_id: uuid.UUID
     ) -> ImageDataWithDetails:
         """Sample ImageDataWithDetails for testing."""
-        from decimal import Decimal
-
         return ImageDataWithDetails(
             id=ImageID(image_id),
             name=ImageCanonical("registry.example.com/test_project/python:3.9-ubuntu20.04"),
