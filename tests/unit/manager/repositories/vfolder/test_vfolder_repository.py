@@ -469,3 +469,215 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         )
 
         assert isinstance(result, VFolderHostPermissionMap)
+
+
+class TestVfolderRepositoryPurge:
+    """Tests for VfolderRepository.purge_vfolder() method"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        return domain_name
+
+    @pytest.fixture
+    async def test_user_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test user resource policy."""
+        policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test user."""
+        user_uuid = uuid.uuid4()
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_user_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        return user_uuid
+
+    @pytest.fixture
+    async def vfolder_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> VfolderRepository:
+        """Create VfolderRepository instance."""
+        return VfolderRepository(db=db_with_cleanup)
+
+    async def _create_vfolder_in_db(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        vfolder_id: uuid.UUID,
+        domain_name: str,
+        user_id: uuid.UUID,
+        status: VFolderOperationStatus,
+    ) -> None:
+        """Helper to create a vfolder directly in DB."""
+        async with db.begin_session() as db_sess:
+            vfolder = VFolderRow(
+                id=vfolder_id,
+                name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                host="local:volume1",
+                domain_name=domain_name,
+                quota_scope_id=f"user:{user_id}",
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.READ_WRITE,
+                max_files=0,
+                max_size=None,
+                num_files=0,
+                cur_size=0,
+                creator=f"test-{user_id.hex[:8]}@example.com",
+                unmanaged_path=None,
+                ownership_type=VFolderOwnershipType.USER,
+                user=user_id,
+                group=None,
+                cloneable=False,
+                status=status,
+            )
+            db_sess.add(vfolder)
+            await db_sess.flush()
+
+    async def _vfolder_exists(self, db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID) -> bool:
+        """Check if vfolder exists in DB."""
+        import sqlalchemy as sa
+
+        async with db.begin_readonly_session() as session:
+            query = sa.select(VFolderRow.id).where(VFolderRow.id == vfolder_id)
+            result = await session.execute(query)
+            return result.scalar_one_or_none() is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [
+            VFolderOperationStatus.DELETE_COMPLETE,
+            VFolderOperationStatus.DELETE_PENDING,
+        ],
+        ids=["delete_complete", "delete_pending"],
+    )
+    async def test_purge_vfolder_success(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        status: VFolderOperationStatus,
+    ) -> None:
+        """Test successful purge of vfolder with purgable status."""
+        from ai.backend.manager.repositories.base.purger import Purger
+
+        vfolder_id = uuid.uuid4()
+        await self._create_vfolder_in_db(
+            db_with_cleanup,
+            vfolder_id=vfolder_id,
+            domain_name=test_domain_name,
+            user_id=test_user,
+            status=status,
+        )
+
+        # Verify vfolder exists before purge
+        assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
+
+        purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
+        result = await vfolder_repository.purge_vfolder(purger)
+
+        # Verify result contains correct data
+        assert result.id == vfolder_id
+        assert result.status == status
+
+        # Verify vfolder is deleted from DB
+        assert not await self._vfolder_exists(db_with_cleanup, vfolder_id)
+
+    @pytest.mark.asyncio
+    async def test_purge_vfolder_not_found(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        """Test purge fails when vfolder doesn't exist."""
+        from ai.backend.manager.errors.storage import VFolderNotFound
+        from ai.backend.manager.repositories.base.purger import Purger
+
+        non_existent_id = uuid.uuid4()
+        purger = Purger(row_class=VFolderRow, pk_value=non_existent_id)
+
+        with pytest.raises(VFolderNotFound):
+            await vfolder_repository.purge_vfolder(purger)

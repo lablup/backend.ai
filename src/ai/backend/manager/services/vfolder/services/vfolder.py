@@ -534,18 +534,9 @@ class VFolderService:
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
-
     async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
         """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
         vfolder_uuid = cast(uuid.UUID, action.purger.pk_value)
-        vfolder_data = await self._vfolder_repository.get_by_id(vfolder_uuid)
-        if vfolder_data is None:
-            raise VFolderNotFound(extra_data=str(vfolder_uuid))
-        if vfolder_data.status not in VFolderStatusSet.PURGABLE:
-            raise VFolderInvalidParameter(
-                f"Cannot purge vfolder with status {vfolder_data.status}"
-            )
-
         await self._vfolder_repository.purge_vfolder(action.purger)
         return PurgeVFolderActionResult(vfolder_uuid=vfolder_uuid)
 

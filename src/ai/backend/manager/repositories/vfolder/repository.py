@@ -50,11 +50,13 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
+    VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
+    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator
@@ -413,18 +415,25 @@ class VfolderRepository:
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
-
     @vfolder_repository_resilience.apply()
     async def purge_vfolder(self, purger: Purger[VFolderRow]) -> VFolderData:
         """
         Permanently delete a VFolder from DB.
-        This should only be called for VFolders with DELETE_COMPLETE status.
+        Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
+
+        Raises:
+            VFolderNotFound: If the vfolder doesn't exist.
+            VFolderInvalidParameter: If the vfolder status is not purgable.
         """
+        vfolder_uuid = cast(uuid.UUID, purger.pk_value)
+        vfolder_data = await self.get_by_id(vfolder_uuid)
+        if vfolder_data is None:
+            raise VFolderNotFound(extra_data=str(vfolder_uuid))
+        if vfolder_data.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
+            raise VFolderInvalidParameter(f"Cannot purge vfolder with status {vfolder_data.status}")
         async with self._db.begin_session() as session:
-            result = await execute_purger(session, purger)
-            if result is None:
-                raise VFolderNotFound(extra_data=str(purger.pk_value))
-            return self._vfolder_row_to_data(result.row)
+            await execute_purger(session, purger)
+            return vfolder_data
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:
