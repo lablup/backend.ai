@@ -82,7 +82,7 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
-extend-safe-fixes = ["UP030", "UP031", "UP040", "UP046", "UP047"]
+extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
     "W",      # pycodestyle warnings: PEP8 style warnings
