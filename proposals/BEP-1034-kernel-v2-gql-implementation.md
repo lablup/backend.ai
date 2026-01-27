@@ -44,7 +44,7 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelImageInfoGQL` - Image info (image deferred)
 - `KernelSessionInfoGQL` - Session info (session_id deferred)
 - `KernelClusterInfoGQL` - Cluster config
-- `KernelUserPermissionInfoGQL` - Unix process permissions only (most fields deferred)
+- `KernelUserInfoGQL` - Unix process permissions only (most fields deferred)
 - `KernelDeviceModelInfoGQL` - Device model info
 - `KernelAttachedDeviceEntryGQL` - Device entry
 - `KernelAttachedDevicesGQL` - Attached devices collection
@@ -80,7 +80,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 | Type/Field | ID Field (Include Now) | Future Node (Defer) |
 |------------|------------------------|---------------------|
 | `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
-| `KernelUserPermissionInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
+| `KernelUserInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
 | `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
 | `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
@@ -95,7 +95,7 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 - [ ] Skip all types listed in "Types to Skip"
 - [ ] Include ID fields for deferred Node types:
   - `KernelImageInfoGQL`: add `image_id`
-  - `KernelUserPermissionInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id` (plus `uid`, `main_gid`, `gids`)
+  - `KernelUserInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id` (plus `uid`, `main_gid`, `gids`)
   - `KernelSessionInfoGQL`: include `session_id`
   - `KernelResourceInfoGQL`: include `agent_id`, `resource_group_name`
   - `KernelRuntimeInfoGQL`: include `vfolder_ids`
@@ -105,10 +105,10 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 ### Future PRs
 
 - [ ] ImageNode PR: Add `image: ImageNode` to `KernelV2GQL`
-- [ ] UserNode PR: Add `user: UserNode` to `KernelUserPermissionInfoGQL`
-- [ ] KeypairNode PR: Add `keypair: KeypairNode` to `KernelUserPermissionInfoGQL`
-- [ ] DomainNode PR: Add `domain: DomainNode` to `KernelUserPermissionInfoGQL`
-- [ ] GroupNode PR: Add `project: GroupNode` to `KernelUserPermissionInfoGQL`
+- [ ] UserNode PR: Add `user: UserNode` to `KernelUserInfoGQL`
+- [ ] KeypairNode PR: Add `keypair: KeypairNode` to `KernelUserInfoGQL`
+- [ ] DomainNode PR: Add `domain: DomainNode` to `KernelUserInfoGQL`
+- [ ] GroupNode PR: Add `project: GroupNode` to `KernelUserInfoGQL`
 - [ ] SessionNode PR: Add `session: SessionNode` to `KernelSessionInfoGQL`
 - [ ] VFolderNode PR: Add `vfolders: list[VFolderNode]` to `KernelRuntimeInfoGQL`
 

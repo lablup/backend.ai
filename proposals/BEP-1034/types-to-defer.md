@@ -11,10 +11,10 @@ For each deferred Node type, we include the **ID field immediately** (for direct
 | Type/Field | ID Field (Include Now) | Future Node (Defer) |
 |------------|------------------------|---------------------|
 | `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
-| `KernelUserPermissionInfoGQL` | `user_id: uuid.UUID` | `user: UserNode` |
-| `KernelUserPermissionInfoGQL` | `access_key: str` | `keypair: KeypairNode` |
-| `KernelUserPermissionInfoGQL` | `domain_name: str` | `domain: DomainNode` |
-| `KernelUserPermissionInfoGQL` | `group_id: uuid.UUID` | `project: GroupNode` |
+| `KernelUserInfoGQL` | `user_id: uuid.UUID` | `user: UserNode` |
+| `KernelUserInfoGQL` | `access_key: str` | `keypair: KeypairNode` |
+| `KernelUserInfoGQL` | `domain_name: str` | `domain: DomainNode` |
+| `KernelUserInfoGQL` | `group_id: uuid.UUID` | `project: GroupNode` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
 | `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
 | `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
@@ -44,7 +44,7 @@ class KernelImageInfoGQL:
 
 ## User/Auth Types (Defer to Node connections)
 
-### KernelUserPermissionInfoGQL
+### KernelUserInfoGQL
 
 This type includes ID fields immediately, with Node connections deferred:
 
@@ -62,8 +62,8 @@ This type includes ID fields immediately, with Node connections deferred:
 
 **Resulting type (current PR)**:
 ```python
-@strawberry.type(name="KernelUserPermissionInfo")
-class KernelUserPermissionInfoGQL:
+@strawberry.type(name="KernelUserInfo")
+class KernelUserInfoGQL:
     user_id: uuid.UUID | None
     access_key: str | None
     domain_name: str | None
@@ -133,10 +133,10 @@ class KernelSessionInfoGQL:
 | PR | Node Connections to Add |
 |----|-------------------------|
 | ImageNode PR | `KernelV2GQL.image: ImageNode` |
-| UserNode PR | `KernelUserPermissionInfoGQL.user: UserNode` |
-| KeypairNode PR | `KernelUserPermissionInfoGQL.keypair: KeypairNode` |
-| DomainNode PR | `KernelUserPermissionInfoGQL.domain: DomainNode` |
-| GroupNode PR | `KernelUserPermissionInfoGQL.project: GroupNode` |
+| UserNode PR | `KernelUserInfoGQL.user: UserNode` |
+| KeypairNode PR | `KernelUserInfoGQL.keypair: KeypairNode` |
+| DomainNode PR | `KernelUserInfoGQL.domain: DomainNode` |
+| GroupNode PR | `KernelUserInfoGQL.project: GroupNode` |
 | SessionNode PR | `KernelSessionInfoGQL.session: SessionNode` |
 | ResourceGroupNode PR | `KernelResourceInfoGQL.resource_group: ResourceGroupNode` |
 | VFolderNode PR | `KernelRuntimeInfoGQL.vfolders: list[VFolderNode]` |

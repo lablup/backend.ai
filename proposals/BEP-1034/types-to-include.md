@@ -92,12 +92,12 @@ class KernelClusterInfoGQL:
     cluster_hostname: str
 ```
 
-### KernelUserPermissionInfoGQL
+### KernelUserInfoGQL
 
 > **Note**: `user: UserNode`, `keypair: KeypairNode`, `domain: DomainNode`, `project: GroupNode` are **deferred** (see types-to-defer.md)
 
 ```python
-class KernelUserPermissionInfoGQL:
+class KernelUserInfoGQL:
     user_id: uuid.UUID | None
     access_key: str | None
     domain_name: str | None
@@ -202,7 +202,7 @@ class KernelV2GQL(Node):
     id: NodeID[str]
     image: KernelImageInfoGQL
     session: KernelSessionInfoGQL
-    user_permission: KernelUserPermissionInfoGQL
+    user_permission: KernelUserInfoGQL
     network: KernelNetworkInfoGQL
     cluster: KernelClusterInfoGQL
     resource: KernelResourceInfoGQL
