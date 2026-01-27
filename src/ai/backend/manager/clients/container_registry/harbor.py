@@ -2,24 +2,22 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, override
+from typing import Any, override
 
 import aiohttp
 import yarl
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import (
+    HarborAuthArgs,
+    HarborProjectInfo,
+    HarborProjectQuotaInfo,
+)
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
     InternalServerError,
     ObjectNotFound,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.service.container_registry.harbor import (
-        HarborAuthArgs,
-        HarborProjectInfo,
-        HarborProjectQuotaInfo,
-    )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,8 +71,6 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
         project_info: HarborProjectInfo,
         rqst_args: dict[str, Any],
     ) -> HarborProjectQuotaInfo:
-        from ai.backend.manager.service.container_registry.harbor import HarborProjectQuotaInfo
-
         harbor_project_id = await self._get_harbor_project_id(sess, project_info, rqst_args)
         get_quota_id_api = (yarl.URL(project_info.url) / "api" / "v2.0" / "quotas").with_query({
             "reference": "project",
