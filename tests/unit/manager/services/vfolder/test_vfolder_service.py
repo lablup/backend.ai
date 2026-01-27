@@ -62,16 +62,15 @@ class TestVFolderServicePurge:
     def sample_action(self, sample_purger: Purger[VFolderRow]) -> PurgeVFolderAction:
         return PurgeVFolderAction(purger=sample_purger)
 
-    def _create_vfolder_data(
-        self, vfolder_uuid: uuid.UUID, status: VFolderOperationStatus
-    ) -> VFolderData:
-        """Helper to create mock VFolderData with specified status."""
+    @pytest.fixture
+    def sample_vfolder_data(self, sample_vfolder_uuid: uuid.UUID) -> VFolderData:
+        """Create mock VFolderData with DELETE_COMPLETE status."""
         return VFolderData(
-            id=vfolder_uuid,
+            id=sample_vfolder_uuid,
             name="test-vfolder",
             host="local:volume1",
             domain_name="default",
-            quota_scope_id=QuotaScopeID.parse(f"user:{vfolder_uuid}"),
+            quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
             usage_mode=VFolderUsageMode.GENERAL,
             permission=VFolderMountPermission.READ_WRITE,
             max_files=0,
@@ -83,10 +82,10 @@ class TestVFolderServicePurge:
             creator="test@example.com",
             unmanaged_path=None,
             ownership_type=VFolderOwnershipType.USER,
-            user=vfolder_uuid,
+            user=sample_vfolder_uuid,
             group=None,
             cloneable=False,
-            status=status,
+            status=VFolderOperationStatus.DELETE_COMPLETE,
         )
 
     async def test_purge_vfolder_success(
@@ -95,12 +94,10 @@ class TestVFolderServicePurge:
         mock_vfolder_repository: MagicMock,
         sample_vfolder_uuid: uuid.UUID,
         sample_action: PurgeVFolderAction,
+        sample_vfolder_data: VFolderData,
     ) -> None:
         """Test successful purge of vfolder."""
-        vfolder_data = self._create_vfolder_data(
-            sample_vfolder_uuid, VFolderOperationStatus.DELETE_COMPLETE
-        )
-        mock_vfolder_repository.purge_vfolder = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.purge_vfolder = AsyncMock(return_value=sample_vfolder_data)
 
         result = await vfolder_service.purge(sample_action)
 

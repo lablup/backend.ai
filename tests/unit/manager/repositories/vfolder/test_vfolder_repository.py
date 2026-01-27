@@ -10,8 +10,11 @@ from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, create_autospec
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.types import BinarySize, VFolderHostPermissionMap, VFolderUsageMode
+from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -618,8 +621,6 @@ class TestVfolderRepositoryPurge:
 
     async def _vfolder_exists(self, db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID) -> bool:
         """Check if vfolder exists in DB."""
-        import sqlalchemy as sa
-
         async with db.begin_readonly_session() as session:
             query = sa.select(VFolderRow.id).where(VFolderRow.id == vfolder_id)
             result = await session.execute(query)
@@ -642,8 +643,6 @@ class TestVfolderRepositoryPurge:
         status: VFolderOperationStatus,
     ) -> None:
         """Test successful purge of vfolder with purgable status."""
-        from ai.backend.manager.repositories.base.purger import Purger
-
         vfolder_id = uuid.uuid4()
         await self._create_vfolder_in_db(
             db_with_cleanup,
@@ -671,9 +670,6 @@ class TestVfolderRepositoryPurge:
         vfolder_repository: VfolderRepository,
     ) -> None:
         """Test purge fails when vfolder doesn't exist."""
-        from ai.backend.manager.errors.storage import VFolderNotFound
-        from ai.backend.manager.repositories.base.purger import Purger
-
         non_existent_id = uuid.uuid4()
         purger = Purger(row_class=VFolderRow, pk_value=non_existent_id)
 
@@ -701,9 +697,6 @@ class TestVfolderRepositoryPurge:
         status: VFolderOperationStatus,
     ) -> None:
         """Test purge fails when vfolder has non-purgable status."""
-        from ai.backend.manager.errors.storage import VFolderInvalidParameter
-        from ai.backend.manager.repositories.base.purger import Purger
-
         vfolder_id = uuid.uuid4()
         await self._create_vfolder_in_db(
             db_with_cleanup,
