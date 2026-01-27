@@ -72,6 +72,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
@@ -530,6 +532,11 @@ class VFolderService:
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
+        """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
+        data = await self._vfolder_repository.purge_vfolder(action.purger)
+        return PurgeVFolderActionResult(vfolder_uuid=data.id)
 
     async def force_delete(
         self, action: ForceDeleteVFolderAction

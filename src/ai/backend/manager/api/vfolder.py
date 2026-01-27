@@ -16,7 +16,6 @@ from typing import (
     Any,
     Concatenate,
     ParamSpec,
-    cast,
 )
 
 import aiohttp
@@ -105,6 +104,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -115,6 +115,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     GetVFolderAction,
     ListVFolderAction,
     MoveToTrashVFolderAction,
+    PurgeVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
 )
@@ -1941,14 +1942,11 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    async with root_ctx.db.begin_session() as db_session:
-        row = await db_session.scalar(sa.select(VFolderRow).where(VFolderRow.id == folder_id))
-        row = cast(VFolderRow | None, row)
-        if row is None:
-            raise VFolderNotFound(extra_data=folder_id)
-        await check_vfolder_status({"status": row.status}, VFolderStatusSet.PURGABLE)
-        delete_stmt = sa.delete(VFolderRow).where(VFolderRow.id == folder_id)
-        await db_session.execute(delete_stmt)
+    await root_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
+        PurgeVFolderAction(
+            purger=Purger(row_class=VFolderRow, pk_value=folder_id),
+        )
+    )
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 

@@ -31,6 +31,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DBOperationFailed, ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
+    VFolderFilterStatusFailed,
     VFolderInvalidParameter,
     VFolderNotFound,
 )
@@ -61,6 +62,7 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
@@ -414,6 +416,27 @@ class VfolderRepository:
             await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+    @vfolder_repository_resilience.apply()
+    async def purge_vfolder(self, purger: Purger[VFolderRow]) -> VFolderData:
+        """
+        Permanently delete a VFolder from DB.
+        Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
+
+        Raises:
+            VFolderNotFound: If the vfolder doesn't exist.
+            VFolderFilterStatusFailed: If the vfolder status is not purgable.
+        """
+        vfolder_uuid = cast(uuid.UUID, purger.pk_value)
+        async with self._db.begin_session() as session:
+            # Fetch vfolder first to validate status before purging.
+            vfolder_row = await self._get_vfolder_by_id(session, vfolder_uuid)
+            if vfolder_row is None:
+                raise VFolderNotFound(extra_data=str(vfolder_uuid))
+            if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
+                raise VFolderFilterStatusFailed
+            await execute_purger(session, purger)
+            return vfolder_row.to_data()
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_permissions(self, vfolder_id: uuid.UUID) -> list[VFolderPermissionData]:
