@@ -68,8 +68,6 @@ class TestImageRepositorySearch:
         test_registry_id: uuid.UUID,
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create sample images for testing"""
-        image_ids: list[uuid.UUID] = []
-
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE),
             ("python:3.10", "x86_64", ImageType.COMPUTE),
@@ -77,6 +75,7 @@ class TestImageRepositorySearch:
             ("ubuntu:22.04", "arm64", ImageType.SYSTEM),
         ]
 
+        image_rows: list[ImageRow] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for name, arch, img_type in images_data:
                 image = ImageRow(
@@ -96,17 +95,9 @@ class TestImageRepositorySearch:
                     resources={},
                 )
                 db_sess.add(image)
+                image_rows.append(image)
             await db_sess.flush()
-            # Retrieve IDs after flush
-            for name, _, _ in images_data:
-                result = await db_sess.execute(
-                    ImageRow.__table__.select().where(
-                        ImageRow.name == f"registry.example.com/test_project/{name}"
-                    )
-                )
-                row = result.fetchone()
-                if row:
-                    image_ids.append(row.id)
+            image_ids = [row.id for row in image_rows]
             await db_sess.commit()
 
         yield image_ids
@@ -118,7 +109,7 @@ class TestImageRepositorySearch:
         test_registry_id: uuid.UUID,
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 images for pagination testing"""
-        image_ids: list[uuid.UUID] = []
+        image_rows: list[ImageRow] = []
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(25):
@@ -139,17 +130,9 @@ class TestImageRepositorySearch:
                     resources={},
                 )
                 db_sess.add(image)
+                image_rows.append(image)
             await db_sess.flush()
-            # Retrieve IDs after flush
-            for i in range(25):
-                result = await db_sess.execute(
-                    ImageRow.__table__.select().where(
-                        ImageRow.name == f"registry.example.com/test_project/image_{i:02d}:latest"
-                    )
-                )
-                row = result.fetchone()
-                if row:
-                    image_ids.append(row.id)
+            image_ids = [row.id for row in image_rows]
             await db_sess.commit()
 
         yield image_ids
