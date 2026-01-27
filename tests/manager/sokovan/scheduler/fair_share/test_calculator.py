@@ -9,7 +9,7 @@ Verifies fair share factor calculation including:
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -29,6 +29,7 @@ from ai.backend.manager.data.fair_share import (
     UserProjectKey,
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.calculator import (
+    FairShareFactorCalculationResult,
     FairShareFactorCalculator,
 )
 
@@ -50,8 +51,6 @@ def make_fair_share_spec(
 
 def make_calculation_snapshot() -> FairShareCalculationSnapshot:
     """Create a dummy calculation snapshot for testing."""
-    from datetime import UTC, datetime
-
     return FairShareCalculationSnapshot(
         fair_share_factor=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
@@ -64,8 +63,6 @@ def make_calculation_snapshot() -> FairShareCalculationSnapshot:
 
 def make_metadata() -> FairShareMetadata:
     """Create dummy metadata for testing."""
-    from datetime import UTC, datetime
-
     now = datetime.now(UTC)
     return FairShareMetadata(created_at=now, updated_at=now)
 
@@ -576,8 +573,6 @@ class TestCalculateFactors:
         - Shorter half_life = faster decay = lower decayed usage = higher factor
         - Longer half_life = slower decay = higher decayed usage = lower factor
         """
-        from datetime import timedelta
-
         domain_name = "test-domain"
         # Usage from 7 days ago (will be decayed based on half_life)
         past_date = today - timedelta(days=7)
@@ -698,10 +693,6 @@ class TestCalculateSchedulingRanks:
 
     def test_empty_user_results_returns_empty(self, calculator: FairShareFactorCalculator) -> None:
         """Empty user results should return empty ranks."""
-        from ai.backend.manager.sokovan.scheduler.fair_share.calculator import (
-            FairShareFactorCalculationResult,
-        )
-
         result = FairShareFactorCalculationResult()
         ranks = calculator._calculate_scheduling_ranks(result)
 

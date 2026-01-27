@@ -5,12 +5,14 @@ from decimal import Decimal
 from typing import Any, Optional, cast
 from uuid import UUID, uuid4
 
+import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
@@ -18,7 +20,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName
+from ai.backend.common.types import AccessKey, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -435,8 +437,6 @@ class UserRepository:
 
     async def _sync_keypair_roles(self, conn, user_uuid: UUID, new_role: UserRole) -> None:
         """Private method to sync keypair roles with user role."""
-        from sqlalchemy.sql.expression import bindparam
-
         result = await conn.execute(
             sa.select(
                 keypairs.c.user,
@@ -864,8 +864,6 @@ class UserRepository:
         """
         Delete user's all virtual folders as well as their physical data.
         """
-        import aiotools
-
         target_vfs: list[VFolderDeletionInfo] = []
         async with self._db.begin_session() as db_session:
             await db_session.execute(
@@ -881,8 +879,6 @@ class UserRepository:
             )
             rows = cast(list[VFolderRow], result.fetchall())
             for vf in rows:
-                from ai.backend.common.types import VFolderID
-
                 target_vfs.append(
                     VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )

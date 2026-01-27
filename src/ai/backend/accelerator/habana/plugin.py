@@ -6,9 +6,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Generic,
     Optional,
-    TypeVar,
 )
 
 import aiodocker
@@ -66,10 +64,7 @@ _config_iv = t.Dict({
 log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.habana.gaudi2"))
 
 
-TDevice = TypeVar("TDevice", bound=AbstractGaudiDevice)
-
-
-class AbstractGaudiPlugin(AbstractComputePlugin, Generic[TDevice], metaclass=ABCMeta):
+class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, metaclass=ABCMeta):
     config_watch_enabled = False
 
     key = DeviceName("gaudi")

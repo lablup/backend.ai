@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 import pytest
 import sqlalchemy as sa
+from graphql_relay.utils import base64
 
 from ai.backend.manager.api.gql.base import (
     CURSOR_VERSION,
@@ -60,8 +61,6 @@ class TestDecodeCursor:
 
     def test_decode_cursor_invalid_format(self) -> None:
         """Test that wrong format (not cursor:v1:id) raises InvalidCursor."""
-        from graphql_relay.utils import base64
-
         # Valid base64 but wrong format
         invalid_cursor = base64("wrong:format")
         with pytest.raises(InvalidCursor) as exc_info:
@@ -70,8 +69,6 @@ class TestDecodeCursor:
 
     def test_decode_cursor_wrong_version(self) -> None:
         """Test that wrong version raises InvalidCursor."""
-        from graphql_relay.utils import base64
-
         # Valid format but wrong version
         invalid_cursor = base64("cursor:v999:some-id")
         with pytest.raises(InvalidCursor) as exc_info:
@@ -80,8 +77,6 @@ class TestDecodeCursor:
 
     def test_decode_cursor_missing_parts(self) -> None:
         """Test that cursor with missing parts raises InvalidCursor."""
-        from graphql_relay.utils import base64
-
         # Only two parts instead of three
         invalid_cursor = base64("cursor:v1")
         with pytest.raises(InvalidCursor) as exc_info:

@@ -26,6 +26,7 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
@@ -52,6 +53,7 @@ from .exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
+from .models.utils import connect_database
 from .types import AppCreator, EventLoopType, WebRequestHandler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -146,8 +148,6 @@ def handle_loop_error(
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -458,8 +458,6 @@ def main(
                 log_config = logging.getLogger("ai.backend.account_manager.config")
                 log_config.debug("debug mode enabled.")
                 if account_manager_cfg.event_loop == EventLoopType.UVLOOP:
-                    import uvloop
-
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
                 try:

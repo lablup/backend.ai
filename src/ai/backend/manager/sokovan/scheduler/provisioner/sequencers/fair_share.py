@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, override
 from uuid import UUID
 
 from ai.backend.manager.data.fair_share import ProjectUserIds, UserFairShareFactors
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .sequencer import WorkloadSequencer
 

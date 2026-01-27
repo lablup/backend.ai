@@ -4,7 +4,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.clients.valkey_client.client import ValkeyStandaloneClient
+from ai.backend.common.clients.valkey_client.client import (
+    ValkeyStandaloneClient,
+    ValkeyStandaloneTarget,
+)
 from ai.backend.common.health_checker import ComponentId
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.testutils.bootstrap import HostPortPairModel
@@ -19,8 +22,6 @@ class TestValkeyHealthChecker:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyStandaloneClient, None]:
         """Create a Valkey standalone client connected to the test container."""
-        from ai.backend.common.clients.valkey_client.client import ValkeyStandaloneTarget
-
         container_id, hostport_pair = redis_container
 
         target = ValkeyStandaloneTarget(address=hostport_pair.address)
@@ -67,8 +68,6 @@ class TestValkeyHealthChecker:
     @pytest.mark.asyncio
     async def test_connection_error(self) -> None:
         """Test health check failure with unreachable Valkey server."""
-        from ai.backend.common.clients.valkey_client.client import ValkeyStandaloneTarget
-
         # Create client pointing to non-existent server
         target = ValkeyStandaloneTarget(address="localhost:99999")
         client = ValkeyStandaloneClient(

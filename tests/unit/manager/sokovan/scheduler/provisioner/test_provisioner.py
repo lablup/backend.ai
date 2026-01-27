@@ -37,6 +37,10 @@ from ai.backend.manager.repositories.scheduler.types.snapshot import (
     ResourcePolicies,
     SnapshotData,
 )
+from ai.backend.manager.sokovan.data import (
+    ResourceOccupancySnapshot,
+    SessionDependencySnapshot,
+)
 from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
@@ -44,10 +48,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
-    ResourceOccupancySnapshot,
-    SessionDependencySnapshot,
 )
 
 

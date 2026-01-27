@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated
 
 import pytest
@@ -200,8 +201,6 @@ class TestEnumFormatter:
         )
 
     def test_format_string_enum(self, formatter: EnumFormatter, enum_field: FieldSchema) -> None:
-        from enum import Enum
-
         class Status(Enum):
             ACTIVE = "active"
             INACTIVE = "inactive"

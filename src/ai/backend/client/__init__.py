@@ -2,7 +2,7 @@ from pathlib import Path
 
 from . import exceptions, session
 
-__all__ = (
+__all__: tuple[str, ...] = (
     *exceptions.__all__,
     *session.__all__,
 )

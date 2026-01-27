@@ -40,14 +40,14 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ImageConfigData,
     KernelBindingData,
     NetworkSetup,
     SessionDataForPull,
     SessionDataForStart,
 )
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

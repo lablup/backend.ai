@@ -398,8 +398,6 @@ def assert_endpoint_creation_operations(mock_session, endpoint_row):
 
 
 def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
-    from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-
     endpoint_row = EndpointRow(
         name="full-featured-endpoint",
         domain="test-domain",

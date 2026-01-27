@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-__all__ = (
+__all__: tuple[str, ...] = (
     "APIVersionWarning",
     "BackendAPIError",
     "BackendClientError",

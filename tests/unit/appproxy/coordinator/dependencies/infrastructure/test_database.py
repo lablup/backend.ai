@@ -5,8 +5,10 @@ from unittest.mock import Mock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.appproxy.common.config import HostPortPair
 from ai.backend.appproxy.coordinator.config import (
     DBConfig,
+    DBType,
     ServerConfig,
 )
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.database import (
@@ -24,9 +26,6 @@ class TestDatabaseProvider:
         postgres_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a coordinator config pointing to the test database."""
-        from ai.backend.appproxy.common.config import HostPortPair
-        from ai.backend.appproxy.coordinator.config import DBType
-
         container_id, db_addr = postgres_container
 
         # Create DB config for testing

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import jinja2
 import pytest
 
 from ai.backend.common.data.notification import (
@@ -20,9 +21,17 @@ from ai.backend.common.data.notification import (
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
+    NotificationChannelListResult,
     NotificationRuleData,
+    NotificationRuleListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.errors.notification import (
+    NotificationChannelNotFound,
+    NotificationRuleNotFound,
+    NotificationTemplateRenderingFailure,
+)
+from ai.backend.manager.notification.notification_center import NotificationCenter
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
@@ -57,19 +66,16 @@ class TestNotificationService:
 
     def _mock_http_session_success(self, notification_service: NotificationService) -> None:
         """Helper to mock HTTP client session for successful webhook delivery"""
-        from unittest.mock import AsyncMock as AsyncMockClass
-        from unittest.mock import MagicMock as MagicMockClass
-
-        mock_response = MagicMockClass()
+        mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
-        mock_session = MagicMockClass()
-        mock_session.post = MagicMockClass(return_value=mock_response)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_response)
 
         notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
-            MagicMockClass(return_value=mock_session)
+            MagicMock(return_value=mock_session)
         )
 
     @pytest.fixture
@@ -82,9 +88,6 @@ class TestNotificationService:
         self, mock_repository: MagicMock
     ) -> AsyncGenerator[NotificationService, None]:
         """Create NotificationService instance with mocked repository"""
-
-        from ai.backend.manager.notification.notification_center import NotificationCenter
-
         # Create real NotificationCenter and mock HTTP client pool later
         notification_center = NotificationCenter()
 
@@ -639,9 +642,6 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test searching notification channels with querier"""
-        from ai.backend.manager.data.notification import NotificationChannelListResult
-        from ai.backend.manager.repositories.base import OffsetPagination
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -671,9 +671,6 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test searching notification rules with querier"""
-        from ai.backend.manager.data.notification import NotificationRuleListResult
-        from ai.backend.manager.repositories.base import OffsetPagination
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -703,23 +700,20 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test validating a notification channel successfully"""
-        from unittest.mock import AsyncMock as AsyncMockClass
-        from unittest.mock import MagicMock as MagicMockClass
-
         mock_repository.get_channel_by_id = AsyncMock(return_value=sample_webhook_channel)
 
         # Mock HTTP client session to avoid actual HTTP calls
-        mock_response = MagicMockClass()
+        mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
-        mock_session = MagicMockClass()
-        mock_session.post = MagicMockClass(return_value=mock_response)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_response)
 
         # Mock the client pool to return our mock session
         notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
-            MagicMockClass(return_value=mock_session)
+            MagicMock(return_value=mock_session)
         )
 
         action = ValidateChannelAction(
@@ -739,8 +733,6 @@ class TestNotificationService:
         mock_repository: MagicMock,
     ) -> None:
         """Test validating a non-existent notification channel"""
-        from ai.backend.manager.errors.notification import NotificationChannelNotFound
-
         channel_id = uuid4()
         mock_repository.get_channel_by_id = AsyncMock(
             side_effect=NotificationChannelNotFound(f"Channel {channel_id} not found")
@@ -761,9 +753,6 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test validating a notification rule successfully"""
-        from unittest.mock import AsyncMock as AsyncMockClass
-        from unittest.mock import MagicMock as MagicMockClass
-
         mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
         notification_data = {
             "session_id": "sess-123",
@@ -781,17 +770,17 @@ class TestNotificationService:
         )
 
         # Mock HTTP client session to avoid actual HTTP calls
-        mock_response = MagicMockClass()
+        mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
-        mock_session = MagicMockClass()
-        mock_session.post = MagicMockClass(return_value=mock_response)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_response)
 
         # Mock the client pool to return our mock session
         notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
-            MagicMockClass(return_value=mock_session)
+            MagicMock(return_value=mock_session)
         )
 
         action = ValidateRuleAction(
@@ -812,10 +801,6 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test validating a rule with invalid template"""
-        import jinja2
-
-        from ai.backend.manager.errors.notification import NotificationTemplateRenderingFailure
-
         invalid_rule = NotificationRuleData(
             id=uuid4(),
             name="Invalid Template Rule",
@@ -855,8 +840,6 @@ class TestNotificationService:
         mock_repository: MagicMock,
     ) -> None:
         """Test validating a non-existent notification rule"""
-        from ai.backend.manager.errors.notification import NotificationRuleNotFound
-
         rule_id = uuid4()
         mock_repository.get_rule_by_id = AsyncMock(
             side_effect=NotificationRuleNotFound(f"Rule {rule_id} not found")

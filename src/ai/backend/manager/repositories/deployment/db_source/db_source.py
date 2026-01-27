@@ -85,7 +85,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
     ModelServiceHelper,
 )
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
@@ -95,6 +95,7 @@ from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     RouteHistoryRow,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -1248,8 +1249,6 @@ class DeploymentDBSource:
             return []
 
         async with self._begin_readonly_session_read_committed() as db_sess:
-            from ai.backend.manager.models.kernel import KernelRow
-
             query = sa.select(
                 KernelRow.id,
                 KernelRow.session_id,
@@ -1265,8 +1264,6 @@ class DeploymentDBSource:
         group_name: str,
     ) -> Optional[uuid.UUID]:
         """Private method to resolve group ID."""
-        from ai.backend.manager.models.group import GroupRow
-
         query = sa.select(GroupRow.id).where(
             sa.and_(
                 GroupRow.domain_name == domain_name,
@@ -1761,8 +1758,6 @@ class DeploymentDBSource:
             return {}
 
         async with self._begin_readonly_session_read_committed() as db_sess:
-            from ai.backend.manager.models.session import SessionRow
-
             # LEFT JOIN으로 route와 session 정보를 한 번에 가져오기
             query = (
                 sa.select(

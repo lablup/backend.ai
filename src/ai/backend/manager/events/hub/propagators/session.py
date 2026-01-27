@@ -33,6 +33,9 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.hub import WILDCARD, EventPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
 
 if TYPE_CHECKING:
     from aiohttp_sse import EventSourceResponse
@@ -163,8 +166,6 @@ class SessionEventPropagator(EventPropagator):
     ) -> Optional[tuple[str, Mapping[str, Any]]]:
         """Fetch kernel data from database."""
         try:
-            from ai.backend.manager.models.kernel import kernels
-
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 query = (
                     sa.select(
@@ -201,8 +202,6 @@ class SessionEventPropagator(EventPropagator):
         """Fetch session data from database."""
         event_name = event.event_name()
         try:
-            from ai.backend.manager.models.session import SessionRow
-
             async with self._db.begin_readonly_session(
                 isolation_level="READ COMMITTED"
             ) as db_session:
@@ -249,8 +248,6 @@ class SessionEventPropagator(EventPropagator):
 
     async def _should_send_event(self, event_data: Mapping[str, Any]) -> bool:
         """Check if event should be sent based on filters."""
-        from ai.backend.manager.models.user import UserRole
-
         user_role = self._filters.get("user_role")
         user_uuid = self._filters.get("user_uuid")
         domain_name = self._filters.get("domain_name")

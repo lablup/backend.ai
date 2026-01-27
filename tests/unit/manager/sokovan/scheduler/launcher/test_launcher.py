@@ -14,13 +14,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.sokovan.recorder import RecorderContext
-from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ImageConfigData,
     SessionDataForPull,
     SessionDataForStart,
 )
+from ai.backend.manager.sokovan.recorder import RecorderContext
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
 # =============================================================================
 # TestSessionLauncherImagePulling (SC-LA-001 ~ SC-LA-004)

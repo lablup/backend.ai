@@ -13,6 +13,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
     DomainDeletionFailed,
@@ -27,6 +28,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType, groups
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -233,9 +235,6 @@ class TestDomainRepository:
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> str:
         """Create an inactive domain with a user for purge testing."""
-        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-        from ai.backend.manager.models.hasher.types import PasswordInfo
-
         domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
@@ -314,9 +313,6 @@ class TestDomainRepository:
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> str:
         """Create an inactive domain with an active kernel for purge testing."""
-        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-        from ai.backend.manager.models.hasher.types import PasswordInfo
-
         domain_name = f"domain-with-kernel-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()

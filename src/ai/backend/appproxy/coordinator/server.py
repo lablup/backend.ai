@@ -10,6 +10,7 @@ import logging
 import os
 import pwd
 import signal
+import socket
 import ssl
 import sys
 import time
@@ -29,6 +30,7 @@ import click
 import jinja2
 import memray
 import pyroscope
+import uvloop
 from aiohttp import web
 from pydantic import ValidationError
 from setproctitle import setproctitle
@@ -50,6 +52,8 @@ from ai.backend.appproxy.common.errors import (
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
+    DoCheckWorkerLostEvent,
+    DoHealthCheckEvent,
     WorkerLostEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -69,6 +73,7 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.config import ModelHealthCheck
@@ -82,6 +87,14 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
+from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+from ai.backend.common.leader.tasks import (
+    EventProducerTask,
+    EventTaskSpec,
+    LeaderCron,
+    PeriodicTask,
+)
+from ai.backend.common.lock import FileLock, RedisLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -120,8 +133,10 @@ from .errors import (
     MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
+from .health_checker import HealthCheckEngine
 from .models import Circuit, Endpoint, Worker
-from .models.utils import execute_with_txn_retry
+from .models.utils import connect_database, execute_with_txn_retry
+from .pglock import PgAdvisoryLock
 from .types import (
     CircuitManager,
     CleanupContext,
@@ -360,20 +375,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     This replaces the GlobalTimer-based approach with a leader-based approach
     where only the elected leader coordinator instance runs periodic tasks.
     """
-    import socket
-
-    from ai.backend.appproxy.common.events import (
-        DoCheckWorkerLostEvent,
-        DoHealthCheckEvent,
-    )
-    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
-    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
-    from ai.backend.common.leader.tasks import (
-        EventProducerTask,
-        EventTaskSpec,
-        LeaderCron,
-        PeriodicTask,
-    )
 
     # Create ValkeyLeaderClient for leader election
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
@@ -592,8 +593,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.local_config.db) as db:
         root_ctx.db = db
         yield
@@ -607,10 +606,6 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ai.backend.appproxy.common.events import DoHealthCheckEvent
-
-    from .health_checker import HealthCheckEngine
-
     health_engine = HealthCheckEngine(
         root_ctx.db,
         root_ctx.core_event_producer,
@@ -909,19 +904,13 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
-            from ai.backend.common.lock import FileLock
-
             return lambda lock_id, lifetime_hint: FileLock(
                 ipc_base_path / f"{coordinator_id}.{lock_id}.lock",
                 timeout=0,
             )
         case "pg_advisory":
-            from .pglock import PgAdvisoryLock
-
             return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
         case "redlock":
-            from ai.backend.common.lock import RedisLock
-
             redlock_config = root_ctx.local_config.proxy_coordinator.redlock_config
 
             return lambda lock_id, lifetime_hint: RedisLock(
@@ -1214,8 +1203,6 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                 log_config.debug("debug mode enabled.")
                 match server_config.proxy_coordinator.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

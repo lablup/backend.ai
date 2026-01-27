@@ -7,6 +7,7 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.storage.config.loaders import make_etcd
 from ai.backend.storage.config.unified import EtcdConfig, StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.redis import (
     RedisProvider,
@@ -44,8 +45,6 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[AsyncEtcd, None]:
         """Create an etcd client for testing."""
-        from ai.backend.storage.config.loaders import make_etcd
-
         redis_container_id, redis_addr = redis_container
 
         async with make_etcd(storage_config) as etcd:

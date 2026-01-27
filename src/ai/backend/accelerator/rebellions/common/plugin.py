@@ -7,9 +7,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Generic,
     Optional,
-    TypeVar,
 )
 
 import aiodocker
@@ -65,10 +63,7 @@ _atom_config_iv = t.Dict({
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-TATOMDevice = TypeVar("TATOMDevice", bound=AbstractATOMDevice)
-
-
-class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=ABCMeta):
+class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin, metaclass=ABCMeta):
     key = DeviceName("atom")
     slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("atom.device"), SlotTypes("count")),

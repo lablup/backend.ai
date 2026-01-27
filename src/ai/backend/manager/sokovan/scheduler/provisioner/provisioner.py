@@ -22,13 +22,7 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-from ai.backend.manager.sokovan.recorder import (
-    ExecutionRecord,
-    RecorderContext,
-    StepStatus,
-)
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AllocationBatch,
     KeypairOccupancy,
     SchedulingFailure,
@@ -37,6 +31,12 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.recorder import (
+    ExecutionRecord,
+    RecorderContext,
+    StepStatus,
+)
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
@@ -46,7 +46,10 @@ from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
+    AgentSelectionCriteria,
     AgentSelector,
+    KernelResourceSpec,
+    SessionMetadata,
 )
 from .sequencers.drf import DRFSequencer
 from .sequencers.fair_share import FairShareSequencer
@@ -414,8 +417,27 @@ class SessionProvisioner:
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
         """
-        # Convert to new criteria format
-        criteria = session_workload.to_agent_selection_criteria()
+        # Convert session workload to agent selection criteria
+        session_metadata = SessionMetadata(
+            session_id=session_workload.session_id,
+            session_type=session_workload.session_type,
+            scaling_group=session_workload.scaling_group,
+            cluster_mode=session_workload.cluster_mode,
+        )
+
+        kernel_requirements = {
+            kernel.kernel_id: KernelResourceSpec(
+                requested_slots=kernel.requested_slots,
+                required_architecture=kernel.architecture,
+            )
+            for kernel in session_workload.kernels
+        }
+
+        criteria = AgentSelectionCriteria(
+            session_metadata=session_metadata,
+            kernel_requirements=kernel_requirements,
+            kernel_counts_at_endpoint=session_workload.kernel_counts_at_endpoint,
+        )
 
         # Use batch selection method - it will get resource requirements internally
         # and apply state changes to agents_info

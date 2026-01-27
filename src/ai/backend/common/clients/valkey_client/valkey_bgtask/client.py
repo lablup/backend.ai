@@ -246,8 +246,6 @@ class ValkeyBgtaskClient:
         Returns:
             True if all subtasks are completed (ongoing_count == 0), False otherwise.
         """
-        from ai.backend.common.bgtask.types import TaskStatus
-
         batch = self._create_batch()
 
         # Update subtask status

@@ -70,6 +70,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
@@ -1560,8 +1561,6 @@ async def share(request: web.Request, params: Any, row: Mapping[str, Any]) -> we
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ai.backend.manager.models.group import association_groups_users as agus
-
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )

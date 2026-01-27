@@ -16,9 +16,11 @@ import traceback
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import Any, Final, cast
 
+import aiohttp
 import aiohttp_cors
 import aiohttp_jinja2
 import aiomonitor
@@ -27,6 +29,7 @@ import click
 import jinja2
 import memray
 import pyroscope
+import uvloop
 from aiohttp import web
 from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
@@ -65,6 +68,10 @@ from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
     ensure_json_serializable,
     mime_match,
+)
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientPool,
+    tcp_client_session_factory,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -277,15 +284,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from functools import partial
-
-    import aiohttp
-
-    from ai.backend.common.clients.http_client.client_pool import (
-        ClientPool,
-        tcp_client_session_factory,
-    )
-
     client_timeout = aiohttp.ClientTimeout(
         total=None,
         connect=10.0,
@@ -991,8 +989,6 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                 log_config.debug("debug mode enabled.")
                 match server_config.proxy_worker.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

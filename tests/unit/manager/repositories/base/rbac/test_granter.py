@@ -10,6 +10,7 @@ from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.data.permission.types import OperationType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -453,7 +454,6 @@ class TestGranterIdempotent:
         handling by the caller.
         """
         ctx = single_role
-        from sqlalchemy.exc import IntegrityError
 
         # First grant in separate session (committed)
         async with database_connection.begin_session_read_committed() as db_sess:

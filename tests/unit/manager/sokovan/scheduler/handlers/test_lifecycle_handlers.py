@@ -21,6 +21,11 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingSessionData,
 )
+from ai.backend.manager.sokovan.data import (
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
 )
@@ -36,11 +41,6 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions 
 from ai.backend.manager.sokovan.scheduler.results import (
     ScheduledSessionData,
     ScheduleResult,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
 )
 
 if TYPE_CHECKING:

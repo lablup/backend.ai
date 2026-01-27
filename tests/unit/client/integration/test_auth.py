@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from ai.backend.client import request
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession, Session
@@ -30,8 +31,6 @@ def test_auth_missing_signature(monkeypatch):
         rqst = Request("GET", "/auth")
         rqst.set_json({"echo": random_msg})
         # let it bypass actual signing
-        from ai.backend.client import request
-
         noop_sign = lambda *args, **kwargs: ({}, None)
         monkeypatch.setattr(request, "generate_signature", noop_sign)
         with pytest.raises(BackendAPIError) as e, rqst.fetch():

@@ -22,6 +22,7 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
+from ai.backend.manager.server import global_subapp_pkgs
 
 
 class ParseError(Exception):
@@ -526,8 +527,6 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
 
 
 async def generate() -> dict[str, Any]:
-    from ai.backend.manager.server import global_subapp_pkgs
-
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=False, expose_headers="*", allow_headers="*"

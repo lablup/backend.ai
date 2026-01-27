@@ -4,9 +4,10 @@ from datetime import UTC, datetime
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
+from sqlalchemy import exc as sa_exc
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.exception import BackendAIError
@@ -50,11 +51,13 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionRow,
     VFolderRow,
+    VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
+    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator
@@ -526,8 +529,6 @@ class VfolderRepository:
         """
         Count VFolders owned by a user (excluding hard deleted ones).
         """
-        from ai.backend.manager.models.vfolder import HARD_DELETED_VFOLDER_STATUSES
-
         async with self._db.begin_session() as session:
             query = (
                 sa.select(sa.func.count())
@@ -762,8 +763,6 @@ class VfolderRepository:
         Check if any of the users already have permission for the vfolder.
         Returns True if any user already has permission.
         """
-        from ai.backend.manager.models.vfolder import VFolderPermissionRow
-
         async with self._db.begin_session() as session:
             # Check direct permissions and ownership
             j = sa.join(
@@ -816,8 +815,6 @@ class VfolderRepository:
         Count VFolders with the given name accessible to the user.
         Used to check for duplicates when accepting invitations.
         """
-        from ai.backend.manager.models.vfolder import VFolderStatusSet, vfolder_status_map
-
         async with self._db.begin_session() as session:
             j = sa.join(
                 VFolderRow,
@@ -876,8 +873,6 @@ class VfolderRepository:
         Create a VFolder invitation.
         Returns the invitee email on success, None on failure.
         """
-        from sqlalchemy import exc as sa_exc
-
         async with self._db.begin_session() as session:
             query = sa.insert(VFolderInvitationRow).values(
                 permission=permission,
@@ -983,8 +978,6 @@ class VfolderRepository:
         Get all pending invitations for a user with VFolder info.
         Returns list of (invitation_data, vfolder_data) tuples.
         """
-        from sqlalchemy.orm import contains_eager
-
         async with self._db.begin_session() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id

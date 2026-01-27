@@ -59,11 +59,7 @@ from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
-    ScheduleResult,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ImageConfigData,
     KernelBindingData,
     SessionDataForPull,
@@ -71,6 +67,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionWithKernels,
+)
+from ai.backend.manager.sokovan.scheduler.results import (
+    ScheduledSessionData,
+    ScheduleResult,
 )
 
 # =============================================================================

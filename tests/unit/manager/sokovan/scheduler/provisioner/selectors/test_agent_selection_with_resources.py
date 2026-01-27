@@ -14,6 +14,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated imp
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
     DispersedAgentSelector,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    NoAvailableAgentError,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
@@ -189,10 +192,6 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoAvailableAgentError,
-        )
-
         with pytest.raises(NoAvailableAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 agents_for_designated_agent_test,

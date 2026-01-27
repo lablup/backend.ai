@@ -1,7 +1,7 @@
 """Validator for pending session resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .exceptions import PendingSessionResourceLimitExceeded
 from .validator import ValidatorRule

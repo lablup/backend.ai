@@ -7,12 +7,11 @@ from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddl
 from ai.backend.appproxy.worker import __version__
 from ai.backend.appproxy.worker.errors import MissingPortProxyConfigError
 from ai.backend.appproxy.worker.types import RootContext
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 
 
 async def hello(request: web.Request) -> web.Response:
     """Health check endpoint with dependency connectivity status"""
-    from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-
     request["do_not_print_access_log"] = True
 
     root_ctx: RootContext = request.app["_root.context"]
