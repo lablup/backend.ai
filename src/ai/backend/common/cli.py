@@ -63,12 +63,12 @@ class EnumChoice(click.Choice):
         super().__init__(enum_members)
         self.enum = enum
 
-    def convert(self, value: Any, param, ctx) -> str:
+    def convert(self, value: Any, param, ctx) -> Enum:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
-            return next(e for e in self.enum if e == value).value
+            return next(e for e in self.enum if e == value)
         value = super().convert(value, param, ctx)
-        return next(k for k in self.enum.__members__.keys() if k == value)
+        return self.enum[value]
 
     def get_metavar(self, param) -> str:
         name = self.enum.__name__

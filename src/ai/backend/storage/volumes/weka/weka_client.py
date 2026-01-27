@@ -70,7 +70,8 @@ class WekaFs:
     ssd_budget: int
     total_budget: int
 
-    def from_json(data: Any) -> WekaFs:
+    @classmethod
+    def from_json(cls, data: Any) -> WekaFs:
         return WekaFs(
             data["id"],
             data["name"],

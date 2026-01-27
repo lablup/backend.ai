@@ -194,7 +194,7 @@ class TPUPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
-    async def restore_from_container(cls, container, alloc_map) -> None:
+    async def restore_from_container(self, container, alloc_map) -> None:
         # TODO: implement!
         pass
 
