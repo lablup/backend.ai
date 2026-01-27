@@ -728,7 +728,7 @@ class StatContext:
         for kernel_id in updated_kernel_ids:
             session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
             metrics = self.kernel_metrics[kernel_id]
-            metric_values: dict[MetricKey, dict[str, Any]] = {}
+            serializable_metrics: dict[MetricKey, dict[str, Any]] = {}
             for key, obj in metrics.items():
                 try:
                     metric_value = obj.to_serializable_dict()
@@ -737,7 +737,7 @@ class StatContext:
                         "Failed to serialize metric (Metric key: {}, {})", key, str(obj.stats)
                     )
                     continue
-                metric_values[key] = metric_value
+                serializable_metrics[key] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
                     (PCT_METRIC_KEY, metric_value["pct"]),
@@ -756,9 +756,9 @@ class StatContext:
                     )
                 )
             if self.agent.local_config.debug.log_stats:
-                log.debug("kernel_updates: {0}: {1}", kernel_id, metric_values)
+                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
 
-            kernel_serialized_updates.append((kernel_id, msgpack.packb(metric_values)))
+            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
         self._stage_observer.observe_stage(
             stage="before_report_to_redis",
