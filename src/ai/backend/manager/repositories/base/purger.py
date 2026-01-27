@@ -44,7 +44,7 @@ class PurgerResult[TRow: Base]:
     row: TRow
 
 
-async def execute_purger(
+async def execute_purger[TRow: Base](
     db_sess: SASession,
     purger: Purger[TRow],
 ) -> PurgerResult[TRow] | None:
@@ -136,7 +136,7 @@ class BatchPurgerResult:
     deleted_count: int
 
 
-async def execute_batch_purger(
+async def execute_batch_purger[TRow: Base](
     db_sess: SASession,
     purger: BatchPurger[TRow],
 ) -> BatchPurgerResult:

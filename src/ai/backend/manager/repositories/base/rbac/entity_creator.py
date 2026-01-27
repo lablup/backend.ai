@@ -49,7 +49,7 @@ class RBACEntityCreatorResult[TRow: Base]:
     row: TRow
 
 
-async def execute_rbac_entity_creator(
+async def execute_rbac_entity_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACEntityCreator[TRow],
 ) -> RBACEntityCreatorResult[TRow]:
@@ -130,7 +130,7 @@ class RBACBulkEntityCreatorResult[TRow: Base]:
     rows: list[TRow]
 
 
-async def execute_rbac_bulk_entity_creator(
+async def execute_rbac_bulk_entity_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACBulkEntityCreator[TRow],
 ) -> RBACBulkEntityCreatorResult[TRow]:

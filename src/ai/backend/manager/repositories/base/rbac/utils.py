@@ -10,7 +10,7 @@ from ai.backend.manager.models.base import Base
 TRow = TypeVar("TRow", bound=Base)
 
 
-async def insert_on_conflict_do_nothing(
+async def insert_on_conflict_do_nothing[TRow: Base](
     db_sess: SASession,
     row: TRow,
 ) -> TRow:
@@ -24,7 +24,7 @@ async def insert_on_conflict_do_nothing(
     return row
 
 
-async def bulk_insert_on_conflict_do_nothing(
+async def bulk_insert_on_conflict_do_nothing[TRow: Base](
     db_sess: SASession,
     rows: Collection[TRow],
 ) -> None:

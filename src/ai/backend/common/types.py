@@ -258,28 +258,28 @@ T4 = TypeVar("T4")
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1](
     value: tuple[Any],
     types: tuple[type[T1]],
 ) -> tuple[T1]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2](
     value: tuple[Any, Any],
     types: tuple[type[T1], type[T2]],
 ) -> tuple[T1, T2]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3](
     value: tuple[Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3]],
 ) -> tuple[T1, T2, T3]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3, T4](
     value: tuple[Any, Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3], type[T4]],
 ) -> tuple[T1, T2, T3, T4]: ...

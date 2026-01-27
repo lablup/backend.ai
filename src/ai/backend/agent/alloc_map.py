@@ -54,7 +54,7 @@ class DeviceSlotInfo:
     amount: Decimal
 
 
-def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
+def distribute[T](num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
     base, extra = divmod(num_items, len(groups))
     return dict(
         zip(

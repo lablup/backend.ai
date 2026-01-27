@@ -685,7 +685,7 @@ T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
 T_PropertyReturn = TypeVar("T_PropertyReturn")
 
 
-def required_permission(permission: PermissionType):
+def required_permission[PermissionType: BasePermission](permission: PermissionType):
     def wrapper(
         property_func: Callable[[T_RBACModel], T_PropertyReturn],
     ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:

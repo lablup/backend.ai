@@ -46,7 +46,7 @@ class QuerierResult[TRow: Base]:
     row: TRow
 
 
-async def execute_querier(
+async def execute_querier[TRow: Base](
     db_sess: SASession,
     querier: Querier[TRow],
 ) -> QuerierResult[TRow] | None:

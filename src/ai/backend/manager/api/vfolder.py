@@ -338,7 +338,7 @@ def with_vfolder_rows_resolved(
     return _wrapper
 
 
-def vfolder_check_exists(
+def vfolder_check_exists[**P](
     handler: Callable[Concatenate[web.Request, Mapping[str, Any], P], Awaitable[web.Response]],
 ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
     """

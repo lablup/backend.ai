@@ -96,7 +96,7 @@ type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamRespo
 ]
 
 
-def ensure_stream_response_type(
+def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
     response: ResponseModel | TAnyResponse,
 ) -> web.StreamResponse:
     json_body: Any
@@ -137,7 +137,7 @@ def pydantic_api_response_handler(
     return wrapped
 
 
-def pydantic_api_handler(
+def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,

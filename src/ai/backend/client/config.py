@@ -48,11 +48,11 @@ def parse_api_version(value: str) -> tuple[int, str]:
 T = TypeVar("T")
 
 
-def default_clean(v: T | Any) -> T:
+def default_clean[T](v: T | Any) -> T:
     return cast(T, v)
 
 
-def get_env(
+def get_env[T](
     key: str,
     default: str | Mapping | Undefined = _undefined,
     *,

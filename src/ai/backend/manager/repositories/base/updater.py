@@ -123,7 +123,7 @@ class BatchUpdaterResult:
     updated_count: int
 
 
-async def execute_updater(
+async def execute_updater[TRow: Base](
     db_sess: SASession,
     updater: Updater[TRow],
 ) -> UpdaterResult[TRow] | None:
@@ -188,7 +188,7 @@ async def execute_updater(
     return UpdaterResult(row=updated_row)
 
 
-async def execute_batch_updater(
+async def execute_batch_updater[TRow: Base](
     db_sess: SASession,
     updater: BatchUpdater[TRow],
 ) -> BatchUpdaterResult:

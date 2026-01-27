@@ -249,7 +249,7 @@ class THandlerFuncWithParam[
     ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
 
 
-def ensure_stream_response_type(
+def ensure_stream_response_type[TResponseModel: LegacyBaseResponseModel](
     response: LegacyBaseResponseModel
     | BaseResponseModel
     | list[TResponseModel]
@@ -268,7 +268,7 @@ def ensure_stream_response_type(
             raise RuntimeError(f"Unsupported response type ({type(response).__mro__})")
 
 
-def pydantic_response_api_handler(
+def pydantic_response_api_handler[**P, TResponseModel: LegacyBaseResponseModel](
     handler: THandlerFuncWithoutParam[P, TResponseModel],
 ) -> Handler:
     """
@@ -287,7 +287,10 @@ def pydantic_response_api_handler(
     return wrapped
 
 
-def pydantic_params_api_handler(
+def pydantic_params_api_handler[
+    TParamModel: LegacyBaseRequestModel,
+    TQueryModel: LegacyBaseRequestModel,
+](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
