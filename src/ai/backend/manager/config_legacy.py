@@ -463,6 +463,6 @@ def load(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return LocalConfig(cfg)

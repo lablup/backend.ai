@@ -221,8 +221,8 @@ class HTTPBackend(BaseBackend):
                 e,
             )
             raise
-        except ConnectionResetError:
-            raise asyncio.CancelledError()
+        except ConnectionResetError as e:
+            raise asyncio.CancelledError() from e
         except aiohttp.ClientOSError as e:
             raise ContainerConnectionRefused from e
         except:

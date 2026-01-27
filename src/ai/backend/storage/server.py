@@ -755,7 +755,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     # Note: logging configuration is handled separately in Logger class
     # Debug mode is already set during config loading if needed
 

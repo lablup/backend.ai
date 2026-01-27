@@ -204,8 +204,8 @@ class DockerKernel(AbstractKernel):
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
-        except ValueError:  # parent_path does not start with work_dir!
-            raise ValueError("malformed committed path.")
+        except ValueError as e:  # parent_path does not start with work_dir!
+            raise ValueError("malformed committed path.") from e
 
         def _write_chunks(
             fileobj: gzip.GzipFile,
@@ -313,7 +313,7 @@ class DockerKernel(AbstractKernel):
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
-            )
+            ) from e
 
     @override
     async def download_file(self, container_path: os.PathLike | str) -> bytes:
@@ -339,8 +339,9 @@ class DockerKernel(AbstractKernel):
                         raise ValueError("Too large archive file exceeding 1 MiB")
                     tar_fobj.seek(0, io.SEEK_SET)
                     tarbytes = tar_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return tarbytes
 
     @override
@@ -378,8 +379,9 @@ class DockerKernel(AbstractKernel):
                         )
                     # FYI: To get the size of extracted file, seek and tell with inner_fobj.
                     content_bytes = inner_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return content_bytes
 
     @override
@@ -563,6 +565,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 ])
                 if await proc.wait() != 0:
                     raise RuntimeError("extracting krunner environment has failed!")
+
     except Exception:
         log.exception("unexpected error")
         return distro, None

@@ -525,8 +525,8 @@ async def check_credential_with_migration(
     try:
         if not _verify_password(target_password_info.password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
-    except ValueError:
-        raise AuthorizationFailed("User credential mismatch.")
+    except ValueError as e:
+        raise AuthorizationFailed("User credential mismatch.") from e
 
     # Password is valid, check if we need to migrate the hash
     current_hash_info = HashInfo.from_hash_string(row.password)
@@ -586,7 +586,7 @@ async def check_credential(
     try:
         if not _verify_password(password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
-    except ValueError:
-        raise AuthorizationFailed("User credential mismatch.")
+    except ValueError as e:
+        raise AuthorizationFailed("User credential mismatch.") from e
 
     return row._mapping

@@ -102,8 +102,8 @@ class UserID:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        raise ValueError(f"no such user {value} in system")
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -174,8 +174,8 @@ class GroupID:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        raise ValueError(f"no such user {value} in system")
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -421,7 +421,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return server_config
 

@@ -1774,8 +1774,8 @@ class ResourceConfig(BaseConfigSchema):
         if isinstance(v, str):
             try:
                 return AffinityPolicy[v.upper()]
-            except KeyError:
-                raise ValueError(f"Invalid affinity policy: {v}")
+            except KeyError as e:
+                raise ValueError(f"Invalid affinity policy: {v}") from e
         return v
 
 

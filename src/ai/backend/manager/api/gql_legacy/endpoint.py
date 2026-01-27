@@ -207,8 +207,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             raw_rule_id = rule_id
         try:
             _rule_id = RuleId(UUID(raw_rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -277,12 +277,12 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                 raw_endpoint_id = endpoint
             try:
                 _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-            except ValueError:
-                raise ObjectNotFound(object_name="Endpoint")
+            except ValueError as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -372,8 +372,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
 
             try:
                 return decimal.Decimal(value)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
+            except decimal.InvalidOperation as e:
+                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal") from e
 
         spec = EndpointAutoScalingRuleUpdaterSpec(
             metric_source=OptionalState.from_graphql(
@@ -439,8 +439,8 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raw_endpoint_id = endpoint
         try:
             _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint") from e
 
         action = props.to_action(
             endpoint_id=_endpoint_id,
@@ -486,8 +486,8 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
@@ -529,8 +529,8 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         graph_ctx: GraphQueryContext = info.context
 
@@ -876,8 +876,8 @@ class Endpoint(graphene.ObjectType):
                     load_session_owner=True,
                 )
                 return await cls.from_row(ctx, row)
-        except NoResultFound:
-            raise EndpointNotFound
+        except NoResultFound as e:
+            raise EndpointNotFound from e
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
@@ -1037,8 +1037,8 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             try:
                 return RuntimeVariant(value)
-            except KeyError:
-                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}")
+            except KeyError as e:
+                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}") from e
 
         if self.desired_session_count is not Undefined and self.replicas is not Undefined:
             raise InvalidAPIParameters(
@@ -1259,8 +1259,8 @@ class EndpointToken(graphene.ObjectType):
                 row = await EndpointTokenRow.get(
                     session, token, project=project, domain=domain_name, user_uuid=user_uuid
                 )
-        except NoResultFound:
-            raise EndpointTokenNotFound
+        except NoResultFound as e:
+            raise EndpointTokenNotFound from e
         return await cls.from_row(ctx, row)
 
     async def resolve_valid_until(

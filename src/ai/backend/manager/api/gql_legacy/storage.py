@@ -118,8 +118,8 @@ class StorageVolume(graphene.ObjectType):
         proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+        except KeyError as e:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}") from e
         async with proxy_info.session.request(
             "GET",
             proxy_info.manager_api_url / "volumes",

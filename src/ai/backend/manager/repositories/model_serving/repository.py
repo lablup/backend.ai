@@ -748,8 +748,9 @@ class ModelServingRepository:
                             user_id = user_data.user_id
                             if endpoint_row.session_owner != user_id:
                                 raise EndpointNotFound
-                except NoResultFound:
-                    raise EndpointNotFound
+                except NoResultFound as e:
+                    raise EndpointNotFound from e
+
                 if endpoint_row.lifecycle_stage in (
                     EndpointLifecycle.DESTROYING,
                     EndpointLifecycle.DESTROYED,

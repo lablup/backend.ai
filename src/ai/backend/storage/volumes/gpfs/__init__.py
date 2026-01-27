@@ -253,8 +253,8 @@ class GPFSVolume(BaseVolume):
         try:
             metrics = await self.api_client.get_metric(query)
             latest_metric = metrics["performanceData"]["rows"][-1]["values"]
-        except (KeyError, IndexError):
-            raise GPFSNoMetricError
+        except (KeyError, IndexError) as e:
+            raise GPFSNoMetricError from e
         return FSPerfMetric(
             iops_read=latest_metric[0] or 0,
             iops_write=latest_metric[1] or 0,

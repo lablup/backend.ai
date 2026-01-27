@@ -21,8 +21,8 @@ class libtpu:
                     stdout=subprocess.PIPE,
                 )
                 out, _ = await proc.communicate()
-            except FileNotFoundError:
-                raise ImportError("Gcloud SDK is not available!")
+            except FileNotFoundError as e:
+                raise ImportError("Gcloud SDK is not available!") from e
             config_json = json.loads(out)
             if zone := config_json.get("compute", {}).get("region"):
                 cls.zone = zone
@@ -52,8 +52,8 @@ class libtpu:
                 stdout=subprocess.PIPE,
             )
             out, _ = await proc.communicate()
-        except FileNotFoundError:
-            raise ImportError("Gcloud SDK is not available!")
+        except FileNotFoundError as e:
+            raise ImportError("Gcloud SDK is not available!") from e
         return out.decode()
 
     @classmethod

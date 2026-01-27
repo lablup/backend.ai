@@ -177,14 +177,14 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     # SECURITY: only allow reading files under static_path
     try:
         file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
+    except (ValueError, FileNotFoundError) as e:
         raise web.HTTPNotFound(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-not-found",
                 "title": "Not Found",
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     # Fallback to index.html to support the URL routing for single-page application.

@@ -290,8 +290,8 @@ class VFolderService:
             await self._vfolder_repository.create_vfolder_with_permission(
                 params, create_owner_permission=create_owner_permission
             )
-        except sa_exc.DataError:
-            raise VFolderInvalidParameter
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
 
         return CreateVFolderActionResult(
             id=folder_id,
@@ -737,7 +737,7 @@ class VFolderService:
                 await response.write(chunk)
 
         except aiohttp.ClientResponseError as e:
-            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message)
+            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message) from e
         finally:
             if prepared:
                 await response.write_eof()

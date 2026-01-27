@@ -205,14 +205,14 @@ async def exception_middleware(
         )
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -221,8 +221,8 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
@@ -427,9 +427,9 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
             if all(isinstance(e, asyncio.CancelledError) for e in ee.exceptions):
-                raise asyncio.CancelledError()
+                raise asyncio.CancelledError() from ee
             else:
-                raise ee
+                raise
 
 
 @asynccontextmanager
@@ -441,12 +441,12 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         with attempt:
             try:
                 await register_worker(root_ctx, str(uuid.uuid4()))
-            except CoordinatorConnectionError:
+            except CoordinatorConnectionError as e:
                 log.warning(
                     "Failed to connect to coordinator {}, retrying...",
                     root_ctx.local_config.proxy_worker.coordinator_endpoint,
                 )
-                raise TryAgain
+                raise TryAgain from e
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
@@ -579,8 +579,8 @@ async def metrics(request: web.Request) -> web.Response:
         remote_ip = ipaddress.IPv4Network(request.remote)
         if not remote_ip.subnet_of(allowed_network):
             raise GenericForbidden
-    except ValueError:
-        raise GenericForbidden
+    except ValueError as e:
+        raise GenericForbidden from e
 
     return web.Response(
         text=root_ctx.metrics.to_prometheus(),
@@ -825,9 +825,9 @@ async def server_main(
         try:
             m.start()
             aiomon_started = True
-        except Exception as e:
+        except Exception:
             log.warning(
-                "aiomonitor could not start but skipping this error to continue", exc_info=e
+                "aiomonitor could not start but skipping this error to continue", exc_info=True
             )
         try:
             yield

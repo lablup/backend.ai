@@ -450,10 +450,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                     await self.runner.feed_input(text)
                 elif mode == "continue":
                     pass
-            except zmq.ZMQError:
+            except zmq.ZMQError as e:
                 # cancel the operation by myself
                 # since the peer is gone.
-                raise asyncio.CancelledError
+                raise asyncio.CancelledError from e
+
             return await self.runner.get_next_result(
                 api_ver=api_version,
                 flush_timeout=flush_timeout,
@@ -641,7 +642,8 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
-                raise InvalidSocket
+                raise InvalidSocket from e
+
             raise
 
     def close(self) -> None:

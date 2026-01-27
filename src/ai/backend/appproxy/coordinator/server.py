@@ -203,7 +203,7 @@ async def exception_middleware(
         resp = await handler(request)
     except ValidationError as ex:
         log.exception("Failed to create response model: {}", ex.json(indent=2))
-        raise InternalServerError()
+        raise InternalServerError() from ex
     except BackendAIError as ex:
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
@@ -222,14 +222,14 @@ async def exception_middleware(
         )
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -238,8 +238,8 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
@@ -827,8 +827,8 @@ async def metrics(request: web.Request) -> web.Response:
         remote_ip = ipaddress.IPv4Network(request.remote)
         if not remote_ip.subnet_of(allowed_network):
             raise GenericForbidden
-    except ValueError:
-        raise GenericForbidden
+    except ValueError as e:
+        raise GenericForbidden from e
 
     return web.Response(
         text=root_ctx.metrics.to_prometheus(),

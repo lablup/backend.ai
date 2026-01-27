@@ -109,8 +109,8 @@ class QTreeQuotaModel(BaseQuotaModel):
                                 break
                         else:
                             raise TryAgain
-        except RetryError:
-            raise QuotaScopeNotFoundError
+        except RetryError as e:
+            raise QuotaScopeNotFoundError from e
 
         if options is not None:
             result = await self.netapp_client.set_quota_rule(

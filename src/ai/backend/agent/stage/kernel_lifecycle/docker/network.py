@@ -109,8 +109,8 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
     async def _prepare_plugin_network(self, spec: NetworkSpec, mode: str) -> list[dict[str, Any]]:
         try:
             plugin = self.network_plugin_ctx.plugins[mode]
-        except KeyError:
-            raise NetworkPluginNotFound(f"Network plugin {mode} not loaded!")
+        except KeyError as e:
+            raise NetworkPluginNotFound(f"Network plugin {mode} not loaded!") from e
 
         cluster_info = ClusterInfo(
             mode=spec.kernel_config["cluster_mode"],

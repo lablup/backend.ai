@@ -193,8 +193,8 @@ class ImageService:
             image_id, image_alias = await self._image_repository.add_image_alias(
                 action.alias, action.image_canonical, action.architecture
             )
-        except UnknownImageReference:
-            raise ImageNotFound
+        except UnknownImageReference as e:
+            raise ImageNotFound from e
         return AliasImageActionResult(
             image_id=image_id,
             image_alias=image_alias,
@@ -219,8 +219,8 @@ class ImageService:
             updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=image_data.id)
             # Pass Updater to repository
             updated_image_data = await self._image_repository.update_image_properties(updater)
-        except UnknownImageReference:
-            raise ModifyImageActionUnknownImageReferenceError
+        except UnknownImageReference as e:
+            raise ModifyImageActionUnknownImageReferenceError from e
 
         return ModifyImageActionResult(image=updated_image_data)
 

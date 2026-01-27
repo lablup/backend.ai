@@ -670,7 +670,7 @@ class ModelCard(graphene.ObjectType):
             except t.DataError as e:
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{e!s})"
-                )
+                ) from e
             if model_definition is None:
                 raise DataTransformationFailed(
                     "Model definition validation returned None unexpectedly"
@@ -1456,7 +1456,7 @@ class QuotaScope(graphene.ObjectType):
                 hard_limit_bytes=quota_config["limit_bytes"] or None,
                 usage_count=None,  # TODO: Implement
             )
-        except QuotaScopeNotFoundError:
+        except QuotaScopeNotFoundError as e:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
@@ -1470,7 +1470,7 @@ class QuotaScope(graphene.ObjectType):
                     if result is None:
                         raise QuotaScopeNotFoundError(
                             f"User not found for quota scope id: {self.quota_scope_id}"
-                        )
+                        ) from e
                     resource_policy_constraint: int | None = (
                         result.resource_policy_row.max_quota_scope_size
                     )
@@ -1484,7 +1484,7 @@ class QuotaScope(graphene.ObjectType):
                     if result is None:
                         raise QuotaScopeNotFoundError(
                             f"Group not found for quota scope id: {self.quota_scope_id}"
-                        )
+                        ) from e
                     resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None

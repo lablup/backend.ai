@@ -377,7 +377,7 @@ async def query_userinfo(
             ),
         )
     except ValueError as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
 
 
 @server_status_required(ALL_ALLOWED)
@@ -450,7 +450,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             params["config"] = creation_config_v3_template.check(params["config"])
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
-        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict()) from e
 
     scopes_param = {
         "owner_access_key": (
@@ -1177,10 +1177,10 @@ async def restart(request: web.Request, params: Any) -> web.Response:
     except BackendAIError:
         log.exception("RESTART: exception")
         raise
-    except Exception:
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
-        raise web.HTTPInternalServerError
+        raise web.HTTPInternalServerError from e
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1193,9 +1193,9 @@ async def execute(request: web.Request) -> web.Response:
     try:
         params = await read_json(request)
         log.info("EXECUTE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    except json.decoder.JSONDecodeError:
+    except json.decoder.JSONDecodeError as e:
         log.warning("EXECUTE: invalid/missing parameters")
-        raise InvalidAPIParameters
+        raise InvalidAPIParameters from e
 
     result = await root_ctx.processors.session.execute_session.wait_for_complete(
         ExecuteSessionAction(
@@ -1245,8 +1245,8 @@ async def complete(request: web.Request) -> web.Response:
         params = await read_json(request)
         code = params.get("code", "")
         opts = params.get("options", None) or {}
-    except json.decoder.JSONDecodeError:
-        raise InvalidAPIParameters
+    except json.decoder.JSONDecodeError as e:
+        raise InvalidAPIParameters from e
 
     log.info("COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
 
@@ -1530,7 +1530,7 @@ async def list_files(request: web.Request) -> web.Response:
         )
     except (TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     return web.json_response(result.result, status=HTTPStatus.OK)
 

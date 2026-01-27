@@ -406,14 +406,14 @@ async def check_nfs_remote_server(
 
         # Export path not found
         raise ExportPathNotFound(f"Export '{export_path}' not found on server '{server}'.")
-    except BaseNFSMountCheckFailed:
-        raise
+    except BaseNFSMountCheckFailed as e:
+        raise e from None
 
-    except TimeoutError:
-        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
+    except TimeoutError as e:
+        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds") from e
 
-    except FileNotFoundError:
-        raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
+    except FileNotFoundError as e:
+        raise ShowmountNotFound("showmount command not found. Install nfs-common package.") from e
 
     except Exception as e:
         raise NFSUnexpectedError(f"Unexpected error: {e!s}") from e
@@ -504,11 +504,11 @@ async def umount(
             raw_out.decode("utf8")
             err = raw_err.decode("utf8")
             await proc.wait()
-    except TimeoutError:
+    except TimeoutError as e:
         raise VolumeUnmountFailed(
             f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."
-        )
+        ) from e
     if err:
         raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
     if rmdir_if_empty:

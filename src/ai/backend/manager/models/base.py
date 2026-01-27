@@ -371,7 +371,7 @@ class StructuredJSONColumn(TypeDecorator):
             raise ValueError(
                 "The given value does not conform with the structured json column format.",
                 e.as_dict(),
-            )
+            ) from e
         return value
 
     def process_result_value(
@@ -539,8 +539,8 @@ class IPColumn(TypeDecorator):
             return value
         try:
             cidr = ReadableCIDR(value).address
-        except InvalidIpAddressValue:
-            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        except InvalidIpAddressValue as e:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
     def process_result_value(self, value, dialect):
@@ -581,8 +581,8 @@ class PermissionListColumn(TypeDecorator):
             return []
         try:
             return [self._perm_type(perm).value for perm in value]
-        except ValueError:
-            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}") from e
 
     def process_result_value(
         self,
@@ -711,7 +711,7 @@ class SlugType(TypeDecorator):
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
-            raise ValueError(e.error, value)
+            raise ValueError(e.error, value) from e
         return value
 
 
@@ -848,7 +848,7 @@ async def populate_fixture(
                         raise ValueError(
                             f"fixture for table {table_name!r} has an invalid column name: "
                             f"{e.args[0]!r}"
-                        )
+                        ) from e
                     update_stmt = update_stmt.values({
                         datacol.name: sa.bindparam(datacol.name) for datacol in datacols
                     })
@@ -857,19 +857,19 @@ async def populate_fixture(
                         for pkidx, pkcol in enumerate(pkcols):
                             try:
                                 update_row[f"_pk_{pkidx}"] = row[pkcol.name]
-                            except KeyError:
+                            except KeyError as e:
                                 raise ValueError(
                                     f"fixture for table {table_name!r} has a missing primary key column for update"
                                     f"query: {pkcol.name!r}"
-                                )
+                                ) from e
                         for datacol in datacols:
                             try:
                                 update_row[datacol.name] = row[datacol.name]
-                            except KeyError:
+                            except KeyError as e:
                                 raise ValueError(
                                     f"fixture for table {table_name!r} has a missing data column for update"
                                     f"query: {datacol.name!r}"
-                                )
+                                ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
 

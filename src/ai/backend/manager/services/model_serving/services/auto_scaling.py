@@ -88,8 +88,10 @@ class AutoScalingService:
     ) -> CreateEndpointAutoScalingRuleActionResult:
         try:
             _threshold = decimal.Decimal(action.creator.threshold)
-        except decimal.InvalidOperation:
-            raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
+        except decimal.InvalidOperation as e:
+            raise InvalidAPIParameters(
+                f"Cannot convert {action.creator.threshold} to Decimal"
+            ) from e
 
         # Validate access to the endpoint first
         validation_data = await self._repository.get_endpoint_access_validation_data(

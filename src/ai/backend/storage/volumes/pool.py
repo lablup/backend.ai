@@ -160,19 +160,19 @@ class VolumePool:
     async def get_volume(self, volume_id: VolumeID) -> AsyncIterator[AbstractVolume]:
         try:
             yield self._volumes[volume_id]
-        except KeyError:
-            raise InvalidVolumeError(f"Volume not found: {volume_id}")
+        except KeyError as e:
+            raise InvalidVolumeError(f"Volume not found: {volume_id}") from e
 
     @actxmgr
     async def get_volume_by_name(self, name: str) -> AsyncIterator[AbstractVolume]:
         try:
             yield self._volumes_by_name[name]
-        except KeyError:
-            raise InvalidVolumeError(name)
+        except KeyError as e:
+            raise InvalidVolumeError(name) from e
 
     def get_volume_by_name_direct(self, name: str) -> AbstractVolume:
         """Get volume by name without context manager."""
         try:
             return self._volumes_by_name[name]
-        except KeyError:
-            raise InvalidVolumeError(name)
+        except KeyError as e:
+            raise InvalidVolumeError(name) from e

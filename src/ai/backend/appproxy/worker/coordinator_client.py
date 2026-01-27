@@ -57,7 +57,7 @@ async def get_circuit_info(root_ctx: RootContext, request_id: str, circuit_id: s
             return Circuit.from_serialized_circuit(SerializableCircuit(**body))
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:circuit")
+            raise ObjectNotFound(object_name="worker:circuit") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 
@@ -74,7 +74,7 @@ async def list_worker_circuits(root_ctx: RootContext, request_id: str) -> list[C
             ]
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:worker")
+            raise ObjectNotFound(object_name="worker:worker") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 
@@ -87,7 +87,7 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
             resp.raise_for_status()
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:circuit")
+            raise ObjectNotFound(object_name="worker:circuit") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 

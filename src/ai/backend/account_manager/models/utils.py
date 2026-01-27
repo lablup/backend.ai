@@ -191,10 +191,12 @@ class ExtendedAsyncSAEngine(SAEngine):
                             result = await txn_func(session_or_conn, *args, **kwargs)
                     except DBAPIError as e:
                         if is_db_retry_error(e):
-                            raise TryAgain
+                            raise TryAgain from e
                         raise
-        except RetryError:
-            raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
+        except RetryError as e:
+            raise TimeoutError(
+                f"DB serialization failed after {max_attempts} retry transactions"
+            ) from e
         return result
 
 

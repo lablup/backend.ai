@@ -151,5 +151,7 @@ class VFSStorageService:
             if not isinstance(storage, VFSStorage):
                 raise StorageTypeInvalidError(f"Storage '{storage_name}' is not a VFS storage")
             return storage
-        except KeyError:
-            raise StorageNotFoundError(f"No VFS storage configuration found for: {storage_name}")
+        except KeyError as e:
+            raise StorageNotFoundError(
+                f"No VFS storage configuration found for: {storage_name}"
+            ) from e

@@ -840,8 +840,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool and verify it's ObjectStorage type
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(
@@ -883,8 +883,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool to access configuration
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage type")

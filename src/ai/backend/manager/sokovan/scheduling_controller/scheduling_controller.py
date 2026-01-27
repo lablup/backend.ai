@@ -402,7 +402,7 @@ class SchedulingController:
                 spec.resource_spec.resource_slots, available_resource_slots
             )
         except ValueError as e:
-            raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
+            raise InvalidAPIParameters(f"Invalid resource allocation: {e}") from e
         # Validate Image
         user = current_user()
         if user is None:

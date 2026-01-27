@@ -127,7 +127,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
             )
         except Exception as e:
-            raise GraphQLError(str(e))
+            raise GraphQLError(str(e)) from e
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):

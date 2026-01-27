@@ -58,10 +58,10 @@ class ArtifactEventHandler:
     ) -> None:
         try:
             registry_type = ArtifactRegistryType(event.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {event.registry_type}"
-            )
+            ) from e
         registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -147,10 +147,10 @@ class ArtifactEventHandler:
     ) -> None:
         try:
             registry_type = ArtifactRegistryType(event.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {event.registry_type}"
-            )
+            ) from e
         registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -252,10 +252,10 @@ class ArtifactEventHandler:
         model_info = event.model
         try:
             registry_type = ArtifactRegistryType(model_info.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {model_info.registry_type}"
-            )
+            ) from e
 
         registry_id: UUID
         match registry_type:

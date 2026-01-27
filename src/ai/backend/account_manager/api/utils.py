@@ -171,10 +171,10 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
