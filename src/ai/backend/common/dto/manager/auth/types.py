@@ -1,23 +1,38 @@
+"""
+Common types for auth system.
+"""
+
 from __future__ import annotations
 
-import enum
+from enum import StrEnum
 from typing import Any, Self
 
 from pydantic import BaseModel
 
+__all__ = (
+    "AuthTokenType",
+    "AuthResponseType",
+    "TwoFactorType",
+    "AuthResponse",
+    "AuthSuccessResponse",
+    "RequireTwoFactorRegistrationResponse",
+    "RequireTwoFactorAuthResponse",
+    "parse_auth_response",
+)
 
-class AuthTokenType(enum.StrEnum):
+
+class AuthTokenType(StrEnum):
     KEYPAIR = "keypair"
     JWT = "jwt"
 
 
-class AuthResponseType(enum.StrEnum):
+class AuthResponseType(StrEnum):
     SUCCESS = "success"
     REQUIRE_TWO_FACTOR_REGISTRATION = "REQUIRE_TWO_FACTOR_REGISTRATION"
     REQUIRE_TWO_FACTOR_AUTH = "REQUIRE_TWO_FACTOR_AUTH"
 
 
-class TwoFactorType(enum.StrEnum):
+class TwoFactorType(StrEnum):
     TOTP = "TOTP"
 
 
@@ -57,12 +72,12 @@ class RequireTwoFactorAuthResponse(AuthResponse):
 
 def parse_auth_response(data: dict[str, Any]) -> AuthResponse:
     raw_response_type = data.get("response_type")
-    respones_type = (
+    response_type = (
         AuthResponseType(raw_response_type)
         if raw_response_type is not None
         else AuthResponseType.SUCCESS
     )
-    match respones_type:
+    match response_type:
         case AuthResponseType.SUCCESS:
             return AuthSuccessResponse.model_validate(data)
         case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
