@@ -673,7 +673,7 @@ def invitations():
                         )
                         print(msg)
                         break
-                    elif action.lower() == "r":
+                    if action.lower() == "r":
                         session.VFolder.delete_invitation(invitations[selection]["id"])
                         msg = "vfolder invitation rejected: {} ({})".format(
                             invitations[selection]["vfolder_name"],
@@ -681,7 +681,7 @@ def invitations():
                         )
                         print(msg)
                         break
-                    elif action.lower() == "c":
+                    if action.lower() == "c":
                         break
         except Exception as e:
             print_error(e)

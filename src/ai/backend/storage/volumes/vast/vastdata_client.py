@@ -199,7 +199,7 @@ class VASTAPIClient:
         if get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
-            return
+            return None
         if get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens

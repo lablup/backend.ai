@@ -322,10 +322,9 @@ def _register_parameter_parser(
             if issubclass(param_type, MiddlewareParam):
                 signature_parser_map[name] = param_type
                 continue
-            else:
-                raise InvalidAPIHandlerDefinition(
-                    f"Not allowed signature for API handler function. (handler:{handler_name}, name:{name}, type:{original_type})"
-                )
+            raise InvalidAPIHandlerDefinition(
+                f"Not allowed signature for API handler function. (handler:{handler_name}, name:{name}, type:{original_type})"
+            )
         model_args = get_args(param_type)
         try:
             validation_model = model_args[0]
