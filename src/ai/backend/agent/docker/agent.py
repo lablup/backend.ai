@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 )
 
 
-async def get_extra_volumes(docker, lang) -> list[MountInfo]:
+async def get_extra_volumes(docker, lang) -> list[VolumeInfo]:
     avail_volumes = (await docker.volumes.list())["Volumes"]
     if not avail_volumes:
         return []
@@ -585,9 +585,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # extra mounts
         async with closing_async(Docker()) as docker:
             extra_mount_list = await get_extra_volumes(docker, self.image_ref.short)
-        mounts.extend(
-            Mount(MountTypes.VOLUME, v.name, v.container_path, v.mode) for v in extra_mount_list
-        )
+        for v in extra_mount_list:
+            permission = MountPermission.READ_ONLY if v.mode == "ro" else MountPermission.READ_WRITE
+            mounts.append(
+                Mount(MountTypes.VOLUME, Path(v.name), Path(v.container_path), permission)
+            )
 
         # debug mounts
         if self.local_config.debug.coredump.enabled:

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from six.moves import builtins
 
 from ai.backend.kernel.python.types import MediaRecord
@@ -7,6 +11,15 @@ from .encoding import encode_commands
 from .turtle import Turtle
 
 _canvas_id_counter = 0
+
+# Command history can contain various command tuples with different structures
+CommandTuple = (
+    tuple[int, str]  # 2-element: stop-anim, resume-anim, begin-group, end-group, end-fill
+    | tuple[int, str, Any]  # 3-element: begin-fill, bgcolor, fgcolor
+    | tuple[int, str, int, tuple[Any, ...]]  # 4-element: obj commands (variable length inner tuple)
+    | tuple[int, str, Any, Any, Any, Any]  # 6-element: canvas initialization
+    | tuple[int, str, int, Any, Any]  # 5-element: update commands
+)
 
 
 class DrawingObject:
@@ -73,7 +86,7 @@ class Canvas:
         global _canvas_id_counter
         self._id = _canvas_id_counter
         _canvas_id_counter += 1
-        self._cmd_history = []
+        self._cmd_history: list[CommandTuple] = []
         self._next_objid = 0
         self._cmd_history.append((
             self._id,

@@ -491,7 +491,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
-    ) -> MountInfo:
+    ) -> Mount:
         """
         Return mount object to mount target krunner file/folder/volume.
         """
@@ -3704,21 +3704,19 @@ class AbstractAgent[
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
-    async def accept_file(
-        self, kernel_id: KernelId, filename: str, filedata: bytes
-    ) -> dict[str, Any]:
+    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes) -> None:
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 
-    async def download_file(self, kernel_id: KernelId, filepath: str) -> dict[str, Any]:
+    async def download_file(self, kernel_id: KernelId, filepath: str) -> bytes:
         return await self.kernel_registry[kernel_id].download_file(filepath)
 
-    async def download_single(self, kernel_id: KernelId, filepath: str) -> dict[str, Any]:
+    async def download_single(self, kernel_id: KernelId, filepath: str) -> bytes:
         return await self.kernel_registry[kernel_id].download_single(filepath)
 
     async def list_files(self, kernel_id: KernelId, path: str) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].list_files(path)
 
-    async def ping_kernel(self, kernel_id: KernelId) -> dict[str, Any]:
+    async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:

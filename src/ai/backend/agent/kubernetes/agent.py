@@ -908,7 +908,7 @@ class KubernetesAgent(
         if len(pv.items) == 0:
             # PV does not exists; create one
             if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
-                new_pv = NFSPersistentVolume(
+                new_pv: NFSPersistentVolume | HostPathPersistentVolume = NFSPersistentVolume(
                     self.local_config.container.scratch_nfs_address,
                     "backend-ai-static-pv",
                     capacity,
@@ -917,9 +917,9 @@ class KubernetesAgent(
                     "backend.ai/backend-ai-scratch-volume",
                     self.local_config.container.scratch_nfs_address,
                 )
-                new_pv.options = [
-                    x.strip() for x in self.local_config.container.scratch_nfs_options.split(",")
-                ]
+                scratch_nfs_options = self.local_config.container.scratch_nfs_options
+                if scratch_nfs_options is not None:
+                    new_pv.options = [x.strip() for x in scratch_nfs_options.split(",")]
             elif self.local_config.container.scratch_type == ScratchType.HOSTDIR:
                 new_pv = HostPathPersistentVolume(
                     self.local_config.container.scratch_root.as_posix(),

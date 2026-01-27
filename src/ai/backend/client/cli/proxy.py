@@ -116,7 +116,7 @@ def _translate_headers(upstream_request: Request, client_request: Request) -> No
         upstream_request.headers["Host"] = f"{api_endpoint.host}:{api_endpoint.port}"
 
 
-async def web_handler(request) -> None:
+async def web_handler(request) -> web.StreamResponse:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         # We treat all requests and responses as streaming universally
@@ -167,7 +167,7 @@ async def web_handler(request) -> None:
         )
 
 
-async def websocket_handler(request) -> None:
+async def websocket_handler(request) -> web.WebSocketResponse | web.Response:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         api_request = Request(
@@ -213,7 +213,7 @@ async def proxy_context(app: web.Application) -> AsyncIterator[None]:
         yield
 
 
-def create_proxy_app() -> None:
+def create_proxy_app() -> web.Application:
     app = web.Application()
     app.cleanup_ctx.append(proxy_context)
 

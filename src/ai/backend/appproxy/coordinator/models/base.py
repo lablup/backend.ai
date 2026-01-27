@@ -19,7 +19,7 @@ import yarl
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine
 
 from ai.backend.appproxy.common.errors import InvalidAPIParameters
 from ai.backend.appproxy.common.utils import ensure_json_serializable
@@ -100,7 +100,7 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
     def process_result_value(self, value: Any, dialect) -> Optional[enum.Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self) -> EnumType:
+    def copy(self, **kw: Any) -> EnumType:
         return EnumType(self._enum_cls, **self._opts)
 
     @property
@@ -165,7 +165,7 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect) -> sa.TypeEngine:
+    def load_dialect_impl(self, dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON)
         return super().load_dialect_impl(dialect)
@@ -187,7 +187,7 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema()
         return self._schema(**value)
 
-    def copy(self) -> StructuredJSONColumn:
+    def copy(self, **kw: Any) -> StructuredJSONColumn:
         return StructuredJSONColumn(self._schema)
 
 
@@ -213,7 +213,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
             return self._schema(**json.loads(value))
         return None
 
-    def copy(self) -> StructuredJSONObjectColumn:
+    def copy(self, **kw: Any) -> StructuredJSONObjectColumn:
         return StructuredJSONObjectColumn(self._schema)
 
 
@@ -243,7 +243,7 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
             return [self._schema(**i) for i in json.loads(value)]
         return None
 
-    def copy(self) -> StructuredJSONObjectListColumn[TBaseModel]:
+    def copy(self, **kw: Any) -> StructuredJSONObjectListColumn[TBaseModel]:
         return StructuredJSONObjectListColumn(self._schema)
 
 
@@ -304,7 +304,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> sa.TypeEngine:
+    def load_dialect_impl(self, dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))

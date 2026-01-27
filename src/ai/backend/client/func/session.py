@@ -638,7 +638,9 @@ class ComputeSession(BaseFunction):
         return data["modify_compute_session"]
 
     @api_function
-    async def destroy(self, *, forced: bool = False, recursive: bool = False) -> None:
+    async def destroy(
+        self, *, forced: bool = False, recursive: bool = False
+    ) -> Optional[dict[str, Any]]:
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -700,7 +702,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def commit(self) -> None:
+    async def commit(self) -> dict[str, Any]:
         """
         Commit a running session to a tar file in the agent host.
         """
@@ -717,7 +719,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def export_to_image(self, new_image_name: str) -> None:
+    async def export_to_image(self, new_image_name: str) -> dict[str, Any]:
         """
         Commits running session to new image and then uploads to designated container registry.
         Requires Backend.AI server set up for per-user image commit feature (24.03).
@@ -792,7 +794,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_info(self) -> None:
+    async def get_info(self) -> dict[str, Any]:
         """
         Retrieves a brief information about the compute session.
         """
@@ -852,7 +854,7 @@ class ComputeSession(BaseFunction):
         return result
 
     @api_function
-    async def get_logs(self, kernel_id: Optional[UUID] = None) -> None:
+    async def get_logs(self, kernel_id: Optional[UUID] = None) -> dict[str, Any]:
         """
         Retrieves the console log of the compute session container.
         """
@@ -871,7 +873,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_dependency_graph(self) -> None:
+    async def get_dependency_graph(self) -> dict[str, Any]:
         """
         Retrieves the root node of dependency graph of the compute session.
         """
@@ -892,7 +894,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_status_history(self) -> None:
+    async def get_status_history(self) -> dict[str, Any]:
         """
         Retrieves the status transition history of the compute session.
         """
@@ -915,7 +917,7 @@ class ComputeSession(BaseFunction):
         code: Optional[str] = None,
         mode: str = "query",
         opts: Optional[dict] = None,
-    ) -> None:
+    ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
         build/clean/execute commands to the compute session.
@@ -1064,7 +1066,7 @@ class ComputeSession(BaseFunction):
         files: Sequence[str | Path],
         dest: str | Path = ".",
         show_progress: bool = False,
-    ) -> None:
+    ) -> dict[str, Any]:
         """
         Downloads the given list of files from the compute session.
 
@@ -1129,7 +1131,7 @@ class ComputeSession(BaseFunction):
         return {"file_names": file_names}
 
     @api_function
-    async def list_files(self, path: str | Path = ".") -> None:
+    async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         """
         Gets the list of files in the given path inside the compute session
         container.

@@ -189,7 +189,7 @@ class ServiceAutoScalingRule(BaseFunction):
         return data["modify_endpoint_auto_scaling_rule_node"]
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         q = textwrap.dedent(
             """
             mutation($rule_id: String!) {

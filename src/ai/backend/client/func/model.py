@@ -59,7 +59,7 @@ class Model(BaseFunction):
         )
 
     @api_function
-    async def info(self) -> None:
+    async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/folders/{self.model_name}")
         async with rqst.fetch() as resp:
             info = await resp.json()

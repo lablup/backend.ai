@@ -175,7 +175,7 @@ def _noop(*args, **kwargs) -> None:
     pass
 
 
-def format_stats(stats) -> None:
+def format_stats(stats) -> str:
     formatted = []
     version = stats.pop("version", 1)
     stats.pop("status")

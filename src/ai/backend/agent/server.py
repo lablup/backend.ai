@@ -475,7 +475,7 @@ class AgentRPCServer(aobject):
             log.exception("status_snapshot_request_handler():")
             raise
 
-    async def detect_manager(self):
+    async def detect_manager(self) -> None:
         log.info("detecting the manager...")
         etcd = self.etcd
         manager_instances = await etcd.get_prefix("nodes/manager")
@@ -491,7 +491,7 @@ class AgentRPCServer(aobject):
                                 break
         log.info("detected at least one manager running")
 
-    async def read_agent_config(self):
+    async def read_agent_config(self) -> None:
         # Fill up Redis configs from etcd and store as separate attributes
         self._redis_config = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
@@ -544,7 +544,7 @@ class AgentRPCServer(aobject):
             except Exception as e:
                 log.warning("etcd: agent-config error: {}", e)
 
-    async def read_agent_config_container(self):
+    async def read_agent_config_container(self) -> None:
         # Fill up global container configurations from etcd.
         try:
             container_etcd_config_raw = await self.etcd.get_prefix("config/container")

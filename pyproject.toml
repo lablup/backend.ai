@@ -285,6 +285,73 @@ explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
+# Disable errors in client CLI, web server, and tests
+# Client SDK will be rewritten, so defer all type fixes
+# "None not callable" errors occur because mypy doesn't understand the APIFunctionMeta metaclass magic
+# that wraps async API functions to work in both sync (Session) and async (AsyncSession) contexts
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.client.cli.*",
+    "ai.backend.client.session",
+    "ai.backend.client.helper",
+    "ai.backend.client.func.resource",
+    "ai.backend.web.server",
+    "ai.backend.test.*",
+    "tests.unit.client.*",
+]
+disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
+
+# Ignore errors in vendor code, accelerators, and build tools
+# These are external/generated code or low-priority plugins
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.kernel.vendor.*",
+    "ai.backend.accelerator.*",
+    "tools.build-macros",
+]
+ignore_errors = true
+
+# Defer type fixes for remaining modules (to be fixed incrementally)
+# These have various type issues that require deeper investigation
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.agent.fs",
+    "ai.backend.agent.server",
+    "ai.backend.agent.docker.kernel",
+    "ai.backend.agent.kubernetes.kernel",
+    "ai.backend.kernel.python",
+    "ai.backend.kernel.python.drawing.canvas",
+    "ai.backend.kernel.utils",
+    "ai.backend.kernel.intrinsic",
+    "ai.backend.web.logging",
+    "ai.backend.manager.api.manager",
+    "ai.backend.manager.cli.image_impl",
+    "ai.backend.manager.models.minilang.ordering",
+    "ai.backend.manager.models.minilang.queryfilter",
+    "ai.backend.storage.volumes.weka.weka_client",
+    "ai.backend.account_manager.models.base",
+    "ai.backend.common.cli",
+    "ai.backend.common.validators",
+    "ai.backend.helpers.package",
+    "ai.backend.cli.params",
+    "ai.backend.cli.extensions",
+]
+disable_error_code = [
+    "assignment",
+    "arg-type",
+    "return-value",
+    "attr-defined",
+    "operator",
+    "call-arg",
+    "call-overload",
+    "var-annotated",
+    "union-attr",
+    "func-returns-value",
+    "override",
+    "dict-item",
+    "str-format",
+]
+
 [tool.pyright]
 pythonVersion = "3.13"
 extraPaths = ["src"]

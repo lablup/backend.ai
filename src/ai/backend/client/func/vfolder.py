@@ -248,14 +248,14 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def info(self) -> None:
+    async def info(self) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("GET", f"/folders/{self.request_key}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("DELETE", "/folders")
         rqst.set_json({
@@ -596,7 +596,7 @@ class VFolderByName(BaseFunction):
         return await self._mkdir(path, parents, exist_ok)
 
     @api_function
-    async def rename_file(self, target_path: str, new_name: str) -> None:
+    async def rename_file(self, target_path: str, new_name: str) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename-file")
         rqst.set_json({
@@ -607,7 +607,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def move_file(self, src_path: str, dst_path: str) -> None:
+    async def move_file(self, src_path: str, dst_path: str) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/move-file")
         rqst.set_json({
@@ -629,14 +629,14 @@ class VFolderByName(BaseFunction):
             return await resp.text()
 
     @api_function
-    async def list_files(self, path: str | Path = ".") -> None:
+    async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def invite(self, perm: str, emails: Sequence[str]) -> None:
+    async def invite(self, perm: str, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/invite")
         rqst.set_json({
@@ -723,7 +723,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def share(self, perm: str, emails: Sequence[str]) -> None:
+    async def share(self, perm: str, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/share")
         rqst.set_json({
@@ -734,7 +734,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def unshare(self, emails: Sequence[str]) -> None:
+    async def unshare(self, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/unshare")
         rqst.set_json({
@@ -744,7 +744,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def leave(self, shared_user_uuid=None) -> None:
+    async def leave(self, shared_user_uuid=None) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/leave")
         rqst.set_json({"shared_user_uuid": shared_user_uuid})
@@ -758,7 +758,7 @@ class VFolderByName(BaseFunction):
         target_host: Optional[str] = None,
         usage_mode: str = "general",
         permission: str = "rw",
-    ) -> None:
+    ) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/clone")
         rqst.set_json({
