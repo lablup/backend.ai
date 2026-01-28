@@ -9,17 +9,9 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.alias_image_by_id import (
-    AliasImageByIdAction,
-    AliasImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
-    ClearImageCustomResourceLimitByIdAction,
-    ClearImageCustomResourceLimitByIdActionResult,
-)
-from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
     ClearImageCustomResourceLimitByIdActionResult,
 )
