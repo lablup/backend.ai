@@ -93,13 +93,6 @@ class KVPair:
 
 
 @dataclass
-class ResourceLimit:
-    key: str
-    min: Decimal
-    max: Decimal
-
-
-@dataclass
 class ResourceLimitInput:
     """Input for setting a resource limit with optional min/max values."""
 
