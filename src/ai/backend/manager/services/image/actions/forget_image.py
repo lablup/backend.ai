@@ -10,6 +10,10 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class ForgetImageAction(ImageAction):
+    """
+    Deprecated. Use ForgetImageByIdAction instead.
+    """
+
     user_id: uuid.UUID
     client_role: UserRole
     reference: str
