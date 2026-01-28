@@ -40,24 +40,6 @@ class KernelOrderByGQL:
 
 ---
 
-## Internal Data Types
-
-### KernelInternalDataGQL
-```python
-class KernelInternalDataGQL:
-    dotfiles: list[DotfileInfoGQL] | None
-    ssh_keypair: SSHKeypairGQL | None
-    model_definition_path: str | None
-    runtime_variant: str | None
-    sudo_session_enabled: bool | None
-    block_service_ports: bool | None
-    prevent_vfolder_mounts: bool | None
-    docker_credentials: JSON | None
-    domain_socket_proxies: list[str] | None
-```
-
----
-
 ## Sub-Info Types
 
 ### KernelImageInfoGQL
@@ -84,8 +66,6 @@ class KernelSessionInfoGQL:
 ### KernelClusterInfoGQL
 ```python
 class KernelClusterInfoGQL:
-    cluster_mode: str
-    cluster_size: int
     cluster_role: str
     cluster_idx: int
     local_rank: int
@@ -102,30 +82,6 @@ class KernelUserInfoGQL:
     access_key: str | None
     domain_name: str | None
     group_id: uuid.UUID | None
-    uid: int | None
-    main_gid: int | None
-    gids: list[int] | None
-```
-
-### KernelDeviceModelInfoGQL
-```python
-class KernelDeviceModelInfoGQL:
-    device_id: str
-    model_name: str
-    data: JSON
-```
-
-### KernelAttachedDeviceEntryGQL
-```python
-class KernelAttachedDeviceEntryGQL:
-    device_type: str
-    devices: list[KernelDeviceModelInfoGQL]
-```
-
-### KernelAttachedDevicesGQL
-```python
-class KernelAttachedDevicesGQL:
-    entries: list[KernelAttachedDeviceEntryGQL]
 ```
 
 ### ResourceAllocationGQL
@@ -143,37 +99,26 @@ class ResourceAllocationGQL:
 
 ```python
 class KernelResourceInfoGQL:
-    agent_id: uuid.UUID | None
-    agent: AgentNode | None
+    agent_id: str | None
     resource_group_name: str | None
     container_id: str | None
     allocation: ResourceAllocationGQL
     shares: ResourceSlotGQL
-    attached_devices: KernelAttachedDevicesGQL | None
     resource_opts: ResourceOptsGQL | None
 ```
 
 ### KernelRuntimeInfoGQL
 
-> **Note**: `vfolders: list[VFolderNode]` is **deferred** (see types-to-defer.md)
-
 ```python
 class KernelRuntimeInfoGQL:
-    vfolder_ids: list[uuid.UUID] | None
-    environ: EnvironmentVariables | None
-    bootstrap_script: str | None
     startup_command: str | None
 ```
 
 ### KernelNetworkInfoGQL
 ```python
 class KernelNetworkInfoGQL:
-    kernel_host: str | None
-    repl_in_port: int
-    repl_out_port: int
     service_ports: ServicePortsGQL | None
     preopen_ports: list[int] | None
-    use_host_network: bool
 ```
 
 ### KernelLifecycleInfoGQL
@@ -187,14 +132,6 @@ class KernelLifecycleInfoGQL:
     created_at: datetime | None
     terminated_at: datetime | None
     starts_at: datetime | None
-    last_seen: datetime | None
-```
-
-### KernelMetadataInfoGQL
-```python
-class KernelMetadataInfoGQL:
-    callback_url: str | None
-    internal_data: KernelInternalDataGQL | None
 ```
 
 ---
@@ -214,7 +151,6 @@ class KernelV2GQL(Node):
     resource: KernelResourceInfoGQL
     runtime: KernelRuntimeInfoGQL
     lifecycle: KernelLifecycleInfoGQL
-    metadata: KernelMetadataInfoGQL
 ```
 
 ### KernelEdgeGQL
@@ -249,14 +185,3 @@ class ServicePortsGQL:
 
 > **Note**: `ResourceOptsEntryGQL`, `ResourceOptsGQL`, `ResourceOptsEntryInput`, `ResourceOptsInput` already exist in `deployment/types/revision.py`
 
-### Internal Data Types
-```python
-class DotfileInfoGQL:
-    path: str
-    data: str
-    perm: str
-
-class SSHKeypairGQL:
-    public_key: str
-    private_key: str
-```
