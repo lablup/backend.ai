@@ -30,32 +30,32 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 ### Types to Include
 
 #### Enums
-- `KernelOrderField` - Ordering field enum
+- [`KernelOrderField`](BEP-1034/types-to-include.md#kernelorderfield) - Ordering field enum
 
 #### Input Types (Filter/Order)
-- `KernelStatusFilterGQL` - Status filter input
-- `KernelFilterGQL` - Main filter input
-- `KernelOrderByGQL` - Ordering input
+- [`KernelStatusFilterGQL`](BEP-1034/types-to-include.md#kernelstatusfiltergql) - Status filter input
+- [`KernelFilterGQL`](BEP-1034/types-to-include.md#kernelfiltergql) - Main filter input
+- [`KernelOrderByGQL`](BEP-1034/types-to-include.md#kernelorderbygql) - Ordering input
 
 #### Sub-Info Types
-- `KernelImageInfoGQL` - Image info
-- `KernelSessionInfoGQL` - Session info
-- `KernelClusterInfoGQL` - Cluster config
-- `KernelUserInfoGQL` - User/permission info
-- `ResourceAllocationGQL` - Resource allocation (requested/used)
-- `KernelResourceInfoGQL` - Resource info
-- `KernelRuntimeInfoGQL` - Runtime config
-- `KernelNetworkInfoGQL` - Network config
-- `KernelLifecycleInfoGQL` - Lifecycle info (partial - see skipped)
+- [`KernelImageInfoGQL`](BEP-1034/types-to-include.md#kernelimageinfogql) - Image info
+- [`KernelSessionInfoGQL`](BEP-1034/types-to-include.md#kernelsessioninfogql) - Session info
+- [`KernelClusterInfoGQL`](BEP-1034/types-to-include.md#kernelclusterinfogql) - Cluster config
+- [`KernelUserInfoGQL`](BEP-1034/types-to-include.md#kerneluserinfogql) - User/permission info
+- [`ResourceAllocationGQL`](BEP-1034/types-to-include.md#resourceallocationgql) - Resource allocation (requested/used)
+- [`KernelResourceInfoGQL`](BEP-1034/types-to-include.md#kernelresourceinfogql) - Resource info
+- [`KernelRuntimeInfoGQL`](BEP-1034/types-to-include.md#kernelruntimeinfogql) - Runtime config
+- [`KernelNetworkInfoGQL`](BEP-1034/types-to-include.md#kernelnetworkinfogql) - Network config
+- [`KernelLifecycleInfoGQL`](BEP-1034/types-to-include.md#kernellifecycleinfogql) - Lifecycle info (partial - see skipped)
 
 #### Main Types
-- `KernelV2GQL` - Main kernel node type
-- `KernelEdgeGQL` - Edge type
-- `KernelConnectionV2GQL` - Connection type
+- [`KernelV2GQL`](BEP-1034/types-to-include.md#kernelv2gql) - Main kernel node type
+- [`KernelEdgeGQL`](BEP-1034/types-to-include.md#kerneledgegql) - Edge type
+- [`KernelConnectionV2GQL`](BEP-1034/types-to-include.md#kernelconnectionv2gql) - Connection type
 
 #### Common Types (from common/types.py)
 - `ResourceOptsEntryGQL`, `ResourceOptsGQL`, `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options (already exist)
-- `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports
+- [`ServicePortEntryGQL`, `ServicePortsGQL`](BEP-1034/types-to-include.md#service-port-types) - Service ports
 
 ### Types to Skip (Do Not Implement)
 
