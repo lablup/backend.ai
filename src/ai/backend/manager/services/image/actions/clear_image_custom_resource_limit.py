@@ -8,6 +8,10 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class ClearImageCustomResourceLimitAction(ImageAction):
+    """
+    Deprecated. Use ClearImageCustomResourceLimitByIdAction instead.
+    """
+
     image_canonical: str
     architecture: str
 

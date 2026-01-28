@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
@@ -122,6 +123,9 @@ class ImageDBSource:
         canonicals: list[str],
         status_filter: list[ImageStatus] | None = None,
     ) -> dict[ImageID, ImageDataWithDetails]:
+        """
+        Deprecated. Use query_images_by_ids instead.
+        """
         query = (
             sa.select(ImageRow)
             .where(ImageRow.name.in_(canonicals))
@@ -140,6 +144,9 @@ class ImageDBSource:
         identifier: ImageIdentifier,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
+        """
+        Deprecated. Use query_image_details_by_id instead.
+        """
         try:
             async with self._db.begin_readonly_session() as session:
                 image_row = await ImageRow.resolve(
@@ -181,7 +188,7 @@ class ImageDBSource:
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
     ) -> ImageData:
         """
-        Marks an image record as deleted in the database.
+        Deprecated. Use mark_image_deleted_by_id instead.
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
@@ -222,6 +229,9 @@ class ImageDBSource:
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
+        """
+        Deprecated. Use insert_image_alias_by_id instead.
+        """
         try:
             async with self._db.begin_session() as session:
                 image_row = await ImageRow.resolve(
@@ -254,8 +264,7 @@ class ImageDBSource:
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
         """
-        Scans a single image and upserts it into the database.
-        Returns RescanImagesResult with the scanned image data.
+        Deprecated. Use scan_images_by_ids instead.
         """
 
         async with self._db.begin_session() as session:
@@ -301,12 +310,130 @@ class ImageDBSource:
     async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
+        """
+        Deprecated. Use clear_image_resource_limits_by_id instead.
+        """
         async with self._db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session, [ImageIdentifier(image_canonical, architecture)]
             )
             image_row._resources = {}
             return image_row.to_dataclass()
+
+    async def insert_image_alias_by_id(
+        self, image_id: UUID, alias: str
+    ) -> tuple[UUID, ImageAliasData]:
+        """
+        Creates an image alias directly using image ID.
+        """
+        try:
+            async with self._db.begin_session() as session:
+                image_row = await self._get_image_by_id(session, image_id)
+                image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
+                image_row.aliases.append(image_alias)
+                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
+            return image_id, alias_data
+        except ValueError as e:
+            raise AliasImageActionValueError from e
+        except DBAPIError as e:
+            raise AliasImageActionDBError(str(e)) from e
+
+    async def query_images_by_ids(
+        self,
+        image_ids: list[UUID],
+        status_filter: list[ImageStatus] | None = None,
+    ) -> dict[ImageID, ImageDataWithDetails]:
+        """
+        Queries images by their IDs with optional status filter.
+        Returns a dictionary mapping ImageID to ImageDataWithDetails.
+        """
+        if not image_ids:
+            return {}
+
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id.in_(image_ids))
+            .options(selectinload(ImageRow.aliases))
+        )
+        if status_filter:
+            query = query.where(ImageRow.status.in_(status_filter))
+
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(query)
+            image_rows = list(result.scalars().all())
+            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
+
+    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+        """
+        Clears image resource limits by image ID.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            image_row._resources = {}
+            return image_row.to_dataclass()
+
+    async def set_image_resource_limit_by_id(
+        self,
+        image_id: UUID,
+        slot_name: str,
+        min_value: Decimal | None,
+        max_value: Decimal | None,
+    ) -> ImageData:
+        """
+        Sets resource limit for an image by its ID.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            resources = dict(image_row._resources) if image_row._resources else {}
+
+            if slot_name not in resources:
+                resources[slot_name] = {"min": None, "max": None}
+
+            if min_value is not None:
+                resources[slot_name]["min"] = str(min_value)
+            if max_value is not None:
+                resources[slot_name]["max"] = str(max_value)
+
+            image_row._resources = resources
+            return image_row.to_dataclass()
+
+    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
+        """
+        Scans multiple images by their IDs and upserts them into the database.
+        Returns RescanImagesResult with the scanned image data.
+        """
+        all_images: list[ImageData] = []
+        all_errors: list[str] = []
+
+        async with self._db.begin_session() as session:
+            for image_id in image_ids:
+                try:
+                    image_row = await self._get_image_by_id(session, image_id)
+
+                    # Get the registry info
+                    registry_parts = []
+                    if image_row.registry:
+                        registry_parts.append(image_row.registry)
+                    if image_row.project:
+                        registry_parts.append(image_row.project)
+                    registry_key = "/".join(registry_parts) if registry_parts else ""
+
+                    # Get the registry row
+                    registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
+                    if not registry_row:
+                        all_errors.append(f"Registry not found for image {image_row.name}")
+                        continue
+
+                    # Call the original scan function
+                    result = await scan_single_image(
+                        self._db, registry_key, registry_row, image_row.name
+                    )
+                    all_images.extend(result.images)
+                    all_errors.extend(result.errors)
+                except ImageNotFound:
+                    all_errors.append(f"Image not found: {image_id}")
+
+        return RescanImagesResult(images=all_images, errors=all_errors)
 
     async def remove_image_and_aliases(
         self,

@@ -12,6 +12,10 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class GetImagesByCanonicalsAction(ImageAction):
+    """
+    Deprecated. Use GetImagesByIdsAction instead.
+    """
+
     image_canonicals: list[str]
     user_role: UserRole
     image_status: list[ImageStatus] | None

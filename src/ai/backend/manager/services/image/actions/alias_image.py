@@ -9,6 +9,10 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class AliasImageAction(ImageAction):
+    """
+    Deprecated. Use AliasImageByIdAction instead.
+    """
+
     image_canonical: str
     architecture: str
     alias: str
