@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.base import ImageAction
 
@@ -25,7 +25,7 @@ class SearchImagesAction(ImageAction):
 
 @dataclass
 class SearchImagesActionResult(BaseActionResult):
-    data: list[ImageDataWithDetails]
+    data: list[ImageData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

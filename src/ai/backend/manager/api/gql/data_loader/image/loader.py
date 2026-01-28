@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -13,7 +13,7 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 async def load_images_by_ids(
     processor: ImageProcessors,
     image_ids: Sequence[uuid.UUID],
-) -> list[ImageDataWithDetails | None]:
+) -> list[ImageData | None]:
     """Batch load images by their IDs.
 
     Args:
@@ -21,7 +21,7 @@ async def load_images_by_ids(
         image_ids: List of image IDs to load.
 
     Returns:
-        List of ImageDataWithDetails (or None if not found) in the same order as image_ids.
+        List of ImageData (or None if not found) in the same order as image_ids.
     """
     if not image_ids:
         return []
@@ -35,7 +35,7 @@ async def load_images_by_ids(
         SearchImagesAction(querier=querier)
     )
 
-    image_map: dict[uuid.UUID, ImageDataWithDetails] = {
+    image_map: dict[uuid.UUID, ImageData] = {
         uuid.UUID(str(image.id)): image for image in action_result.data
     }
     return [image_map.get(image_id) for image_id in image_ids]
