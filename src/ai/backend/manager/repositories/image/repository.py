@@ -344,9 +344,7 @@ class ImageRepository:
         """
         Sets resource limit for an image by its ID.
         """
-        return await self._db_source.set_image_resource_limit_by_id(
-            image_id, resource_limit
-        )
+        return await self._db_source.set_image_resource_limit_by_id(image_id, resource_limit)
 
     @image_repository_resilience.apply()
     async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
