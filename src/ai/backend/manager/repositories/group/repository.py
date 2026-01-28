@@ -60,15 +60,15 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.purger import execute_batch_purger
+from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.purgers import (
-    create_group_endpoint_purger,
-    create_group_kernel_purger,
-    create_group_purger,
-    create_group_session_purger,
-    create_session_purger_by_ids,
+    GroupBatchPurgerSpec,
+    GroupEndpointBatchPurgerSpec,
+    GroupKernelBatchPurgerSpec,
+    GroupSessionBatchPurgerSpec,
+    SessionByIdsBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
@@ -490,12 +490,16 @@ class GroupRepository:
 
     async def _delete_group_kernels(self, session: SASession, group_id: uuid.UUID) -> int:
         """Delete all kernels belonging to the group."""
-        result = await execute_batch_purger(session, create_group_kernel_purger(group_id))
+        result = await execute_batch_purger(
+            session, BatchPurger(spec=GroupKernelBatchPurgerSpec(group_id=group_id))
+        )
         return result.deleted_count
 
     async def _delete_group_sessions(self, session: SASession, group_id: uuid.UUID) -> int:
         """Delete all sessions belonging to the group."""
-        result = await execute_batch_purger(session, create_group_session_purger(group_id))
+        result = await execute_batch_purger(
+            session, BatchPurger(spec=GroupSessionBatchPurgerSpec(group_id=group_id))
+        )
         return result.deleted_count
 
     async def _delete_group_endpoints(self, session: SASession, group_id: uuid.UUID) -> None:
@@ -540,11 +544,15 @@ class GroupRepository:
         session_ids = [sid for sid in session_ids_result.all() if sid is not None]
 
         # Delete endpoints first (routings are CASCADE deleted automatically)
-        await execute_batch_purger(session, create_group_endpoint_purger(group_id))
+        await execute_batch_purger(
+            session, BatchPurger(spec=GroupEndpointBatchPurgerSpec(project_id=group_id))
+        )
 
         # Delete sessions using the collected IDs
         if session_ids:
-            await execute_batch_purger(session, create_session_purger_by_ids(session_ids))
+            await execute_batch_purger(
+                session, BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
+            )
 
     @group_repository_resilience.apply()
     async def purge_group(self, group_id: uuid.UUID) -> bool:
@@ -576,7 +584,9 @@ class GroupRepository:
             await self._delete_group_sessions(session, group_id)
 
             # Finally delete the group itself
-            result = await execute_batch_purger(session, create_group_purger(group_id))
+            result = await execute_batch_purger(
+                session, BatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1)
+            )
 
             if result.deleted_count > 0:
                 return True

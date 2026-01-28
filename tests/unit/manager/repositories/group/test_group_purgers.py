@@ -36,13 +36,13 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGro
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.repositories.base.purger import execute_batch_purger
+from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.group.purgers import (
-    create_group_endpoint_purger,
-    create_group_kernel_purger,
-    create_group_purger,
-    create_group_session_purger,
-    create_session_purger_by_ids,
+    GroupBatchPurgerSpec,
+    GroupEndpointBatchPurgerSpec,
+    GroupKernelBatchPurgerSpec,
+    GroupSessionBatchPurgerSpec,
+    SessionByIdsBatchPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -383,7 +383,7 @@ class TestGroupPurgersIntegration:
 
         # Purge sessions
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_session_purger(group_id)
+            purger = BatchPurger(spec=GroupSessionBatchPurgerSpec(group_id=group_id))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_sessions)
 
@@ -419,7 +419,7 @@ class TestGroupPurgersIntegration:
 
         # Purge kernels
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_kernel_purger(group_id)
+            purger = BatchPurger(spec=GroupKernelBatchPurgerSpec(group_id=group_id))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_kernels)
 
@@ -453,7 +453,7 @@ class TestGroupPurgersIntegration:
 
         # Purge endpoints
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_endpoint_purger(group_id)
+            purger = BatchPurger(spec=GroupEndpointBatchPurgerSpec(project_id=group_id))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_endpoints)
 
@@ -496,13 +496,13 @@ class TestGroupPurgersIntegration:
 
         # Delete endpoints first (CASCADE deletes routings)
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_endpoint_purger(group_id)
+            purger = BatchPurger(spec=GroupEndpointBatchPurgerSpec(project_id=group_id))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_endpoints)
 
         # Purge endpoint sessions using collected session IDs
         async with db_with_cleanup.begin_session() as session:
-            purger = create_session_purger_by_ids(session_ids)
+            purger = BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(endpoint_sessions)
 
@@ -533,7 +533,7 @@ class TestGroupPurgersIntegration:
 
         # Purge group
         async with db_with_cleanup.begin_session() as session:
-            purger = create_group_purger(group_id)
+            purger = BatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1)
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == 1
 
