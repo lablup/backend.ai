@@ -67,9 +67,9 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageActionResult,
     ModifyImageActionUnknownImageReferenceError,
 )
-from ai.backend.manager.services.image.actions.preload_image_by_id import (
-    PreloadImageByIdAction,
-    PreloadImageByIdActionResult,
+from ai.backend.manager.services.image.actions.preload_image import (
+    PreloadImageAction,
+    PreloadImageActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgedImagesData,
