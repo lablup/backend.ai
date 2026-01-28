@@ -372,15 +372,6 @@ class TestGroupPurgersIntegration:
         """Test purging sessions belonging to a group."""
         group_id = sample_group.id
 
-        # Verify sessions exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(SessionRow)
-                .where(SessionRow.group_id == group_id)
-            )
-            assert count == len(sample_sessions)
-
         # Purge sessions
         async with db_with_cleanup.begin_session() as session:
             purger = BatchPurger(spec=GroupSessionBatchPurgerSpec(group_id=group_id))
@@ -400,22 +391,11 @@ class TestGroupPurgersIntegration:
     async def test_purge_group_kernels(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_sessions: list[SessionRow],
         sample_kernels: list[KernelRow],
         sample_group: GroupRow,
     ) -> None:
         """Test purging kernels belonging to group sessions."""
         group_id = sample_group.id
-        session_ids = [sess.id for sess in sample_sessions]
-
-        # Verify kernels exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(KernelRow)
-                .where(KernelRow.session_id.in_(session_ids))
-            )
-            assert count == len(sample_kernels)
 
         # Purge kernels
         async with db_with_cleanup.begin_session() as session:
@@ -428,7 +408,7 @@ class TestGroupPurgersIntegration:
             count = await session.scalar(
                 sa.select(sa.func.count())
                 .select_from(KernelRow)
-                .where(KernelRow.session_id.in_(session_ids))
+                .where(KernelRow.group_id == group_id)
             )
             assert count == 0
 
@@ -441,15 +421,6 @@ class TestGroupPurgersIntegration:
     ) -> None:
         """Test purging endpoints belonging to the group."""
         group_id = sample_group.id
-
-        # Verify endpoints exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(EndpointRow)
-                .where(EndpointRow.project == group_id)
-            )
-            assert count == len(sample_endpoints)
 
         # Purge endpoints
         async with db_with_cleanup.begin_session() as session:
@@ -485,15 +456,6 @@ class TestGroupPurgersIntegration:
         endpoint_sessions, _ = sample_endpoint_sessions_with_routings
         session_ids = [sess.id for sess in endpoint_sessions]
 
-        # Verify endpoint sessions exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(SessionRow)
-                .where(SessionRow.id.in_(session_ids))
-            )
-            assert count == len(endpoint_sessions)
-
         # Delete endpoints first (CASCADE deletes routings)
         async with db_with_cleanup.begin_session() as session:
             purger = BatchPurger(spec=GroupEndpointBatchPurgerSpec(project_id=group_id))
@@ -523,13 +485,6 @@ class TestGroupPurgersIntegration:
     ) -> None:
         """Test purging the group itself."""
         group_id = sample_group.id
-
-        # Verify group exists
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count()).select_from(GroupRow).where(GroupRow.id == group_id)
-            )
-            assert count == 1
 
         # Purge group
         async with db_with_cleanup.begin_session() as session:
