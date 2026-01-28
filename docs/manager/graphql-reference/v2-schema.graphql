@@ -2143,11 +2143,6 @@ Fields available for ordering image queries.
 enum ImageOrderField {
   NAME
   CREATED_AT
-  ARCHITECTURE
-  SIZE_BYTES
-  REGISTRY
-  TAG
-  STATUS
 }
 
 """
@@ -2258,6 +2253,14 @@ type ImageV2 implements Node {
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
+
+  """
+  Added in 26.2.0.
+  
+  User-defined aliases for this image.
+  Aliases provide alternative, memorable names for referencing images.
+  """
+  aliases: [String!]!
 }
 
 """An edge in a connection."""
