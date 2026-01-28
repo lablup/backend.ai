@@ -8,16 +8,28 @@ These types reference entities that should be represented as proper Relay Node c
 
 For each deferred Node type, we include the **ID field immediately** (for direct fetching) and defer only the **Node connection** (for full object resolution).
 
-| Type/Field | ID Field (Include Now) | Future Node (Defer) |
-|------------|------------------------|---------------------|
-| `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
-| `KernelUserInfoGQL` | `user_id: uuid.UUID` | `user: UserNode` |
-| `KernelUserInfoGQL` | `access_key: str` | `keypair: KeypairNode` |
-| `KernelUserInfoGQL` | `domain_name: str` | `domain: DomainNode` |
-| `KernelUserInfoGQL` | `group_id: uuid.UUID` | `project: GroupNode` |
-| `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
-| `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
-| `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
+Node references are placed directly on `KernelV2GQL`:
+
+| Node Field | Type |
+|------------|------|
+| `image_node` | `ImageNode \| None` |
+| `session_node` | `SessionNode \| None` |
+| `user_node` | `UserNode \| None` |
+| `keypair_node` | `KeypairNode \| None` |
+| `domain_node` | `DomainNode \| None` |
+| `project_node` | `GroupNode \| None` |
+| `agent_node` | `AgentNode \| None` |
+| `resource_group_node` | `ResourceGroupNode \| None` |
+| `vfolder_nodes` | `list[VFolderNode] \| None` |
+
+ID fields are included in sub-info types:
+
+| Sub-Info Type | ID Field |
+|---------------|----------|
+| `KernelImageInfoGQL` | `image_id: uuid.UUID` |
+| `KernelSessionInfoGQL` | `session_id: uuid.UUID` |
+| `KernelUserInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` |
+| `KernelResourceInfoGQL` | `agent_id`, `resource_group_name` |
 
 ### Types to Skip Entirely
 | Type | Reason |
@@ -37,8 +49,8 @@ class KernelImageInfoGQL:
     image_id: uuid.UUID | None
 ```
 
-**Future additions**:
-- `image: ImageNode | None`
+**Future additions** (on `KernelV2GQL`):
+- `image_node: ImageNode | None`
 
 ---
 
@@ -54,9 +66,6 @@ This type includes ID fields immediately, with Node connections deferred:
 | `access_key` | `str \| None` | Yes | `keypair: KeypairNode` |
 | `domain_name` | `str \| None` | Yes | `domain: DomainNode` |
 | `group_id` | `uuid.UUID \| None` | Yes | `project: GroupNode` |
-| `uid` | `int \| None` | Yes | - |
-| `main_gid` | `int \| None` | Yes | - |
-| `gids` | `list[int] \| None` | Yes | - |
 
 **Action**: Include all ID fields now. Defer Node connections to future PRs.
 
@@ -68,16 +77,13 @@ class KernelUserInfoGQL:
     access_key: str | None
     domain_name: str | None
     group_id: uuid.UUID | None
-    uid: int | None
-    main_gid: int | None
-    gids: list[int] | None
 ```
 
-**Future additions**:
-- `user: UserNode | None`
-- `keypair: KeypairNode | None`
-- `domain: DomainNode | None`
-- `project: GroupNode | None`
+**Future additions** (on `KernelV2GQL`):
+- `user_node: UserNode | None`
+- `keypair_node: KeypairNode | None`
+- `domain_node: DomainNode | None`
+- `project_node: GroupNode | None`
 
 ---
 
@@ -97,8 +103,8 @@ class KernelSessionInfoGQL:
     session_type: SessionTypes
 ```
 
-**Future additions**:
-- `session: SessionNode | None`
+**Future additions** (on `KernelV2GQL`):
+- `session_node: SessionNode | None`
 
 ---
 
@@ -108,8 +114,9 @@ class KernelSessionInfoGQL:
 
 **Action**: Include `resource_group_name: str | None` field now. Defer `resource_group: ResourceGroupNode` connection.
 
-**Future additions**:
-- `resource_group: ResourceGroupNode | None`
+**Future additions** (on `KernelV2GQL`):
+- `resource_group_node: ResourceGroupNode | None`
+- `agent_node: AgentNode | None`
 
 ---
 
@@ -119,24 +126,21 @@ class KernelSessionInfoGQL:
 
 **Action**: Do not include in `common/types.py`. Will be replaced by `VFolderNode` connection.
 
-### KernelRuntimeInfoGQL.vfolder_mounts
-
-**Action**: Include `vfolder_ids: list[uuid.UUID] | None` field now. Defer `vfolders: list[VFolderNode]` connection.
-
-**Future additions**:
-- `vfolders: list[VFolderNode] | None`
+**Future additions** (on `KernelV2GQL`):
+- `vfolder_nodes: list[VFolderNode] | None`
 
 ---
 
 ## Future Implementation PRs
 
-| PR | Node Connections to Add |
+| PR | Node Field on `KernelV2GQL` |
 |----|-------------------------|
-| ImageNode PR | `KernelV2GQL.image: ImageNode` |
-| UserNode PR | `KernelUserInfoGQL.user: UserNode` |
-| KeypairNode PR | `KernelUserInfoGQL.keypair: KeypairNode` |
-| DomainNode PR | `KernelUserInfoGQL.domain: DomainNode` |
-| GroupNode PR | `KernelUserInfoGQL.project: GroupNode` |
-| SessionNode PR | `KernelSessionInfoGQL.session: SessionNode` |
-| ResourceGroupNode PR | `KernelResourceInfoGQL.resource_group: ResourceGroupNode` |
-| VFolderNode PR | `KernelRuntimeInfoGQL.vfolders: list[VFolderNode]` |
+| ImageNode PR | `image_node: ImageNode` |
+| SessionNode PR | `session_node: SessionNode` |
+| UserNode PR | `user_node: UserNode` |
+| KeypairNode PR | `keypair_node: KeypairNode` |
+| DomainNode PR | `domain_node: DomainNode` |
+| GroupNode PR | `project_node: GroupNode` |
+| AgentNode PR | `agent_node: AgentNode` |
+| ResourceGroupNode PR | `resource_group_node: ResourceGroupNode` |
+| VFolderNode PR | `vfolder_nodes: list[VFolderNode]` |
