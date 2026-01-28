@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import (
     ImageStatus,
@@ -14,7 +13,6 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 @dataclass
 class GetImageByIdAction(ImageAction):
     image_id: UUID
-    user_role: UserRole
     image_status: Optional[list[ImageStatus]]
 
     @override

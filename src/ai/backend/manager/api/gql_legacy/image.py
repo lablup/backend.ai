@@ -74,8 +74,8 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
+    ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
 from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.get_image_by_identifier import (
@@ -90,7 +90,7 @@ from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -276,7 +276,6 @@ class Image(graphene.ObjectType):
         result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
                 image_id=id,
-                user_role=ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -736,7 +735,6 @@ class ImageNode(graphene.ObjectType):
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
                 image_id=UUID(image_id),
-                user_role=ctx.user["role"],
                 image_status=None,
             )
         )
