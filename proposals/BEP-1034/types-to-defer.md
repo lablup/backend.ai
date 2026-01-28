@@ -32,11 +32,6 @@ ID fields are included in sub-info types:
 
 > **Note**: `image_id` is inlined directly on `KernelV2GQL` (single-element type removed)
 
-### Types to Skip Entirely
-| Type | Reason |
-|------|--------|
-| `VFolderMountGQL` | Replaced by `VFolderNode` connection |
-
 ---
 
 ## Image Types (Defer to ImageNode)
@@ -115,10 +110,6 @@ class KernelSessionInfoGQL:
 ---
 
 ## VFolder Types (Defer to VFolderNode)
-
-### VFolderMountGQL
-
-**Action**: Do not include in `common/types.py`. Will be replaced by `VFolderNode` connection.
 
 **Future additions** (on `KernelV2GQL`):
 - `vfolder_nodes: VFolderConnection`

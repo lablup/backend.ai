@@ -12,6 +12,7 @@ These types are **not to be implemented**. They have been decided to be replaced
 | `SchedulerInfoGQL` | `common/types.py` | Replaced by new scheduler design |
 | `KernelStatusHistoryEntryGQL` | `kernel/types.py` | Replaced by new status tracking design |
 | `KernelStatusHistoryGQL` | `kernel/types.py` | Replaced by new status tracking design |
+| `VFolderMountGQL` | `common/types.py` | Replaced by `VFolderNode` connection |
 
 ---
 
@@ -36,6 +37,14 @@ These types are **not to be implemented**. They have been decided to be replaced
 ### KernelStatusHistoryGQL
 
 **Action**: Do not implement. Status history design will be revisited.
+
+---
+
+## VFolder Types
+
+### VFolderMountGQL
+
+**Action**: Do not implement. Replaced by `VFolderNode` connection on `KernelV2GQL`.
 
 ---
 
