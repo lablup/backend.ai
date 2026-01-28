@@ -83,7 +83,7 @@ from ai.backend.manager.services.image.actions.get_image_by_identifier import (
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.modify_image import (

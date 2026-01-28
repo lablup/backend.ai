@@ -2,17 +2,15 @@ from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import ImageStatus, ImageWithAgentInstallStatus
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class GetImagesByIdsAction(ImageAction):
+class UnloadImageAction(ImageAction):
     image_ids: list[UUID]
-    user_role: UserRole
-    image_status: Optional[list[ImageStatus]]
+    agents: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -21,12 +19,12 @@ class GetImagesByIdsAction(ImageAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_by_ids"
+        return "unload"
 
 
 @dataclass
-class GetImagesByIdsActionResult(BaseActionResult):
-    images: list[ImageWithAgentInstallStatus]
+class UnloadImageActionResult(BaseActionResult):
+    images: list[ImageData]
 
     @override
     def entity_id(self) -> Optional[str]:
