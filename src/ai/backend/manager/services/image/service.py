@@ -450,8 +450,6 @@ class ImageService:
         """
         image_data = await self._image_repository.set_image_resource_limit_by_id(
             action.image_id,
-            action.slot_name,
-            action.min_value,
-            action.max_value,
+            action.resource_limit,
         )
         return SetImageResourceLimitByIdActionResult(image_data=image_data)
