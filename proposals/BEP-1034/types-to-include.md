@@ -140,8 +140,7 @@ class KernelResourceInfoGQL:
     agent: AgentNode | None
     resource_group_name: str | None
     container_id: str | None
-    used: ResourceSlotGQL
-    requested: ResourceSlotGQL
+    allocation: ResourceAllocationGQL
     shares: ResourceSlotGQL
     attached_devices: KernelAttachedDevicesGQL | None
     resource_opts: ResourceOptsGQL | None
@@ -220,6 +219,22 @@ KernelEdgeGQL = Edge[KernelV2GQL]
 ```python
 class KernelConnectionV2GQL(Connection[KernelV2GQL]):
     count: int
+```
+
+---
+
+## Resource Allocation Types
+
+> **Design Note**: Types directly related to resource allocation are grouped separately.
+
+### ResourceAllocationGQL
+
+> **Description**: A bundle type representing the resource allocation state for individual workloads (Kernel)
+
+```python
+class ResourceAllocationGQL:
+    requested: ResourceSlotGQL
+    used: ResourceSlotGQL
 ```
 
 ---
