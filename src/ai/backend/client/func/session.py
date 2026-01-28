@@ -685,7 +685,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_name) -> None:
+    async def rename(self, new_name: str) -> None:
         """
         Renames Session ID of running compute session.
         """
@@ -1491,7 +1491,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def rename(self, new_id) -> None:
+    async def rename(self, new_id: str) -> None:
         """
         Renames Session ID or running inference session.
         """

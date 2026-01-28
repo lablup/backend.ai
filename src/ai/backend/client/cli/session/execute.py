@@ -10,9 +10,9 @@ import string
 import sys
 import traceback
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional, TextIO
 
 import aiohttp
 import click
@@ -37,6 +37,9 @@ from ai.backend.client.config import local_cache_path
 from ai.backend.client.exceptions import BackendError
 from ai.backend.client.output.fields import network_fields
 from ai.backend.client.session import AsyncSession
+
+if TYPE_CHECKING:
+    from ai.backend.client.func.session import ComputeSession
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode, MountExpression
 
@@ -48,15 +51,15 @@ list_expr: click.ParamType = CommaSeparatedListType()
 
 
 async def exec_loop(
-    stdout,
-    stderr,
-    compute_session,
-    mode,
-    code,
+    stdout: TextIO,
+    stderr: TextIO,
+    compute_session: ComputeSession,
+    mode: str,
+    code: str,
     *,
-    opts=None,
-    vprint_done=print_done,
-    is_multi=False,
+    opts: dict[str, Any] | None = None,
+    vprint_done: Callable[[str], None] = print_done,
+    is_multi: bool = False,
 ) -> None:
     """
     Fully streamed asynchronous version of the execute loop.
@@ -114,7 +117,14 @@ async def exec_loop(
 
 
 def exec_loop_sync(
-    stdout, stderr, compute_session, mode, code, *, opts=None, vprint_done=print_done
+    stdout: TextIO,
+    stderr: TextIO,
+    compute_session: ComputeSession,
+    mode: str,
+    code: str,
+    *,
+    opts: dict[str, Any] | None = None,
+    vprint_done: Callable[[str], None] = print_done,
 ) -> None:
     """
     Old synchronous polling version of the execute loop.
@@ -143,17 +153,17 @@ def exec_loop_sync(
             print("--- end of generated files ---", file=stdout)
         if result["status"] == "clean-finished":
             exitCode = result.get("exitCode")
-            vprint_done(f"Clean finished. (exit code = {exitCode}", file=stdout)
+            vprint_done(f"Clean finished. (exit code = {exitCode})")
             mode = "continue"
             code = ""
         elif result["status"] == "build-finished":
             exitCode = result.get("exitCode")
-            vprint_done(f"Build finished. (exit code = {exitCode})", file=stdout)
+            vprint_done(f"Build finished. (exit code = {exitCode})")
             mode = "continue"
             code = ""
         elif result["status"] == "finished":
             exitCode = result.get("exitCode")
-            vprint_done(f"Execution finished. (exit code = {exitCode})", file=stdout)
+            vprint_done(f"Execution finished. (exit code = {exitCode})")
             break
         elif result["status"] == "waiting-input":
             mode = "input"
@@ -166,16 +176,21 @@ def exec_loop_sync(
             code = ""
 
 
-async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done) -> None:
+async def exec_terminal(
+    compute_session: ComputeSession,
+    *,
+    vprint_wait: Callable[[str], None] = print_wait,
+    vprint_done: Callable[[str], None] = print_done,
+) -> None:
     # async with compute_session.stream_pty() as stream: ...
     raise NotImplementedError
 
 
-def _noop(*args, **kwargs) -> None:
+def _noop(*args: Any, **kwargs: Any) -> None:
     pass
 
 
-def format_stats(stats) -> str:
+def format_stats(stats: dict[str, Any]) -> str:
     formatted = []
     version = stats.pop("version", 1)
     stats.pop("status")
@@ -394,44 +409,44 @@ def prepare_mount_arg(
 )
 @click_start_option()
 def run(
-    image,
-    files,
-    name,  # click_start_option
-    type,  # click_start_option
+    image: str,
+    files: tuple[str, ...],
+    name: str | None,  # click_start_option
+    type: str,  # click_start_option
     priority: int | None,  # click_start_option
-    starts_at,  # click_start_option
-    enqueue_only,  # click_start_option
-    max_wait,  # click_start_option
-    no_reuse,  # click_start_option
-    callback_url,  # click_start_option
-    code,
-    terminal,  # query-mode options
-    clean,
-    build,
-    exec,
-    basedir,  # batch-mode options
-    env,  # click_start_option
-    bootstrap_script,
-    rm,
-    stats,
-    tag,  # click_start_option
-    quiet,  # extra options
-    env_range,
-    build_range,
-    exec_range,
-    max_parallel,  # experiment support
-    mount,  # click_start_option
-    scaling_group,  # click_start_option
-    resources,  # click_start_option
-    cluster_size,  # click_start_option
+    starts_at: str | None,  # click_start_option
+    enqueue_only: bool,  # click_start_option
+    max_wait: int,  # click_start_option
+    no_reuse: bool,  # click_start_option
+    callback_url: str | None,  # click_start_option
+    code: str | None,
+    terminal: bool,  # query-mode options
+    clean: str | None,
+    build: str | None,
+    exec: str | None,
+    basedir: str | None,  # batch-mode options
+    env: tuple[str, ...],  # click_start_option
+    bootstrap_script: TextIO | None,
+    rm: bool,
+    stats: bool,
+    tag: str | None,  # click_start_option
+    quiet: bool,  # extra options
+    env_range: tuple[str, ...],
+    build_range: tuple[str, ...],
+    exec_range: tuple[str, ...],
+    max_parallel: int,  # experiment support
+    mount: tuple[str, ...],  # click_start_option
+    scaling_group: str | None,  # click_start_option
+    resources: tuple[str, ...],  # click_start_option
+    cluster_size: int,  # click_start_option
     cluster_mode: ClusterMode,
-    resource_opts,  # click_start_option
-    architecture,
-    domain,  # click_start_option
-    group,  # click_start_option
-    network,  # click_start_option
-    preopen,
-    assign_agent,  # resource grouping
+    resource_opts: tuple[str, ...],  # click_start_option
+    architecture: str,
+    domain: str | None,  # click_start_option
+    group: str | None,  # click_start_option
+    network: str | None,  # click_start_option
+    preopen: list[str] | None,
+    assign_agent: list[str] | None,  # resource grouping
 ) -> None:
     """
     Run the given code snippet or files in a session.
@@ -472,9 +487,9 @@ def run(
     if exec_range is None:
         exec_range = []
 
-    env_ranges = {v: r for v, r in env_range}
-    build_ranges = {v: r for v, r in build_range}
-    exec_ranges = {v: r for v, r in exec_range}
+    env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
+    build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]
+    exec_ranges: dict[str, Any] = {v: r for v, r in exec_range}  # type: ignore[has-type]
 
     env_var_maps = [
         dict(zip(env_ranges.keys(), values, strict=True))
@@ -528,7 +543,15 @@ def run(
                 pretty_env = " ".join(f"{item[0]}={item[1]}" for item in case[0])
                 print(f"env = {pretty_env!r}, build = {case[1]!r}, exec = {case[2]!r}")
 
-    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd) -> None:
+    def _run_legacy(
+        session: AsyncSession,
+        idx: int,
+        name: str,
+        envs: Mapping[str, str],
+        clean_cmd: str | None,
+        build_cmd: str | None,
+        exec_cmd: str | None,
+    ) -> None:
         try:
             compute_session = session.ComputeSession.get_or_create(
                 image,
@@ -628,7 +651,14 @@ def run(
                         print(f"[{idx}] Statistics is not available.")
 
     async def _run(
-        session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False
+        session: AsyncSession,
+        idx: int,
+        name: str,
+        envs: Mapping[str, str],
+        clean_cmd: str | None,
+        build_cmd: str | None,
+        exec_cmd: str | None,
+        is_multi: bool = False,
     ) -> None:
         try:
             if network:
@@ -719,7 +749,7 @@ def run(
 
         try:
 
-            def indexed_vprint_done(msg) -> None:
+            def indexed_vprint_done(msg: str) -> None:
                 vprint_done(f"[{idx}] " + msg)
 
             if files:

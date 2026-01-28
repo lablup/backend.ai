@@ -147,7 +147,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
         page_size: Optional[int] = None,
-        plain=False,
+        plain: bool = False,
     ) -> None:
         fields: list[FieldSpec] = []
 

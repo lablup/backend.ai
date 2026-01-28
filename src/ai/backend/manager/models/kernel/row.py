@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -179,7 +179,7 @@ async def get_user_email(
     return user_email.replace("@", "_")
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
@@ -283,8 +283,8 @@ async def handle_kernel_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     kernel_id: KernelId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]

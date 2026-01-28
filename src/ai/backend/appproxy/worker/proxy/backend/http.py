@@ -237,7 +237,7 @@ class HTTPBackend(BaseBackend):
         async def _proxy_task(
             left: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
             right: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
-            tag="(unknown)",
+            tag: str = "(unknown)",
         ) -> None:
             nonlocal total_bytes
 

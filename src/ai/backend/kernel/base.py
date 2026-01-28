@@ -756,7 +756,7 @@ class BaseRunner(metaclass=ABCMeta):
             # After the None check, narrow the type
             model_service_info = cast(Mapping[str, Any], model_service_info)
             service_name = f"{model_info['name']}-{model_service_info['port']}"
-            self.service_parser.add_model_service(service_name, model_service_info)
+            self.service_parser.add_model_service(service_name, dict(model_service_info))
             service_info = {
                 "name": service_name,
                 "port": model_service_info["port"],

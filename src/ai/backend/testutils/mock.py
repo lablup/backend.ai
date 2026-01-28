@@ -8,14 +8,14 @@ from unittest.mock import AsyncMock, Mock
 from aioresponses import CallbackResult
 
 
-def mock_corofunc(return_value) -> Mock:
+def mock_corofunc(return_value: Any) -> Mock:
     """
     Return mock coroutine function.
 
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs) -> Any:
+    async def _mock_corofunc(*args: Any, **kargs: Any) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
@@ -41,7 +41,7 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -49,7 +49,9 @@ class AsyncContextManagerMock:
     async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -62,19 +64,19 @@ class MockableZMQAsyncSock:
     def create_mock(cls) -> Mock:
         return mock.Mock(cls())
 
-    def bind(self, addr) -> None:
+    def bind(self, addr: str) -> None:
         pass
 
-    def connect(self, addr) -> None:
+    def connect(self, addr: str) -> None:
         pass
 
     def close(self) -> None:
         pass
 
-    async def send(self, frame) -> None:
+    async def send(self, frame: bytes) -> None:
         pass
 
-    async def send_multipart(self, msg) -> None:
+    async def send_multipart(self, msg: list[bytes]) -> None:
         pass
 
     async def recv(self) -> None:
@@ -112,7 +114,9 @@ class AsyncContextMock(mock.Mock):
     async def __aenter__(self) -> "AsyncContextMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -127,7 +131,9 @@ class AsyncContextMagicMock(mock.MagicMock):
     async def __aenter__(self) -> "AsyncContextMagicMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -159,7 +165,9 @@ class AsyncContextCoroutineMock(AsyncMock):
     async def __aenter__(self) -> "AsyncContextCoroutineMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -173,7 +181,7 @@ def mock_aioresponses_sequential_payloads(
     """
     cb_call_counter = 0
 
-    def _callback(*args, **kwargs) -> CallbackResult:
+    def _callback(*args: Any, **kwargs: Any) -> CallbackResult:
         nonlocal cb_call_counter
 
         if cb_call_counter >= len(mock_responses):
@@ -187,7 +195,7 @@ def mock_aioresponses_sequential_payloads(
 
 
 def setup_dockerhub_mocking(
-    aiohttp_request_mock, registry_url: str, dockerhub_responses_mock: dict[str, Any]
+    aiohttp_request_mock: Any, registry_url: str, dockerhub_responses_mock: dict[str, Any]
 ) -> None:
     # /v2/ endpoint
     aiohttp_request_mock.get(

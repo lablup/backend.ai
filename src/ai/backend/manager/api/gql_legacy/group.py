@@ -236,7 +236,7 @@ class GroupNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, group_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
@@ -559,7 +559,7 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
-        def value_or_none(value) -> Any:
+        def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         type_val = None if self.type is Undefined else ProjectType[self.type]

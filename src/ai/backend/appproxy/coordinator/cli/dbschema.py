@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -16,7 +16,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
-def cli(args) -> None:
+def cli(args: Any) -> None:
     pass
 
 
@@ -29,7 +29,7 @@ def cli(args) -> None:
     help="The path to Alembic config file. [default: alembic-appproxy.ini]",
 )
 @click.pass_obj
-def show(cli_ctx: CLIContext, alembic_config) -> None:
+def show(cli_ctx: CLIContext, alembic_config: str) -> None:
     """Show the current schema information."""
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext

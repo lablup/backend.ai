@@ -116,7 +116,7 @@ def _translate_headers(upstream_request: Request, client_request: Request) -> No
         upstream_request.headers["Host"] = f"{api_endpoint.host}:{api_endpoint.port}"
 
 
-async def web_handler(request) -> web.StreamResponse:
+async def web_handler(request: web.Request) -> web.StreamResponse:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         # We treat all requests and responses as streaming universally
@@ -167,7 +167,7 @@ async def web_handler(request) -> web.StreamResponse:
         )
 
 
-async def websocket_handler(request) -> web.WebSocketResponse | web.Response:
+async def websocket_handler(request: web.Request) -> web.WebSocketResponse | web.Response:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         api_request = Request(
@@ -235,7 +235,7 @@ def create_proxy_app() -> web.Application:
     help="The TCP port to accept non-encrypted non-authorized API requests.",
 )
 @click.pass_context
-def proxy(ctx, bind, port) -> None:
+def proxy(ctx: click.Context, bind: str, port: int) -> None:
     """
     Run a non-encrypted non-authorized API proxy server.
     Use this only for development and testing!

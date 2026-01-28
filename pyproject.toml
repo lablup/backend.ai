@@ -171,7 +171,6 @@ ignore = [
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
     # ANN (annotations) - defer for gradual migration, mypy handles type checking
-    "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
     "ANN002",  # missing-type-args - *args type annotation, low practical value
     "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
     "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs

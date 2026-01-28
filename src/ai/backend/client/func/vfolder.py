@@ -88,7 +88,7 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete_by_id(cls, oid) -> dict[str, Any]:
+    async def delete_by_id(cls, oid: str) -> dict[str, Any]:
         rqst = Request("DELETE", "/folders")
         rqst.set_json({"id": oid})
         async with rqst.fetch():
@@ -96,7 +96,7 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls, list_all=False) -> dict[str, Any]:
+    async def list(cls, list_all: bool = False) -> dict[str, Any]:
         rqst = Request("GET", "/folders")
         rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
@@ -309,7 +309,7 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
-    async def rename(self, new_name) -> str:
+    async def rename(self, new_name: str) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename")
         rqst.set_json({
@@ -671,13 +671,14 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_fstab_contents(cls, agent_id=None) -> dict[str, Any]:
+    async def get_fstab_contents(cls, agent_id: Optional[str] = None) -> dict[str, Any]:
+        params: dict[str, str | int] = {}
+        if agent_id is not None:
+            params["agent_id"] = agent_id
         rqst = Request(
             "GET",
             "/folders/_/fstab",
-            params={
-                "agent_id": agent_id,
-            },
+            params=params,
         )
         async with rqst.fetch() as resp:
             return await resp.json()
@@ -699,7 +700,11 @@ class VFolderByName(BaseFunction):
     @api_function
     @classmethod
     async def mount_host(
-        cls, name: str, fs_location: str, options=None, edit_fstab: bool = False
+        cls,
+        name: str,
+        fs_location: str,
+        options: Optional[dict[str, Any]] = None,
+        edit_fstab: bool = False,
     ) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/mounts")
         rqst.set_json({
@@ -744,7 +749,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def leave(self, shared_user_uuid=None) -> dict[str, Any]:
+    async def leave(self, shared_user_uuid: Optional[str] = None) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/leave")
         rqst.set_json({"shared_user_uuid": shared_user_uuid})

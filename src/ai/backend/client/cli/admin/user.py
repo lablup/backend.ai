@@ -132,7 +132,15 @@ def info(ctx: CLIContext, email: str) -> None:
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext,
+    status: str | None,
+    group: str | None,
+    filter_: str | None,
+    order: str | None,
+    offset: int,
+    limit: int | None,
+) -> None:
     """
     List users.
     (admin privilege required)
@@ -585,7 +593,7 @@ def update(
 @user.command()
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
-def delete(ctx: CLIContext, email) -> None:
+def delete(ctx: CLIContext, email: str) -> None:
     """
     Inactivate an existing user.
 
@@ -640,7 +648,9 @@ def delete(ctx: CLIContext, email) -> None:
         "and delegate the ownership to the requested admin."
     ),
 )
-def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership) -> None:
+def purge(
+    ctx: CLIContext, email: str, purge_shared_vfolders: bool, delegate_endpoint_ownership: bool
+) -> None:
     """
     Delete an existing user. This action cannot be undone.
 

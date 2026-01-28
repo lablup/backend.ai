@@ -168,7 +168,9 @@ def generate_openapi_spec(output: Path) -> None:
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
+def dbshell(
+    cli_ctx: CLIContext, container_name: str | None, psql_help: bool, psql_args: list[str]
+) -> None:
     """
     Run the database shell.
 

@@ -14,7 +14,7 @@ from ai.backend.common.types import MetricValue
 from .types import AbstractOutputFormatter, FieldSpec
 
 
-def format_stats(raw_stats: Optional[str], indent="") -> str:
+def format_stats(raw_stats: Optional[str], indent: str = "") -> str:
     if raw_stats is None:
         return "(unavailable)"
     stats = json.loads(raw_stats)
@@ -318,7 +318,7 @@ def _fit_multiline_in_cell(text: str, indent: str) -> str:
 
 
 class ContainerListFormatter(NestedObjectFormatter):
-    def format_console(self, value: Any, field: FieldSpec, indent="") -> str:
+    def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
         if not isinstance(value, list):
             raise ValueError("ContainerListFormatter expects a list value")
         if len(value) == 0:
@@ -337,7 +337,7 @@ class ContainerListFormatter(NestedObjectFormatter):
 
 
 class DependencyListFormatter(NestedObjectFormatter):
-    def format_console(self, value: Any, field: FieldSpec, indent="") -> str:
+    def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
         if not isinstance(value, list):
             raise ValueError("DependencyListFormatter expects a list value")
         if len(value) == 0:

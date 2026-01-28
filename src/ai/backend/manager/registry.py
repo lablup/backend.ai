@@ -297,7 +297,7 @@ class AgentRegistry:
             result = await db_sess.execute(query)
             return [AgentId(row) for row in result.scalars().all()]
 
-    async def update_instance(self, inst_id, updated_fields) -> None:
+    async def update_instance(self, inst_id: AgentId, updated_fields: dict[str, Any]) -> None:
         async def _update() -> None:
             async with self.db.begin() as conn:
                 query = sa.update(agents).values(**updated_fields).where(agents.c.id == inst_id)
@@ -368,10 +368,10 @@ class AgentRegistry:
         config: dict[str, Any],
         cluster_mode: ClusterMode,
         cluster_size: int,
-        dry_run=False,
-        reuse=False,
-        enqueue_only=False,
-        max_wait_seconds=0,
+        dry_run: bool = False,
+        reuse: bool = False,
+        enqueue_only: bool = False,
+        max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
         bootstrap_script: Optional[str] = None,
         dependencies: Optional[list[uuid.UUID]] = None,
@@ -668,9 +668,9 @@ class AgentRegistry:
         scaling_group: str,
         sess_type: SessionTypes,
         tag: str,
-        enqueue_only=False,
-        max_wait_seconds=0,
-        sudo_session_enabled=False,
+        enqueue_only: bool = False,
+        max_wait_seconds: int = 0,
+        sudo_session_enabled: bool = False,
         attach_network: uuid.UUID | None = None,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
@@ -1060,7 +1060,9 @@ class AgentRegistry:
             "public_key": public_key.decode("utf-8"),
         }
 
-    async def get_user_occupancy(self, user_id, *, db_sess=None) -> ResourceSlot:
+    async def get_user_occupancy(
+        self, user_id: uuid.UUID, *, db_sess: Optional[AsyncSession] = None
+    ) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
@@ -1081,7 +1083,9 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_keypair_occupancy(self, access_key, *, db_sess=None) -> ResourceSlot:
+    async def get_keypair_occupancy(
+        self, access_key: AccessKey, *, db_sess: Optional[AsyncSession] = None
+    ) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
@@ -1107,7 +1111,9 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_domain_occupancy(self, domain_name, *, db_sess=None) -> ResourceSlot:
+    async def get_domain_occupancy(
+        self, domain_name: str, *, db_sess: Optional[AsyncSession] = None
+    ) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
@@ -1135,7 +1141,9 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, db_sess=None) -> ResourceSlot:
+    async def get_group_occupancy(
+        self, group_id: uuid.UUID, *, db_sess: Optional[AsyncSession] = None
+    ) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 

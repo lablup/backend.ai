@@ -74,7 +74,7 @@ def recalculate_usage() -> None:
 
     with Session() as session:
         try:
-            session.Resource.recalculate_usage()
+            _ = session.Resource.recalculate_usage()
             print("Resource allocation is re-calculated.")
         except Exception as e:
             print_error(e)

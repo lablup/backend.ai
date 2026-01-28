@@ -36,7 +36,7 @@ import pkg_resources
 import zmq
 import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
-from aiodocker.exceptions import DockerError
+from aiodocker.exceptions import DockerContainerError, DockerError
 from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
@@ -265,14 +265,14 @@ async def _clean_scratch(
         pass
 
 
-def _DockerError_reduce(self) -> tuple[type, tuple[Any, ...]]:
+def _DockerError_reduce(self: DockerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, *self.args),
     )
 
 
-def _DockerContainerError_reduce(self) -> tuple[type, tuple[Any, ...]]:
+def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),

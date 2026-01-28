@@ -292,7 +292,7 @@ class GPFSAPIClient:
         path: Optional[Path] = None,
         owner: Optional[str] = None,
         permissions: Optional[int] = None,
-        create_directory=True,
+        create_directory: bool = True,
     ) -> None:
         body: dict[str, Any] = {
             "filesetName": fileset_name,

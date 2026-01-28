@@ -10,7 +10,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, Literal, Optional, cast
+from typing import IO, Any, Literal, Optional, cast
 from uuid import UUID
 
 import click
@@ -622,7 +622,13 @@ def _destroy_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     @click.option(
         "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
     )
-    def destroy(session_names, forced, owner, stats, recursive) -> None:
+    def destroy(
+        session_names: tuple[str, ...],
+        forced: bool,
+        owner: str | None,
+        stats: bool,
+        recursive: bool,
+    ) -> None:
         """
         Terminate and destroy the given session.
 
@@ -686,7 +692,7 @@ def _restart_cmd(docs: Optional[str] = None) -> Callable[..., None]:
         metavar="ACCESS_KEY",
         help="Specify the owner of the target session explicitly.",
     )
-    def restart(session_refs, owner) -> None:
+    def restart(session_refs: tuple[str, ...], owner: str | None) -> None:
         """
         Restart the compute session.
 
@@ -702,7 +708,7 @@ def _restart_cmd(docs: Optional[str] = None) -> Callable[..., None]:
             for session_ref in session_refs:
                 try:
                     compute_session = session.ComputeSession(session_ref, owner)
-                    compute_session.restart()
+                    _ = compute_session.restart()
                 except BackendAPIError as e:
                     print_error(e)
                     if e.status == 404:
@@ -732,7 +738,7 @@ session.command()(_restart_cmd())
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", type=click.Path(exists=True), nargs=-1)
-def upload(session_id, files) -> None:
+def upload(session_id: str, files: tuple[str, ...]) -> None:
     """
     Upload the files to a compute session's home directory.
     If the target directory is in a storage folder mount, the operation is
@@ -753,7 +759,7 @@ def upload(session_id, files) -> None:
         try:
             print_wait("Uploading files...")
             kernel = session.ComputeSession(session_id)
-            kernel.upload(files, show_progress=True)
+            _ = kernel.upload(files, show_progress=True)
             print_done("Uploaded.")
         except Exception as e:
             print_error(e)
@@ -764,7 +770,7 @@ def upload(session_id, files) -> None:
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", nargs=-1)
 @click.option("--dest", type=Path, default=".", help="Destination path to store downloaded file(s)")
-def download(session_id, files, dest) -> None:
+def download(session_id: str, files: tuple[str, ...], dest: Path) -> None:
     """
     Download files from a compute session's home directory.
     If the source path is in a storage folder mount, the operation is
@@ -785,7 +791,7 @@ def download(session_id, files, dest) -> None:
         try:
             print_wait(f"Downloading file(s) from {session_id}...")
             kernel = session.ComputeSession(session_id)
-            kernel.download(files, dest, show_progress=True)
+            _ = kernel.download(files, dest, show_progress=True)
             print_done(f"Downloaded to {dest.resolve()}.")
         except Exception as e:
             print_error(e)
@@ -795,7 +801,7 @@ def download(session_id, files, dest) -> None:
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("path", metavar="PATH", nargs=1, default="/home/work")
-def ls(session_id, path) -> None:
+def ls(session_id: str, path: str) -> None:
     """
     List files in a path of a running compute session.
 
@@ -1004,7 +1010,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
-    async def export_tracker(bgtask_id) -> None:
+    async def export_tracker(bgtask_id: str) -> None:
         async with AsyncSession() as session:
             completion_msg_func = lambda: print_done("Session export process completed.")
             try:
@@ -1246,7 +1252,7 @@ def _events_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     )
     def events(
         session_id_or_name: str,
-        owner_access_key: str,
+        owner_access_key: str | None,
         scope: str,
         quiet: bool,
         wait: Optional[str] = None,
@@ -1263,7 +1269,7 @@ def _events_cmd(docs: Optional[str] = None) -> Callable[..., None]:
         - Any other event name waits for that specific event (exit code 0)
         """
 
-        def print_event(ev) -> None:
+        def print_event(ev: Any) -> None:
             click.echo(
                 click.style(ev.event, fg="cyan", bold=True)
                 + " "
@@ -1373,7 +1379,11 @@ def _watch_cmd(docs: Optional[str] = None) -> Callable[..., None]:
         help="Set the output style of the command results.",
     )
     def watch(
-        session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str
+        session_name_or_id: tuple[str, ...],
+        owner_access_key: str | None,
+        scope: str,
+        max_wait: int,
+        output: str,
     ) -> None:
         """
         Monitor the lifecycle events of a compute session

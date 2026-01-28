@@ -37,17 +37,21 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute
+    column: sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement
     order_direction: OrderDirection
 
 
 class QueryOrderTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, column_map: Optional[ColumnMapType] = None) -> None:
+    def __init__(
+        self, sa_table: sa.Table | sa.sql.Join | type, column_map: Optional[ColumnMapType] = None
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
 
-    def _get_col(self, col_name: str) -> sa.Column:
+    def _get_col(
+        self, col_name: str
+    ) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]
@@ -59,10 +63,10 @@ class QueryOrderTransformer(Transformer):
                         matched_col = _column.op("->>")(_key)  # type: ignore[assignment]
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
-                col = func(matched_col) if func is not None else matched_col
+                col = func(matched_col) if func is not None else matched_col  # type: ignore[arg-type]
             else:
                 col = get_col_from_table(self._sa_table, col_name)
-            return col
+            return col  # type: ignore[return-value]
         except KeyError as e:
             raise ValueError("Unknown/unsupported field name", col_name) from e
 
@@ -88,7 +92,9 @@ class QueryOrderParser:
         self._column_map = column_map
         self._parser = _parser
 
-    def parse_order(self, table, order_expr: str) -> list[OrderingItem]:
+    def parse_order(
+        self, table: sa.Table | sa.sql.Join | type, order_expr: str
+    ) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
             return QueryOrderTransformer(table, self._column_map).transform(ast)
@@ -105,8 +111,12 @@ class QueryOrderParser:
         the given SQLAlchemy query object.
         """
         table = sa_query.froms[0]
+        # FromClause is compatible with our union type, cast for type checker
+        from typing import cast
+
+        parsed_table = cast(sa.Table | sa.sql.Join | type, table)
         orders = [
             col.asc() if direction == OrderDirection.ASC else col.desc()
-            for col, direction in self.parse_order(table, order_expr)
+            for col, direction in self.parse_order(parsed_table, order_expr)
         ]
         return sa_query.order_by(*orders)

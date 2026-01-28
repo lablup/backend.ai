@@ -49,7 +49,7 @@ Base = declarative_base(metadata=metadata_obj)
 
 
 class BaseMixin:
-    def dump_model(self, serializable=True) -> dict[str, Any]:
+    def dump_model(self, serializable: bool = True) -> dict[str, Any]:
         o = dict(self.__dict__)
         del o["_sa_instance_state"]
         if serializable:
@@ -68,7 +68,7 @@ pgsql_connect_opts = {
 
 
 # helper functions
-def zero_if_none(val) -> int:
+def zero_if_none(val: int | None) -> int:
     return 0 if val is None else val
 
 
@@ -84,7 +84,7 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls, **opts) -> None:
+    def __init__(self, enum_cls: type[enum.Enum], **opts: Any) -> None:
         if not issubclass(enum_cls, enum.Enum):
             raise InvalidEnumTypeError(f"Expected an Enum subclass, got {enum_cls}")
         if "name" not in opts:
@@ -94,10 +94,10 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value, dialect) -> Optional[str]:
+    def process_bind_param(self, value: enum.Enum | None, dialect: sa.Dialect) -> Optional[str]:
         return value.name if value else None
 
-    def process_result_value(self, value: Any, dialect) -> Optional[enum.Enum]:
+    def process_result_value(self, value: Any, dialect: sa.Dialect) -> Optional[enum.Enum]:
         return self._enum_cls[value] if value else None
 
     def copy(self, **kw: Any) -> EnumType:
@@ -165,12 +165,12 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect) -> TypeEngine[Any]:
+    def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON)
+            return dialect.type_descriptor(sa.JSON())  # type: ignore[arg-type]
         return super().load_dialect_impl(dialect)
 
-    def process_bind_param(self, value, dialect) -> BaseModel:
+    def process_bind_param(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
         try:
@@ -182,7 +182,7 @@ class StructuredJSONColumn(TypeDecorator):
             ) from e
         return value
 
-    def process_result_value(self, value, dialect) -> BaseModel:
+    def process_result_value(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
         return self._schema(**value)
@@ -203,12 +203,12 @@ class StructuredJSONObjectColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(self, value: BaseModel | None, dialect) -> Optional[str]:
+    def process_bind_param(self, value: BaseModel | None, dialect: sa.Dialect) -> Optional[str]:
         if value:
             return value.model_dump_json()
         return None
 
-    def process_result_value(self, value: str | None, dialect) -> Optional[BaseModel]:
+    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> Optional[BaseModel]:
         if value:
             return self._schema(**json.loads(value))
         return None
@@ -233,12 +233,16 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> Optional[str]:
+    def process_bind_param(
+        self, value: list[TBaseModel] | None, dialect: sa.Dialect
+    ) -> Optional[str]:
         if value is not None:
             return TypeAdapter(list[TBaseModel]).dump_json(value).decode("utf-8")
         return None
 
-    def process_result_value(self, value: str | None, dialect) -> Optional[list[TBaseModel]]:
+    def process_result_value(
+        self, value: str | None, dialect: sa.Dialect
+    ) -> Optional[list[TBaseModel]]:
         if value is not None:
             return [self._schema(**i) for i in json.loads(value)]
         return None
@@ -255,12 +259,14 @@ class URLColumn(TypeDecorator):
     impl = sa.types.UnicodeText
     cache_ok = True
 
-    def process_bind_param(self, value, dialect) -> Optional[str]:
+    def process_bind_param(
+        self, value: yarl.URL | str | None, dialect: sa.Dialect
+    ) -> Optional[str]:
         if isinstance(value, yarl.URL):
             return str(value)
         return value
 
-    def process_result_value(self, value, dialect) -> Optional[yarl.URL]:
+    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
         if value is not None:
@@ -276,7 +282,7 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value, dialect) -> Optional[str]:
+    def process_bind_param(self, value: str | None, dialect: sa.Dialect) -> Optional[str]:
         if value is None:
             return value
         try:
@@ -285,7 +291,9 @@ class IPColumn(TypeDecorator):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value, dialect) -> Optional[ReadableCIDR]:
+    def process_result_value(
+        self, value: str | None, dialect: sa.Dialect
+    ) -> Optional[ReadableCIDR]:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -304,12 +312,12 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> TypeEngine[Any]:
+    def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Any, dialect) -> Optional[str | bytes]:
+    def process_bind_param(self, value: Any, dialect: sa.Dialect) -> Optional[str | bytes]:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -324,7 +332,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
             return value.bytes
         return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> Optional[UUID_SubType]:
+    def process_result_value(self, value: Any, dialect: sa.Dialect) -> Optional[UUID_SubType]:
         if value is None:
             return value
         cls = type(self)
@@ -337,9 +345,9 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-def IDColumn(name="id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def ForeignKeyIDColumn(name, fk_field, nullable=True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)

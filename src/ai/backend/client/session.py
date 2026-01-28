@@ -99,7 +99,7 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
                 orig_lost = proto.connection_lost
                 orig_eof_received = proto.eof_received
 
-                def connection_lost(exc) -> None:
+                def connection_lost(exc: Exception | None) -> None:
                     orig_lost(exc)
                     nonlocal transports
                     transports -= 1
@@ -186,7 +186,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    async def agen_wrapper(self, agen) -> None:
+    async def agen_wrapper(self, agen: AsyncIterator[Any]) -> None:
         self.agen_shutdown = False
         try:
             async for item in agen:
@@ -569,7 +569,7 @@ class AsyncSession(BaseSession):
 
 # TODO: Remove this after refactoring session management with contextvars
 @actxmgr
-async def set_api_context(session) -> AsyncIterator[None]:
+async def set_api_context(session: BaseSession) -> AsyncIterator[None]:
     token = api_session.set(session)
     try:
         yield

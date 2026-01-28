@@ -76,7 +76,7 @@ def freeze(wait: bool, force_kill: bool) -> None:
             if force_kill:
                 print_wait("Killing all sessions...")
 
-            session.Manager.freeze(force_kill=force_kill)
+            _ = session.Manager.freeze(force_kill=force_kill)
 
             if force_kill:
                 print_done("All sessions are killed.")
@@ -94,7 +94,7 @@ def unfreeze() -> None:
 
     try:
         with Session() as session:
-            session.Manager.unfreeze()
+            _ = session.Manager.unfreeze()
             print("Manager is successfully unfrozen.")
     except Exception as e:
         print_error(e)
@@ -143,7 +143,7 @@ def update(message: str | None) -> None:
             if message is None:
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            session.Manager.update_announcement(enabled=True, message=message)
+            _ = session.Manager.update_announcement(enabled=True, message=message)
         print_done("Posted new announcement.")
     except Exception as e:
         print_error(e)
@@ -160,7 +160,7 @@ def delete() -> None:
         sys.exit(ExitCode.FAILURE)
     try:
         with Session() as session:
-            session.Manager.update_announcement(enabled=False)
+            _ = session.Manager.update_announcement(enabled=False)
         print_done("Deleted announcement.")
     except Exception as e:
         print_error(e)
@@ -208,7 +208,7 @@ def include_agents(agent_ids: tuple[str, ...]) -> None:
 
     try:
         with Session() as session:
-            session.Manager.scheduler_op("include-agents", agent_ids)
+            _ = session.Manager.scheduler_op("include-agents", agent_ids)
         print_done("The given agents now accepts new sessions.")
     except Exception as e:
         print_error(e)
@@ -227,7 +227,7 @@ def exclude_agents(agent_ids: tuple[str, ...]) -> None:
 
     try:
         with Session() as session:
-            session.Manager.scheduler_op("exclude-agents", agent_ids)
+            _ = session.Manager.scheduler_op("exclude-agents", agent_ids)
         print_done("The given agents will no longer start new sessions.")
     except Exception as e:
         print_error(e)

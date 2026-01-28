@@ -257,7 +257,7 @@ def extract_api_handler_params(
     return body_model, query_model, path_model
 
 
-def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str, Any]:
+def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> dict[str, Any]:
     openapi: dict[str, Any] = {
         "openapi": "3.1.0",
         "info": {

@@ -434,7 +434,7 @@ class AsyncResponseMixin:
     async def text(self) -> str:
         return await self._raw_response.text()
 
-    async def json(self, *, loads=modjson.loads) -> Any:
+    async def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
@@ -455,7 +455,7 @@ class SyncResponseMixin:
             self._raw_response.text(),
         )
 
-    def json(self, *, loads=modjson.loads) -> Any:
+    def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(

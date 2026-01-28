@@ -1721,8 +1721,10 @@ async def _delete(
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Get connection from session
+        conn = await db_session.connection()
         await ensure_host_permission_allowed(
-            db_session.bind,
+            conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -446,8 +446,8 @@ async def handle_session_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     session_id: SessionId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]
@@ -511,14 +511,14 @@ async def handle_session_exception(
 
 
 def _build_session_fetch_query(
-    base_cond,
+    base_cond: Any,
     access_key: AccessKey | None = None,
     *,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
 ) -> sa.sql.Select:
     cond = base_cond
     if access_key:
@@ -1508,7 +1508,7 @@ class SessionRow(Base):
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
         max_load_count: Optional[int] = None,
     ) -> Iterable[SessionRow]:
@@ -1557,7 +1557,7 @@ class SessionRow(Base):
         max_matches: int | None = None,
         allow_stale: bool = True,
         for_update: bool = False,
-        eager_loading_op=None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         sessions = await _match_sessions_by_id(
             db_session,

@@ -63,14 +63,16 @@ class RouteCreationSpec:
 
     # Extension methods for DeploymentInfo compatibility
     @staticmethod
-    def get_target_replicas_from_deployment(deployment_info) -> int:
+    def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
         """Get the target number of replicas for a DeploymentInfo."""
         # DeploymentInfo has replica_spec.replica_count
         return deployment_info.replica_spec.replica_count
 
     # Extension methods for DeploymentInfoWithRoutes compatibility
     @staticmethod
-    def get_healthy_route_count_from_deployment(deployment_with_routes) -> int:
+    def get_healthy_route_count_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes,
+    ) -> int:
         """Get the count of healthy routes."""
         return sum(
             1

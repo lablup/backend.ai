@@ -601,7 +601,7 @@ class NetAppClient:
                 qos_policies.append(policy)
         return qos_policies
 
-    async def get_qos_by_uuid(self, qos_uuid) -> Mapping[str, Any]:
+    async def get_qos_by_uuid(self, qos_uuid: str) -> Mapping[str, Any]:
         async with self.send_request(
             "get",
             f"/api/storage/qos/policies/{qos_uuid}",
@@ -621,7 +621,7 @@ class NetAppClient:
                 "svm": data["svm"],
             }
 
-    async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
+    async def get_qos_by_volume_id(self, volume_uuid: str) -> Mapping[str, Any]:
         async with self.send_request(
             "get",
             f"/api/storage/volumes/{volume_uuid}?fields=qos",

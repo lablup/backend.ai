@@ -115,8 +115,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         circuit_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.id == circuit_id)
         if load_worker:
@@ -133,8 +133,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
@@ -150,8 +150,8 @@ class Circuit(Base, BaseMixin):
     async def list_circuits(
         cls,
         session: AsyncSession,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> Sequence["Circuit"]:
         query = sa.select(Circuit)
         if load_worker:
@@ -190,8 +190,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:

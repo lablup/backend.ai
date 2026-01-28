@@ -121,7 +121,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         # Cache subqueries to avoid duplication
         subquery_cache = {}
 
-        def get_cursor_value_subquery(column) -> sa.ScalarSelect:
+        def get_cursor_value_subquery(column: sa.Column[Any]) -> sa.ScalarSelect[Any]:
             """Get or create cached subquery for cursor value"""
             if column not in subquery_cache:
                 id_column = self.model_class.id

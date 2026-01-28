@@ -6,7 +6,7 @@ from urllib.request import urlopen
 Numeric = int | float
 
 
-def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
+def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname: bool = False) -> str:
     while True:
         user_reply = input(f"{prompt} (default: {default}): ")
         if user_reply == "":
@@ -92,7 +92,7 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
     return user_reply
 
 
-def ask_path(prompt: str, is_file=True, is_directory=True) -> Path:
+def ask_path(prompt: str, is_file: bool = True, is_directory: bool = True) -> Path:
     if not (is_file or is_directory):
         print("One of args(is_file/is_directory) has True value.")
     while True:

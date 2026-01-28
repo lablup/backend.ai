@@ -1030,8 +1030,10 @@ class VfolderRepository:
         Ensure that the user has the required permission on the specified vfolder host.
         """
         async with self._db.begin_session() as session:
+            # Get connection from session
+            conn = await session.connection()
             await ensure_host_permission_allowed(
-                session.bind,
+                conn,
                 folder_host,
                 permission=permission,
                 allowed_vfolder_types=allowed_vfolder_types,

@@ -27,7 +27,7 @@ else:
     all_tasks = asyncio.Task.all_tasks  # type: ignore
 
 
-def _cancel_all_tasks(loop) -> None:
+def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
     to_cancel = all_tasks(loop)
     if not to_cancel:
         return
@@ -45,7 +45,7 @@ def _cancel_all_tasks(loop) -> None:
             })
 
 
-def _asyncio_run(coro, *, debug=False) -> Any:
+def _asyncio_run(coro: Any, *, debug: bool = False) -> Any:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.set_debug(debug)
@@ -68,7 +68,7 @@ else:
     asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
-def asyncio_run_forever(server_context, *, debug=False) -> Any:
+def asyncio_run_forever(server_context: Any, *, debug: bool = False) -> Any:
     """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.

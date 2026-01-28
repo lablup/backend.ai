@@ -32,7 +32,7 @@ def network() -> None:
 @click.argument("project", type=str, metavar="PROJECT_ID_OR_NAME")
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--driver", default=None, help="Set the network driver.")
-def create(ctx: CLIContext, project, name, driver) -> None:
+def create(ctx: CLIContext, project: str, name: str, driver: str | None) -> None:
     """Create a new network interface."""
 
     with Session() as session:
@@ -73,7 +73,14 @@ def create(ctx: CLIContext, project, name, driver) -> None:
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, format, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext,
+    format: str | None,
+    filter_: str | None,
+    order: str | None,
+    offset: int,
+    limit: int | None,
+) -> None:
     """List all available network interfaces."""
 
     if format:
@@ -112,7 +119,7 @@ def list(ctx: CLIContext, format, filter_, order, offset, limit) -> None:
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, network, format) -> None:
+def get(ctx: CLIContext, network: str, format: str | None) -> None:
     fields: Iterable[Any]
     if format:
         try:
@@ -144,7 +151,7 @@ def get(ctx: CLIContext, network, format) -> None:
 @network.command()
 @pass_ctx_obj
 @click.argument("network", type=str, metavar="NETWORK_ID_OR_NAME")
-def delete(ctx: CLIContext, network) -> None:
+def delete(ctx: CLIContext, network: str) -> None:
     with Session() as session:
         try:
             network_info = session.Network(uuid.UUID(network)).get(fields=[network_fields["id"]])
@@ -163,7 +170,7 @@ def delete(ctx: CLIContext, network) -> None:
             network_info = networks.items[0]
 
         try:
-            session.Network(uuid.UUID(network_info["row_id"])).delete()
+            _ = session.Network(uuid.UUID(network_info["row_id"])).delete()
             print_done(f"Network {network} has been deleted.")
         except BackendAPIError as e:
             ctx.output.print_fail(f"Failed to delete network {network}:")

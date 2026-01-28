@@ -1757,7 +1757,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         is_installed: bool | None = None,
-        is_operation=False,
+        is_operation: bool = False,
         filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
@@ -2289,12 +2289,14 @@ class Query(graphene.ObjectType):
     async def resolve_scaling_groups_for_user_group(
         root: Any,
         info: graphene.ResolveInfo,
-        user_group,
+        user_group: str,
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
+        from uuid import UUID
+
         return await ScalingGroup.load_by_group(
             info.context,
-            user_group,
+            UUID(user_group),
             is_active=is_active,
         )
 

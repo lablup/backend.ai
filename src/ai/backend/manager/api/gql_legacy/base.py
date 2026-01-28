@@ -53,6 +53,7 @@ from ai.backend.manager.models.minilang.ordering import (
     QueryOrderParser,
 )
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser, WhereClauseType
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .gql_relay import (
@@ -64,8 +65,6 @@ from .gql_relay import (
 if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from sqlalchemy.sql.selectable import ScalarSelect
-
-    from ai.backend.manager.models.user import UserRole
 
     from .schema import GraphQueryContext
 
@@ -146,7 +145,7 @@ class Bytes(Scalar):
         return val.hex()
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None) -> Optional[bytes]:
+    def parse_literal(node: Any, _variables: Optional[dict[str, Any]] = None) -> Optional[bytes]:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return bytes.fromhex(node.value)
         return None
@@ -186,7 +185,9 @@ class UUIDFloatMap(Scalar):
         return validated
 
     @classmethod
-    def parse_literal(cls, node: ValueNode, _variables=None) -> dict[str, float]:
+    def parse_literal(
+        cls, node: ValueNode, _variables: Optional[dict[str, Any]] = None
+    ) -> dict[str, float]:
         if not isinstance(node, ObjectValueNode):
             raise GraphQLError(f"UUIDFloatMap cannot represent non-object value: {print_ast(node)}")
         validated: dict[str, Any] = {}
@@ -524,7 +525,7 @@ async def batch_multiresult_in_scalar_stream(
 
 
 def privileged_query(required_role: UserRole) -> Callable:
-    def wrap(func) -> Callable:
+    def wrap(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapped(
             root: Any,
@@ -560,7 +561,7 @@ def scoped_query(
         in the keyword arguments.
     """
 
-    def wrap(resolve_func) -> Callable:
+    def wrap(resolve_func: Callable) -> Callable:
         @functools.wraps(resolve_func)
         async def wrapped(
             root: Any,
@@ -622,10 +623,10 @@ def scoped_query(
     return wrap
 
 
-def privileged_mutation(required_role, target_func=None) -> Callable:
-    def wrap(func) -> Callable:
+def privileged_mutation(required_role: UserRole, target_func: Callable | None = None) -> Callable:
+    def wrap(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
+        async def wrapped(cls: type, root: Any, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
@@ -870,11 +871,11 @@ class InferenceSessionError(graphene.ObjectType):
 
 
 class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type, *args, **kwargs) -> None:
+    def __init__(self, type: type | str, *args, **kwargs) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())
-        super().__init__(type, *args, **kwargs)
+        super().__init__(type, *args, **kwargs)  # type: ignore[arg-type]
 
 
 PaginatedConnectionField = AsyncPaginatedConnectionField
@@ -958,7 +959,10 @@ def _apply_ordering(
             id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
 
             def set_ordering(
-                col: sa.Column[Any] | InstrumentedAttribute[Any], direction: OrderDirection
+                col: sa.Column[Any]
+                | InstrumentedAttribute[Any]
+                | sa.sql.elements.KeyedColumnElement[Any],
+                direction: OrderDirection,
             ) -> Any:
                 return col.asc() if direction == OrderDirection.ASC else col.desc()
 
@@ -968,7 +972,10 @@ def _apply_ordering(
 
             # Reverse ordering direction for backward pagination
             def set_ordering(
-                col: sa.Column[Any] | InstrumentedAttribute[Any], direction: OrderDirection
+                col: sa.Column[Any]
+                | InstrumentedAttribute[Any]
+                | sa.sql.elements.KeyedColumnElement[Any],
+                direction: OrderDirection,
             ) -> Any:
                 return col.desc() if direction == OrderDirection.ASC else col.asc()
 
@@ -1019,7 +1026,9 @@ def _apply_cursor_pagination(
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
-        column_to_be_compared: sa.Column[Any] | InstrumentedAttribute[Any],
+        column_to_be_compared: sa.Column[Any]
+        | InstrumentedAttribute[Any]
+        | sa.sql.elements.KeyedColumnElement[Any],
         subquery: ScalarSelect[Any],
         direction: OrderDirection,
     ) -> WhereClauseType:

@@ -18,7 +18,7 @@ __all__ = (
 
 def _wrap_method(cls: type, orig_name: str, meth: Callable) -> Callable:
     @functools.wraps(meth)
-    def _method(*args, **kwargs) -> Any:
+    def _method(*args: Any, **kwargs: Any) -> Any:
         # We need to keep the original attributes so that they could be correctly
         # bound to the class/instance at runtime.
         func = getattr(cls, orig_name)
@@ -40,11 +40,11 @@ def _wrap_method(cls: type, orig_name: str, meth: Callable) -> Callable:
     return _method
 
 
-def api_function(meth) -> None:
+def api_function[T: Callable](meth: T) -> T:
     """
     Mark the wrapped method as the API function method.
     """
-    meth._backend_api = True
+    meth._backend_api = True  # type: ignore[attr-defined]
     return meth
 
 
@@ -65,7 +65,7 @@ def field_resolver(
     default_fields: Iterable[FieldSpec],
 ) -> Callable:
     def decorator(meth: Callable) -> Callable:
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if fields := kwargs.get("fields", default_fields):
                 resolved_fields = tuple(
                     f.field_ref if isinstance(f, FieldSpec) else base_field_set[f].field_ref
@@ -88,7 +88,9 @@ class APIFunctionMeta(type):
 
     _async = True
 
-    def __init__(cls, name, bases, attrs, **kwargs) -> None:
+    def __init__(
+        cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any
+    ) -> None:
         super().__init__(name, bases, attrs)
         for attr_name, attr_value in attrs.items():
             if hasattr(attr_value, "_backend_api"):

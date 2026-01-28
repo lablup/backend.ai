@@ -22,7 +22,7 @@ def server_logs() -> None:
     "-l", "--page-size", type=int, default=20, help="Number of logs to fetch (from latest log)"
 )
 @click.option("-n", "--page-number", type=int, default=1, help="Page number to fetch.")
-def list(mark_read, page_size, page_number) -> None:
+def list(mark_read: bool, page_size: int, page_number: int) -> None:
     """Fetch server (error) logs."""
     with Session() as session:
         try:
