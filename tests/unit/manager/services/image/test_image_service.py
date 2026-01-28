@@ -64,6 +64,7 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
 )
+from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
     PurgeImagesAction,
@@ -74,6 +75,7 @@ from ai.backend.manager.services.image.actions.search_images import SearchImages
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
 )
+from ai.backend.manager.services.image.actions.unload_image import UnloadImageAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -1190,3 +1192,39 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await processors.set_image_resource_limit_by_id.wait_for_complete(action)
+
+
+class TestPreloadImage(ImageServiceBaseFixtures):
+    """Tests for ImageService.preload_image"""
+
+    async def test_preload_image_not_implemented(
+        self,
+        processors: ImageProcessors,
+        image_data: ImageData,
+    ) -> None:
+        """Preload image should raise NotImplementedError."""
+        action = PreloadImageAction(
+            image_ids=[image_data.id],
+            agents=["agent1"],
+        )
+
+        with pytest.raises(NotImplementedError):
+            await processors.preload_image.wait_for_complete(action)
+
+
+class TestUnloadImage(ImageServiceBaseFixtures):
+    """Tests for ImageService.unload_image"""
+
+    async def test_unload_image_not_implemented(
+        self,
+        processors: ImageProcessors,
+        image_data: ImageData,
+    ) -> None:
+        """Unload image should raise NotImplementedError."""
+        action = UnloadImageAction(
+            image_ids=[image_data.id],
+            agents=["agent1"],
+        )
+
+        with pytest.raises(NotImplementedError):
+            await processors.unload_image.wait_for_complete(action)
