@@ -230,66 +230,63 @@ class HealthCheckTestCase:
     expected_initial_delay: float = 60.0
 
 
-@pytest.fixture
-def mock_storage_manager() -> AsyncMock:
-    return AsyncMock()
+class TestGetHealthCheckInfo:
+    """Tests for get_health_check_info method."""
 
+    @pytest.fixture
+    def mock_storage_manager(self) -> AsyncMock:
+        return AsyncMock()
 
-@pytest.fixture
-def mock_config_provider() -> MockConfigProvider:
-    return MockConfigProvider(
-        config=MockConfig(deployment=MockDeploymentConfig(enable_model_definition_override=False))
-    )
+    @pytest.fixture
+    def mock_config_provider(self) -> MockConfigProvider:
+        return MockConfigProvider(
+            config=MockConfig(
+                deployment=MockDeploymentConfig(enable_model_definition_override=False)
+            )
+        )
 
+    @pytest.fixture
+    def mock_endpoint_custom(self) -> MockEndpointData:
+        return MockEndpointData(
+            runtime_variant=RuntimeVariant.CUSTOM,
+            model_definition_path="model-definition.yaml",
+        )
 
-@pytest.fixture
-def mock_endpoint_custom() -> MockEndpointData:
-    return MockEndpointData(
-        runtime_variant=RuntimeVariant.CUSTOM,
-        model_definition_path="model-definition.yaml",
-    )
+    @pytest.fixture
+    def mock_vfolder(self) -> MockVFolderRow:
+        quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, uuid.uuid4())
+        return MockVFolderRow(
+            host="local",
+            vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=uuid.uuid4()),
+        )
 
+    @pytest.fixture
+    def patch_model_service_helper(self) -> Iterator[AsyncMock]:
+        """Patch ModelServiceHelper methods for testing."""
+        with (
+            patch(
+                "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition_file_exists",
+                new_callable=AsyncMock,
+                return_value="model-definition.yaml",
+            ),
+            patch(
+                "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition",
+                new_callable=AsyncMock,
+            ) as mock_validate_definition,
+        ):
+            yield mock_validate_definition
 
-@pytest.fixture
-def mock_vfolder() -> MockVFolderRow:
-    quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, uuid.uuid4())
-    return MockVFolderRow(
-        host="local",
-        vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=uuid.uuid4()),
-    )
-
-
-@pytest.fixture
-def patch_model_service_helper() -> Iterator[AsyncMock]:
-    """Patch ModelServiceHelper methods for testing."""
-    with (
-        patch(
-            "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition_file_exists",
-            new_callable=AsyncMock,
-            return_value="model-definition.yaml",
-        ),
-        patch(
-            "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition",
-            new_callable=AsyncMock,
-        ) as mock_validate_definition,
-    ):
-        yield mock_validate_definition
-
-
-@pytest.fixture
-def mock_registry(
-    mock_storage_manager: AsyncMock,
-    mock_config_provider: MockConfigProvider,
-) -> MagicMock:
-    """Create a mock AgentRegistry with required dependencies."""
-    registry = MagicMock(spec=AgentRegistry)
-    registry.storage_manager = mock_storage_manager
-    registry.config_provider = mock_config_provider
-    return registry
-
-
-class TestGetHealthCheckInfoCustomVariant:
-    """Tests for get_health_check_info with CUSTOM runtime variant."""
+    @pytest.fixture
+    def mock_registry(
+        self,
+        mock_storage_manager: AsyncMock,
+        mock_config_provider: MockConfigProvider,
+    ) -> MagicMock:
+        """Create a mock AgentRegistry with required dependencies."""
+        registry = MagicMock(spec=AgentRegistry)
+        registry.storage_manager = mock_storage_manager
+        registry.config_provider = mock_config_provider
+        return registry
 
     @pytest.mark.parametrize(
         "test_case",
@@ -386,10 +383,6 @@ class TestGetHealthCheckInfoCustomVariant:
         )
 
         assert result is None
-
-
-class TestGetHealthCheckInfoNonCustomVariant:
-    """Tests for get_health_check_info with non-CUSTOM runtime variants."""
 
     async def test_vllm_variant_returns_default_health_check(
         self,
