@@ -28,6 +28,7 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
+    ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
@@ -1128,18 +1129,21 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
             return_value=expected_image
         )
 
-        action = SetImageResourceLimitByIdAction(
-            image_id=image_data.id,
+        resource_limit = ResourceLimitInput(
             slot_name="cpu",
             min_value=Decimal("2"),
             max_value=Decimal("4"),
+        )
+        action = SetImageResourceLimitByIdAction(
+            image_id=image_data.id,
+            resource_limit=resource_limit,
         )
 
         result = await processors.set_image_resource_limit_by_id.wait_for_complete(action)
 
         assert result.image_data.resources.resources_data.get(SlotName("cpu")) is not None
         mock_image_repository.set_image_resource_limit_by_id.assert_called_once_with(
-            image_data.id, "cpu", Decimal("2"), Decimal("4")
+            image_data.id, resource_limit
         )
 
     async def test_set_image_resource_limit_by_id_not_found(
@@ -1154,9 +1158,11 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
 
         action = SetImageResourceLimitByIdAction(
             image_id=uuid.uuid4(),
-            slot_name="cpu",
-            min_value=Decimal("1"),
-            max_value=Decimal("2"),
+            resource_limit=ResourceLimitInput(
+                slot_name="cpu",
+                min_value=Decimal("1"),
+                max_value=Decimal("2"),
+            ),
         )
 
         with pytest.raises(ImageNotFound):
