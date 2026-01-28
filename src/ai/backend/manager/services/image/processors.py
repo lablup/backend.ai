@@ -25,6 +25,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
@@ -121,6 +125,9 @@ class ImageProcessors(AbstractProcessorPackage):
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    get_aliases_by_image_ids: ActionProcessor[
+        GetAliasesByImageIdsAction, GetAliasesByImageIdsActionResult
+    ]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
         self.get_image_installed_agents = ActionProcessor(
@@ -160,6 +167,9 @@ class ImageProcessors(AbstractProcessorPackage):
         )
         self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
         self.search_images = ActionProcessor(service.search_images, action_monitors)
+        self.get_aliases_by_image_ids = ActionProcessor(
+            service.get_aliases_by_image_ids, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

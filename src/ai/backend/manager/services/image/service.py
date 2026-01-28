@@ -84,6 +84,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
     SearchImagesActionResult,
@@ -448,3 +452,12 @@ class ImageService:
             action.resource_limit,
         )
         return SetImageResourceLimitByIdActionResult(image_data=image_data)
+
+    async def get_aliases_by_image_ids(
+        self, action: GetAliasesByImageIdsAction
+    ) -> GetAliasesByImageIdsActionResult:
+        """
+        Retrieves aliases for multiple images by their IDs.
+        """
+        aliases_map = await self._image_repository.get_aliases_by_image_ids(action.image_ids)
+        return GetAliasesByImageIdsActionResult(aliases_map=aliases_map)

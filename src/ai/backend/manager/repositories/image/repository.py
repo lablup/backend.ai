@@ -321,3 +321,11 @@ class ImageRepository:
         Returns ImageListResult with items and pagination info.
         """
         return await self._db_source.search_images(querier)
+
+    @image_repository_resilience.apply()
+    async def get_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
+        """
+        Retrieves aliases for multiple images by their IDs.
+        Returns a dictionary mapping image ID to list of alias strings.
+        """
+        return await self._db_source.query_aliases_by_image_ids(image_ids)

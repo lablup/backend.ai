@@ -12,10 +12,11 @@ from datetime import datetime
 from typing import Self
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
     ImageData,
@@ -322,6 +323,18 @@ class ImageV2GQL(Node):
     registry_id: uuid.UUID = strawberry.field(
         description="UUID of the container registry where this image is stored."
     )
+
+    @strawberry.field(
+        description=dedent_strip("""
+        Added in 26.2.0.
+
+        User-defined aliases for this image.
+        Aliases provide alternative, memorable names for referencing images.
+        """)
+    )
+    async def aliases(self, info: Info[StrawberryGQLContext]) -> list[str]:
+        """Load aliases for this image using the data loader."""
+        return await info.context.data_loaders.image_aliases_loader.load(self.id)
 
     @classmethod
     def from_data(
