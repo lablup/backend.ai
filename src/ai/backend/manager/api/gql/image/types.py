@@ -286,12 +286,9 @@ class ImageV2GQL(Node):
         default=None, description="Permission info for the current user. May be null."
     )
 
-    # Registry (primitive for now, to be replaced with ContainerRegistryNode later)
+    # Registry (ContainerRegistryNode connection to be added later)
     registry_id: uuid.UUID = strawberry.field(
         description="UUID of the container registry where this image is stored."
-    )
-    registry: str = strawberry.field(
-        description="Registry hostname. Will be replaced with ContainerRegistryNode connection."
     )
 
     @classmethod
@@ -318,7 +315,6 @@ class ImageV2GQL(Node):
             if permissions
             else None,
             registry_id=data.registry_id,
-            registry=data.registry,
         )
 
 
