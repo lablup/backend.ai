@@ -16,6 +16,11 @@ class ImageStatus(enum.StrEnum):
     DELETED = "DELETED"
 
 
+class ImageOrderField(enum.StrEnum):
+    NAME = "NAME"
+    CREATED_AT = "CREATED_AT"
+
+
 class ImageType(CIStrEnum):
     COMPUTE = "compute"
     SYSTEM = "system"
