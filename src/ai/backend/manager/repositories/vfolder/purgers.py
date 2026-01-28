@@ -8,7 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
-from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
+from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 
 
 @dataclass
@@ -35,21 +35,3 @@ class VFolderPermissionBatchPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
         return sa.select(VFolderPermissionRow).where(
             VFolderPermissionRow.vfolder.in_(self.vfolder_ids)
         )
-
-
-def create_vfolder_invitation_purger(
-    vfolder_ids: Sequence[UUID],
-) -> BatchPurger[VFolderInvitationRow]:
-    """Create a BatchPurger for deleting vfolder invitation rows."""
-    return BatchPurger(
-        spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids),
-    )
-
-
-def create_vfolder_permission_purger(
-    vfolder_ids: Sequence[UUID],
-) -> BatchPurger[VFolderPermissionRow]:
-    """Create a BatchPurger for deleting vfolder permission rows."""
-    return BatchPurger(
-        spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids),
-    )

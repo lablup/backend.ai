@@ -1283,10 +1283,10 @@ async def initiate_vfolder_deletion(
 ) -> int:
     """Purges VFolder content from storage host."""
     # Lazy import to avoid circular import
-    from ai.backend.manager.repositories.base.purger import execute_batch_purger
+    from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
     from ai.backend.manager.repositories.vfolder.purgers import (
-        create_vfolder_invitation_purger,
-        create_vfolder_permission_purger,
+        VFolderInvitationBatchPurgerSpec,
+        VFolderPermissionBatchPurgerSpec,
     )
 
     vfolder_info_len = len(requested_vfolders)
@@ -1295,8 +1295,14 @@ async def initiate_vfolder_deletion(
         return 0
 
     async with db_engine.begin_session() as db_session:
-        await execute_batch_purger(db_session, create_vfolder_invitation_purger(vfolder_ids))
-        await execute_batch_purger(db_session, create_vfolder_permission_purger(vfolder_ids))
+        await execute_batch_purger(
+            db_session,
+            BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids)),
+        )
+        await execute_batch_purger(
+            db_session,
+            BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids)),
+        )
     await update_vfolder_status(
         db_engine,
         vfolder_ids,

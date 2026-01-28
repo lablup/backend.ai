@@ -31,10 +31,10 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderPermissionRow,
     VFolderRow,
 )
-from ai.backend.manager.repositories.base.purger import execute_batch_purger
+from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.vfolder.purgers import (
-    create_vfolder_invitation_purger,
-    create_vfolder_permission_purger,
+    VFolderInvitationBatchPurgerSpec,
+    VFolderPermissionBatchPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -240,18 +240,9 @@ class TestVFolderPurgersIntegration:
         """Test purging vfolder invitations."""
         vfolder_ids = [sample_vfolder.id]
 
-        # Verify invitations exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderInvitationRow)
-                .where(VFolderInvitationRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == len(sample_invitations)
-
         # Purge invitations
         async with db_with_cleanup.begin_session() as session:
-            purger = create_vfolder_invitation_purger(vfolder_ids)
+            purger = BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_invitations)
 
@@ -274,18 +265,9 @@ class TestVFolderPurgersIntegration:
         """Test purging vfolder permissions."""
         vfolder_ids = [sample_vfolder.id]
 
-        # Verify permissions exist
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderPermissionRow)
-                .where(VFolderPermissionRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == len(sample_permissions)
-
         # Purge permissions
         async with db_with_cleanup.begin_session() as session:
-            purger = create_vfolder_permission_purger(vfolder_ids)
+            purger = BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids))
             result = await execute_batch_purger(session, purger)
             assert result.deleted_count == len(sample_permissions)
 
