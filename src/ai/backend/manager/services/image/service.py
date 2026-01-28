@@ -55,11 +55,9 @@ from ai.backend.manager.services.image.actions.get_image_installed_agents import
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
 )
-from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
-)
-from ai.backend.manager.services.image.actions.get_images_by_ids import (
     GetImagesByIdsAction,
     GetImagesByIdsActionResult,
 )
@@ -68,9 +66,9 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageActionResult,
     ModifyImageActionUnknownImageReferenceError,
 )
-from ai.backend.manager.services.image.actions.preload_image_by_id import (
-    PreloadImageByIdAction,
-    PreloadImageByIdActionResult,
+from ai.backend.manager.services.image.actions.preload_image import (
+    PreloadImageAction,
+    PreloadImageActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgedImagesData,
@@ -97,9 +95,9 @@ from ai.backend.manager.services.image.actions.set_image_resource_limit_by_id im
     SetImageResourceLimitByIdAction,
     SetImageResourceLimitByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.unload_image_by_id import (
-    UnloadImageByIdAction,
-    UnloadImageByIdActionResult,
+from ai.backend.manager.services.image.actions.unload_image import (
+    UnloadImageAction,
+    UnloadImageActionResult,
 )
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
@@ -410,17 +408,17 @@ class ImageService:
         )
         return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 
-    async def preload_image_by_id(
-        self, action: PreloadImageByIdAction
-    ) -> PreloadImageByIdActionResult:
+    async def preload_image(
+        self, action: PreloadImageAction
+    ) -> PreloadImageActionResult:
         """
         Preloads images by their IDs to specified agents.
         """
         raise NotImplementedError
 
-    async def unload_image_by_id(
-        self, action: UnloadImageByIdAction
-    ) -> UnloadImageByIdActionResult:
+    async def unload_image(
+        self, action: UnloadImageAction
+    ) -> UnloadImageActionResult:
         """
         Unloads images by their IDs from specified agents.
         """

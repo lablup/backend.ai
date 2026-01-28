@@ -8,7 +8,7 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class UnloadImageByIdAction(ImageAction):
+class PreloadImageAction(ImageAction):
     image_ids: list[UUID]
     agents: list[str]
 
@@ -19,11 +19,11 @@ class UnloadImageByIdAction(ImageAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "unload_by_id"
+        return "preload"
 
 
 @dataclass
-class UnloadImageByIdActionResult(BaseActionResult):
+class PreloadImageActionResult(BaseActionResult):
     images: list[ImageData]
 
     @override
