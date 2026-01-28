@@ -2666,6 +2666,13 @@ type Mutation {
   Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
+
+  """
+  Added in 26.2.0. Get aggregated resource stats for a resource group.
+  Returns total capacity, used, and free resource slots for all agents in the resource group.
+  If hide_agents config is enabled and the user is not superadmin, returns empty stats.
+  """
+  resourceGroupResources(resourceGroup: String!): AgentStats!
 }
 
 """An object with a Globally Unique ID"""

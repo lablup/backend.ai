@@ -995,3 +995,15 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class AgentResourceStatsNotAccessibleError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/agent-resource-stats-not-available"
+    error_title = "Agent Resource Stats Not Accessible due to insufficient permissions."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )

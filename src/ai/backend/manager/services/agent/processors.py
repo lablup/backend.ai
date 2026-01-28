@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.agent.actions.get_scaling_group_resources import (
+    GetScalingGroupResourcesAction,
+    GetScalingGroupResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -72,6 +76,9 @@ class AgentProcessors(AbstractProcessorPackage):
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
     get_total_resources: ActionProcessor[GetTotalResourcesAction, GetTotalResourcesActionResult]
+    get_scaling_group_resources: ActionProcessor[
+        GetScalingGroupResourcesAction, GetScalingGroupResourcesActionResult
+    ]
     handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
     mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
     mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
@@ -94,6 +101,9 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
         self.get_total_resources = ActionProcessor(service.get_total_resources, action_monitors)
+        self.get_scaling_group_resources = ActionProcessor(
+            service.get_scaling_group_resources, action_monitors
+        )
         self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
         self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
         self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
@@ -116,6 +126,7 @@ class AgentProcessors(AbstractProcessorPackage):
             WatcherAgentStopAction.spec(),
             RecalculateUsageAction.spec(),
             GetTotalResourcesAction.spec(),
+            GetScalingGroupResourcesAction.spec(),
             HandleHeartbeatAction.spec(),
             RemoveAgentFromImagesAction.spec(),
             RemoveAgentFromImagesByCanonicalsAction.spec(),

@@ -209,3 +209,26 @@ class ScalingGroupRepository:
             ScalingGroupNotFound: If the scaling group does not exist.
         """
         return await self._db_source.get_resource_info(scaling_group)
+
+    async def check_user_is_in_project_with_scaling_group(
+        self,
+        user_id: UUID,
+        scaling_group_name: str,
+    ) -> bool:
+        """Check if a user belongs to any project that is associated with the scaling group.
+
+        This verifies project-level access by checking if the user is a member of at least
+        one project (group) that has the specified scaling group associated with it.
+
+        Args:
+            user_id: The UUID of the user to check.
+            scaling_group_name: The name of the scaling group.
+
+        Returns:
+            True if the user belongs to a project associated with the scaling group,
+            False otherwise.
+        """
+        return await self._db_source.check_user_is_in_project_with_scaling_group(
+            user_id=user_id,
+            scaling_group_name=scaling_group_name,
+        )

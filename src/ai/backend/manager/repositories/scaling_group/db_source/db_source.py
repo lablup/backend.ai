@@ -19,6 +19,7 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
@@ -354,3 +355,44 @@ class ScalingGroupDBSource:
                 used=used,
                 free=free,
             )
+
+    async def check_user_is_in_project_with_scaling_group(
+        self,
+        user_id: uuid.UUID,
+        scaling_group_name: str,
+    ) -> bool:
+        """Check if a user belongs to any project that is associated with the scaling group.
+
+        This verifies project-level access by checking if the user is a member of at least
+        one project (group) that has the specified scaling group associated with it.
+
+        Query path:
+            user_id → AssocGroupUserRow.user_id → AssocGroupUserRow.group_id
+                   → ScalingGroupForProjectRow.group → ScalingGroupForProjectRow.scaling_group
+
+        Args:
+            user_id: The UUID of the user to check.
+            scaling_group_name: The name of the scaling group.
+
+        Returns:
+            True if the user belongs to a project associated with the scaling group,
+            False otherwise.
+        """
+        async with self._db.begin_readonly_session() as session:
+            subquery = (
+                sa.select(sa.literal(1))
+                .select_from(AssocGroupUserRow)
+                .join(
+                    ScalingGroupForProjectRow,
+                    AssocGroupUserRow.group_id == ScalingGroupForProjectRow.group,
+                )
+                .where(
+                    sa.and_(
+                        AssocGroupUserRow.user_id == user_id,
+                        ScalingGroupForProjectRow.scaling_group == scaling_group_name,
+                    )
+                )
+            )
+            query = sa.select(sa.exists(subquery))
+            result = await session.execute(query)
+            return result.scalar() or False

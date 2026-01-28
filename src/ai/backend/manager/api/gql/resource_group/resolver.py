@@ -9,11 +9,16 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.manager.api.gql.agent.types import AgentResourceGQL, AgentStatsGQL
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
     ScalingGroupOrders,
+)
+from ai.backend.manager.services.agent.actions.get_scaling_group_resources import (
+    GetScalingGroupResourcesAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -152,4 +157,30 @@ async def update_resource_group_fair_share_spec(
 
     return UpdateResourceGroupFairShareSpecPayload(
         resource_group=ResourceGroupGQL.from_dataclass(result.scaling_group),
+    )
+
+
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 26.2.0. Get aggregated resource stats for a resource group.
+    Returns total capacity, used, and free resource slots for all agents in the resource group.
+    If hide_agents config is enabled and the user is not superadmin, returns empty stats.
+""")
+)
+async def resource_group_resources(
+    info: Info[StrawberryGQLContext],
+    resource_group: str,
+) -> AgentStatsGQL:
+    result = await info.context.processors.agent.get_scaling_group_resources.wait_for_complete(
+        GetScalingGroupResourcesAction(
+            scaling_group_name=resource_group,
+        )
+    )
+
+    return AgentStatsGQL(
+        total_resource=AgentResourceGQL(
+            free=result.total_resources.total_free_slots.to_json(),
+            used=result.total_resources.total_used_slots.to_json(),
+            capacity=result.total_resources.total_capacity_slots.to_json(),
+        )
     )

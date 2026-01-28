@@ -3145,6 +3145,58 @@ class ScheduleDBSource:
                 total_capacity_slots=total_capacity_slots,
             )
 
+    async def calculate_total_resource_slots_by_scaling_group(
+        self, scaling_group_name: str
+    ) -> TotalResourceData:
+        """
+        Calculate total resource slots from agents in a specific scaling group.
+        Uses AgentRow.available_slots for capable slots and kernel-based calculation for occupied slots.
+
+        :param scaling_group_name: The name of the scaling group to filter by
+        :return: TotalResourceData with total used, free, and capable slots
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # Get active agent IDs and their available slots in the specified scaling group
+            agent_stmt = sa.select(
+                AgentRow.id,
+                AgentRow.available_slots,
+            ).where(
+                sa.and_(
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                    AgentRow.scaling_group == scaling_group_name,
+                )
+            )
+
+            agent_result = await db_sess.execute(agent_stmt)
+            agent_rows = agent_result.fetchall()
+
+            # Extract agent IDs and calculate total capacity slots
+            agent_ids: set[AgentId] = set()
+            total_capacity_slots = ResourceSlot()
+
+            for agent_row in agent_rows:
+                agent_ids.add(agent_row.id)
+                if agent_row.available_slots:
+                    total_capacity_slots += agent_row.available_slots
+
+            # Calculate occupied slots from kernels using existing method
+            agent_occupied_slots = await self._calculate_agent_occupied_slots(db_sess, agent_ids)
+
+            # Sum up all occupied slots
+            total_used_slots = ResourceSlot()
+            for occupied_slots in agent_occupied_slots.values():
+                total_used_slots += occupied_slots
+
+            # Calculate free slots
+            total_free_slots = total_capacity_slots - total_used_slots
+
+            return TotalResourceData(
+                total_used_slots=total_used_slots,
+                total_free_slots=total_free_slots,
+                total_capacity_slots=total_capacity_slots,
+            )
+
     # =========================================================================
     # Handler-specific methods for SessionLifecycleHandler pattern
     # =========================================================================
