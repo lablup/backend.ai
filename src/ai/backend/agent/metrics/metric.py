@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import enum
 import functools
 import uuid
-from collections.abc import Iterable
-from typing import Optional, Self
+from collections.abc import Iterable, MutableMapping
+from typing import TYPE_CHECKING, Optional, Self
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -20,6 +22,9 @@ from .types import (
     FlattenedDeviceMetric,
     FlattenedKernelMetric,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.agent.stats import Metric
 
 
 class StatScope(enum.StrEnum):
@@ -129,6 +134,7 @@ class UtilizationMetricObserver:
 
     async def lazy_remove_container_metric(
         self,
+        kernel_metrics: MutableMapping[KernelId, dict[MetricKey, Metric]],
         *,
         agent_id: AgentId,
         kernel_id: KernelId,
@@ -156,6 +162,7 @@ class UtilizationMetricObserver:
 
         def callback(task: asyncio.Task) -> None:
             self._removal_tasks.pop(kernel_id, None)
+            kernel_metrics.pop(kernel_id, None)
 
         task = asyncio.create_task(remove_later())
         self._removal_tasks[kernel_id] = task
