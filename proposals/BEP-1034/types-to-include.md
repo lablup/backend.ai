@@ -44,16 +44,12 @@ class KernelOrderByGQL:
 
 ### KernelImageInfoGQL
 
-> **Note**: `image: ImageNode` is **deferred** (see types-to-defer.md)
-
 ```python
 class KernelImageInfoGQL:
     image_id: uuid.UUID | None
 ```
 
 ### KernelSessionInfoGQL
-
-> **Note**: `session: SessionNode` is **deferred** (see types-to-defer.md)
 
 ```python
 class KernelSessionInfoGQL:
@@ -74,8 +70,6 @@ class KernelClusterInfoGQL:
 
 ### KernelUserInfoGQL
 
-> **Note**: `user: UserNode`, `keypair: KeypairNode`, `domain: DomainNode`, `project: GroupNode` are **deferred** (see types-to-defer.md)
-
 ```python
 class KernelUserInfoGQL:
     user_id: uuid.UUID | None
@@ -93,8 +87,6 @@ class ResourceAllocationGQL:
 
 ### KernelResourceInfoGQL
 
-> **Note**: `resource_group: ResourceGroupNode` is **deferred** (see types-to-defer.md)
->
 > **Field Renames**: `occupied_slots` → `used`, `requested_slots` → `requested`, `occupied_shares` → `shares`
 
 ```python
@@ -140,12 +132,27 @@ class KernelLifecycleInfoGQL:
 
 ### KernelV2GQL
 
+> **Note**: All node references below are **deferred** (see types-to-defer.md)
+
 ```python
 class KernelV2GQL(Node):
     id: NodeID[str]
+
+    # Node references (deferred)
+    image_node: ImageNode | None
+    session_node: SessionNode | None
+    user_node: UserNode | None
+    keypair_node: KeypairNode | None
+    domain_node: DomainNode | None
+    project_node: GroupNode | None
+    agent_node: AgentNode | None
+    resource_group_node: ResourceGroupNode | None
+    vfolder_nodes: list[VFolderNode] | None
+
+    # Sub-info types
     image: KernelImageInfoGQL
     session: KernelSessionInfoGQL
-    user_permission: KernelUserInfoGQL
+    user: KernelUserInfoGQL
     network: KernelNetworkInfoGQL
     cluster: KernelClusterInfoGQL
     resource: KernelResourceInfoGQL
