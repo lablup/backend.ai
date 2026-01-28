@@ -2386,14 +2386,7 @@ class AgentRegistry:
 
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
-                    _info = ModelHealthCheck(
-                        path=health_check_info["path"],
-                        interval=health_check_info["interval"],
-                        max_retries=health_check_info["max_retries"],
-                        max_wait_time=health_check_info["max_wait_time"],
-                        expected_status_code=health_check_info["expected_status_code"],
-                        initial_delay=health_check_info.get("initial_delay"),
-                    )
+                    _info = ModelHealthCheck.model_validate(health_check_info)
                     break
         elif (
             self.config_provider.config.deployment.enable_model_definition_override
