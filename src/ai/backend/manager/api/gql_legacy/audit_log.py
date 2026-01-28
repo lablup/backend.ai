@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from datetime import timedelta
 from typing import TYPE_CHECKING, Optional, Self, cast
