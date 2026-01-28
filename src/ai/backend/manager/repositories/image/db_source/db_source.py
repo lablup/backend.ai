@@ -39,10 +39,7 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.batch_querier import (
-    BatchQuerier,
-    execute_batch_querier,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -327,7 +324,7 @@ class ImageDBSource:
                 await session.delete(image_row)
             return data
         except DBAPIError as e:
-            raise PurgeImageActionByIdObjectDBError(str(e))
+            raise PurgeImageActionByIdObjectDBError(str(e)) from e
 
     async def search_images(self, querier: BatchQuerier) -> ImageListResult:
         """
@@ -335,9 +332,9 @@ class ImageDBSource:
         Returns ImageListResult with items and pagination info.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
+            query = sa.select(ImageRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ImageRow.to_detailed_dataclass() for row in result.rows]
+            items = [row.ImageRow.to_dataclass() for row in result.rows]
             return ImageListResult(
                 items=items,
                 total_count=result.total_count,
