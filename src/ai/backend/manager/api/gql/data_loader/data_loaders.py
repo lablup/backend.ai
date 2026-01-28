@@ -22,7 +22,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.data.image.types import ImageAliasData, ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -203,7 +203,7 @@ class DataLoaders:
     @cached_property
     def image_loader(
         self,
-    ) -> DataLoader[ImageID, ImageDataWithDetails | None]:
+    ) -> DataLoader[ImageID, ImageData | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
 
     @cached_property
