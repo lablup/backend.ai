@@ -12,10 +12,9 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.model_serving.types import RuntimeVariant
 
 # Import Row classes to ensure SQLAlchemy mapper initialization
 from ai.backend.manager.models.agent import AgentRow
