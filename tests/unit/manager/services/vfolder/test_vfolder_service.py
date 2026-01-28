@@ -19,7 +19,8 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.storage import VFolderFilterStatusFailed, VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
@@ -55,11 +56,15 @@ class TestVFolderServicePurge:
         return uuid.uuid4()
 
     @pytest.fixture
-    def sample_purger(self, sample_vfolder_uuid: uuid.UUID) -> Purger[VFolderRow]:
-        return Purger(row_class=VFolderRow, pk_value=sample_vfolder_uuid)
+    def sample_purger(self, sample_vfolder_uuid: uuid.UUID) -> RBACEntityPurger[VFolderRow]:
+        return RBACEntityPurger(
+            row_class=VFolderRow,
+            pk_value=sample_vfolder_uuid,
+            spec=VFolderPurgerSpec(vfolder_id=sample_vfolder_uuid),
+        )
 
     @pytest.fixture
-    def sample_action(self, sample_purger: Purger[VFolderRow]) -> PurgeVFolderAction:
+    def sample_action(self, sample_purger: RBACEntityPurger[VFolderRow]) -> PurgeVFolderAction:
         return PurgeVFolderAction(purger=sample_purger)
 
     @pytest.fixture

@@ -1,11 +1,10 @@
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -68,11 +67,13 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.base.rbac.granter import (
     RBACGranter,
@@ -430,7 +431,7 @@ class VfolderRepository:
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
     @vfolder_repository_resilience.apply()
-    async def purge_vfolder(self, purger: Purger[VFolderRow]) -> VFolderData:
+    async def purge_vfolder(self, purger: RBACEntityPurger[VFolderRow]) -> VFolderData:
         """
         Permanently delete a VFolder from DB.
         Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
@@ -447,7 +448,7 @@ class VfolderRepository:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
             if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
                 raise VFolderFilterStatusFailed
-            await execute_purger(session, purger)
+            await execute_rbac_entity_purger(session, purger)
             return vfolder_row.to_data()
 
     @vfolder_repository_resilience.apply()

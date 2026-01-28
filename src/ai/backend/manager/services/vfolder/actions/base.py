@@ -25,7 +25,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderRow,
 )
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -385,7 +385,7 @@ class DeleteForeverVFolderActionResult(VFolderSingleEntityActionResult):
 
 @dataclass
 class PurgeVFolderAction(VFolderSingleEntityAction):
-    purger: Purger[VFolderRow]
+    purger: RBACEntityPurger[VFolderRow]
 
     @override
     def entity_id(self) -> Optional[str]:
