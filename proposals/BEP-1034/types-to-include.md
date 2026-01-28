@@ -128,6 +128,13 @@ class KernelAttachedDevicesGQL:
     entries: list[KernelAttachedDeviceEntryGQL]
 ```
 
+### ResourceAllocationGQL
+```python
+class ResourceAllocationGQL:
+    requested: ResourceSlotGQL
+    used: ResourceSlotGQL
+```
+
 ### KernelResourceInfoGQL
 
 > **Note**: `resource_group: ResourceGroupNode` is **deferred** (see types-to-defer.md)
@@ -219,22 +226,6 @@ KernelEdgeGQL = Edge[KernelV2GQL]
 ```python
 class KernelConnectionV2GQL(Connection[KernelV2GQL]):
     count: int
-```
-
----
-
-## Resource Allocation Types
-
-> **Design Note**: Types directly related to resource allocation are grouped separately.
-
-### ResourceAllocationGQL
-
-> **Description**: A bundle type representing the resource allocation state for individual workloads (Kernel)
-
-```python
-class ResourceAllocationGQL:
-    requested: ResourceSlotGQL
-    used: ResourceSlotGQL
 ```
 
 ---
