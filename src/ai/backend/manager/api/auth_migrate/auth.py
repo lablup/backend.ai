@@ -1,3 +1,10 @@
+"""
+Legacy auth handlers (function-based).
+
+DEPRECATED: This module is preserved for regression testing only.
+Use ai.backend.manager.api.auth (class-based handlers) for production.
+"""
+
 from __future__ import annotations
 
 import functools
@@ -34,6 +41,8 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
+from ai.backend.manager.api.utils import check_api_params, get_handler_attr, set_handler_attr
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
@@ -60,11 +69,8 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
-from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_handler_attr, set_handler_attr
-
 if TYPE_CHECKING:
-    from .context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
