@@ -37,22 +37,16 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - `KernelFilterGQL` - Main filter input
 - `KernelOrderByGQL` - Ordering input
 
-#### Internal Data Types
-- `KernelInternalDataGQL` - Internal kernel data
-
 #### Sub-Info Types
-- `KernelImageInfoGQL` - Image info (image deferred)
-- `KernelSessionInfoGQL` - Session info (session_id deferred)
+- `KernelImageInfoGQL` - Image info
+- `KernelSessionInfoGQL` - Session info
 - `KernelClusterInfoGQL` - Cluster config
-- `KernelUserInfoGQL` - Unix process permissions only (most fields deferred)
-- `KernelDeviceModelInfoGQL` - Device model info
-- `KernelAttachedDeviceEntryGQL` - Device entry
-- `KernelAttachedDevicesGQL` - Attached devices collection
-- `KernelResourceInfoGQL` - Resource allocation (resource_group deferred, agent included)
-- `KernelRuntimeInfoGQL` - Runtime config (partial - see deferred)
+- `KernelUserInfoGQL` - User/permission info
+- `ResourceAllocationGQL` - Resource allocation (requested/used)
+- `KernelResourceInfoGQL` - Resource info
+- `KernelRuntimeInfoGQL` - Runtime config
 - `KernelNetworkInfoGQL` - Network config
 - `KernelLifecycleInfoGQL` - Lifecycle info (partial - see skipped)
-- `KernelMetadataInfoGQL` - Metadata
 
 #### Main Types
 - `KernelV2GQL` - Main kernel node type
@@ -62,7 +56,6 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 #### Common Types (from common/types.py)
 - `ResourceOptsEntryGQL`, `ResourceOptsGQL`, `ResourceOptsEntryInput`, `ResourceOptsInput` - Resource options (already exist)
 - `ServicePortEntryGQL`, `ServicePortsGQL` - Service ports
-- `DotfileInfoGQL`, `SSHKeypairGQL` - Internal data types
 
 ### Types to Skip (Do Not Implement)
 
@@ -77,15 +70,19 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 
 For each deferred Node type, we include the **ID field now** and defer only the **Node connection**.
 
-| Type/Field | ID Field (Include Now) | Future Node (Defer) |
-|------------|------------------------|---------------------|
-| `KernelImageInfoGQL` | `image_id: uuid.UUID` | `image: ImageNode` |
-| `KernelUserInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` | `user`, `keypair`, `domain`, `project` |
-| `KernelSessionInfoGQL` | `session_id: uuid.UUID` | `session: SessionNode` |
-| `KernelResourceInfoGQL` | `resource_group_name: str` | `resource_group: ResourceGroupNode` |
-| `KernelRuntimeInfoGQL` | `vfolder_ids: list[uuid.UUID]` | `vfolders: list[VFolderNode]` |
+Node references are placed directly on `KernelV2GQL`:
 
-**Types to skip entirely**: `VFolderMountGQL`
+| Node Field | Type |
+|------------|------|
+| `image_node` | `ImageNode \| None` |
+| `session_node` | `SessionNode \| None` |
+| `user_node` | `UserNode \| None` |
+| `keypair_node` | `KeypairNode \| None` |
+| `domain_node` | `DomainNode \| None` |
+| `project_node` | `GroupNode \| None` |
+| `agent_node` | `AgentNode \| None` |
+| `resource_group_node` | `ResourceGroupNode \| None` |
+| `vfolder_nodes` | `list[VFolderNode] \| None` |
 
 ## Implementation Checklist
 
@@ -95,22 +92,23 @@ For each deferred Node type, we include the **ID field now** and defer only the 
 - [ ] Skip all types listed in "Types to Skip"
 - [ ] Include ID fields for deferred Node types:
   - `KernelImageInfoGQL`: add `image_id`
-  - `KernelUserInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id` (plus `uid`, `main_gid`, `gids`)
-  - `KernelSessionInfoGQL`: include `session_id`
+  - `KernelUserInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id`
+  - `KernelSessionInfoGQL`: include `session_id`, `creation_id`
   - `KernelResourceInfoGQL`: include `agent_id`, `resource_group_name`
-  - `KernelRuntimeInfoGQL`: include `vfolder_ids`
 - [ ] Update `KernelLifecycleInfoGQL` to remove `status_history`, `status_info`, `status_data`, `status_changed` fields
 - [ ] Update `from_kernel_info()` method to match new type structure
 
 ### Future PRs
 
-- [ ] ImageNode PR: Add `image: ImageNode` to `KernelV2GQL`
-- [ ] UserNode PR: Add `user: UserNode` to `KernelUserInfoGQL`
-- [ ] KeypairNode PR: Add `keypair: KeypairNode` to `KernelUserInfoGQL`
-- [ ] DomainNode PR: Add `domain: DomainNode` to `KernelUserInfoGQL`
-- [ ] GroupNode PR: Add `project: GroupNode` to `KernelUserInfoGQL`
-- [ ] SessionNode PR: Add `session: SessionNode` to `KernelSessionInfoGQL`
-- [ ] VFolderNode PR: Add `vfolders: list[VFolderNode]` to `KernelRuntimeInfoGQL`
+- [ ] ImageNode PR: Implement `image_node: ImageNode` on `KernelV2GQL`
+- [ ] SessionNode PR: Implement `session_node: SessionNode` on `KernelV2GQL`
+- [ ] UserNode PR: Implement `user_node: UserNode` on `KernelV2GQL`
+- [ ] KeypairNode PR: Implement `keypair_node: KeypairNode` on `KernelV2GQL`
+- [ ] DomainNode PR: Implement `domain_node: DomainNode` on `KernelV2GQL`
+- [ ] GroupNode PR: Implement `project_node: GroupNode` on `KernelV2GQL`
+- [ ] AgentNode PR: Implement `agent_node: AgentNode` on `KernelV2GQL`
+- [ ] ResourceGroupNode PR: Implement `resource_group_node: ResourceGroupNode` on `KernelV2GQL`
+- [ ] VFolderNode PR: Implement `vfolder_nodes: list[VFolderNode]` on `KernelV2GQL`
 
 ## References
 
