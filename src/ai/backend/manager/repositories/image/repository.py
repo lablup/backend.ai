@@ -287,6 +287,41 @@ class ImageRepository:
         return await self._db_source.insert_image_alias_by_id(creator)
 
     @image_repository_resilience.apply()
+    async def get_images_by_ids(
+        self,
+        image_ids: list[UUID],
+        status_filter: list[ImageStatus] | None = None,
+        requested_by_superadmin: bool = False,
+    ) -> list[ImageWithAgentInstallStatus]:
+        """
+        Retrieves multiple images by their IDs with agent install status.
+        """
+        images_data = await self._db_source.query_images_by_ids(image_ids, status_filter)
+        image_id_list = list(images_data.keys())
+        installed_agents_for_images = await self._stateful_source.list_agents_with_images(
+            image_id_list
+        )
+
+        hide_agents = (
+            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
+        )
+
+        images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
+        for image_id_key, image in images_data.items():
+            installed_agents = installed_agents_for_images.get(image_id_key, set())
+            images_with_agent_install_status.append(
+                ImageWithAgentInstallStatus(
+                    image=image,
+                    agent_install_status=ImageAgentInstallStatus(
+                        installed=bool(installed_agents),
+                        agent_names=[] if hide_agents else list(installed_agents),
+                    ),
+                )
+            )
+
+        return images_with_agent_install_status
+
+    @image_repository_resilience.apply()
     async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
         """
         Clears image resource limits by image ID.
@@ -303,6 +338,13 @@ class ImageRepository:
         Sets resource limit for an image by its ID.
         """
         return await self._db_source.set_image_resource_limit_by_id(image_id, resource_limit)
+
+    @image_repository_resilience.apply()
+    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
+        """
+        Scans multiple images by their IDs.
+        """
+        return await self._db_source.scan_images_by_ids(image_ids)
 
     @image_repository_resilience.apply()
     async def delete_image_with_aliases(self, image_id: UUID) -> ImageData:

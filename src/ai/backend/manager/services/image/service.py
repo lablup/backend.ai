@@ -26,9 +26,17 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.alias_image_by_id import (
+    AliasImageByIdAction,
+    AliasImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
+    ClearImageCustomResourceLimitByIdAction,
+    ClearImageCustomResourceLimitByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
     ClearImageCustomResourceLimitByIdActionResult,
 )
@@ -58,14 +66,18 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.get_images_by_ids import (
+    GetImagesByIdsAction,
+    GetImagesByIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
     ModifyImageActionUnknownImageReferenceError,
 )
-from ai.backend.manager.services.image.actions.preload_image import (
-    PreloadImageAction,
-    PreloadImageActionResult,
+from ai.backend.manager.services.image.actions.preload_image_by_id import (
+    PreloadImageByIdAction,
+    PreloadImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgedImagesData,
@@ -75,6 +87,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
+)
+from ai.backend.manager.services.image.actions.rescan_images_by_id import (
+    RescanImagesByIdAction,
+    RescanImagesByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
@@ -366,6 +382,9 @@ class ImageService:
         )
 
     async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
+        """
+        Deprecated. Use rescan_images_by_id instead.
+        """
         image_canonical = action.canonical
         architecture = action.architecture
 
@@ -413,6 +432,17 @@ class ImageService:
             image_alias=image_alias,
         )
 
+    async def get_images_by_ids(self, action: GetImagesByIdsAction) -> GetImagesByIdsActionResult:
+        """
+        Retrieves multiple images by their IDs.
+        """
+        images_with_agent_install_status = await self._image_repository.get_images_by_ids(
+            action.image_ids,
+            status_filter=action.image_status,
+            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+        )
+        return GetImagesByIdsActionResult(images=images_with_agent_install_status)
+
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         """
         Preloads images by their IDs to specified agents.
@@ -433,6 +463,15 @@ class ImageService:
         """
         image_data = await self._image_repository.clear_image_resource_limits_by_id(action.image_id)
         return ClearImageCustomResourceLimitByIdActionResult(image_data=image_data)
+
+    async def rescan_images_by_id(
+        self, action: RescanImagesByIdAction
+    ) -> RescanImagesByIdActionResult:
+        """
+        Rescans images by their IDs.
+        """
+        result = await self._image_repository.scan_images_by_ids(action.image_ids)
+        return RescanImagesByIdActionResult(images=result.images, errors=result.errors)
 
     async def set_image_resource_limit_by_id(
         self, action: SetImageResourceLimitByIdAction

@@ -398,6 +398,44 @@ class ImageDBSource:
             image_row._resources = resources
             return image_row.to_dataclass()
 
+    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
+        """
+        Scans multiple images by their IDs and upserts them into the database.
+        Returns RescanImagesResult with the scanned image data.
+        """
+        all_images: list[ImageData] = []
+        all_errors: list[str] = []
+
+        async with self._db.begin_session() as session:
+            for image_id in image_ids:
+                try:
+                    image_row = await self._get_image_by_id(session, image_id)
+
+                    # Get the registry info
+                    registry_parts: list[str] = []
+                    if image_row.registry:
+                        registry_parts.append(image_row.registry)
+                    if image_row.project:
+                        registry_parts.append(image_row.project)
+                    registry_key = "/".join(registry_parts) if registry_parts else ""
+
+                    # Get the registry row
+                    registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
+                    if not registry_row:
+                        all_errors.append(f"Registry not found for image {image_row.name}")
+                        continue
+
+                    # Call the original scan function
+                    result = await scan_single_image(
+                        self._db, registry_key, registry_row, image_row.name
+                    )
+                    all_images.extend(result.images)
+                    all_errors.extend(result.errors)
+                except ImageNotFound:
+                    all_errors.append(f"Image not found: {image_id}")
+
+        return RescanImagesResult(images=all_images, errors=all_errors)
+
     async def remove_image_and_aliases(
         self,
         image_id: UUID,
