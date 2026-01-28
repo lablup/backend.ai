@@ -17,7 +17,6 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -119,7 +118,6 @@ async def fetch_image_by_id(
     action_result = await info.context.processors.image.get_image_by_id.wait_for_complete(
         GetImageByIdAction(
             image_id=image_id,
-            user_role=UserRole.USER,
             image_status=None,
         )
     )
