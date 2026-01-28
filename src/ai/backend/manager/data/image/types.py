@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,7 +45,22 @@ class ImageLabelsData:
 
 @dataclass
 class ImageResourcesData:
-    resources_data: "Resources"
+    resources_data: Resources
+
+
+@dataclass
+class ImageTagEntry:
+    """A single parsed tag component from the image reference."""
+
+    key: str
+    value: str
+
+
+@dataclass
+class ResourceLimit:
+    key: str
+    min: Decimal
+    max: Decimal
 
 
 @dataclass
@@ -64,6 +81,8 @@ class ImageData:
     accelerators: str | None
     labels: ImageLabelsData
     resources: ImageResourcesData
+    resource_limits: list[ResourceLimit]
+    tags: list[ImageTagEntry]
     status: ImageStatus
 
 
