@@ -42,13 +42,6 @@ class KernelOrderByGQL:
 
 ## Sub-Info Types
 
-### KernelImageInfoGQL
-
-```python
-class KernelImageInfoGQL:
-    image_id: uuid.UUID | None
-```
-
 ### KernelSessionInfoGQL
 
 ```python
@@ -82,7 +75,7 @@ class KernelUserInfoGQL:
 ```python
 class ResourceAllocationGQL:
     requested: ResourceSlotGQL
-    used: ResourceSlotGQL
+    used: ResourceSlotGQL | None
 ```
 
 ### KernelResourceInfoGQL
@@ -97,13 +90,6 @@ class KernelResourceInfoGQL:
     allocation: ResourceAllocationGQL
     shares: ResourceSlotGQL
     resource_opts: ResourceOptsGQL | None
-```
-
-### KernelRuntimeInfoGQL
-
-```python
-class KernelRuntimeInfoGQL:
-    startup_command: str | None
 ```
 
 ### KernelNetworkInfoGQL
@@ -147,16 +133,18 @@ class KernelV2GQL(Node):
     project_node: GroupNode | None
     agent_node: AgentNode | None
     resource_group_node: ResourceGroupNode | None
-    vfolder_nodes: list[VFolderNode] | None
+    vfolder_nodes: VFolderConnection
+
+    # Inlined fields (from single-element types)
+    image_id: uuid.UUID | None
+    startup_command: str | None
 
     # Sub-info types
-    image: KernelImageInfoGQL
     session: KernelSessionInfoGQL
     user: KernelUserInfoGQL
     network: KernelNetworkInfoGQL
     cluster: KernelClusterInfoGQL
     resource: KernelResourceInfoGQL
-    runtime: KernelRuntimeInfoGQL
     lifecycle: KernelLifecycleInfoGQL
 ```
 

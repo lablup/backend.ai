@@ -38,15 +38,15 @@ This document defines the implementation plan for `KernelV2GQL` types as part of
 - [`KernelOrderByGQL`](BEP-1034/types-to-include.md#kernelorderbygql) - Ordering input
 
 #### Sub-Info Types
-- [`KernelImageInfoGQL`](BEP-1034/types-to-include.md#kernelimageinfogql) - Image info
 - [`KernelSessionInfoGQL`](BEP-1034/types-to-include.md#kernelsessioninfogql) - Session info
 - [`KernelClusterInfoGQL`](BEP-1034/types-to-include.md#kernelclusterinfogql) - Cluster config
 - [`KernelUserInfoGQL`](BEP-1034/types-to-include.md#kerneluserinfogql) - User/permission info
 - [`ResourceAllocationGQL`](BEP-1034/types-to-include.md#resourceallocationgql) - Resource allocation (requested/used)
 - [`KernelResourceInfoGQL`](BEP-1034/types-to-include.md#kernelresourceinfogql) - Resource info
-- [`KernelRuntimeInfoGQL`](BEP-1034/types-to-include.md#kernelruntimeinfogql) - Runtime config
 - [`KernelNetworkInfoGQL`](BEP-1034/types-to-include.md#kernelnetworkinfogql) - Network config
 - [`KernelLifecycleInfoGQL`](BEP-1034/types-to-include.md#kernellifecycleinfogql) - Lifecycle info (partial - see skipped)
+
+> **Note**: `image_id` and `startup_command` are inlined directly on `KernelV2GQL` (single-element types removed)
 
 #### Main Types
 - [`KernelV2GQL`](BEP-1034/types-to-include.md#kernelv2gql) - Main kernel node type
@@ -82,7 +82,7 @@ Node references are placed directly on `KernelV2GQL`:
 | `project_node` | `GroupNode \| None` |
 | `agent_node` | `AgentNode \| None` |
 | `resource_group_node` | `ResourceGroupNode \| None` |
-| `vfolder_nodes` | `list[VFolderNode] \| None` |
+| `vfolder_nodes` | `VFolderConnection` |
 
 ## Implementation Checklist
 
@@ -91,7 +91,6 @@ Node references are placed directly on `KernelV2GQL`:
 - [ ] Implement all types listed in "Types to Include"
 - [ ] Skip all types listed in "Types to Skip"
 - [ ] Include ID fields for deferred Node types:
-  - `KernelImageInfoGQL`: add `image_id`
   - `KernelUserInfoGQL`: include `user_id`, `access_key`, `domain_name`, `group_id`
   - `KernelSessionInfoGQL`: include `session_id`, `creation_id`
   - `KernelResourceInfoGQL`: include `agent_id`, `resource_group_name`
@@ -108,7 +107,7 @@ Node references are placed directly on `KernelV2GQL`:
 - [ ] GroupNode PR: Implement `project_node: GroupNode` on `KernelV2GQL`
 - [ ] AgentNode PR: Implement `agent_node: AgentNode` on `KernelV2GQL`
 - [ ] ResourceGroupNode PR: Implement `resource_group_node: ResourceGroupNode` on `KernelV2GQL`
-- [ ] VFolderNode PR: Implement `vfolder_nodes: list[VFolderNode]` on `KernelV2GQL`
+- [ ] VFolderNode PR: Implement `vfolder_nodes: VFolderConnection` on `KernelV2GQL`
 
 ## References
 

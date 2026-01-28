@@ -20,16 +20,17 @@ Node references are placed directly on `KernelV2GQL`:
 | `project_node` | `GroupNode \| None` |
 | `agent_node` | `AgentNode \| None` |
 | `resource_group_node` | `ResourceGroupNode \| None` |
-| `vfolder_nodes` | `list[VFolderNode] \| None` |
+| `vfolder_nodes` | `VFolderConnection` |
 
 ID fields are included in sub-info types:
 
 | Sub-Info Type | ID Field |
 |---------------|----------|
-| `KernelImageInfoGQL` | `image_id: uuid.UUID` |
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` |
 | `KernelUserInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` |
 | `KernelResourceInfoGQL` | `agent_id`, `resource_group_name` |
+
+> **Note**: `image_id` is inlined directly on `KernelV2GQL` (single-element type removed)
 
 ### Types to Skip Entirely
 | Type | Reason |
@@ -40,14 +41,7 @@ ID fields are included in sub-info types:
 
 ## Image Types (Defer to ImageNode)
 
-### KernelImageInfoGQL
-
-**Action**: Implement with `image_id` field now. Defer `image: ImageNode` connection.
-
-```python
-class KernelImageInfoGQL:
-    image_id: uuid.UUID | None
-```
+**Action**: `image_id` field is inlined directly on `KernelV2GQL`. Defer `image_node: ImageNode` connection.
 
 **Future additions** (on `KernelV2GQL`):
 - `image_node: ImageNode | None`
@@ -127,7 +121,7 @@ class KernelSessionInfoGQL:
 **Action**: Do not include in `common/types.py`. Will be replaced by `VFolderNode` connection.
 
 **Future additions** (on `KernelV2GQL`):
-- `vfolder_nodes: list[VFolderNode] | None`
+- `vfolder_nodes: VFolderConnection`
 
 ---
 
@@ -143,4 +137,4 @@ class KernelSessionInfoGQL:
 | GroupNode PR | `project_node: GroupNode` |
 | AgentNode PR | `agent_node: AgentNode` |
 | ResourceGroupNode PR | `resource_group_node: ResourceGroupNode` |
-| VFolderNode PR | `vfolder_nodes: list[VFolderNode]` |
+| VFolderNode PR | `vfolder_nodes: VFolderConnection` |
