@@ -91,7 +91,7 @@ class KernelUserInfoGQL:
 ```python
 @strawberry.type(name="KernelSessionInfo")
 class KernelSessionInfoGQL:
-    session_id: uuid.UUID | None
+    session_id: uuid.UUID
     creation_id: str | None
     name: str | None
     session_type: SessionTypes
