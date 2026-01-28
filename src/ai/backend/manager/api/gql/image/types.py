@@ -176,7 +176,7 @@ class ImageIdentityInfoGQL:
     def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
         return cls(
             canonical_name=str(data.name),
-            namespace=data.namespace,
+            namespace=data.image,
             architecture=data.architecture,
         )
 
