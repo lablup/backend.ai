@@ -4419,11 +4419,6 @@ type ImageV2 implements Node
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
-
-  """
-  Registry hostname. Will be replaced with ContainerRegistryNode connection.
-  """
-  registry: String!
 }
 
 """An edge in a connection."""
