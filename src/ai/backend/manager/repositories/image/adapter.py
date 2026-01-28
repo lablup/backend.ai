@@ -4,6 +4,7 @@ from typing import Any, override
 
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, EntityType, ScopeType
 from ai.backend.common.docker import LabelName
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.repositories.base.rbac.adapter import CreatorAdapter
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
@@ -18,7 +19,7 @@ class ImageCreatorAdapter(CreatorAdapter[ImageRowCreatorSpec]):
     """
 
     @override
-    def build(self, spec: ImageRowCreatorSpec) -> RBACEntityCreator:
+    def build(self, spec: ImageRowCreatorSpec) -> RBACEntityCreator[ImageRow]:
         labels: dict[str, Any] = spec.labels or {}
         owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
 
