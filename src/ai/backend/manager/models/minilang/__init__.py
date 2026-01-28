@@ -34,12 +34,13 @@ OrderSpecItem = tuple[
 ]
 
 
-def get_col_from_table(table, column_name: str) -> sa.Column:
-    try:
+def get_col_from_table(
+    table: sa.Table | sa.sql.Join | type, column_name: str
+) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
+    if isinstance(table, (sa.Table, sa.sql.Join)):
         return table.c[column_name]
-    except AttributeError:
-        # For ORM class table
-        return getattr(table, column_name)
+    # For ORM class table
+    return getattr(table, column_name)
 
 
 class ExternalTableFilterSpec:

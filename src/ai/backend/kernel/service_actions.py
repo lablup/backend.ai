@@ -41,7 +41,7 @@ async def write_tempfile(
 async def run_command(
     variables: Mapping[str, Any],
     command: Iterable[str],
-    echo=False,
+    echo: bool = False,
 ) -> Optional[MutableMapping[str, str]]:
     proc = await create_subprocess_exec(
         *(str(piece).format_map(variables) for piece in command),

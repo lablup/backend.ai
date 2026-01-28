@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
@@ -230,12 +230,12 @@ class SingleRedisConfig(BaseModel):
         raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
     @field_serializer("addr")
-    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info) -> Optional[str]:
+    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info: Any) -> Optional[str]:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
     @field_serializer("sentinel")
     def _serialize_sentinel(
-        self, sentinel: Optional[list[HostPortPairModel]], _info
+        self, sentinel: Optional[list[HostPortPairModel]], _info: Any
     ) -> Optional[str]:
         if sentinel is None:
             return None

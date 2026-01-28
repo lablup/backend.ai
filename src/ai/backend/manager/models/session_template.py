@@ -149,7 +149,7 @@ async def query_accessible_session_templates(
     user_role: Optional[UserRole] = None,
     domain_name: Optional[str] = None,
     allowed_types: Iterable[str] = ["user"],
-    extra_conds=None,
+    extra_conds: Any = None,
 ) -> list[Mapping[str, Any]]:
     from .group import association_groups_users as agus
     from .group import groups

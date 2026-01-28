@@ -47,7 +47,7 @@ _default_routing_fields: Sequence[FieldSpec] = (
 
 def get_service_id(session: Session, name_or_id: str) -> UUID:
     try:
-        session.Service(name_or_id).info()
+        _ = session.Service(name_or_id).info()
     except (ValueError, BackendError):
         services = session.Service.list(name=name_or_id)
         try:
@@ -601,7 +601,7 @@ def rm(ctx: CLIContext, service_name_or_id: str) -> None:
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).delete()
+            _ = session.Service(service_id).delete()
             print_done("Removed.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -621,7 +621,7 @@ def sync(ctx: CLIContext, service_name_or_id: str) -> None:
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).sync()
+            _ = session.Service(service_id).sync()
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -647,7 +647,7 @@ def scale(
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).scale(target_count)
+            _ = session.Service(service_id).scale(target_count)
             print_done("Triggered scaling.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -728,7 +728,7 @@ def update_traffic_ratio(
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).update_traffic_ratio(route_id, ratio)
+            _ = session.Service(service_id).update_traffic_ratio(route_id, ratio)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -752,7 +752,7 @@ def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: UUID) ->
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).downscale_single_route(route_id)
+            _ = session.Service(service_id).downscale_single_route(route_id)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)

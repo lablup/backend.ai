@@ -552,14 +552,14 @@ async def query_accessible_vfolders(
     user_uuid: uuid.UUID,
     *,
     # when enabled, skip vfolder ownership check if user role is admin or superadmin
-    allow_privileged_access=False,
-    user_role=None,
-    domain_name=None,
-    allowed_vfolder_types=None,
-    extra_vf_conds=None,
-    extra_invited_vf_conds=None,
-    extra_vf_user_conds=None,
-    extra_vf_group_conds=None,
+    allow_privileged_access: bool = False,
+    user_role: UserRole | str | None = None,
+    domain_name: str | None = None,
+    allowed_vfolder_types: Sequence[str] | None = None,
+    extra_vf_conds: Any = None,
+    extra_invited_vf_conds: Any = None,
+    extra_vf_user_conds: Any = None,
+    extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
     from ai.backend.manager.models.group import association_groups_users as agus
@@ -592,7 +592,7 @@ async def query_accessible_vfolders(
         # users.c.email,
     ]
 
-    async def _append_entries(_query, _is_owner=True) -> None:
+    async def _append_entries(_query: sa.sql.Select, _is_owner: bool = True) -> None:
         if extra_vf_conds is not None:
             _query = _query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:
@@ -746,7 +746,7 @@ async def query_accessible_vfolders(
 
 async def get_allowed_vfolder_hosts_by_group(
     conn: SAConnection,
-    resource_policy,
+    resource_policy: Mapping[str, Any],
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> VFolderHostPermissionMap:
@@ -1193,7 +1193,7 @@ async def update_vfolder_status(
 
 
 async def ensure_host_permission_allowed(
-    db_conn,
+    db_conn: SAConnection,
     folder_host: str,
     *,
     permission: VFolderHostPermission,
@@ -1222,7 +1222,7 @@ async def ensure_host_permission_allowed(
 
 
 async def filter_host_allowed_permission(
-    db_conn,
+    db_conn: SAConnection,
     *,
     allowed_vfolder_types: Sequence[str],
     user_uuid: uuid.UUID,

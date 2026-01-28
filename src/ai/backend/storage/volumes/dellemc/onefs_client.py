@@ -87,7 +87,7 @@ class OneFSClient:
             data = await resp.json()
         return data["storagepools"][0]["lnns"]
 
-    async def get_node_hardware_info_by_lnn(self, lnn) -> Mapping[str, Any]:
+    async def get_node_hardware_info_by_lnn(self, lnn: int) -> Mapping[str, Any]:
         async with self._request("GET", f"cluster/nodes/{lnn}/hardware") as resp:
             data = await resp.json()
             node = data["nodes"][0]
@@ -98,7 +98,7 @@ class OneFSClient:
             "serial_number": node["serial_number"],
         }
 
-    async def get_node_status_by_lnn(self, lnn) -> Mapping[str, Any]:
+    async def get_node_status_by_lnn(self, lnn: int) -> Mapping[str, Any]:
         async with self._request("GET", f"cluster/nodes/{lnn}/status/nvram") as resp:
             data = await resp.json()
             node = data["nodes"][0]
@@ -206,7 +206,7 @@ class OneFSClient:
         ) as resp:
             return await resp.json()
 
-    async def delete_quota(self, quota_id) -> None:
+    async def delete_quota(self, quota_id: str) -> None:
         async with self._request(
             "DELETE",
             f"quota/quotas/{quota_id}",

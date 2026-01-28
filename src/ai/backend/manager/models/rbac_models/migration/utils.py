@@ -21,13 +21,15 @@ from .types import (
 )
 
 
-def insert_if_data_exists(db_conn: Connection, row_type, data: Collection[dict[str, Any]]) -> None:
+def insert_if_data_exists(
+    db_conn: Connection, row_type: sa.Table, data: Collection[dict[str, Any]]
+) -> None:
     if data:
         db_conn.execute(sa.insert(row_type), list(data))
 
 
 def insert_skip_on_conflict(
-    db_conn: Connection, row_type, data: Collection[dict[str, Any]]
+    db_conn: Connection, row_type: sa.Table, data: Collection[dict[str, Any]]
 ) -> None:
     if data:
         stmt = pg_insert(row_type).values(list(data)).on_conflict_do_nothing()
@@ -36,7 +38,7 @@ def insert_skip_on_conflict(
 
 def insert_and_returning_id(
     db_conn: Connection,
-    row_type,
+    row_type: sa.Table,
     data: Any,
 ) -> uuid.UUID:
     stmt = sa.insert(row_type).values(data).returning(row_type.c.id)

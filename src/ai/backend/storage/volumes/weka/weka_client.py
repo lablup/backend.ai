@@ -4,7 +4,7 @@ import logging
 import ssl
 import time
 import urllib.parse
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
@@ -91,7 +91,7 @@ class WekaFs:
         )
 
 
-def error_handler(inner) -> Any:
+def error_handler(inner: Callable[..., Awaitable[Any]]) -> Any:
     async def outer(*args, **kwargs) -> Any:
         try:
             return await inner(*args, **kwargs)

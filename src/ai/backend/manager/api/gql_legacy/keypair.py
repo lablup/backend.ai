@@ -502,7 +502,7 @@ class CreateKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         user_id: str,
         props: KeyPairInput,
@@ -531,7 +531,7 @@ class ModifyKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
         props: ModifyKeyPairInput,
@@ -559,7 +559,7 @@ class DeleteKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:

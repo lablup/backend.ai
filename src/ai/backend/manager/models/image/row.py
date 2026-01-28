@@ -392,36 +392,36 @@ class ImageRow(Base):
 
     def __init__(
         self,
-        name,
-        project,
-        architecture,
-        registry_id,
-        is_local=False,
-        registry=None,
-        image=None,
-        tag=None,
-        config_digest=None,
-        size_bytes=None,
-        type=None,
-        accelerators=None,
-        labels=None,
-        resources=None,
-        status=ImageStatus.ALIVE,
+        name: str,
+        project: str | None,
+        architecture: str,
+        registry_id: UUID,
+        is_local: bool = False,
+        registry: str | None = None,
+        image: str | None = None,
+        tag: str | None = None,
+        config_digest: str | None = None,
+        size_bytes: int | None = None,
+        type: ImageType | None = None,
+        accelerators: str | None = None,
+        labels: dict[str, Any] | None = None,
+        resources: dict[str, Any] | None = None,
+        status: ImageStatus = ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
-        self.registry = registry
+        self.registry = registry  # type: ignore[assignment]
         self.registry_id = registry_id
-        self.image = image
+        self.image = image  # type: ignore[assignment]
         self.tag = tag
         self.architecture = architecture
         self.is_local = is_local
-        self.config_digest = config_digest
-        self.size_bytes = size_bytes
-        self.type = type
+        self.config_digest = config_digest  # type: ignore[assignment]
+        self.size_bytes = size_bytes  # type: ignore[assignment]
+        self.type = type  # type: ignore[assignment]
         self.accelerators = accelerators
-        self.labels = labels
-        self._resources = resources
+        self.labels = labels  # type: ignore[assignment]
+        self._resources = resources  # type: ignore[assignment]
         self.status = status
 
     @property
@@ -563,7 +563,7 @@ class ImageRow(Base):
             type=image_data.type,
             accelerators=image_data.accelerators,
             labels=image_data.labels.label_data,
-            resources=image_data.resources.resources_data,
+            resources={str(k): v for k, v in image_data.resources.resources_data.items()},
             status=image_data.status,
         )
         image_row.id = image_data.id

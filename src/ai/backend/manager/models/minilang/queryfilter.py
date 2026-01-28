@@ -63,7 +63,9 @@ type WhereClauseType = sa.sql.expression.ColumnElement[bool]
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
+    def __init__(
+        self, sa_table: sa.Table | sa.sql.Join | type, fieldspec: Optional[FieldSpecType] = None
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
@@ -220,7 +222,7 @@ class QueryFilterParser:
 
     def parse_filter(
         self,
-        table,
+        table: sa.Table | sa.sql.Join | type,
         filter_expr: str,
     ) -> WhereClauseType:
         try:
@@ -239,13 +241,17 @@ class QueryFilterParser:
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.
         """
+        from typing import cast
+
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
         elif isinstance(sa_query, (sa.sql.Delete, sa.sql.Update)):
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")
-        where_clause = self.parse_filter(table, filter_expr)
+        # FromClause is compatible with our union type, cast for type checker
+        parsed_table = cast(sa.Table | sa.sql.Join | type, table)
+        where_clause = self.parse_filter(parsed_table, filter_expr)
         final_query = sa_query.where(where_clause)
         if final_query is None:
             raise DataTransformationFailed("Failed to apply filter to query")

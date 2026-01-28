@@ -9,7 +9,7 @@ import textwrap
 import traceback
 from collections.abc import Iterator, Sequence
 from types import TracebackType
-from typing import Optional, Self
+from typing import Any, Optional, Self, TextIO
 
 from click import echo, style
 from tqdm import tqdm
@@ -79,7 +79,9 @@ format_fail = functools.partial(format_pretty, status=PrintStatus.FAILED)
 format_warn = functools.partial(format_pretty, status=PrintStatus.WARNING)
 
 
-def print_pretty(msg, *, status=PrintStatus.NONE, file=None) -> None:
+def print_pretty(
+    msg: str, *, status: PrintStatus = PrintStatus.NONE, file: TextIO | None = None
+) -> None:
     if file is None:
         file = sys.stderr
     if status == PrintStatus.NONE:
@@ -182,7 +184,7 @@ def format_error(exc: Exception) -> Iterator[str]:
         yield ("*** Traceback ***\n" + "".join(traceback.format_tb(exc.__traceback__)).strip())
 
 
-def print_error(exc: Exception, *, file=None) -> None:
+def print_error(exc: Exception, *, file: TextIO | None = None) -> None:
     if file is None:
         file = sys.stderr
     indicator = style("\u2718", fg="bright_red", reset=False)
@@ -196,7 +198,14 @@ def print_error(exc: Exception, *, file=None) -> None:
     file.flush()
 
 
-def show_warning(message, category, filename, lineno, file=None, line=None) -> None:
+def show_warning(
+    message: str,
+    category: type[Warning],
+    filename: str,
+    lineno: int,
+    file: TextIO | None = None,
+    line: str | None = None,
+) -> None:
     echo(
         "{}: {}".format(
             style(str(category.__name__), fg="yellow", bold=True),
@@ -224,19 +233,19 @@ class ProgressBarWithSpinner(tqdm):
 
     @staticmethod
     def alt_format_meter(
-        n,
-        total,
-        elapsed,
-        ncols=None,
-        prefix="",
-        ascii=False,
-        unit="it",
-        unit_scale=False,
-        rate=None,
-        bar_format=None,
-        postfix=None,
-        *args,
-        **kwargs,
+        n: int | float,
+        total: int | float | None,
+        elapsed: float,
+        ncols: int | None = None,
+        prefix: str = "",
+        ascii: bool = False,
+        unit: str = "it",
+        unit_scale: bool = False,
+        rate: float | None = None,
+        bar_format: str | None = None,
+        postfix: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         # Return the prefix string only.
         return str(prefix) + str(postfix)

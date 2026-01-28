@@ -3,6 +3,8 @@ import io
 import json
 import logging
 import threading
+from queue import Queue
+from typing import Any
 
 from boto3 import Session
 from botocore.exceptions import BotoCoreError, ClientError  # pants: no-infer-dep
@@ -11,7 +13,14 @@ log = logging.getLogger()
 
 
 class PollyInprocRunner(threading.Thread):
-    def __init__(self, input_queue, output_queue, sentinel, access_key, secret_key) -> None:
+    def __init__(
+        self,
+        input_queue: Queue[str],
+        output_queue: Queue[Any],
+        sentinel: object,
+        access_key: str | None,
+        secret_key: str | None,
+    ) -> None:
         super().__init__(name="InprocRunner", daemon=True)
 
         # for interoperability with the main asyncio loop

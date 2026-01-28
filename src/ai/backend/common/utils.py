@@ -266,7 +266,7 @@ class FstabEntry:
     """
 
     def __init__(
-        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d: int = 0, p: int = 0
     ) -> None:
         self.device = device
         self.mountpoint = mountpoint
@@ -277,7 +277,7 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    def __eq__(self, o) -> bool:
+    def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)
 
     def __str__(self) -> str:
@@ -300,7 +300,16 @@ class Fstab:
         self._fp = fp
 
     def _hydrate_entry(self, line: str) -> FstabEntry:
-        return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
+        parts = [x for x in line.strip("\n").split(" ") if x not in ("", None)]
+        # Ensure we have at least 4 parts (device, mountpoint, fstype, options)
+        # and convert the last two to integers if present
+        device = parts[0] if len(parts) > 0 else ""
+        mountpoint = parts[1] if len(parts) > 1 else ""
+        fstype = parts[2] if len(parts) > 2 else ""
+        options = parts[3] if len(parts) > 3 else None
+        d = int(parts[4]) if len(parts) > 4 else 0
+        p = int(parts[5]) if len(parts) > 5 else 0
+        return FstabEntry(device, mountpoint, fstype, options, d, p)
 
     async def get_entries(self) -> AsyncIterator[FstabEntry]:
         await self._fp.seek(0)
@@ -326,7 +335,13 @@ class Fstab:
         await self._fp.truncate()
 
     async def add(
-        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+        self,
+        device: str,
+        mountpoint: str,
+        fstype: str,
+        options: str | None = None,
+        d: int = 0,
+        p: int = 0,
     ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 

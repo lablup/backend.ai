@@ -226,7 +226,9 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
         super().__init__()
         self.type_ = type_ if type_ is not None else str
 
-    def convert(self, arg, param, ctx) -> int | list[Any]:
+    def convert(
+        self, arg: str | int, param: Optional[click.Parameter], ctx: Optional[click.Context]
+    ) -> int | list[Any]:
         try:
             match arg:
                 case int():

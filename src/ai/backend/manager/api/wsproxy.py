@@ -66,7 +66,7 @@ class TCPProxy(ServiceProxy):
         "down_task",
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.down_task: Optional[asyncio.Task] = None
 

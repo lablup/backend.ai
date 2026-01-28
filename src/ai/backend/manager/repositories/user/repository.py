@@ -369,7 +369,7 @@ class UserRepository:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
 
-    async def _get_user_by_email_with_conn(self, conn, email: str) -> UserRow:
+    async def _get_user_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UserRow:
         """Private method to get user by email using connection."""
         result = await conn.execute(sa.select(users).where(users.c.email == email))
         res = result.first()
@@ -414,7 +414,7 @@ class UserRepository:
             log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
 
     async def _validate_and_update_main_access_key(
-        self, conn, email: str, main_access_key: str
+        self, conn: AsyncConnection, email: str, main_access_key: str
     ) -> None:
         """Private method to validate and update main access key."""
         session = SASession(conn)
@@ -436,7 +436,9 @@ class UserRepository:
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
 
-    async def _sync_keypair_roles(self, conn, user_uuid: UUID, new_role: UserRole) -> None:
+    async def _sync_keypair_roles(
+        self, conn: AsyncConnection, user_uuid: UUID, new_role: UserRole
+    ) -> None:
         """Private method to sync keypair roles with user role."""
         result = await conn.execute(
             sa.select(
@@ -454,6 +456,8 @@ class UserRepository:
         if new_role in [UserRole.SUPERADMIN, UserRole.ADMIN]:
             # User becomes admin - set first keypair as active admin
             kp = result.first()
+            if kp is None:
+                return
             kp_data = {}
             if not kp.is_admin:
                 kp_data["is_admin"] = True
@@ -492,7 +496,7 @@ class UserRepository:
                     kp_updates,
                 )
 
-    async def _clear_user_groups(self, conn, user_uuid: UUID) -> None:
+    async def _clear_user_groups(self, conn: AsyncConnection, user_uuid: UUID) -> None:
         """Private method to clear user's group associations."""
         await conn.execute(
             sa.delete(association_groups_users).where(
@@ -501,7 +505,7 @@ class UserRepository:
         )
 
     async def _update_user_groups(
-        self, conn, user_uuid: UUID, domain_name: str, group_ids: list[str]
+        self, conn: AsyncConnection, user_uuid: UUID, domain_name: str, group_ids: list[str]
     ) -> None:
         """Private method to update user's group associations."""
         # Clear existing groups

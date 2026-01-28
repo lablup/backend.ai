@@ -22,7 +22,6 @@ from graphene.relay.connection import (
 )
 from graphene.relay.node import Node, NodeField, is_node
 from graphene.types import Field, NonNull, ObjectType, String
-from graphene.types.objecttype import ObjectTypeMeta
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
 
@@ -37,7 +36,7 @@ def get_edge_class(
     base_name: str,
     strict_types: bool = False,
     description: str | None = None,
-) -> ObjectTypeMeta:
+) -> type[ObjectType]:
     edge_class = getattr(connection_class, "Edge", None)
 
     class EdgeBase:
@@ -116,7 +115,7 @@ class ConnectionConstructor(Protocol):
 
 
 class AsyncNodeField(NodeField):
-    def wrap_resolve(self, parent_resolver) -> functools.partial:
+    def wrap_resolve(self, parent_resolver: Callable) -> functools.partial:
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 
@@ -144,17 +143,19 @@ class AsyncNode(Node):
         return await cls.get_node_from_global_id(info, id, only_type=only_type)
 
     @staticmethod
-    def to_global_id(type_, id_) -> str:
+    def to_global_id(type_: str, id_: str) -> str:
         if id_ is None:
             raise Exception("Encoding None value as Global ID is not allowed.")
         return base64(f"{type_}:{id_}")
 
     @classmethod
-    def resolve_global_id(cls, info, global_id: str) -> tuple[str, str]:
+    def resolve_global_id(cls, info: Any, global_id: str) -> tuple[str, str]:
         return _resolve_global_id(global_id)
 
     @classmethod
-    async def get_node_from_global_id(cls, info, global_id: str, only_type=None) -> Any:
+    async def get_node_from_global_id(
+        cls, info: Any, global_id: str, only_type: type | None = None
+    ) -> Any:
         _type, _ = cls.resolve_global_id(info, global_id)
 
         graphene_type = info.schema.get_type(_type)
@@ -164,10 +165,15 @@ class AsyncNode(Node):
         graphene_type = graphene_type.graphene_type
 
         if only_type:
+            # Use hasattr to check for _meta attribute safely
+            if not hasattr(only_type, "_meta"):
+                raise ServerMisconfiguredError("GraphQL type missing _meta attribute")
             if graphene_type != only_type:
-                raise InvalidAPIParameters(f"Must receive a {only_type._meta.name} id.")
+                only_type_name = getattr(getattr(only_type, "_meta", None), "name", str(only_type))
+                raise InvalidAPIParameters(f"Must receive a {only_type_name} id.")
 
-        if cls not in graphene_type._meta.interfaces:
+        _meta = getattr(graphene_type, "_meta", None)
+        if _meta is None or cls not in _meta.interfaces:
             raise Exception(f'ObjectType "{_type}" does not implement the "{cls}" interface.')
 
         get_node = getattr(graphene_type, "get_node", None)
@@ -302,7 +308,7 @@ class AsyncListConnectionField(IterableConnectionField):
     @classmethod
     def resolve_connection(
         cls,
-        connection_type: ConnectionConstructor,
+        connection_type: Any,
         args: dict[str, Any] | None,
         resolver_result: ConnectionResolverResult,
     ) -> Connection:
@@ -325,7 +331,7 @@ class AsyncListConnectionField(IterableConnectionField):
             resolved = resolved[:page_size]
         if pagination_order == ConnectionPaginationOrder.BACKWARD:
             resolved = resolved[::-1]
-        edge_type = connection_type.Edge
+        edge_type = connection_type.Edge  # type: ignore[attr-defined]
         edges = [
             edge_type(
                 node=value,
@@ -333,7 +339,7 @@ class AsyncListConnectionField(IterableConnectionField):
             )
             for value in resolved
         ]
-        return connection_type(
+        return connection_type(  # type: ignore[operator]
             edges=edges,
             page_info=PageInfo(
                 start_cursor=edges[0].cursor if edges else None,
@@ -356,10 +362,10 @@ class AsyncListConnectionField(IterableConnectionField):
     async def connection_resolver(
         cls,
         resolver: Resolver,
-        connection_type: ConnectionConstructor,
-        root,
-        info,
-        **args,
+        connection_type: Any,
+        root: Any,
+        info: graphene.ResolveInfo,
+        **args: Any,
     ) -> Connection:
         _result = resolver(root, info, **args)
         match _result:
@@ -405,7 +411,9 @@ class GlobalIDField(graphene.Scalar):
         return val
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None) -> ResolvedGlobalID | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ResolvedGlobalID | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return _from_str(node.value)
         return None

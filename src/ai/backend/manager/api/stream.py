@@ -15,7 +15,7 @@ import secrets
 import uuid
 import weakref
 from collections import defaultdict
-from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, MutableMapping
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -69,7 +69,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @server_status_required(READ_ALLOWED)
 @auth_required
 @adefer
-async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
+async def stream_pty(
+    defer: Callable[[Callable[[], None]], None], request: web.Request
+) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["stream.context"]
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
@@ -276,7 +278,9 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @adefer
-async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
+async def stream_execute(
+    defer: Callable[[Callable[[], None]], None], request: web.Request
+) -> web.StreamResponse:
     """
     WebSocket-version of gateway.kernel.execute().
     """
@@ -423,7 +427,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
 )
 @adefer
 async def stream_proxy(
-    defer, request: web.Request, params: Mapping[str, Any]
+    defer: Callable[[Callable[[], None]], None], request: web.Request, params: Mapping[str, Any]
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["stream.context"]

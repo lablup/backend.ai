@@ -21,7 +21,7 @@ from .logging import BraceStyleAdapter
 from .utils import safe_close_task
 
 if TYPE_CHECKING:
-    from asyncio import Task
+    from asyncio import AbstractEventLoop, Task
 
 log = BraceStyleAdapter(logging.getLogger())
 
@@ -31,7 +31,15 @@ class Terminal:
     A wrapper for a terminal-based app.
     """
 
-    def __init__(self, shell_cmd, ev_term, sock_out, *, auto_restart=True, loop=None) -> None:
+    def __init__(
+        self,
+        shell_cmd: list[str],
+        ev_term: asyncio.Event,
+        sock_out: zmq.asyncio.Socket,
+        *,
+        auto_restart: bool = True,
+        loop: AbstractEventLoop | None = None,
+    ) -> None:
         self._sorna_media: list = []
         self.zctx = sock_out.context
 
@@ -65,11 +73,11 @@ class Terminal:
         parser_resize.add_argument("cols", type=int)
         parser_resize.set_defaults(func=self.do_resize_term)
 
-    async def do_ping(self, args) -> int:
+    async def do_ping(self, args: argparse.Namespace) -> int:
         await self.sock_out.send_multipart([b"stdout", b"pong!"])
         return 0
 
-    async def do_resize_term(self, args) -> int:
+    async def do_resize_term(self, args: argparse.Namespace) -> int:
         if self.fd is None:
             return 0
         origsz_in = struct.pack("HHHH", 0, 0, 0, 0)
@@ -84,7 +92,7 @@ class Terminal:
         ])
         return 0
 
-    async def handle_command(self, code_txt) -> int:
+    async def handle_command(self, code_txt: str) -> int:
         try:
             if code_txt.startswith("%"):
                 args = self.cmdparser.parse_args(shlex.split(code_txt[1:], comments=True))
@@ -108,7 +116,9 @@ class Terminal:
         await safe_close_task(self.term_out_task)
         pid, fd = pty.fork()
         if pid == 0:
-            args = shlex.split(self.shell_cmd)
+            args = (
+                shlex.split(self.shell_cmd) if isinstance(self.shell_cmd, str) else self.shell_cmd
+            )
             os.execv(args[0], args)
         else:
             self.pid = pid
@@ -156,7 +166,7 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error during restart of terminal")
 
-    async def term_in(self, term_writer) -> None:
+    async def term_in(self, term_writer: asyncio.StreamWriter) -> None:
         try:
             if self.sock_term_in is None:
                 raise RuntimeError("Terminal input socket is not initialized")
@@ -175,7 +185,7 @@ class Terminal:
         except Exception:
             log.exception("Unexpected error at term_in()")
 
-    async def term_out(self, term_reader) -> None:
+    async def term_out(self, term_reader: asyncio.StreamReader) -> None:
         try:
             if self.sock_term_out is None:
                 raise RuntimeError("Terminal output socket is not initialized")

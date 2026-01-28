@@ -10,6 +10,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
+from textual.events import Mount
 from textual.validation import ValidationResult, Validator
 from textual.widget import Widget
 from textual.widgets import (
@@ -176,7 +177,7 @@ class InputDialog(Static):
             if self._allow_cancel:
                 yield Button("Cancel", id="button-cancel")
 
-    def on_mount(self, _) -> None:
+    def on_mount(self, _: Mount) -> None:
         self._override_focus()
         self.query_one(Input).focus()
 

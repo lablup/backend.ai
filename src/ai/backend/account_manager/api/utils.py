@@ -18,7 +18,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
+    async def wrapped(request: web.Request, *args, **kwargs) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -28,15 +28,15 @@ def auth_required(handler: Handler) -> Handler:
     return wrapped
 
 
-def set_handler_attr(func, key, value) -> None:
+def set_handler_attr(func: Callable, key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    func._backend_attrs = attrs
+    func._backend_attrs = attrs  # type: ignore[attr-defined]
 
 
-def get_handler_attr(request, key, default=None) -> Any:
+def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -116,7 +116,7 @@ def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
 
 def pydantic_api_response_handler(
     handler: THandlerFuncWithoutParam,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -141,7 +141,7 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Callable[[THandlerFuncWithParam], Handler]:
     def wrap(
         handler: THandlerFuncWithParam,

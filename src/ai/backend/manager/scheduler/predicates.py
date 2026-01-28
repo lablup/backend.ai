@@ -6,7 +6,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -151,8 +151,11 @@ async def check_keypair_resource_limit(
     total_keypair_allowed = ResourceSlot.from_policy(
         resource_policy_map, sched_ctx.known_slot_types
     )
+
+    if sess_ctx.access_key is None:
+        return PredicateResult(False, "Session has no access key")
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        sess_ctx.access_key, db_sess=db_sess
+        AccessKey(sess_ctx.access_key), db_sess=db_sess
     )
     log.debug("keypair:{} current-occupancy: {}", sess_ctx.access_key, key_occupied)
     log.debug("keypair:{} total-allowed: {}", sess_ctx.access_key, total_keypair_allowed)

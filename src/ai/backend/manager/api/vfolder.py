@@ -142,6 +142,7 @@ from ai.backend.manager.types import OptionalState
 
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+from .types import CORSOptions
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
@@ -1721,8 +1722,10 @@ async def _delete(
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Get connection from session
+        conn = await db_session.connection()
         await ensure_host_permission_allowed(
-            db_session.bind,
+            conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
@@ -2814,7 +2817,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

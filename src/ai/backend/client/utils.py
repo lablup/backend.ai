@@ -3,6 +3,7 @@ import io
 import os
 import textwrap
 import uuid
+from typing import Any
 
 from ai.backend.client.output.types import FieldSet, FieldSpec
 
@@ -61,7 +62,7 @@ def flatten_connections_in_data(data: dict) -> dict:
 
 
 class ProgressReportingReader(io.BufferedReader):
-    def __init__(self, file_path, *, tqdm_instance=None) -> None:
+    def __init__(self, file_path: str, *, tqdm_instance: Any = None) -> None:
         super().__init__(open(file_path, "rb"))
         self._filename = os.path.basename(file_path)
         if tqdm_instance is None:
@@ -80,7 +81,12 @@ class ProgressReportingReader(io.BufferedReader):
     def __enter__(self) -> "ProgressReportingReader":
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: Any,
+    ) -> None:
         if self._owns_tqdm:
             self.tqdm.close()
         self.close()

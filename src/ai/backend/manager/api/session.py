@@ -336,20 +336,20 @@ overwritten_param_check = t.Dict({
 }).allow_extra("*")
 
 
-def sub(d, old, new) -> dict:
+def sub(d: dict[Any, Any], old: Any, new: Any) -> dict[Any, Any]:
     for k, v in d.items():
         if isinstance(v, (Mapping, dict)):
-            d[k] = sub(v, old, new)
+            d[k] = sub(dict(v), old, new)
         elif d[k] == old:
             d[k] = new
     return d
 
 
-def drop_undefined(d) -> dict:
-    newd = {}
+def drop_undefined(d: dict[Any, Any]) -> dict[Any, Any]:
+    newd: dict[Any, Any] = {}
     for k, v in d.items():
         if isinstance(v, (Mapping, dict)):
-            newval = drop_undefined(v)
+            newval = drop_undefined(dict(v))
             if len(newval.keys()) > 0:  # exclude empty dict always
                 newd[k] = newval
         elif not isinstance(v, Undefined):

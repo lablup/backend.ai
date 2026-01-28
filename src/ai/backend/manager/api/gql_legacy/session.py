@@ -339,7 +339,7 @@ class ComputeSessionNode(graphene.ObjectType):
         *,
         permissions: Optional[Iterable[ComputeSessionPermission]] = None,
     ) -> Self:
-        status_history = row.status_history or {}
+        status_history: dict[str, Any] = dict(row.status_history) if row.status_history else {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         result = cls(
             # identity
@@ -451,7 +451,7 @@ class ComputeSessionNode(graphene.ObjectType):
         return result
 
     async def __resolve_reference(
-        self, info: graphene.ResolveInfo, **kwargs
+        self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> Optional[ComputeSessionNode]:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
@@ -840,7 +840,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        **input,
+        **input: Any,
     ) -> ModifyComputeSession:
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
@@ -897,7 +897,7 @@ class CheckAndTransitStatus(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         input: CheckAndTransitStatusInput,
     ) -> CheckAndTransitStatus:

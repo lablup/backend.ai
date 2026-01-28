@@ -194,7 +194,7 @@ def set_(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.set_quota_scope(
+            _ = session.QuotaScope.set_quota_scope(
                 host=host,
                 qsid=qsid,
                 config=QuotaConfig(limit_bytes=limit_bytes),
@@ -251,7 +251,7 @@ def unset(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.unset_quota_scope(
+            _ = session.QuotaScope.unset_quota_scope(
                 host=host,
                 qsid=qsid,
             )

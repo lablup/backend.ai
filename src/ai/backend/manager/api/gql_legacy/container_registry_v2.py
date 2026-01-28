@@ -77,7 +77,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         props: CreateContainerRegistryNodeInputV2,
     ) -> CreateContainerRegistryNodeV2:
@@ -193,7 +193,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyContainerRegistryNodeInputV2,
@@ -228,7 +228,7 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> DeleteContainerRegistryNodeV2:

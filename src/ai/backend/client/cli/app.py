@@ -3,7 +3,7 @@ import json
 import shlex
 import sys
 from collections.abc import MutableMapping, Sequence
-from typing import Optional
+from typing import Any, Optional
 
 import aiohttp
 import click
@@ -293,7 +293,7 @@ class ProxyRunnerContext:
     metavar='"ENVNAME=envvalue"',
     help="Add additional environment variable when starting service.",
 )
-def app(session_name, app, bind, arg, env) -> None:
+def app(session_name: str, app: str, bind: str, arg: tuple[str, ...], env: tuple[str, ...]) -> None:
     """
     Run a local proxy to a service provided by Backend.AI compute sessions.
 
@@ -331,7 +331,7 @@ def app(session_name, app, bind, arg, env) -> None:
 @click.argument("session_name", type=str, metavar="SESSION_ID", nargs=1)
 @click.argument("app_name", type=str, metavar="APP", nargs=-1)
 @click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
-def apps(session_name, app_name, list_names) -> None:
+def apps(session_name: str, app_name: tuple[str, ...], list_names: bool) -> None:
     """
     List available additional arguments and environment variables when starting service.
 
@@ -342,7 +342,7 @@ def apps(session_name, app_name, list_names) -> None:
     """
 
     async def print_arguments() -> None:
-        apps = []
+        apps: list[dict[str, Any]] = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()

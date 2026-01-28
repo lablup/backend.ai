@@ -236,7 +236,7 @@ class GroupNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, group_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
@@ -559,7 +559,7 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
-        def value_or_none(value) -> Any:
+        def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         type_val = None if self.type is Undefined else ProjectType[self.type]
@@ -673,7 +673,7 @@ class CreateGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: GroupInput,
@@ -711,7 +711,7 @@ class ModifyGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
         props: ModifyGroupInput,
@@ -745,7 +745,7 @@ class DeleteGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
         await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
         return cls(ok=True, msg="success")
@@ -773,7 +773,7 @@ class PurgeGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))

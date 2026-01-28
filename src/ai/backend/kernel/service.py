@@ -84,7 +84,7 @@ class ServiceParser:
             except TypeError as e:
                 raise InvalidServiceDefinition(e.args[0][11:]) from e  # lstrip "__init__() "
 
-    def add_model_service(self, name, model_service_info) -> None:
+    def add_model_service(self, name: str, model_service_info: dict[str, Any]) -> None:
         service_def = ServiceDefinition(
             model_service_info["start_command"],
             shell=model_service_info["shell"],

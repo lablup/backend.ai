@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .func.session import ComputeSession
+    from .session import BaseSession
 
 
 naming_profile = {
@@ -36,7 +37,7 @@ def get_id_or_name(api_version: tuple[int, str], obj: ComputeSession) -> str:
 
 
 def apply_version_aware_fields(
-    api_session,
+    api_session: BaseSession,
     fields: Sequence[tuple[str, Callable | str]],
 ) -> Sequence[tuple[str, str]]:
     version_aware_fields = []

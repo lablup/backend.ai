@@ -701,7 +701,7 @@ class CreateScalingGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: CreateScalingGroupInput,
@@ -758,7 +758,7 @@ class ModifyScalingGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: ModifyScalingGroupInput,
@@ -782,7 +782,7 @@ class DeleteScalingGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteScalingGroup:
@@ -808,7 +808,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         domain: str,
@@ -845,7 +845,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         domain: str,
@@ -881,7 +881,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         domain: str,
@@ -916,7 +916,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         domain: str,
@@ -948,7 +948,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         domain: str,
     ) -> DisassociateAllScalingGroupsWithDomain:
@@ -979,7 +979,7 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         user_group: uuid.UUID,
@@ -1016,7 +1016,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         user_group: uuid.UUID,
@@ -1052,7 +1052,7 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         user_group: uuid.UUID,
@@ -1087,7 +1087,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         user_group: uuid.UUID,
@@ -1119,7 +1119,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
@@ -1150,7 +1150,7 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         access_key: str,
@@ -1187,7 +1187,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         access_key: str,
@@ -1223,7 +1223,7 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_group: str,
         access_key: str,
@@ -1258,7 +1258,7 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scaling_groups: Sequence[str],
         access_key: str,

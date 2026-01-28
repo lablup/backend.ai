@@ -121,8 +121,8 @@ class NetworkRow(Base):
         cls,
         session: AsyncSession,
         network_id: uuid.UUID,
-        load_project=False,
-        load_domain=False,
+        load_project: bool = False,
+        load_domain: bool = False,
     ) -> NetworkRow:
         query = sa.select(NetworkRow).filter(NetworkRow.id == network_id)
         if load_project:

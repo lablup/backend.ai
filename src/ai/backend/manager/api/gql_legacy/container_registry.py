@@ -335,7 +335,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         url: str,
         type: ContainerRegistryType,
@@ -345,7 +345,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        extra: dict[str, Any] | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
         validator = ContainerRegistryValidator(
@@ -417,7 +417,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         url: str | UndefinedType = Undefined,
@@ -428,7 +428,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        extra: dict[str, Any] | UndefinedType = Undefined,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -483,7 +483,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> DeleteContainerRegistryNode:
@@ -520,7 +520,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         quota: int | float,
@@ -560,7 +560,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         quota: int | float,
@@ -599,7 +599,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
@@ -732,7 +732,11 @@ class CreateContainerRegistry(graphene.Mutation):
 
     @classmethod
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+        cls,
+        root: Any,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        props: CreateContainerRegistryInput,
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
 
@@ -776,7 +780,7 @@ class ModifyContainerRegistry(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
         props: ModifyContainerRegistryInput,
@@ -827,7 +831,7 @@ class DeleteContainerRegistry(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
     ) -> DeleteContainerRegistry:

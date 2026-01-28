@@ -7,8 +7,11 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -136,6 +139,7 @@ from ai.backend.manager.sokovan.data import (
     SessionWithKernels,
     UserResourcePolicy,
 )
+from ai.backend.manager.types import UserScope
 
 from .types import KeypairConcurrencyData, SessionRowCache
 
@@ -1171,7 +1175,7 @@ class ScheduleDBSource:
         self,
         spec: SessionCreationSpec,
         scaling_group_name: str,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
     ) -> SessionCreationContext:
         """
@@ -1362,9 +1366,9 @@ class ScheduleDBSource:
     async def _fetch_vfolder_mounts(
         self,
         db_sess: SASession,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
-        user_scope,
+        user_scope: UserScope,
         resource_policy: dict[str, Any],
         combined_mounts: list[str],
         combined_mount_map: dict[str | UUID, str],
@@ -1391,7 +1395,7 @@ class ScheduleDBSource:
     async def _fetch_dotfiles(
         self,
         db_sess: SASession,
-        user_scope,
+        user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list,
     ) -> dict[str, Any]:
@@ -1430,9 +1434,9 @@ class ScheduleDBSource:
 
     async def prepare_vfolder_mounts(
         self,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
-        user_scope,
+        user_scope: UserScope,
         resource_policy: dict[str, Any],
         combined_mounts: list[str],
         combined_mount_map: dict[str | UUID, str],
@@ -1456,7 +1460,7 @@ class ScheduleDBSource:
 
     async def prepare_dotfiles(
         self,
-        user_scope,
+        user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list,
     ) -> dict[str, Any]:

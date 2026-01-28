@@ -289,7 +289,7 @@ class AgentNode(graphene.ObjectType):
                 cnt_query = cnt_query.where(cond)
             else:
 
-                async def all_permissions(row) -> frozenset[AgentPermission]:
+                async def all_permissions(row: AgentRow) -> frozenset[AgentPermission]:
                     return ADMIN_PERMISSIONS
 
                 permission_getter = all_permissions  # type: ignore[assignment]
@@ -868,7 +868,7 @@ class ModifyAgent(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyAgentInput,
@@ -906,7 +906,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:

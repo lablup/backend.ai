@@ -28,8 +28,8 @@ __all__ = (
 )
 
 
-def parse_version(expr) -> tuple:
-    result = []
+def parse_version(expr: str) -> tuple[int | str, ...]:
+    result: list[int | str] = []
     for part in expr.split("."):
         try:
             result.append(int(part))

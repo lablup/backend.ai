@@ -27,7 +27,7 @@ class ScopeField(graphene.Scalar):
         return val.serialize()
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None) -> Optional[ScopeType]:
+    def parse_literal(node: Any, _variables: dict | None = None) -> Optional[ScopeType]:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return deserialize_scope(node.value)
         return None

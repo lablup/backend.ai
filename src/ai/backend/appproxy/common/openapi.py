@@ -28,7 +28,7 @@ def get_path_parameters(resource: AbstractResource) -> list[dict]:
 
 
 def generate_openapi(
-    component: str, subapps: list[web.Application], verbose=False
+    component: str, subapps: list[web.Application], verbose: bool = False
 ) -> dict[str, Any]:
     openapi: dict[str, Any] = {
         "openapi": "3.1.0",

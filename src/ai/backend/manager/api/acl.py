@@ -11,6 +11,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .auth import auth_required
 from .gql_legacy.acl import get_all_permissions
 from .manager import ALL_ALLOWED, server_status_required
+from .types import CORSOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -32,7 +33,7 @@ async def shutdown(app: web.Application) -> None:
     pass
 
 
-def create_app(default_cors_options) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
     app = web.Application()
     app["prefix"] = "acl"
     app["api_versions"] = (4,)

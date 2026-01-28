@@ -327,7 +327,7 @@ class DomainNode(graphene.ObjectType):
                 )
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> DomainNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> DomainNode:
         domain_node = await DomainNode.get_node(info, self.id)
         if domain_node is None:
             raise DomainNotFound(f"Domain not found: {self.id}")
@@ -377,7 +377,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
     def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
-        def value_or_none(value) -> Any:
+        def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
@@ -642,7 +642,7 @@ class DomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
-        def value_or_none(value) -> Any:
+        def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         return CreateDomainAction(
@@ -721,7 +721,7 @@ class CreateDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: DomainInput,
@@ -757,7 +757,7 @@ class ModifyDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: ModifyDomainInput,
@@ -793,7 +793,7 @@ class DeleteDomain(graphene.Mutation):
     msg = graphene.String()
 
     @classmethod
-    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
@@ -824,7 +824,7 @@ class PurgeDomain(graphene.Mutation):
     msg = graphene.String()
 
     @classmethod
-    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(

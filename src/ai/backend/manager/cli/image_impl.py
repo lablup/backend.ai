@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from pprint import pformat, pprint
 from typing import Any, Optional
 
@@ -23,7 +24,7 @@ from .context import CLIContext, redis_ctx
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def list_images(cli_ctx: CLIContext, short, installed_only) -> None:
+async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -75,7 +76,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture) -> None:
+async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -96,9 +97,10 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture) -
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
+async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.bootstrap_config.db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -146,10 +148,10 @@ async def purge_image(
 
 async def set_image_resource_limit(
     cli_ctx: CLIContext,
-    canonical_or_alias,
-    slot_type,
-    range_value,
-    architecture,
+    canonical_or_alias: str,
+    slot_type: str,
+    range_value: tuple[Decimal | None, Decimal | None],
+    architecture: str,
 ) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -188,7 +190,7 @@ async def rescan_images(
             log.exception(f"Unknown error occurred. Error: {e}")
 
 
-async def alias(cli_ctx: CLIContext, alias, target, architecture) -> None:
+async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -208,7 +210,7 @@ async def alias(cli_ctx: CLIContext, alias, target, architecture) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def dealias(cli_ctx: CLIContext, alias) -> None:
+async def dealias(cli_ctx: CLIContext, alias: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,

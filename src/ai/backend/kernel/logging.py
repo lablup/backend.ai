@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class RelativeCreatedFormatter(logging.Formatter):
-    def format(self, record) -> str:
+    def format(self, record: logging.LogRecord) -> str:
         record.relative_seconds = record.relativeCreated / 1000
         return super().format(record)
 
@@ -19,7 +19,7 @@ class RelativeCreatedFormatter(logging.Formatter):
 class BraceMessage:
     __slots__ = ("args", "fmt")
 
-    def __init__(self, fmt, args) -> None:
+    def __init__(self, fmt: str, args: tuple) -> None:
         self.fmt = fmt
         self.args = args
 
@@ -28,7 +28,7 @@ class BraceMessage:
 
 
 class BraceStyleAdapter(logging.LoggerAdapter):
-    def log(self, level, msg, *args, **kwargs) -> None:
+    def log(self, level: int, msg: object, *args: object, **kwargs: object) -> None:  # type: ignore[override]
         if self.isEnabledFor(level):
             _msg, _kwargs = self.process(msg, kwargs)
             self.logger._log(level, BraceMessage(_msg, args), (), **_kwargs)

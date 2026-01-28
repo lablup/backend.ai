@@ -291,8 +291,8 @@ async def _make_message_queue(
     node_id: str,
     redis_config: RedisConfig,
     *,
-    anycast_stream_key=APPPROXY_ANYCAST_STREAM_KEY,
-    broadcast_channel=APPPROXY_BROADCAST_CHANNEL,
+    anycast_stream_key: str = APPPROXY_ANYCAST_STREAM_KEY,
+    broadcast_channel: str = APPPROXY_BROADCAST_CHANNEL,
     use_experimental_redis_event_dispatcher: bool = False,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config.to_dict())
@@ -1154,7 +1154,7 @@ async def server_main_logwrapper(
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
+def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-coordinator service as a foreground process.
     """

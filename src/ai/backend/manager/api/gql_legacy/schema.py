@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
@@ -1757,7 +1757,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         is_installed: bool | None = None,
-        is_operation=False,
+        is_operation: bool = False,
         filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
@@ -2289,12 +2289,14 @@ class Query(graphene.ObjectType):
     async def resolve_scaling_groups_for_user_group(
         root: Any,
         info: graphene.ResolveInfo,
-        user_group,
+        user_group: str,
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
+        from uuid import UUID
+
         return await ScalingGroup.load_by_group(
             info.context,
-            user_group,
+            UUID(user_group),
             is_active=is_active,
         )
 
@@ -3294,7 +3296,9 @@ class Query(graphene.ObjectType):
 
 
 class GQLMutationPrivilegeCheckMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
             mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)
@@ -3311,7 +3315,9 @@ class GQLMutationPrivilegeCheckMiddleware:
 
 
 class GQLExceptionMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         try:
             res = next(root, info, **args)
         except BackendAIError as e:
@@ -3337,7 +3343,9 @@ class GQLExceptionMiddleware:
 
 
 class GQLMetricMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         operation_type = info.operation.operation
         field_name = info.field_name

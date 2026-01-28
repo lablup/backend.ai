@@ -39,15 +39,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _danger_words = ["password", "passwd", "secret"]
 
 
-def set_handler_attr(func, key, value) -> None:
+def set_handler_attr(func: Callable[..., Any], key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    func._backend_attrs = attrs
+    func._backend_attrs = attrs  # type: ignore[attr-defined]
 
 
-def get_handler_attr(request, key, default=None) -> Any:
+def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -175,7 +175,7 @@ def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
 
 def pydantic_api_response_handler(
     handler: THandlerFuncWithoutParam,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -200,7 +200,7 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Callable[[THandlerFuncWithParam], Handler]:
     def wrap(
         handler: THandlerFuncWithParam,
@@ -280,7 +280,7 @@ def config_key_to_kebab_case(o: Any) -> Any:
             return o
 
 
-def mime_match(base_array: str, compare: str, strict=False) -> bool:
+def mime_match(base_array: str, compare: str, strict: bool = False) -> bool:
     """
     Checks if `base_array` MIME string contains `compare` MIME type.
 
@@ -307,7 +307,7 @@ class BackendAIAccessLogger(AccessLogger):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def log(self, request, response, time) -> None:
+    def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:
         if request.get("do_not_print_access_log"):
             return
 

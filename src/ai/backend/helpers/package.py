@@ -11,7 +11,7 @@ Package = namedtuple("Package", "name version is_user")
 __all__ = ("install",)
 
 
-def install(pkgname, force_install=False) -> None:
+def install(pkgname: str, force_install: bool = False) -> None:
     """
     Install a Python package from pypi.org or the given index server.
     The package is installed inside the user site directory.

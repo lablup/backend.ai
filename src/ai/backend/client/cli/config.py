@@ -162,7 +162,7 @@ def logout() -> None:
 
     with Session() as session:
         try:
-            session.Auth.logout()
+            _ = session.Auth.logout()
             print_done("Logout done.")
             try:
                 (local_state_path / "cookie.dat").unlink()
@@ -177,7 +177,7 @@ def logout() -> None:
 @click.argument("old_password", metavar="OLD_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
 @click.argument("new_password2", metavar="NEW_PASSWORD2")
-def update_password(old_password, new_password, new_password2) -> None:
+def update_password(old_password: str, new_password: str, new_password2: str) -> None:
     """
     Update user's password.
     """
@@ -188,7 +188,7 @@ def update_password(old_password, new_password, new_password2) -> None:
 
     with Session() as session:
         try:
-            session.Auth.update_password(old_password, new_password, new_password2)
+            _ = session.Auth.update_password(old_password, new_password, new_password2)
             print_done("Password updated.")
         except Exception as e:
             print_error(e)
@@ -199,7 +199,9 @@ def update_password(old_password, new_password, new_password2) -> None:
 @click.argument("user_id", metavar="USER_ID")
 @click.argument("current_password", metavar="CURRENT_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
-def update_password_no_auth(domain, user_id, current_password, new_password) -> None:
+def update_password_no_auth(
+    domain: str, user_id: str, current_password: str, new_password: str
+) -> None:
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """
@@ -207,11 +209,11 @@ def update_password_no_auth(domain, user_id, current_password, new_password) -> 
         try:
             config = get_config()
             if config.endpoint_type == "session":
-                session.Auth.update_password_no_auth_in_session(
+                _ = session.Auth.update_password_no_auth_in_session(
                     user_id, current_password, new_password
                 )
             else:
-                session.Auth.update_password_no_auth(
+                _ = session.Auth.update_password_no_auth(
                     domain, user_id, current_password, new_password
                 )
             print_done("Password updated.")

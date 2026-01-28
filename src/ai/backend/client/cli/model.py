@@ -32,7 +32,9 @@ def model() -> None:
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List the models.
     """
@@ -58,7 +60,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
 @model.command()
 @pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def info(ctx: CLIContext, model_name) -> None:
+def info(ctx: CLIContext, model_name: str) -> None:
     """
     Display the detail of a model with its backing storage vfolder.
 
@@ -141,7 +143,16 @@ def info(ctx: CLIContext, model_name) -> None:
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(ctx: CLIContext, name, host, group, host_path, permission, quota, cloneable) -> None:
+def create(
+    ctx: CLIContext,
+    name: str,
+    host: str,
+    group: str | None,
+    host_path: bool,
+    permission: str,
+    quota: str,
+    cloneable: bool,
+) -> None:
     """
     Create a new model with the given configuration.
 
@@ -180,7 +191,7 @@ def create(ctx: CLIContext, name, host, group, host_path, permission, quota, clo
 @model.command()
 @pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def rm(ctx: CLIContext, model_name) -> None:
+def rm(ctx: CLIContext, model_name: str) -> None:
     """
     Remove the given model.
 
@@ -191,7 +202,7 @@ def rm(ctx: CLIContext, model_name) -> None:
     with Session() as session:
         try:
             serving = session.Model(model_name)
-            serving.delete()
+            _ = serving.delete()
             print_done("Model deleted.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -236,12 +247,12 @@ def rm(ctx: CLIContext, model_name) -> None:
 )
 def upload(
     ctx: CLIContext,
-    model_name,
-    filenames,
-    model_version,
-    base_dir,
-    chunk_size,
-    override_storage_proxy,
+    model_name: str,
+    filenames: tuple[Path, ...],
+    model_version: str,
+    base_dir: Path | None,
+    chunk_size: int,
+    override_storage_proxy: dict[str, str] | None,
 ) -> None:
     """
     Upload a file to the model as the given version.
@@ -253,7 +264,7 @@ def upload(
     """
     with Session() as session:
         try:
-            session.VFolder(model_name).upload(
+            _ = session.VFolder(model_name).upload(
                 filenames,
                 dst_dir=Path("versions", model_version),
                 basedir=base_dir,
@@ -313,13 +324,13 @@ def upload(
 )
 def download(
     ctx: CLIContext,
-    model_name,
-    filenames,
-    model_version,
-    base_dir,
-    chunk_size,
-    override_storage_proxy,
-    max_retries,
+    model_name: str,
+    filenames: tuple[Path, ...],
+    model_version: str,
+    base_dir: Path | None,
+    chunk_size: int,
+    override_storage_proxy: dict[str, str] | None,
+    max_retries: int,
 ) -> None:
     """
     Download a file from the model storage.
@@ -332,7 +343,7 @@ def download(
     """
     with Session() as session:
         try:
-            session.VFolder(model_name).download(
+            _ = session.VFolder(model_name).download(
                 filenames,
                 dst_dir=Path("versions", model_version),
                 basedir=base_dir,

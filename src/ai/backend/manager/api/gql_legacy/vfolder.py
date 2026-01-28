@@ -439,7 +439,9 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> VirtualFolderNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> VirtualFolderNode:
         vfolder_node = await VirtualFolderNode.get_node(info, self.id)
         if vfolder_node is None:
             raise VFolderNotFound(f"Virtual folder not found: {self.id}")
@@ -1516,7 +1518,7 @@ class SetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
@@ -1565,7 +1567,7 @@ class UnsetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,

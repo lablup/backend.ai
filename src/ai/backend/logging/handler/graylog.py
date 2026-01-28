@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import socket
 import ssl
+from typing import Any
 
 import graypy
 
@@ -12,7 +13,16 @@ from ai.backend.logging.config import LoggingConfig
 class GELFTLSHandler(graypy.GELFTLSHandler):
     ssl_ctx: ssl.SSLContext
 
-    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 12204,
+        validate: bool = False,
+        ca_certs: str | None = None,
+        certfile: str | None = None,
+        keyfile: str | None = None,
+        **kwargs,
+    ) -> None:
         """Initialize the GELFTLSHandler
 
         :param host: GELF TLS input host.
@@ -56,7 +66,7 @@ def setup_graylog_handler(config: LoggingConfig) -> logging.Handler:
     drv_config = config.graylog
     if drv_config is None:
         raise RuntimeError("Graylog configuration is required but not provided")
-    graylog_params = {
+    graylog_params: dict[str, Any] = {
         "host": drv_config.host,
         "port": drv_config.port,
         "validate": drv_config.ssl_verify,

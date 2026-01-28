@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+from collections.abc import Callable
 from typing import Any, Optional
 
 import click
@@ -85,7 +86,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f) -> click.Command:
+        def _decorator(f: Callable) -> click.Command:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -104,7 +105,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f) -> click.Group:
+        def _decorator(f: Callable) -> click.Group:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -114,7 +115,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def get_command(self, ctx, cmd_name) -> Optional[click.Command]:
+    def get_command(self, ctx: click.Context, cmd_name: str) -> Optional[click.Command]:
         if cmd_name in self._aliases:
             cmd_name = self._aliases[cmd_name]
         command = super().get_command(ctx, cmd_name)
@@ -122,7 +123,7 @@ class AliasGroupMixin(click.Group):
             return command
         return None
 
-    def format_commands(self, ctx, formatter) -> None:
+    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         commands = []
         for subcommand in self.list_commands(ctx):
             cmd = self.get_command(ctx, subcommand)

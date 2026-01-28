@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 import uuid
-from typing import Optional, cast
+from typing import TYPE_CHECKING, Optional, cast
+
+if TYPE_CHECKING:
+    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -369,7 +374,7 @@ class SessionRepository:
         self,
         image_canonical: str,
         registry_project: str,
-        reporter=None,
+        reporter: Optional[ProgressReporter] = None,
     ) -> RescanImagesResult:
         return await rescan_images(
             self._db,

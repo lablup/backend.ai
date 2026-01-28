@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from ai.backend.kernel import BaseRunner
 
@@ -53,7 +55,7 @@ class Runner(BaseRunner):
         log.error('cannot find the main script ("main.py").')
         return 127
 
-    async def start_service(self, service_info) -> tuple[list, dict] | None:
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[list, dict] | None:
         if service_info["name"] in ["jupyter", "jupyterlab"]:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", suffix=".py", delete=False

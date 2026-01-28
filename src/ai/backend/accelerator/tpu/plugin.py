@@ -17,6 +17,7 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
 )
 from ai.backend.agent.stats import ContainerMeasurement, NodeMeasurement, StatContext
+from ai.backend.agent.types import Container
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
@@ -194,7 +195,9 @@ class TPUPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
-    async def restore_from_container(self, container, alloc_map) -> None:
+    async def restore_from_container(
+        self, container: Container, alloc_map: AbstractAllocMap
+    ) -> None:
         # TODO: implement!
         pass
 

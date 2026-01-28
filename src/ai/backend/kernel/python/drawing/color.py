@@ -8,7 +8,7 @@ rgba = struct.Struct("BBBB")
 
 
 class Color:
-    def __init__(self, red, green, blue, alpha=255) -> None:
+    def __init__(self, red: int, green: int, blue: int, alpha: int = 255) -> None:
         self.red = red
         self.green = green
         self.blue = blue
@@ -32,7 +32,7 @@ class Color:
         r, g, b, a = rgba.unpack(value)
         return Color(r, g, b, a)
 
-    def to_hex(self, include_alpha=True) -> str:
+    def to_hex(self, include_alpha: bool = True) -> str:
         if include_alpha:
             return f"#{self.red:02x}{self.green:02x}{self.blue:02x}{self.alpha:02x}"
         return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"

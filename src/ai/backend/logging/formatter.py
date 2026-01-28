@@ -17,7 +17,10 @@ type _SysExcInfoType = (
 )
 
 
-def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
+def format_exception(
+    self: logging.Formatter,
+    ei: Sequence[str] | _SysExcInfoType,
+) -> str:
     match ei:
         case (str(), *_):
             # Already foramtted from the source process for ease of serialization
@@ -31,12 +34,12 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
 
 
 class SerializedExceptionFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
 
 class ConsoleFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
@@ -49,7 +52,7 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class CustomJsonFormatter(JsonFormatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def add_fields(

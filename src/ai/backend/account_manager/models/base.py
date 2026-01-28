@@ -55,13 +55,13 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> TypeDecorator:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator:
         if dialect.name == "postgresql":
-            return dialect.type_descriptor(UUID())
-        return dialect.type_descriptor(CHAR(16))
+            return cast(TypeDecorator, dialect.type_descriptor(UUID()))
+        return cast(TypeDecorator, dialect.type_descriptor(CHAR(16)))
 
     def process_bind_param(
-        self, value: UUID_SubType | uuid.UUID | None, dialect
+        self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect
     ) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
@@ -82,7 +82,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
                 case _:
                     return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> UUID_SubType | None:
+    def process_result_value(self, value: Any, dialect: Dialect) -> UUID_SubType | None:
         if value is None:
             return value
         cls = type(self)
@@ -134,9 +134,9 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
 class PasswordColumn(TypeDecorator):
     impl = VARCHAR
 
-    def process_bind_param(self, value, dialect) -> str:
+    def process_bind_param(self, value: Any, dialect: Dialect) -> str:
         return hash_password(value)
 
 
-def IDColumn(name="id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))

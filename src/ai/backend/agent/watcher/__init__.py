@@ -5,7 +5,7 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
@@ -34,7 +34,9 @@ shutdown_enabled = False
 
 
 @web.middleware
-async def auth_middleware(request, handler) -> web.StreamResponse:
+async def auth_middleware(
+    request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+) -> web.StreamResponse:
     token = request.headers.get("X-BackendAI-Watcher-Token", None)
     if token == request.app["token"]:
         try:
@@ -236,7 +238,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     return web.Response(text=out)
 
 
-async def init_app(app) -> None:
+async def init_app(app: web.Application) -> None:
     r = app.router.add_route
     r("GET", "/", handle_status)
     if app["config"]["watcher"]["soft-reset-available"]:
@@ -252,11 +254,11 @@ async def init_app(app) -> None:
     r("DELETE", "/mounts", handle_umount)
 
 
-async def shutdown_app(app) -> None:
+async def shutdown_app(app: web.Application) -> None:
     pass
 
 
-async def prepare_hook(request, response) -> None:
+async def prepare_hook(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 

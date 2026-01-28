@@ -291,7 +291,10 @@ class LogHandlerConfig(BaseConfigModel):
     )
 
     @model_serializer(mode="wrap")
-    def rename_class(self, handler) -> dict[str, Any]:
+    def rename_class(
+        self,
+        handler: Any,
+    ) -> dict[str, Any]:
         data = handler(self)
         if "class_" in data:
             data["class"] = data.pop("class_")

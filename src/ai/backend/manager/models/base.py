@@ -105,7 +105,7 @@ DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 # helper functions
-def zero_if_none(val) -> int:
+def zero_if_none(val: int | None) -> int:
     return 0 if val is None else val
 
 
@@ -262,7 +262,7 @@ class CurvePublicKeyColumn(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
         return dialect.type_descriptor(sa.String(40))
 
     def process_bind_param(
@@ -290,7 +290,7 @@ class QuotaScopeIDType(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
         return dialect.type_descriptor(sa.String(64))
 
     def process_bind_param(
@@ -399,11 +399,19 @@ class StructuredJSONObjectColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(self, value, dialect) -> Optional[dict]:
-        return self._schema.to_json(value)
+    def process_bind_param(
+        self, value: JSONSerializableMixin | None, dialect: Dialect
+    ) -> Optional[dict]:
+        if value is None:
+            return None
+        return self._schema.to_json(value)  # type: ignore[arg-type]
 
-    def process_result_value(self, value, dialect) -> Optional[JSONSerializableMixin]:
-        return self._schema.from_json(value)
+    def process_result_value(
+        self, value: dict | None, dialect: Dialect
+    ) -> Optional[JSONSerializableMixin]:
+        if value is None:
+            return None
+        return self._schema.from_json(value)  # type: ignore[arg-type]
 
     def copy(self, **kw) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
@@ -422,13 +430,17 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op, value) -> JSONB:
+    def coerce_compared_value(self, op: Any, value: Any) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value, dialect) -> list[dict]:
-        return [self._schema.to_json(item) for item in value]
+    def process_bind_param(
+        self, value: list[JSONSerializableMixin] | None, dialect: Dialect
+    ) -> list[dict]:
+        return [self._schema.to_json(item) for item in value] if value is not None else []
 
-    def process_result_value(self, value, dialect) -> list[JSONSerializableMixin]:
+    def process_result_value(
+        self, value: list | None, dialect: Dialect
+    ) -> list[JSONSerializableMixin]:
         if value is None:
             return []
         return [self._schema.from_json(item) for item in value]
@@ -487,16 +499,16 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op, value) -> JSONB:
+    def coerce_compared_value(self, op: Any, value: Any) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value: list[TBaseModel] | None, dialect) -> list:
+    def process_bind_param(self, value: list[TBaseModel] | None, dialect: Dialect) -> list:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
             return [item.model_dump(mode="json") for item in value]
         return []
 
-    def process_result_value(self, value: list | str | None, dialect) -> list[TBaseModel]:
+    def process_result_value(self, value: list | str | None, dialect: Dialect) -> list[TBaseModel]:
         # JSONB returns already parsed Python objects, not strings
         # Handle case where value is stored as JSON string (legacy data)
         if value is not None:
@@ -534,16 +546,21 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value, dialect) -> Optional[str]:
+    def process_bind_param(
+        self, value: str | ReadableCIDR | None, dialect: Dialect
+    ) -> Optional[str]:
         if value is None:
             return value
         try:
-            cidr = ReadableCIDR(value).address
+            if isinstance(value, str):
+                cidr = ReadableCIDR(value).address
+            else:
+                cidr = value.address
         except InvalidIpAddressValue as e:
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value, dialect) -> Optional[ReadableCIDR]:
+    def process_result_value(self, value: str | None, dialect: Dialect) -> Optional[ReadableCIDR]:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -645,12 +662,12 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Any | None, dialect) -> str | bytes | None:
+    def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -665,7 +682,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
             return value.bytes
         return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> Optional[TUUIDSubType]:
+    def process_result_value(self, value: Any, dialect: Dialect) -> Optional[TUUIDSubType]:
         if value is None:
             return value
         cls = type(self)
@@ -702,10 +719,10 @@ class SlugType(TypeDecorator):
             allow_unicode=allow_unicode,
         )
 
-    def coerce_compared_value(self, op, value) -> Unicode:
+    def coerce_compared_value(self, op: Any, value: Any) -> Unicode:
         return Unicode()
 
-    def process_bind_param(self, value: Any | None, dialect) -> str | None:
+    def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | None:
         if value is None:
             return value
         try:
@@ -730,29 +747,29 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-def IDColumn(name="id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def EndpointIDColumn(name="id") -> sa.Column:
+def EndpointIDColumn(name: str = "id") -> sa.Column:
     return sa.Column(
         name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def SessionIDColumn(name="id") -> sa.Column:
+def SessionIDColumn(name: str = "id") -> sa.Column:
     return sa.Column(
         name, SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def KernelIDColumn(name="id") -> sa.Column:
+def KernelIDColumn(name: str = "id") -> sa.Column:
     return sa.Column(
         name, KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def ForeignKeyIDColumn(name, fk_field, nullable=True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 

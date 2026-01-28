@@ -26,7 +26,9 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         # We can't measure activeness of HTTP/2 circuits
         return []
 
-    async def _log_monitor_task(self, stream: asyncio.StreamReader, log_header_postfix="") -> None:
+    async def _log_monitor_task(
+        self, stream: asyncio.StreamReader, log_header_postfix: str = ""
+    ) -> None:
         while True:
             line = await stream.readline()
             if len(line) == 0:

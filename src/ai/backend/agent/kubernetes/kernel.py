@@ -226,15 +226,15 @@ class KubernetesKernel(AbstractKernel):
         return await self.runner.feed_service_apps()
 
     @override
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: Any, subdir: Any) -> CommitStatus:
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
     @override
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: Any,
+        subdir: Any,
         *,
         canonical: str | None = None,
         filename: str | None = None,
@@ -369,15 +369,15 @@ class KubernetesCodeRunner(AbstractCodeRunner):
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: Any,
+        session_id: Any,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: int = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,

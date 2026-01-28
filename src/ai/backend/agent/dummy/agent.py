@@ -166,7 +166,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         return []
 
     @override
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path()
 
     @override
@@ -185,7 +185,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
@@ -208,8 +208,8 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts,
-        preopen_ports,
+        resource_opts: Optional[Mapping[str, Any]],
+        preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config.container.bind_host

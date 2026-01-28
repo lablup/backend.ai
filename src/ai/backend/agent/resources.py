@@ -827,7 +827,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
-        def accel_lt_intrinsic(item) -> int:
+        def accel_lt_intrinsic(item: tuple[str, type[AbstractComputePlugin]]) -> int:
             # push back "intrinsic" plugins (if exists)
             if item[0] in ("cpu", "mem"):
                 return 0
@@ -852,22 +852,25 @@ class Mount:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
-    def from_str(cls, s) -> Self:
-        source, target, perm = s.split(":")
-        source = Path(source)
+    def from_str(cls, s: str) -> Self:
+        source_str, target_str, perm_str = s.split(":")
+        source_path = Path(source_str)
         type = MountTypes.BIND
-        if not source.is_absolute():
-            if len(source.parts) == 1:
-                source = str(source)
+        source: Optional[Path]
+        if not source_path.is_absolute():
+            if len(source_path.parts) == 1:
+                source = Path(source_str)
                 type = MountTypes.VOLUME
             else:
                 raise ValueError(
-                    "Mount source must be an absolute path if it is not a volume name.", source
+                    "Mount source must be an absolute path if it is not a volume name.", source_path
                 )
-        target = Path(target)
+        else:
+            source = source_path
+        target = Path(target_str)
         if not target.is_absolute():
             raise ValueError("Mount target must be an absolute path.", target)
-        perm = MountPermission(perm)
+        perm = MountPermission(perm_str)
         return cls(type, source, target, perm, None)
 
 

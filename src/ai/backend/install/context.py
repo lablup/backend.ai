@@ -125,7 +125,7 @@ class Context(metaclass=ABCMeta):
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
 
-    def generate_passphrase(self, len=16) -> str:
+    def generate_passphrase(self, len: int = 16) -> str:
         return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
