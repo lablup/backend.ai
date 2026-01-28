@@ -408,17 +408,13 @@ class ImageService:
         )
         return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 
-    async def preload_image(
-        self, action: PreloadImageAction
-    ) -> PreloadImageActionResult:
+    async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         """
         Preloads images by their IDs to specified agents.
         """
         raise NotImplementedError
 
-    async def unload_image(
-        self, action: UnloadImageAction
-    ) -> UnloadImageActionResult:
+    async def unload_image(self, action: UnloadImageAction) -> UnloadImageActionResult:
         """
         Unloads images by their IDs from specified agents.
         """
