@@ -17,8 +17,9 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.image.options import ImageConditions
+from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
 from .types import (
@@ -84,7 +85,7 @@ async def fetch_images(
 
     edges = []
     for image_data in action_result.data:
-        image = ImageV2GQL.from_data(image_data)
+        image = ImageV2GQL.from_detailed_data(image_data)
         cursor = encode_cursor(image_data.id)
         edges.append(ImageEdgeGQL(node=image, cursor=cursor))
 
@@ -115,17 +116,12 @@ async def fetch_image_by_id(
     Returns:
         ImageV2GQL if found, None otherwise
     """
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(first=1),
-        _get_image_pagination_spec(),
-        base_conditions=[ImageConditions.by_ids([image_id])],
+    action_result = await info.context.processors.image.get_image_by_id.wait_for_complete(
+        GetImageByIdAction(
+            image_id=image_id,
+            user_role=UserRole.USER,
+            image_status=None,
+        )
     )
 
-    action_result = await info.context.processors.image.search_images.wait_for_complete(
-        SearchImagesAction(querier=querier)
-    )
-
-    if not action_result.data:
-        return None
-
-    return ImageV2GQL.from_data(action_result.data[0])
+    return ImageV2GQL.from_detailed_data(action_result.image_with_agent_install_status.image)
