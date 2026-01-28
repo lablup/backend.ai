@@ -18,9 +18,8 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
-    ImageDataWithDetails,
+    ImageData,
     ImageStatus,
-    KVPair,
     ResourceLimit,
 )
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
@@ -74,24 +73,6 @@ class ImagePermissionGQL(enum.Enum):
 
 
 @strawberry.type(
-    name="ImageTagEntry",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    A key-value pair representing an image tag component.
-    Tags are parsed from the image's full tag string (e.g., "3.9", "ubuntu20.04").
-    """),
-)
-class ImageTagEntryGQL:
-    key: str = strawberry.field(description="The tag key (e.g., 'python', 'ubuntu').")
-    value: str = strawberry.field(description="The tag value (e.g., '3.9', '20.04').")
-
-    @classmethod
-    def from_data(cls, kv: KVPair) -> Self:
-        return cls(key=kv.key, value=kv.value)
-
-
-@strawberry.type(
     name="ImageLabelEntry",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -105,8 +86,8 @@ class ImageLabelEntryGQL:
     value: str = strawberry.field(description="The label value.")
 
     @classmethod
-    def from_data(cls, kv: KVPair) -> Self:
-        return cls(key=kv.key, value=kv.value)
+    def from_dict_item(cls, key: str, value: str) -> Self:
+        return cls(key=key, value=value)
 
 
 @strawberry.type(
@@ -115,25 +96,41 @@ class ImageLabelEntryGQL:
     Added in 26.2.0.
 
     Resource limit specification for an image.
-    Defines the minimum and optional maximum resource requirements.
+    Defines minimum and maximum values for a resource slot.
     """),
 )
 class ImageResourceLimitGQL:
     key: str = strawberry.field(
-        description="Resource type key (e.g., 'cpu', 'mem', 'cuda.shares')."
+        description="Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."
     )
-    min: str = strawberry.field(description="Minimum required resource amount.")
-    max: Optional[str] = strawberry.field(
-        default=None, description="Maximum allowed resource amount, if specified."
-    )
+    min: str = strawberry.field(description="Minimum required amount.")
+    max: str = strawberry.field(description="Maximum allowed amount.")
 
     @classmethod
-    def from_data(cls, limit: ResourceLimit) -> Self:
+    def from_data(cls, data: ResourceLimit) -> Self:
         return cls(
-            key=limit.key,
-            min=str(limit.min),
-            max=str(limit.max) if limit.max else None,
+            key=data.key,
+            min=str(data.min),
+            max=str(data.max),
         )
+
+
+@strawberry.type(
+    name="ImageTagEntry",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    A key-value pair representing a parsed tag component.
+    Tags are extracted from the image reference (e.g., py311, cuda12.1).
+    """),
+)
+class ImageTagEntryGQL:
+    key: str = strawberry.field(description="The tag key (e.g., 'python', 'cuda').")
+    value: str = strawberry.field(description="The tag value (e.g., '3.11', '12.1').")
+
+    @classmethod
+    def from_dict_item(cls, key: str, value: str) -> Self:
+        return cls(key=key, value=value)
 
 
 # =============================================================================
@@ -147,7 +144,7 @@ class ImageResourceLimitGQL:
     Added in 26.2.0.
 
     Identity information for an image.
-    Contains the canonical name, namespace, architecture, and aliases.
+    Contains the canonical name, namespace, and architecture.
     """),
 )
 class ImageIdentityInfoGQL:
@@ -155,20 +152,18 @@ class ImageIdentityInfoGQL:
         description="Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."
     )
     namespace: str = strawberry.field(
-        description="Base image namespace (e.g., 'python', 'tensorflow')."
+        description="Image namespace/path within the registry (e.g., 'stable/python')."
     )
     architecture: str = strawberry.field(
         description="CPU architecture (e.g., 'x86_64', 'aarch64')."
     )
-    aliases: list[str] = strawberry.field(description="List of image aliases.")
 
     @classmethod
-    def from_data(cls, data: ImageDataWithDetails) -> Self:
+    def from_data(cls, data: ImageData) -> Self:
         return cls(
             canonical_name=str(data.name),
-            namespace=data.namespace,
+            namespace=data.image,
             architecture=data.architecture,
-            aliases=data.aliases,
         )
 
 
@@ -183,7 +178,7 @@ class ImageIdentityInfoGQL:
 )
 class ImageMetadataInfoGQL:
     tags: list[ImageTagEntryGQL] = strawberry.field(
-        description="Parsed tag components from the image tag string."
+        description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
     )
     labels: list[ImageLabelEntryGQL] = strawberry.field(description="Docker labels.")
     digest: Optional[str] = strawberry.field(
@@ -196,14 +191,16 @@ class ImageMetadataInfoGQL:
     )
 
     @classmethod
-    def from_data(cls, data: ImageDataWithDetails) -> Self:
+    def from_data(cls, data: ImageData) -> Self:
         return cls(
-            tags=[ImageTagEntryGQL.from_data(t) for t in data.tags],
-            labels=[ImageLabelEntryGQL.from_data(l) for l in data.labels],
-            digest=data.digest,
+            tags=[ImageTagEntryGQL.from_dict_item(entry.key, entry.value) for entry in data.tags],
+            labels=[
+                ImageLabelEntryGQL.from_dict_item(k, v) for k, v in data.labels.label_data.items()
+            ],
+            digest=data.config_digest,
             size_bytes=data.size_bytes,
             status=ImageStatusGQL.from_data(data.status),
-            created_at=None,  # ImageDataWithDetails doesn't have created_at
+            created_at=data.created_at,
         )
 
 
@@ -218,17 +215,18 @@ class ImageMetadataInfoGQL:
 )
 class ImageRequirementsInfoGQL:
     resource_limits: list[ImageResourceLimitGQL] = strawberry.field(
-        description="List of resource limits (min/max) for the image."
+        description="Resource slot limits (cpu, memory, accelerators, etc.)."
     )
     supported_accelerators: list[str] = strawberry.field(
         description="List of supported accelerator types (e.g., 'cuda', 'rocm')."
     )
 
     @classmethod
-    def from_data(cls, data: ImageDataWithDetails) -> Self:
+    def from_data(cls, data: ImageData) -> Self:
+        accelerators = data.accelerators.split(",") if data.accelerators else []
         return cls(
-            resource_limits=[ImageResourceLimitGQL.from_data(r) for r in data.resource_limits],
-            supported_accelerators=data.supported_accelerators,
+            resource_limits=[ImageResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
+            supported_accelerators=[a.strip() for a in accelerators if a.strip()],
         )
 
 
@@ -276,13 +274,13 @@ class ImageV2GQL(Node):
 
     # Sub-info types
     identity: ImageIdentityInfoGQL = strawberry.field(
-        description="Image identity information (name, namespace, architecture, aliases)."
+        description="Image identity information (name, architecture)."
     )
     metadata: ImageMetadataInfoGQL = strawberry.field(
-        description="Image metadata (tags, labels, digest, size, status, created_at)."
+        description="Image metadata (labels, digest, size, status, created_at)."
     )
     requirements: ImageRequirementsInfoGQL = strawberry.field(
-        description="Runtime requirements (resource_limits, supported_accelerators)."
+        description="Runtime requirements (supported_accelerators)."
     )
     permission: Optional[ImagePermissionInfoGQL] = strawberry.field(
         default=None, description="Permission info for the current user. May be null."
@@ -299,13 +297,13 @@ class ImageV2GQL(Node):
     @classmethod
     def from_data(
         cls,
-        data: ImageDataWithDetails,
+        data: ImageData,
         permissions: Optional[list[ImagePermission]] = None,
     ) -> Self:
-        """Create ImageV2GQL from ImageDataWithDetails.
+        """Create ImageV2GQL from ImageData.
 
         Args:
-            data: The image data with details.
+            data: The image data.
             permissions: Optional list of permissions the user has on this image.
 
         Returns:
