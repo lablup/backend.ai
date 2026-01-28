@@ -131,6 +131,7 @@ class ImageDataWithDetails:
     labels: list[KVPair] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
+    created_at: Optional[datetime] = field(default=None)
     # legacy
     hash: str | None = field(default=None)
 

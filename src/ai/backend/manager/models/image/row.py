@@ -937,6 +937,7 @@ class ImageRow(Base):
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            created_at=self.created_at,
             # legacy
             hash=self.trimmed_digest or None,
         )

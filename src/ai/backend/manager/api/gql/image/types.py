@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
     ImageData,
+    ImageDataWithDetails,
     ImageStatus,
     ResourceLimit,
 )
@@ -166,6 +167,14 @@ class ImageIdentityInfoGQL:
             architecture=data.architecture,
         )
 
+    @classmethod
+    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
+        return cls(
+            canonical_name=str(data.name),
+            namespace=data.namespace,
+            architecture=data.architecture,
+        )
+
 
 @strawberry.type(
     name="ImageMetadataInfo",
@@ -203,6 +212,17 @@ class ImageMetadataInfoGQL:
             created_at=data.created_at,
         )
 
+    @classmethod
+    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
+        return cls(
+            tags=[ImageTagEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.tags],
+            labels=[ImageLabelEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.labels],
+            digest=data.digest,
+            size_bytes=data.size_bytes,
+            status=ImageStatusGQL.from_data(data.status),
+            created_at=data.created_at,
+        )
+
 
 @strawberry.type(
     name="ImageRequirementsInfo",
@@ -227,6 +247,13 @@ class ImageRequirementsInfoGQL:
         return cls(
             resource_limits=[ImageResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
             supported_accelerators=[a.strip() for a in accelerators if a.strip()],
+        )
+
+    @classmethod
+    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
+        return cls(
+            resource_limits=[ImageResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
+            supported_accelerators=[a.strip() for a in data.supported_accelerators if a.strip()],
         )
 
 
@@ -311,6 +338,32 @@ class ImageV2GQL(Node):
             identity=ImageIdentityInfoGQL.from_data(data),
             metadata=ImageMetadataInfoGQL.from_data(data),
             requirements=ImageRequirementsInfoGQL.from_data(data),
+            permission=ImagePermissionInfoGQL.from_permissions(permissions)
+            if permissions
+            else None,
+            registry_id=data.registry_id,
+        )
+
+    @classmethod
+    def from_detailed_data(
+        cls,
+        data: ImageDataWithDetails,
+        permissions: Optional[list[ImagePermission]] = None,
+    ) -> Self:
+        """Create ImageV2GQL from ImageDataWithDetails.
+
+        Args:
+            data: The detailed image data.
+            permissions: Optional list of permissions the user has on this image.
+
+        Returns:
+            ImageV2GQL instance.
+        """
+        return cls(
+            id=data.id,
+            identity=ImageIdentityInfoGQL.from_detailed_data(data),
+            metadata=ImageMetadataInfoGQL.from_detailed_data(data),
+            requirements=ImageRequirementsInfoGQL.from_detailed_data(data),
             permission=ImagePermissionInfoGQL.from_permissions(permissions)
             if permissions
             else None,
