@@ -25,7 +25,7 @@ from ai.backend.manager.models.image import (
     ImageRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.batch_querier import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
