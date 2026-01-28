@@ -47,6 +47,7 @@ from .metrics.types import (
     PCT_METRIC_KEY,
     FlattenedDeviceMetric,
     FlattenedKernelMetric,
+    FlattenedProcessMetric,
 )
 from .utils import remove_exponent
 
@@ -634,6 +635,35 @@ class StatContext:
             )
         )
 
+    def observe_process_metric(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId,
+        pid: PID,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = self.agent.id
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_process_metric(
+            metric=FlattenedProcessMetric(
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                container_id=container_id,
+                pid=pid,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
+
     async def collect_container_stat(
         self,
         container_ids: Sequence[ContainerId],
@@ -806,14 +836,25 @@ class StatContext:
         Intended to be used by the agent.
         """
         # FIXME: support Docker Desktop backend (#1230)
-        if sys.platform == "darwin":
-            return
+        # if sys.platform == "darwin":
+        #     return
 
         self._stage_observer.observe_stage(
             stage="before_lock",
             upper_layer="collect_per_container_process_stat",
         )
         async with self._lock:
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            for kid, info in self.agent.kernel_registry.items():
+                try:
+                    cid = info["container_id"]
+                except KeyError:
+                    log.warning(
+                        "collect_per_container_process_stat(): no container for kernel {}", kid
+                    )
+                else:
+                    kernel_id_map[ContainerId(cid)] = kid
+
             pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
@@ -868,7 +909,18 @@ class StatContext:
                     for pid, measure in proc_measure.per_process.items():
                         pid = PID(pid)
                         cid = pid_map[pid]
+                        try:
+                            kernel_id = kernel_id_map[cid]
+                        except KeyError:
+                            continue
                         updated_cids.add(cid)
+                        self.observe_process_metric(
+                            kernel_id,
+                            cid,
+                            pid,
+                            metric_key,
+                            measure,
+                        )
                         if cid not in self.process_metrics:
                             self.process_metrics[cid] = {}
                         if pid not in self.process_metrics[cid]:

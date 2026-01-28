@@ -12,6 +12,7 @@ from prometheus_client import Counter, Gauge, Histogram
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     DEVICE_UTILIZATION_METRIC_LABEL_NAME,
+    PROCESS_UTILIZATION_METRIC_LABEL_NAME,
     UNDEFINED,
     UTILIZATION_METRIC_DETENTION,
 )
@@ -21,6 +22,7 @@ from .types import (
     ALL_METRIC_VALUE_TYPES,
     FlattenedDeviceMetric,
     FlattenedKernelMetric,
+    FlattenedProcessMetric,
 )
 
 if TYPE_CHECKING:
@@ -83,6 +85,7 @@ class UtilizationMetricObserver:
 
     _container_metric: Gauge
     _device_metric: Gauge
+    _process_metric: Gauge
 
     def __init__(self) -> None:
         self._removal_tasks = {}
@@ -106,6 +109,21 @@ class UtilizationMetricObserver:
                 DEVICE_UTILIZATION_METRIC_LABEL_NAME,
                 "agent_id",
                 "device_id",
+                "value_type",
+            ],
+        )
+        self._process_metric = Gauge(
+            name="backendai_process_utilization",
+            documentation="Process utilization metrics",
+            labelnames=[
+                PROCESS_UTILIZATION_METRIC_LABEL_NAME,
+                "agent_id",
+                "kernel_id",
+                "session_id",
+                "user_id",
+                "project_id",
+                "container_id",
+                "pid",
                 "value_type",
             ],
         )
@@ -178,6 +196,24 @@ class UtilizationMetricObserver:
                 device_metric_name=metric.key,
                 agent_id=metric.agent_id,
                 device_id=metric.device_id,
+                value_type=metric_value_type,
+            ).set(float(value))
+
+    def observe_process_metric(
+        self,
+        *,
+        metric: FlattenedProcessMetric,
+    ) -> None:
+        for metric_value_type, value in metric.value_pairs:
+            self._process_metric.labels(
+                process_metric_name=metric.key,
+                agent_id=metric.agent_id,
+                kernel_id=metric.kernel_id,
+                session_id=metric.session_id or UNDEFINED,
+                user_id=metric.owner_user_id or UNDEFINED,
+                project_id=metric.project_id or UNDEFINED,
+                container_id=metric.container_id,
+                pid=metric.pid,
                 value_type=metric_value_type,
             ).set(float(value))
 
