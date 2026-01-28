@@ -6,16 +6,12 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
-)
-from ai.backend.manager.services.image.actions.alias_image_by_id import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
-)
-from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
     ClearImageCustomResourceLimitByIdActionResult,
 )
@@ -26,8 +22,6 @@ from ai.backend.manager.services.image.actions.dealias_image import (
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
-)
-from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
@@ -63,13 +57,11 @@ from ai.backend.manager.services.image.actions.preload_image_by_id import (
     PreloadImageByIdAction,
     PreloadImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import (
-    PurgeImageByIdAction,
-    PurgeImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageAction,
     PurgeImageActionResult,
+    PurgeImageByIdAction,
+    PurgeImageByIdActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )

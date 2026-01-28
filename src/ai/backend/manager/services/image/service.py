@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
@@ -19,16 +20,12 @@ from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
-)
-from ai.backend.manager.services.image.actions.alias_image_by_id import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
-)
-from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
     ClearImageCustomResourceLimitByIdActionResult,
 )
@@ -39,8 +36,6 @@ from ai.backend.manager.services.image.actions.dealias_image import (
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
-)
-from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
@@ -77,14 +72,12 @@ from ai.backend.manager.services.image.actions.preload_image_by_id import (
     PreloadImageByIdAction,
     PreloadImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import (
-    PurgeImageByIdAction,
-    PurgeImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgedImagesData,
     PurgeImageAction,
     PurgeImageActionResult,
+    PurgeImageByIdAction,
+    PurgeImageByIdActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
@@ -185,12 +178,14 @@ class ImageService:
         return GetAllImagesActionResult(data=images)
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
         image_with_agent_install_status: ImageWithAgentInstallStatus = (
             await self._image_repository.get_image_by_id(
                 action.image_id,
                 load_aliases=True,
                 status_filter=action.image_status,
-                requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+                requested_by_superadmin=is_superadmin,
             )
         )
         return GetImageByIdActionResult(
