@@ -57,8 +57,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
-)
-from ai.backend.manager.services.image.actions.get_images_by_ids import (
     GetImagesByIdsAction,
     GetImagesByIdsActionResult,
 )
@@ -419,6 +417,17 @@ class ImageService:
             image_id=action.image_id,
             image_alias=image_alias,
         )
+
+    async def get_images_by_ids(self, action: GetImagesByIdsAction) -> GetImagesByIdsActionResult:
+        """
+        Retrieves multiple images by their IDs.
+        """
+        images_with_agent_install_status = await self._image_repository.get_images_by_ids(
+            action.image_ids,
+            status_filter=action.image_status,
+            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+        )
+        return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         """

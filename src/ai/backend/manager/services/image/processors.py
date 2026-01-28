@@ -40,6 +40,8 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
+    GetImagesByIdsAction,
+    GetImagesByIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -119,6 +121,7 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
+    get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
@@ -157,6 +160,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
+        self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
         self.search_images = ActionProcessor(service.search_images, action_monitors)
 
     @override
