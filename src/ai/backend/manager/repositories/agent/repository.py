@@ -14,6 +14,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.resource.types import AgentResourceData
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -220,3 +221,15 @@ class AgentRepository:
     ) -> AgentListResult:
         """Searches agents with total count."""
         return await self._db_source.search_agents(querier=querier)
+
+    @agent_repository_resilience.apply()
+    async def get_agent_resources(
+        self, agent_ids: Sequence[AgentId]
+    ) -> Mapping[AgentId, AgentResourceData]:
+        """
+        Get resource information (capacity and used) for the given agent IDs.
+
+        :param agent_ids: Sequence of agent IDs to get resources for
+        :return: Mapping of agent IDs to AgentResourceData
+        """
+        return await self._db_source.get_agent_resource_slots(agent_ids)
