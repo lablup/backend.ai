@@ -671,7 +671,9 @@ class ImageRef:
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 
-    def __lt__(self, other: ImageRef) -> bool:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ImageRef):
+            return NotImplemented
         if self == other:  # call __eq__ first for resolved check
             return False
         if not (self.name == other.name and self.project == other.project):

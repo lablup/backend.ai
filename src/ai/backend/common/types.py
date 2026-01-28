@@ -956,7 +956,7 @@ class ResourceSlot(UserDict[str, Decimal]):
 
     def __ne__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
-            raise TypeError("Only can compare ResourceSlot objects.")
+            return NotImplemented
         self.sync_keys(other)
         return not self.__eq__(other)
 
@@ -978,17 +978,17 @@ class ResourceSlot(UserDict[str, Decimal]):
         other_values = [other.data[k] for k in common_keys]
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
-    def __le__(self, other: ResourceSlot) -> bool:
+    def __le__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
-            raise TypeError("Only can compare ResourceSlot objects.")
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
-    def __lt__(self, other: ResourceSlot) -> bool:
+    def __lt__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
-            raise TypeError("Only can compare ResourceSlot objects.")
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
@@ -996,17 +996,17 @@ class ResourceSlot(UserDict[str, Decimal]):
             self_values == other_values
         )
 
-    def __ge__(self, other: ResourceSlot) -> bool:
+    def __ge__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
-            raise TypeError("Only can compare ResourceSlot objects.")
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
-    def __gt__(self, other: ResourceSlot) -> bool:
+    def __gt__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
-            raise TypeError("Only can compare ResourceSlot objects.")
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
