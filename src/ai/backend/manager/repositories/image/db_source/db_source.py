@@ -22,6 +22,7 @@ from ai.backend.manager.data.image.types import (
     ImageListResult,
     ImageStatus,
     RescanImagesResult,
+    ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
@@ -375,9 +376,7 @@ class ImageDBSource:
     async def set_image_resource_limit_by_id(
         self,
         image_id: UUID,
-        slot_name: str,
-        min_value: Optional[Decimal],
-        max_value: Optional[Decimal],
+        resource_limit: ResourceLimitInput,
     ) -> ImageData:
         """
         Sets resource limit for an image by its ID.
@@ -386,13 +385,13 @@ class ImageDBSource:
             image_row = await self._get_image_by_id(session, image_id)
             resources = dict(image_row._resources) if image_row._resources else {}
 
-            if slot_name not in resources:
-                resources[slot_name] = {"min": None, "max": None}
+            if resource_limit.slot_name not in resources:
+                resources[resource_limit.slot_name] = {"min": None, "max": None}
 
-            if min_value is not None:
-                resources[slot_name]["min"] = str(min_value)
-            if max_value is not None:
-                resources[slot_name]["max"] = str(max_value)
+            if resource_limit.min_value is not None:
+                resources[resource_limit.slot_name]["min"] = str(resource_limit.min_value)
+            if resource_limit.max_value is not None:
+                resources[resource_limit.slot_name]["max"] = str(resource_limit.max_value)
 
             image_row._resources = resources
             return image_row.to_dataclass()

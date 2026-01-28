@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -21,6 +20,7 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
+    ResourceLimitInput,
 )
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -340,15 +340,13 @@ class ImageRepository:
     async def set_image_resource_limit_by_id(
         self,
         image_id: UUID,
-        slot_name: str,
-        min_value: Optional[Decimal],
-        max_value: Optional[Decimal],
+        resource_limit: ResourceLimitInput,
     ) -> ImageData:
         """
         Sets resource limit for an image by its ID.
         """
         return await self._db_source.set_image_resource_limit_by_id(
-            image_id, slot_name, min_value, max_value
+            image_id, resource_limit
         )
 
     @image_repository_resilience.apply()
