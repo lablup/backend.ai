@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -21,11 +22,14 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
+    ImageAgentInstallStatus,
     ImageAliasData,
     ImageData,
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
+    ImageWithAgentInstallStatus,
+    RescanImagesResult,
     ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
@@ -47,11 +51,15 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitByIdAction,
 )
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
+    ClearImageCustomResourceLimitByIdAction,
+)
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageByIdAction,
 )
+from ai.backend.manager.services.image.actions.get_images_by_ids import GetImagesByIdsAction
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
@@ -61,6 +69,7 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesKeyData,
 )
+from ai.backend.manager.services.image.actions.rescan_images_by_id import RescanImagesByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -990,6 +999,55 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         assert creator_arg.spec.image_id == image_id
 
 
+class TestGetImagesByIds(ImageServiceBaseFixtures):
+    """Tests for ImageService.get_images_by_ids"""
+
+    async def test_get_images_by_ids_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Get images by IDs should return images with agent install status."""
+        mock_image_with_details = MagicMock()
+        mock_image_with_details.id = image_data.id
+        image_with_status = ImageWithAgentInstallStatus(
+            image=mock_image_with_details,
+            agent_install_status=ImageAgentInstallStatus(installed=True, agent_names=["agent1"]),
+        )
+        mock_image_repository.get_images_by_ids = AsyncMock(return_value=[image_with_status])
+
+        action = GetImagesByIdsAction(
+            image_ids=[image_data.id],
+            user_role=UserRole.SUPERADMIN,
+            image_status=None,
+        )
+
+        result = await processors.get_images_by_ids.wait_for_complete(action)
+
+        assert len(result.images) == 1
+        assert result.images[0].image.id == image_data.id
+        mock_image_repository.get_images_by_ids.assert_called_once()
+
+    async def test_get_images_by_ids_empty_list(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+    ) -> None:
+        """Get images by empty ID list should return empty result."""
+        mock_image_repository.get_images_by_ids = AsyncMock(return_value=[])
+
+        action = GetImagesByIdsAction(
+            image_ids=[],
+            user_role=UserRole.SUPERADMIN,
+            image_status=None,
+        )
+
+        result = await processors.get_images_by_ids.wait_for_complete(action)
+
+        assert len(result.images) == 0
+
+
 class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
     """Tests for ImageService.clear_image_custom_resource_limit_by_id"""
 
@@ -1029,6 +1087,51 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
+
+
+class TestRescanImagesById(ImageServiceBaseFixtures):
+    """Tests for ImageService.rescan_images_by_id"""
+
+    async def test_rescan_images_by_id_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Rescan images by ID should return scanned images."""
+        mock_image_repository.scan_images_by_ids = AsyncMock(
+            return_value=RescanImagesResult(images=[image_data], errors=[])
+        )
+
+        action = RescanImagesByIdAction(image_ids=[image_data.id])
+
+        result = await processors.rescan_images_by_id.wait_for_complete(action)
+
+        assert len(result.images) == 1
+        assert result.images[0] == image_data
+        assert len(result.errors) == 0
+        mock_image_repository.scan_images_by_ids.assert_called_once_with([image_data.id])
+
+    async def test_rescan_images_by_id_with_errors(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Rescan images by ID should collect errors."""
+        mock_image_repository.scan_images_by_ids = AsyncMock(
+            return_value=RescanImagesResult(
+                images=[image_data], errors=["Registry not found for image test"]
+            )
+        )
+
+        action = RescanImagesByIdAction(image_ids=[image_data.id, uuid.uuid4()])
+
+        result = await processors.rescan_images_by_id.wait_for_complete(action)
+
+        assert len(result.images) == 1
+        assert len(result.errors) == 1
+        assert "Registry not found" in result.errors[0]
 
 
 class TestSetImageResourceLimitById(ImageServiceBaseFixtures):

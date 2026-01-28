@@ -9,9 +9,17 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.alias_image_by_id import (
+    AliasImageByIdAction,
+    AliasImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
+    ClearImageCustomResourceLimitByIdAction,
+    ClearImageCustomResourceLimitByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
     ClearImageCustomResourceLimitByIdActionResult,
 )
@@ -41,13 +49,17 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.get_images_by_ids import (
+    GetImagesByIdsAction,
+    GetImagesByIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
 )
-from ai.backend.manager.services.image.actions.preload_image import (
-    PreloadImageAction,
-    PreloadImageActionResult,
+from ai.backend.manager.services.image.actions.preload_image_by_id import (
+    PreloadImageByIdAction,
+    PreloadImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageAction,
@@ -56,6 +68,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
+)
+from ai.backend.manager.services.image.actions.rescan_images_by_id import (
+    RescanImagesByIdAction,
+    RescanImagesByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
@@ -93,8 +109,8 @@ class ImageProcessors(AbstractProcessorPackage):
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
     modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
-    preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
-    unload_image: ActionProcessor[UnloadImageAction, UnloadImageActionResult]
+    preload_image_by_id: ActionProcessor[PreloadImageByIdAction, PreloadImageByIdActionResult]
+    unload_image_by_id: ActionProcessor[UnloadImageByIdAction, UnloadImageByIdActionResult]
     untag_image_from_registry: ActionProcessor[
         UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
     ]
@@ -109,6 +125,7 @@ class ImageProcessors(AbstractProcessorPackage):
         ClearImageCustomResourceLimitByIdAction,
         ClearImageCustomResourceLimitByIdActionResult,
     ]
+    rescan_images_by_id: ActionProcessor[RescanImagesByIdAction, RescanImagesByIdActionResult]
     set_image_resource_limit_by_id: ActionProcessor[
         SetImageResourceLimitByIdAction, SetImageResourceLimitByIdActionResult
     ]
@@ -119,6 +136,7 @@ class ImageProcessors(AbstractProcessorPackage):
     get_images_by_canonicals: ActionProcessor[
         GetImagesByCanonicalsAction, GetImagesByCanonicalsActionResult
     ]
+    get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
     get_image_installed_agents: ActionProcessor[
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
@@ -134,6 +152,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.get_images_by_canonicals = ActionProcessor(
             service.get_images_by_canonicals, action_monitors
         )
+        self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
         self.get_image_by_identifier = ActionProcessor(
             service.get_image_by_identifier, action_monitors
         )
@@ -145,8 +164,8 @@ class ImageProcessors(AbstractProcessorPackage):
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
         self.modify_image = ActionProcessor(service.modify_image, action_monitors)
-        self.preload_image = ActionProcessor(service.preload_image, action_monitors)
-        self.unload_image = ActionProcessor(service.unload_image, action_monitors)
+        self.preload_image_by_id = ActionProcessor(service.preload_image_by_id, action_monitors)
+        self.unload_image_by_id = ActionProcessor(service.unload_image_by_id, action_monitors)
         self.untag_image_from_registry = ActionProcessor(
             service.untag_image_from_registry, action_monitors
         )
@@ -159,6 +178,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.clear_image_custom_resource_limit_by_id = ActionProcessor(
             service.clear_image_custom_resource_limit_by_id, action_monitors
         )
+        self.rescan_images_by_id = ActionProcessor(service.rescan_images_by_id, action_monitors)
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
@@ -175,12 +195,14 @@ class ImageProcessors(AbstractProcessorPackage):
             AliasImageByIdAction.spec(),
             DealiasImageAction.spec(),
             ModifyImageAction.spec(),
-            PreloadImageAction.spec(),
-            UnloadImageAction.spec(),
+            PreloadImageByIdAction.spec(),
+            UnloadImageByIdAction.spec(),
             UntagImageFromRegistryAction.spec(),
             ScanImageAction.spec(),
             PurgeImagesAction.spec(),
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
+            RescanImagesByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
+            GetImagesByIdsAction.spec(),
         ]
