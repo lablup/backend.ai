@@ -285,7 +285,10 @@ class ScheduleDBSource:
     async def _fetch_pending_sessions(
         self, db_sess: SASession, scaling_group: str
     ) -> PendingSessions:
-        """Fetch pending sessions with kernels using single JOIN query."""
+        """
+        Fetch pending sessions with kernels using single JOIN query.
+        The result is sorted by session creation time (oldest first).
+        """
         query = (
             sa.select(
                 SessionRow.id,
