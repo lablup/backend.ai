@@ -24,9 +24,13 @@ from ai.backend.manager.data.image.types import (
     ResourceLimit,
 )
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.image.options import ImageConditions, ImageOrders
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 
 # =============================================================================
 # Enums
