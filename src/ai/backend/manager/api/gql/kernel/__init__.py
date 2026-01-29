@@ -1,7 +1,8 @@
-"""GraphQL types for kernel management."""
+"""GraphQL types and resolvers for kernel management."""
 
 from __future__ import annotations
 
+from .fetcher import fetch_kernels
 from .types import (
     KernelClusterInfoGQL,
     KernelConnectionV2GQL,
@@ -21,6 +22,7 @@ from .types import (
 )
 
 __all__ = [
+    # Types
     "KernelClusterInfoGQL",
     "KernelConnectionV2GQL",
     "KernelEdgeGQL",
@@ -36,4 +38,6 @@ __all__ = [
     "KernelUserInfoGQL",
     "KernelV2GQL",
     "ResourceAllocationGQL",
+    # Fetchers
+    "fetch_kernels",
 ]

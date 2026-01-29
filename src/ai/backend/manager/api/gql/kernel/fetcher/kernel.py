@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Optional
 
 import strawberry
 from strawberry import Info
@@ -17,6 +18,7 @@ from ai.backend.manager.api.gql.kernel.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.scheduler.options import KernelConditions
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
@@ -41,6 +43,7 @@ async def fetch_kernels(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: Optional[list[QueryCondition]] = None,
 ) -> KernelConnectionV2GQL:
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -54,6 +57,7 @@ async def fetch_kernels(
         pagination_spec=_get_kernel_pagination_spec(),
         filter=filter,
         order_by=order_by,
+        base_conditions=base_conditions if base_conditions else None,
     )
 
     action_result = await info.context.processors.session.search_kernels.wait_for_complete(
