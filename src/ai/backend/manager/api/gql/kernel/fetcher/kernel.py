@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Optional
 
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.kernel.types import (
@@ -42,12 +42,8 @@ async def fetch_kernels(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-    agent_id: AgentId | None = None,
+    base_conditions: Optional[list[QueryCondition]] = None,
 ) -> KernelConnectionV2GQL:
-    base_conditions: list[QueryCondition] = []
-    if agent_id is not None:
-        base_conditions.append(KernelConditions.by_agent_ids([str(agent_id)]))
-
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,

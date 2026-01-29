@@ -29,6 +29,9 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.scheduler.options import (
+    KernelConditions,
+)
 
 
 @strawberry.enum(
@@ -420,7 +423,7 @@ class AgentV2GQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            agent_id=self._agent_id,
+            base_conditions=[KernelConditions.by_agent_ids([str(self._agent_id)])],
         )
 
     @classmethod
