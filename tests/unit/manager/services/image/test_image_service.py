@@ -51,9 +51,6 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitByIdAction,
 )
-from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
-    ClearImageCustomResourceLimitByIdAction,
-)
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
