@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.group import GroupDotfile
@@ -17,7 +17,7 @@ class GetDotfileAction(ProjectConfigAction):
     path: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.project_id_or_name)
 
     @override
@@ -31,5 +31,5 @@ class GetDotfileActionResult(BaseActionResult):
     dotfile: GroupDotfile
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

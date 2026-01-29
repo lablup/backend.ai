@@ -9,7 +9,6 @@ It will be fixed in the future; for now understand them as the same concept.
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 import sqlalchemy as sa
 
@@ -44,7 +43,7 @@ class ProjectConfigDBSource:
         self._db = db
 
     async def resolve_project(
-        self, domain_name: Optional[str], project_id_or_name: uuid.UUID | str
+        self, domain_name: str | None, project_id_or_name: uuid.UUID | str
     ) -> ResolvedProject:
         """
         Resolve project identity (id + domain_name) in a single query.
