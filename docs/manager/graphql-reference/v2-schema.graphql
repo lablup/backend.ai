@@ -2559,7 +2559,7 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
-Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
+Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
 """
 type KernelClusterInfo {
   """The role of this kernel in the cluster (e.g., main, sub)."""
@@ -2575,7 +2575,7 @@ type KernelClusterInfo {
   clusterHostname: String!
 }
 
-"""Added in 26.1.0. Connection type for paginated kernel results."""
+"""Added in 26.2.0. Connection type for paginated kernel results."""
 type KernelConnectionV2 {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -2585,14 +2585,14 @@ type KernelConnectionV2 {
   count: Int!
 }
 
-"""Added in 26.1.0. Filter criteria for querying kernels."""
+"""Added in 26.2.0. Filter criteria for querying kernels."""
 input KernelFilter {
   id: UUIDFilter = null
   status: KernelStatusFilter = null
   sessionId: UUIDFilter = null
 }
 
-"""Added in 26.1.0. Lifecycle and status information for a kernel."""
+"""Added in 26.2.0. Lifecycle and status information for a kernel."""
 type KernelLifecycleInfo {
   """
   Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
@@ -2613,7 +2613,7 @@ type KernelLifecycleInfo {
   startsAt: DateTime
 }
 
-"""Added in 26.1.0. Network configuration for a kernel."""
+"""Added in 26.2.0. Network configuration for a kernel."""
 type KernelNetworkInfo {
   """Collection of service ports exposed by this kernel."""
   servicePorts: ServicePorts
@@ -2622,18 +2622,18 @@ type KernelNetworkInfo {
   preopenPorts: [Int!]
 }
 
-"""Added in 26.1.0. Ordering specification for kernels."""
+"""Added in 26.2.0. Ordering specification for kernels."""
 input KernelOrderBy {
   field: KernelOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.1.0. Fields available for ordering kernels."""
+"""Added in 26.2.0. Fields available for ordering kernels."""
 enum KernelOrderField {
   CREATED_AT
 }
 
-"""Added in 26.1.0. Resource allocation information for a kernel."""
+"""Added in 26.2.0. Resource allocation information for a kernel."""
 type KernelResourceInfo {
   """
   The ID of the agent running this kernel. Null if not yet assigned or hidden.
@@ -2658,7 +2658,7 @@ type KernelResourceInfo {
   resourceOpts: ResourceOpts
 }
 
-"""Added in 26.1.0. Information about the session this kernel belongs to."""
+"""Added in 26.2.0. Information about the session this kernel belongs to."""
 type KernelSessionInfo {
   """The unique identifier of the session this kernel belongs to."""
   sessionId: UUID!
@@ -2673,7 +2673,7 @@ type KernelSessionInfo {
   sessionType: SessionTypes!
 }
 
-"""Added in 26.1.0"""
+"""Added in 26.2.0"""
 enum KernelStatus {
   PENDING
   SCHEDULED
@@ -2692,13 +2692,13 @@ enum KernelStatus {
   CANCELLED
 }
 
-"""Added in 26.1.0. Filter for kernel status."""
+"""Added in 26.2.0. Filter for kernel status."""
 input KernelStatusFilter {
   in: [KernelStatus!] = null
   notIn: [KernelStatus!] = null
 }
 
-"""Added in 26.1.0. User and ownership information for a kernel."""
+"""Added in 26.2.0. User and ownership information for a kernel."""
 type KernelUserInfo {
   """The UUID of the user who owns this kernel."""
   userId: UUID
@@ -2714,7 +2714,7 @@ type KernelUserInfo {
 }
 
 """
-Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
@@ -4492,10 +4492,10 @@ type Query {
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
 
-  """Added in 26.1.0. Query a single kernel by ID."""
+  """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2
 
-  """Added in 26.1.0. Query kernels with pagination and filtering."""
+  """Added in 26.2.0. Query kernels with pagination and filtering."""
   kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 
   """Added in 25.19.0. Get a specific route by ID."""
@@ -4901,7 +4901,7 @@ type ResourceInfo {
 }
 
 """
-Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
+Added in 26.2.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
 """
 type ResourceOpts {
   """List of resource option entries."""
@@ -4909,7 +4909,7 @@ type ResourceOpts {
 }
 
 """
-Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
+Added in 26.2.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
 """
 type ResourceOptsEntry {
   """The name of this resource option (e.g., 'shmem')."""
@@ -4920,7 +4920,7 @@ type ResourceOptsEntry {
 }
 
 """
-Added in 26.1.0. A single key-value entry representing a resource option.
+Added in 26.2.0. A single key-value entry representing a resource option.
 """
 input ResourceOptsEntryInput {
   """The name of this resource option (e.g., 'shmem')."""
@@ -4931,7 +4931,7 @@ input ResourceOptsEntryInput {
 }
 
 """
-Added in 26.1.0. A collection of additional resource options for input.
+Added in 26.2.0. A collection of additional resource options for input.
 """
 input ResourceOptsInput {
   """List of resource option entries."""
@@ -5380,7 +5380,7 @@ enum SchedulingStatus {
 }
 
 """
-Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
+Added in 26.2.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
 """
 type ServicePortEntry {
   """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
@@ -5407,7 +5407,7 @@ enum ServicePortProtocols {
 }
 
 """
-Added in 26.1.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
+Added in 26.2.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
 """
 type ServicePorts {
   """List of service port entries."""

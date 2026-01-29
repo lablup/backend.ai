@@ -4801,7 +4801,7 @@ scalar JSONString
   @join__type(graph: GRAPHENE)
 
 """
-Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
+Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
 """
 type KernelClusterInfo
   @join__type(graph: STRAWBERRY)
@@ -4833,7 +4833,7 @@ type KernelConnection
   count: Int
 }
 
-"""Added in 26.1.0. Connection type for paginated kernel results."""
+"""Added in 26.2.0. Connection type for paginated kernel results."""
 type KernelConnectionV2
   @join__type(graph: STRAWBERRY)
 {
@@ -4856,7 +4856,7 @@ type KernelEdge
   cursor: String!
 }
 
-"""Added in 26.1.0. Filter criteria for querying kernels."""
+"""Added in 26.2.0. Filter criteria for querying kernels."""
 input KernelFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -4865,7 +4865,7 @@ input KernelFilter
   sessionId: UUIDFilter = null
 }
 
-"""Added in 26.1.0. Lifecycle and status information for a kernel."""
+"""Added in 26.2.0. Lifecycle and status information for a kernel."""
 type KernelLifecycleInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4888,7 +4888,7 @@ type KernelLifecycleInfo
   startsAt: DateTime
 }
 
-"""Added in 26.1.0. Network configuration for a kernel."""
+"""Added in 26.2.0. Network configuration for a kernel."""
 type KernelNetworkInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4941,7 +4941,7 @@ type KernelNode implements Node
   preopen_ports: [Int]
 }
 
-"""Added in 26.1.0. Ordering specification for kernels."""
+"""Added in 26.2.0. Ordering specification for kernels."""
 input KernelOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -4949,14 +4949,14 @@ input KernelOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.1.0. Fields available for ordering kernels."""
+"""Added in 26.2.0. Fields available for ordering kernels."""
 enum KernelOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.1.0. Resource allocation information for a kernel."""
+"""Added in 26.2.0. Resource allocation information for a kernel."""
 type KernelResourceInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4983,7 +4983,7 @@ type KernelResourceInfo
   resourceOpts: ResourceOpts
 }
 
-"""Added in 26.1.0. Information about the session this kernel belongs to."""
+"""Added in 26.2.0. Information about the session this kernel belongs to."""
 type KernelSessionInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -5000,7 +5000,7 @@ type KernelSessionInfo
   sessionType: SessionTypes!
 }
 
-"""Added in 26.1.0"""
+"""Added in 26.2.0"""
 enum KernelStatus
   @join__type(graph: STRAWBERRY)
 {
@@ -5021,7 +5021,7 @@ enum KernelStatus
   CANCELLED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.1.0. Filter for kernel status."""
+"""Added in 26.2.0. Filter for kernel status."""
 input KernelStatusFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -5029,7 +5029,7 @@ input KernelStatusFilter
   notIn: [KernelStatus!] = null
 }
 
-"""Added in 26.1.0. User and ownership information for a kernel."""
+"""Added in 26.2.0. User and ownership information for a kernel."""
 type KernelUserInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -5047,7 +5047,7 @@ type KernelUserInfo
 }
 
 """
-Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -8622,10 +8622,10 @@ type Query
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.1.0. Query a single kernel by ID."""
+  """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
 
-  """Added in 26.1.0. Query kernels with pagination and filtering."""
+  """Added in 26.2.0. Query kernels with pagination and filtering."""
   kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. Get a specific route by ID."""
@@ -9154,7 +9154,7 @@ input ResourceLimitInput
 }
 
 """
-Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
+Added in 26.2.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
 """
 type ResourceOpts
   @join__type(graph: STRAWBERRY)
@@ -9164,7 +9164,7 @@ type ResourceOpts
 }
 
 """
-Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
+Added in 26.2.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
 """
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
@@ -9177,7 +9177,7 @@ type ResourceOptsEntry
 }
 
 """
-Added in 26.1.0. A single key-value entry representing a resource option.
+Added in 26.2.0. A single key-value entry representing a resource option.
 """
 input ResourceOptsEntryInput
   @join__type(graph: STRAWBERRY)
@@ -9190,7 +9190,7 @@ input ResourceOptsEntryInput
 }
 
 """
-Added in 26.1.0. A collection of additional resource options for input.
+Added in 26.2.0. A collection of additional resource options for input.
 """
 input ResourceOptsInput
   @join__type(graph: STRAWBERRY)
@@ -9893,7 +9893,7 @@ type ServiceConfigNode implements Node
 }
 
 """
-Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
+Added in 26.2.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
 """
 type ServicePortEntry
   @join__type(graph: STRAWBERRY)
@@ -9924,7 +9924,7 @@ enum ServicePortProtocols
 }
 
 """
-Added in 26.1.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
+Added in 26.2.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
 """
 type ServicePorts
   @join__type(graph: STRAWBERRY)
