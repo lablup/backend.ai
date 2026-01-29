@@ -271,7 +271,7 @@ class Image(graphene.ObjectType):
             filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=id,
+                image_id=ImageID(id),
                 image_status=filter_by_statuses,
             )
         )
@@ -729,7 +729,7 @@ class ImageNode(graphene.ObjectType):
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=UUID(image_id),
+                image_id=ImageID(UUID(image_id)),
                 image_status=None,
             )
         )
@@ -771,7 +771,7 @@ class ForgetImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
-            ForgetImageByIdAction(image_id=image_uuid)
+            ForgetImageByIdAction(image_id=ImageID(image_uuid))
         )
 
         return ForgetImageById(
@@ -867,14 +867,14 @@ class PurgeImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.wait_for_complete(
                 UntagImageFromRegistryAction(
-                    image_id=image_uuid,
+                    image_id=ImageID(image_uuid),
                 )
             )
 
@@ -909,7 +909,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
             UntagImageFromRegistryAction(
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 

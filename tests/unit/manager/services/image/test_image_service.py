@@ -119,9 +119,9 @@ class ImageServiceBaseFixtures:
         return uuid.uuid4()
 
     @pytest.fixture
-    def image_id(self) -> uuid.UUID:
+    def image_id(self) -> ImageID:
         """Image ID for test fixtures."""
-        return uuid.uuid4()
+        return ImageID(uuid.uuid4())
 
     @pytest.fixture
     def container_registry_data(self, container_registry_id: uuid.UUID) -> ContainerRegistryData:
@@ -448,7 +448,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         """Forget non-existent image should raise ImageNotFound."""
         mock_image_repository.soft_delete_image_by_id = AsyncMock(side_effect=ImageNotFound())
 
-        action = ForgetImageByIdAction(image_id=uuid.uuid4())
+        action = ForgetImageByIdAction(image_id=ImageID(uuid.uuid4()))
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
@@ -638,7 +638,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         """Purge non-existent image should raise ImageNotFound."""
         mock_image_repository.delete_image_with_aliases = AsyncMock(side_effect=ImageNotFound())
 
-        action = PurgeImageByIdAction(image_id=uuid.uuid4())
+        action = PurgeImageByIdAction(image_id=ImageID(uuid.uuid4()))
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
@@ -810,7 +810,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         mock_image_repository.untag_image_from_registry = AsyncMock(side_effect=ImageNotFound())
 
         action = UntagImageFromRegistryAction(
-            image_id=uuid.uuid4(),
+            image_id=ImageID(uuid.uuid4()),
         )
 
         with with_user(superadmin_user_data):
@@ -965,7 +965,7 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         self,
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
-        image_id: uuid.UUID,
+        image_id: ImageID,
         image_alias_data: ImageAliasData,
     ) -> None:
         """Alias image by ID with valid data should return image alias."""
@@ -1018,7 +1018,7 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
             side_effect=ImageNotFound()
         )
 
-        action = ClearImageCustomResourceLimitByIdAction(image_id=uuid.uuid4())
+        action = ClearImageCustomResourceLimitByIdAction(image_id=ImageID(uuid.uuid4()))
 
         with pytest.raises(ImageNotFound):
             await processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
@@ -1070,7 +1070,7 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
         )
 
         action = SetImageResourceLimitByIdAction(
-            image_id=uuid.uuid4(),
+            image_id=ImageID(uuid.uuid4()),
             resource_limit=ResourceLimitInput(
                 slot_name="cpu",
                 min_value=Decimal("1"),

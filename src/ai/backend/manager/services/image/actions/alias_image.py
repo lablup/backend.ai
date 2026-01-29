@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -29,7 +29,7 @@ class AliasImageAction(ImageAction):
 
 @dataclass
 class AliasImageActionResult(BaseActionResult):
-    image_id: UUID
+    image_id: ImageID
     image_alias: ImageAliasData
 
     @override
@@ -39,11 +39,11 @@ class AliasImageActionResult(BaseActionResult):
 
 @dataclass
 class AliasImageByIdAction(ImageAction):
-    image_id: UUID
+    image_id: ImageID
     alias: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
 
     @override
@@ -54,9 +54,9 @@ class AliasImageByIdAction(ImageAction):
 
 @dataclass
 class AliasImageByIdActionResult(BaseActionResult):
-    image_id: UUID
+    image_id: ImageID
     image_alias: ImageAliasData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
