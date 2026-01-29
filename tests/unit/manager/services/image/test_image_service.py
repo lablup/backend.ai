@@ -61,7 +61,6 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
 )
-from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
     PurgeImagesAction,
@@ -72,7 +71,6 @@ from ai.backend.manager.services.image.actions.search_images import SearchImages
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
 )
-from ai.backend.manager.services.image.actions.unload_image import UnloadImageAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
