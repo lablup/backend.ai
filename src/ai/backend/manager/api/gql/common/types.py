@@ -13,8 +13,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-
-
 # ========== Resource Options Types ==========
 
 

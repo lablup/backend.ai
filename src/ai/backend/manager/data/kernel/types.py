@@ -211,6 +211,7 @@ class ImageInfo:
     registry: Optional[str]
     tag: Optional[str]
     architecture: Optional[str]
+    image_id: UUID | None = None
 
 
 @dataclass
