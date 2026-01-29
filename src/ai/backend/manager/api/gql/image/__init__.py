@@ -6,6 +6,13 @@ See BEP-1038 for detailed specifications.
 """
 
 from .fetcher import fetch_image_by_id, fetch_images
+from .mutations import (
+    alias_image,
+    clear_image_resource_limit,
+    dealias_image,
+    forget_image,
+    purge_image,
+)
 from .resolver import image_v2, images_v2
 from .types import (
     ImageConnectionV2GQL,
@@ -49,7 +56,13 @@ __all__ = [
     # Fetcher functions
     "fetch_images",
     "fetch_image_by_id",
-    # Resolver fields
+    # Resolver fields (Queries)
     "images_v2",
     "image_v2",
+    # Mutation fields
+    "forget_image",
+    "purge_image",
+    "alias_image",
+    "dealias_image",
+    "clear_image_resource_limit",
 ]
