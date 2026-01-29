@@ -9154,7 +9154,7 @@ input ResourceLimitInput
 }
 
 """
-Added in 26.2.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
+Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
 """
 type ResourceOpts
   @join__type(graph: STRAWBERRY)
@@ -9164,7 +9164,7 @@ type ResourceOpts
 }
 
 """
-Added in 26.2.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
+Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
 """
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
@@ -9177,7 +9177,7 @@ type ResourceOptsEntry
 }
 
 """
-Added in 26.2.0. A single key-value entry representing a resource option.
+Added in 26.1.0. A single key-value entry representing a resource option.
 """
 input ResourceOptsEntryInput
   @join__type(graph: STRAWBERRY)
@@ -9190,7 +9190,7 @@ input ResourceOptsEntryInput
 }
 
 """
-Added in 26.2.0. A collection of additional resource options for input.
+Added in 26.1.0. A collection of additional resource options for input.
 """
 input ResourceOptsInput
   @join__type(graph: STRAWBERRY)
