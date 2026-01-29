@@ -298,6 +298,18 @@ class KernelOrders:
             return KernelRow.created_at.asc()
         return KernelRow.created_at.desc()
 
+    @staticmethod
+    def terminated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.terminated_at.asc()
+        return KernelRow.terminated_at.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.status.asc()
+        return KernelRow.status.desc()
+
 
 class UserConditions:
     """Query conditions for users."""

@@ -15,29 +15,29 @@ from ai.backend.common.types import ServicePortProtocols
 @strawberry.type(
     name="ResourceOptsEntry",
     description=(
-        "Added in 26.1.0. A single resource option entry with name and value. "
-        "Resource options provide additional configuration like shared memory settings."
+        "Added in 26.1.0. A single key-value entry representing a resource option. "
+        "Contains additional resource configuration such as shared memory settings."
     ),
 )
 class ResourceOptsEntryGQL:
     """Single resource option entry with name and value."""
 
-    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
-    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
+    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
+    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
 @strawberry.type(
     name="ResourceOpts",
     description=(
-        "Added in 26.1.0. A collection of additional resource options. "
-        "Contains configuration like shared memory and other resource-specific settings."
+        "Added in 26.1.0. A collection of additional resource options for a deployment. "
+        "Contains key-value pairs for resource configuration like shared memory."
     ),
 )
 class ResourceOptsGQL:
-    """Resource options containing multiple entries."""
+    """Resource options containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryGQL] = strawberry.field(
-        description="List of resource option entries."
+        description="List of resource option entries. Each entry contains a key-value pair."
     )
 
     @classmethod
