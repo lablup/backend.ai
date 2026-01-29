@@ -48,7 +48,7 @@ from .types import ImageV2GQL
     Input for forgetting an image by ID.
     """)
 )
-class ForgetImageByIdInputGQL:
+class ForgetImageInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to forget.")
 
 
@@ -59,7 +59,7 @@ class ForgetImageByIdInputGQL:
     Options for purging an image.
     """)
 )
-class PurgeImageByIdOptionsGQL:
+class PurgeImageOptionsGQL:
     remove_from_registry: bool = strawberry.field(
         default=False,
         description="Untag the deleted image from the registry. Only available for HarborV2 registries.",
@@ -73,9 +73,9 @@ class PurgeImageByIdOptionsGQL:
     Input for purging an image by ID.
     """)
 )
-class PurgeImageByIdInputGQL:
+class PurgeImageInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to purge.")
-    options: Optional[PurgeImageByIdOptionsGQL] = strawberry.field(
+    options: Optional[PurgeImageOptionsGQL] = strawberry.field(
         default=None,
         description="Options for purging the image.",
     )
@@ -88,7 +88,7 @@ class PurgeImageByIdInputGQL:
     Input for creating an alias for an image by ID.
     """)
 )
-class AliasImageByIdInputGQL:
+class AliasImageInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to alias.")
     alias: str = strawberry.field(description="The alias to create.")
 
@@ -111,7 +111,7 @@ class DealiasImageInputGQL:
     Input for clearing custom resource limits for an image.
     """)
 )
-class ClearImageResourceLimitByIdInputGQL:
+class ClearImageResourceLimitInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to clear resource limits for.")
 
 
@@ -121,7 +121,7 @@ class ClearImageResourceLimitByIdInputGQL:
 
 
 @strawberry.type(
-    name="ForgetImageByIdResult",
+    name="ForgetImageResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -129,12 +129,12 @@ class ClearImageResourceLimitByIdInputGQL:
     but not removed from the database.
     """),
 )
-class ForgetImageByIdResultGQL:
+class ForgetImageResultGQL:
     image: ImageV2GQL = strawberry.field(description="The forgotten image.")
 
 
 @strawberry.type(
-    name="PurgeImageByIdResult",
+    name="PurgeImageResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -142,19 +142,19 @@ class ForgetImageByIdResultGQL:
     from the database.
     """),
 )
-class PurgeImageByIdResultGQL:
+class PurgeImageResultGQL:
     image: ImageV2GQL = strawberry.field(description="The purged image data.")
 
 
 @strawberry.type(
-    name="AliasImageByIdResult",
+    name="AliasImageResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of creating an alias for an image.
     """),
 )
-class AliasImageByIdResultGQL:
+class AliasImageResultGQL:
     image_id: ID = strawberry.field(description="The ID of the aliased image.")
     alias: str = strawberry.field(description="The created alias.")
 
@@ -173,14 +173,14 @@ class DealiasImageResultGQL:
 
 
 @strawberry.type(
-    name="ClearImageResourceLimitByIdResult",
+    name="ClearImageResourceLimitResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of clearing custom resource limits for an image.
     """),
 )
-class ClearImageResourceLimitByIdResultGQL:
+class ClearImageResourceLimitResultGQL:
     image: ImageV2GQL = strawberry.field(description="The image with cleared resource limits.")
 
 
@@ -202,16 +202,16 @@ class ClearImageResourceLimitByIdResultGQL:
     """)
 )
 async def forget_image(
-    input: ForgetImageByIdInputGQL,
+    input: ForgetImageInputGQL,
     info: Info[StrawberryGQLContext],
-) -> ForgetImageByIdResultGQL:
+) -> ForgetImageResultGQL:
     ctx = info.context
 
     result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
         ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return ForgetImageByIdResultGQL(image=ImageV2GQL.from_data(result.image))
+    return ForgetImageResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -227,9 +227,9 @@ async def forget_image(
     """)
 )
 async def purge_image(
-    input: PurgeImageByIdInputGQL,
+    input: PurgeImageInputGQL,
     info: Info[StrawberryGQLContext],
-) -> PurgeImageByIdResultGQL:
+) -> PurgeImageResultGQL:
     ctx = info.context
     image_uuid = UUID(input.image_id)
 
@@ -242,7 +242,7 @@ async def purge_image(
             UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
         )
 
-    return PurgeImageByIdResultGQL(image=ImageV2GQL.from_data(result.image))
+    return PurgeImageResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -258,9 +258,9 @@ async def purge_image(
     """)
 )
 async def alias_image(
-    input: AliasImageByIdInputGQL,
+    input: AliasImageInputGQL,
     info: Info[StrawberryGQLContext],
-) -> AliasImageByIdResultGQL:
+) -> AliasImageResultGQL:
     ctx = info.context
 
     result = await ctx.processors.image.alias_image_by_id.wait_for_complete(
@@ -270,7 +270,7 @@ async def alias_image(
         )
     )
 
-    return AliasImageByIdResultGQL(
+    return AliasImageResultGQL(
         image_id=ID(str(result.image_id)),
         alias=result.image_alias.alias,
     )
@@ -314,13 +314,13 @@ async def dealias_image(
     """)
 )
 async def clear_image_resource_limit(
-    input: ClearImageResourceLimitByIdInputGQL,
+    input: ClearImageResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
-) -> ClearImageResourceLimitByIdResultGQL:
+) -> ClearImageResourceLimitResultGQL:
     ctx = info.context
 
     result = await ctx.processors.image.clear_image_custom_resource_limit_by_id.wait_for_complete(
         ClearImageCustomResourceLimitByIdAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return ClearImageResourceLimitByIdResultGQL(image=ImageV2GQL.from_data(result.image_data))
+    return ClearImageResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
