@@ -772,10 +772,7 @@ class ForgetImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
-            ForgetImageByIdAction(
-                user_id=ctx.user["uuid"],
-                image_id=image_uuid,
-            )
+            ForgetImageByIdAction(image_id=image_uuid)
         )
 
         return ForgetImageById(
@@ -818,8 +815,6 @@ class ForgetImage(graphene.Mutation):
 
         result = await ctx.processors.image.forget_image.wait_for_complete(
             ForgetImageAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 reference=reference,
                 architecture=arch,
             )
@@ -873,7 +868,6 @@ class PurgeImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(
-                user_id=ctx.user["uuid"],
                 image_id=image_uuid,
             )
         )
@@ -881,8 +875,6 @@ class PurgeImageById(graphene.Mutation):
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.wait_for_complete(
                 UntagImageFromRegistryAction(
-                    user_id=ctx.user["uuid"],
-                    client_role=ctx.user["role"],
                     image_id=image_uuid,
                 )
             )
@@ -918,8 +910,6 @@ class UntagImageFromRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
             UntagImageFromRegistryAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 image_id=image_uuid,
             )
         )

@@ -305,8 +305,6 @@ class TestForgetImage(ImageServiceBaseFixtures):
         mock_image_repository.soft_delete_image = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             reference=image_data.name,
             architecture=image_data.architecture,
         )
@@ -323,15 +321,12 @@ class TestForgetImage(ImageServiceBaseFixtures):
         image_data: ImageData,
     ) -> None:
         """Regular user can forget image they own."""
-        user_id = uuid.uuid4()
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=True)
         mock_image_repository.soft_delete_image = AsyncMock(return_value=deleted_image)
 
         action = ForgetImageAction(
-            user_id=user_id,
-            client_role=UserRole.USER,
             reference=image_data.name,
             architecture=image_data.architecture,
         )
@@ -353,8 +348,6 @@ class TestForgetImage(ImageServiceBaseFixtures):
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
         action = ForgetImageAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.USER,
             reference=image_data.name,
             architecture=image_data.architecture,
         )
@@ -371,8 +364,6 @@ class TestForgetImage(ImageServiceBaseFixtures):
         mock_image_repository.soft_delete_image = AsyncMock(side_effect=ImageNotFound())
 
         action = ForgetImageAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             reference="non-existent-image",
             architecture="x86_64",
         )
@@ -751,8 +742,6 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         mock_image_repository.untag_image_from_registry = AsyncMock(return_value=image_data)
 
         action = UntagImageFromRegistryAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=image_data.id,
         )
 
@@ -768,13 +757,10 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         image_data: ImageData,
     ) -> None:
         """Regular user can untag image they own from registry."""
-        user_id = uuid.uuid4()
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=True)
         mock_image_repository.untag_image_from_registry = AsyncMock(return_value=image_data)
 
         action = UntagImageFromRegistryAction(
-            user_id=user_id,
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
@@ -794,8 +780,6 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
         action = UntagImageFromRegistryAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
@@ -811,8 +795,6 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
         mock_image_repository.untag_image_from_registry = AsyncMock(side_effect=ImageNotFound())
 
         action = UntagImageFromRegistryAction(
-            user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=uuid.uuid4(),
         )
 
