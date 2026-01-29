@@ -6,7 +6,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 from ai.backend.manager.api.gql.data_loader.image.loader import load_images_by_ids
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageData
 
 
 class TestLoadImagesByIds:
@@ -14,7 +14,7 @@ class TestLoadImagesByIds:
 
     @staticmethod
     def create_mock_image(image_id: uuid.UUID) -> MagicMock:
-        return MagicMock(spec=ImageDataWithDetails, id=image_id)
+        return MagicMock(spec=ImageData, id=image_id)
 
     @staticmethod
     def create_mock_processor(images: list[MagicMock]) -> MagicMock:
