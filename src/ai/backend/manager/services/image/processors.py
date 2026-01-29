@@ -128,7 +128,6 @@ class ImageProcessors(AbstractProcessorPackage):
     get_images_by_canonicals: ActionProcessor[
         GetImagesByCanonicalsAction, GetImagesByCanonicalsActionResult
     ]
-    get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
     get_image_installed_agents: ActionProcessor[
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
@@ -144,7 +143,6 @@ class ImageProcessors(AbstractProcessorPackage):
         self.get_images_by_canonicals = ActionProcessor(
             service.get_images_by_canonicals, action_monitors
         )
-        self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
         self.get_image_by_identifier = ActionProcessor(
             service.get_image_by_identifier, action_monitors
         )
@@ -196,5 +194,4 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitByIdAction.spec(),
             RescanImagesByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
-            GetImagesByIdsAction.spec(),
         ]

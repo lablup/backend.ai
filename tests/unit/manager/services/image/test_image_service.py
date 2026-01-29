@@ -22,13 +22,11 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
-    ImageAgentInstallStatus,
     ImageAliasData,
     ImageData,
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
-    ImageWithAgentInstallStatus,
     RescanImagesResult,
     ResourceLimitInput,
 )
