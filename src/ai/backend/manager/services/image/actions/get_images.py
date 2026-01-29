@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import (
     ImageIdentifier,
@@ -15,7 +14,6 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 @dataclass
 class GetImageByIdAction(ImageAction):
     image_id: UUID
-    user_role: UserRole
     image_status: list[ImageStatus] | None
 
     @override
@@ -40,7 +38,6 @@ class GetImageByIdActionResult(BaseActionResult):
 @dataclass
 class GetImageByIdentifierAction(ImageAction):
     image_identifier: ImageIdentifier
-    user_role: UserRole
     image_status: list[ImageStatus] | None
 
     @override
@@ -69,7 +66,6 @@ class GetImagesByCanonicalsAction(ImageAction):
     """
 
     image_canonicals: list[str]
-    user_role: UserRole
     image_status: list[ImageStatus] | None
 
     @override
@@ -95,7 +91,6 @@ class GetImagesByCanonicalsActionResult(BaseActionResult):
 @dataclass
 class GetImagesByIdsAction(ImageAction):
     image_ids: list[UUID]
-    user_role: UserRole
     image_status: list[ImageStatus] | None
 
     @override
