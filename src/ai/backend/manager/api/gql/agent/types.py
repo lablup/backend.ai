@@ -395,7 +395,7 @@ class AgentV2GQL(Node):
         return await info.context.data_loaders.container_count_loader.load(self._agent_id)
 
     @strawberry.field(
-        description="Added in 26.1.0. List of kernels running on this agent with pagination support."
+        description="Added in 26.2.0. List of kernels running on this agent with pagination support."
     )
     async def kernels(
         self,
