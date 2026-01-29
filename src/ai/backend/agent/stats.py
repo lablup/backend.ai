@@ -47,6 +47,7 @@ from .metrics.types import (
     PCT_METRIC_KEY,
     FlattenedDeviceMetric,
     FlattenedKernelMetric,
+    FlattenedProcessMetric,
 )
 from .utils import remove_exponent
 
@@ -414,8 +415,12 @@ class StatContext:
             )
         )
 
-    async def remove_kernel_metric(self, kernel_id: KernelId) -> None:
-        log.info("Removing metrics for kernel {}", kernel_id)
+    async def remove_kernel_metric(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId | None,
+    ) -> None:
+        log.info("Removing metrics for kernel {} (container: {})", kernel_id, container_id)
         known_metrics = self.kernel_metrics.get(kernel_id)
         log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
         if known_metrics is None:
@@ -425,6 +430,7 @@ class StatContext:
         agent_id = self.agent.id
         session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
         # TODO: Remove passing kernel_metrics dict to UtilizationMetricObserver
+        # Removing container metrics
         await self._utilization_metric_observer.lazy_remove_container_metric(
             self.kernel_metrics,
             agent_id=agent_id,
@@ -434,6 +440,42 @@ class StatContext:
             project_id=project_id,
             keys=metric_keys,
         )
+
+        # Removing process metrics associated with the container
+        # Skip if running on macOS
+        if sys.platform == "darwin":
+            return
+
+        if container_id is None:
+            log.warning(
+                "Skipping process metric removal for kernel {}: container_id is None", kernel_id
+            )
+            return
+
+        process_metrics_for_container = self.process_metrics.get(container_id, {})
+        if not process_metrics_for_container:
+            log.warning("No process metrics to remove for container {}", container_id)
+            return
+
+        log.info(
+            "Removing process metrics for container {}: {} PIDs",
+            container_id,
+            len(process_metrics_for_container),
+        )
+        for pid, metrics in process_metrics_for_container.items():
+            metric_keys = list(metrics.keys())
+            # TODO: Remove passing process_metrics dict to UtilizationMetricObserver
+            await self._utilization_metric_observer.lazy_remove_process_metric(
+                self.process_metrics,
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                container_id=container_id,
+                pid=pid,
+                keys=metric_keys,
+            )
 
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         """
@@ -634,6 +676,35 @@ class StatContext:
             )
         )
 
+    def observe_process_metric(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId,
+        pid: PID,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = self.agent.id
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_process_metric(
+            metric=FlattenedProcessMetric(
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                container_id=container_id,
+                pid=pid,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
+
     async def collect_container_stat(
         self,
         container_ids: Sequence[ContainerId],
@@ -814,23 +885,21 @@ class StatContext:
             upper_layer="collect_per_container_process_stat",
         )
         async with self._lock:
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            for kid, info in self.agent.kernel_registry.items():
+                try:
+                    cid = info["container_id"]
+                except KeyError:
+                    log.warning(
+                        "collect_per_container_process_stat(): no container for kernel {}", kid
+                    )
+                else:
+                    kernel_id_map[ContainerId(cid)] = kid
+
             pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
                     active_pids = await self._get_processes(cid, docker)
-                    if cid in self.process_metrics:
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
-                        if unused_pids:
-                            log.debug(
-                                "removing pid_metric for {}: {}",
-                                cid,
-                                ", ".join([str(p) for p in unused_pids]),
-                            )
-                            self.process_metrics[cid] = {
-                                pid_: metric
-                                for pid_, metric in self.process_metrics[cid].items()
-                                if pid_ in active_pids
-                            }
                     for pid_ in active_pids:
                         pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
@@ -865,10 +934,21 @@ class StatContext:
                 for proc_measure in result:
                     metric_key = proc_measure.key
                     # update per-process metric
-                    for pid, measure in proc_measure.per_process.items():
-                        pid = PID(pid)
+                    for raw_pid, measure in proc_measure.per_process.items():
+                        pid = PID(raw_pid)
                         cid = pid_map[pid]
+                        try:
+                            kernel_id = kernel_id_map[cid]
+                        except KeyError:
+                            continue
                         updated_cids.add(cid)
+                        self.observe_process_metric(
+                            kernel_id,
+                            cid,
+                            pid,
+                            metric_key,
+                            measure,
+                        )
                         if cid not in self.process_metrics:
                             self.process_metrics[cid] = {}
                         if pid not in self.process_metrics[cid]:

@@ -5,7 +5,15 @@ from typing import (
     Optional,
 )
 
-from ai.backend.common.types import AgentId, DeviceId, KernelId, MetricKey, SessionId
+from ai.backend.common.types import (
+    PID,
+    AgentId,
+    ContainerId,
+    DeviceId,
+    KernelId,
+    MetricKey,
+    SessionId,
+)
 
 MetricValueFieldKey = NewType("MetricValueFieldKey", str)
 MetricValueFieldPair = tuple[MetricValueFieldKey, str]
@@ -31,5 +39,18 @@ class FlattenedKernelMetric:
 class FlattenedDeviceMetric:
     agent_id: AgentId
     device_id: DeviceId
+    key: MetricKey
+    value_pairs: list[MetricValueFieldPair]
+
+
+@dataclass
+class FlattenedProcessMetric:
+    agent_id: AgentId
+    kernel_id: KernelId
+    session_id: SessionId | None
+    owner_user_id: uuid.UUID | None
+    project_id: uuid.UUID | None
+    container_id: ContainerId
+    pid: PID
     key: MetricKey
     value_pairs: list[MetricValueFieldPair]
