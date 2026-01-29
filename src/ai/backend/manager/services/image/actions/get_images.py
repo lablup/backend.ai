@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
