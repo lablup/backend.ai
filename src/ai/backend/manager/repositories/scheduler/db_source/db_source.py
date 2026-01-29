@@ -308,6 +308,7 @@ class ScheduleDBSource:
             )
             .select_from(SessionRow)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
+            .order_by(SessionRow.created_at.asc())
             .where(
                 sa.and_(
                     SessionRow.scaling_group_name == scaling_group,
