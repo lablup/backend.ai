@@ -47,6 +47,11 @@ from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.image.adapter import ImageCreatorAdapter
+from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
@@ -103,6 +108,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         }
         self.credentials = {}
         self.ssl_verify = ssl_verify
+        self._creator_adapter = ImageCreatorAdapter()
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
@@ -200,24 +206,26 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    image_row = ImageRow(
-                        name=parsed_img.canonical,
-                        project=self.registry_info.project,
-                        registry=parsed_img.registry,
-                        registry_id=self.registry_info.id,
-                        image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                        tag=parsed_img.tag,
-                        architecture=image_identifier.architecture,
-                        is_local=is_local,
-                        config_digest=update["config_digest"],
-                        size_bytes=update["size_bytes"],
-                        type=ImageType.COMPUTE,
-                        accelerators=update.get("accels"),
-                        labels=update["labels"],
-                        status=ImageStatus.ALIVE,
+                    rbac_creator = self._creator_adapter.build(
+                        spec=ImageRowCreatorSpec(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            architecture=image_identifier.architecture,
+                            registry_id=self.registry_info.id,
+                            is_local=is_local,
+                            registry=parsed_img.registry,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            status=ImageStatus.ALIVE,
+                        )
                     )
-                    session.add(image_row)
-                    scanned_images.append(image_row.to_dataclass())
+                    result = await execute_rbac_entity_creator(session, rbac_creator)
+                    scanned_images.append(result.row.to_dataclass())
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
